@@ -17,6 +17,10 @@ globalStyle("*, *::before, *::after", {
   padding: 0,
 });
 
+globalStyle("html", {
+  scrollbarGutter: "stable both-edges",
+});
+
 globalStyle("html, body", {
   minHeight: "100vh",
   backgroundColor: tokens.color.bg,
