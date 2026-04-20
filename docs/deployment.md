@@ -64,3 +64,36 @@ container-orchestrator liveness probes.
   server speaks plain HTTP.
 - **Logs.** Structured via `tracing` — `tracing_subscriber`'s `EnvFilter`
   reads `RUST_LOG`. Default: `info`.
+
+## Cache layout notes
+
+The Dockerfile uses `cargo-chef` and BuildKit cache mounts to keep rebuilds
+small on incremental changes:
+
+| Scenario | What rebuilds | What stays cached |
+|----------|---------------|-------------------|
+| Rust source edit | `cargo build --release` for the top crate only | cargo-chef `cook` dep layer, ui-builder, apt, registry/git mounts |
+| Solid or CSS edit | `bun run build` | `bun install` layer (cache mount warm), entire rust stage |
+| `package.json` / `bun.lock` change | `bun install` (warm via `/root/.bun/install/cache` mount) + `bun run build` | entire rust stage |
+| `Cargo.lock` change | cargo-chef `cook` + final `cargo build` (registry mount warm) | ui-builder, apt |
+
+## sqlx offline mode (for when the DB comes back)
+
+If ronitnath grows a database layer with sqlx queries, build-time query
+verification must not require a live DB. The pattern:
+
+1. Run `cargo sqlx prepare --workspace` locally (or in CI with a DB). This
+   generates `.sqlx/query-*.json` at the repo root.
+2. Commit `.sqlx/` to git.
+3. In the `rust-builder` stage, add:
+   ```dockerfile
+   COPY .sqlx ./.sqlx
+   ENV SQLX_OFFLINE=true
+   ```
+   (Place these before `cargo build`.)
+4. Docker builds then compile without any DB connection. If a `.env` file
+   with `DATABASE_URL` leaks into the build context, it will take precedence
+   over `.sqlx` — `SQLX_OFFLINE=true` is the guard against that.
+
+`SQLX_OFFLINE_DIR` can relocate `.sqlx` when a build system filters it
+(e.g., Nix vendoring); not needed for plain Docker.
