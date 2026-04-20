@@ -1,0 +1,9 @@
+target
+ui/node_modules
+ui/dist
+static/ui
+.git
+.gitignore
+.env
+.env.*
+.DS_Store

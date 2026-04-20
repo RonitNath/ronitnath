@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark" id="html-root">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Ronit Nath — Founder of Isoastra.">
+<title>{% block title %}Ronit Nath{% endblock %}</title>
+<link rel="icon" type="image/png" href="/static/favicon.png">
+<link rel="preload" href="/static/fonts/agency-bold.ttf" as="font" type="font/truetype" crossorigin>
+<script>
+(function(){try{var m=document.cookie.match(/__iso_theme=([^;]+)/);if(m){document.getElementById('html-root').setAttribute('data-theme',m[1]);}}catch(e){}})();
+</script>
+{%- for css in css_files %}
+<link rel="stylesheet" href="{{ css }}">
+{%- endfor %}
+{%- if let Some(src) = script_src %}
+<link rel="modulepreload" href="{{ src }}">
+{%- endif %}
+</head>
+<body>
+<div class="starfield" aria-hidden="true">
+<div class="stars-dim"></div>
+<div class="stars-med"></div>
+<div class="stars-bright"></div>
+</div>
+<div class="nebula" aria-hidden="true"></div>
+<header class="site-nav">
+<div class="nav-inner">
+<div class="nav-links">
+<a href="/" class="nav-link">Home</a>
+</div>
+<div class="nav-mode" data-island="mode-toggle"></div>
+</div>
+</header>
+<main class="site-main">
+{% block content %}{% endblock %}
+</main>
+{%- if let Some(src) = script_src %}
+<script type="module" src="{{ src }}"></script>
+{%- endif %}
+</body>
+</html>
