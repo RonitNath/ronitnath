@@ -14,10 +14,10 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends \
     pkg-config libssl-dev ca-certificates \
     && rm -rf /var/lib/apt/lists/*
-COPY Cargo.toml rust-toolchain.toml clippy.toml ./
+COPY Cargo.toml Cargo.lock rust-toolchain.toml clippy.toml ./
 COPY src ./src
 COPY templates ./templates
-RUN cargo build --release --locked || cargo build --release
+RUN cargo build --release --locked
 
 # ---------- Runtime ----------
 FROM debian:bookworm-slim AS runtime
@@ -28,6 +28,7 @@ WORKDIR /app
 COPY --from=rust-builder /app/target/release/ronitnath /usr/local/bin/ronitnath
 COPY templates ./templates
 COPY static ./static
+COPY config.toml ./config.toml
 COPY --from=ui-builder /app/ui/dist ./ui/dist
 ENV HOST=0.0.0.0 PORT=8080
 EXPOSE 8080

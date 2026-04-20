@@ -3,11 +3,11 @@ import * as styles from "@/styles/mode-toggle.css";
 
 type Theme = "dark" | "light";
 
-const COOKIE = "__iso_theme";
+const COOKIE = "__rn_theme";
 const ONE_YEAR = 60 * 60 * 24 * 365;
 
 function readTheme(): Theme {
-  const match = document.cookie.match(/__iso_theme=([^;]+)/);
+  const match = document.cookie.match(/__rn_theme=([^;]+)/);
   if (match?.[1] === "light") return "light";
   return (document.documentElement.dataset["theme"] as Theme | undefined) ?? "dark";
 }

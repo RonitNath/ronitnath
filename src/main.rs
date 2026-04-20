@@ -1,4 +1,5 @@
 mod assets;
+mod config;
 mod render;
 mod routes;
 
@@ -10,9 +11,13 @@ use tower_http::services::ServeDir;
 use tower_http::trace::TraceLayer;
 use tracing_subscriber::EnvFilter;
 
+use crate::config::Config;
+
 #[derive(Clone)]
 pub(crate) struct AppState {
     pub(crate) manifest: assets::AssetManifest,
+    #[allow(dead_code)]
+    pub(crate) domain: String,
 }
 
 #[tokio::main]
@@ -23,9 +28,13 @@ async fn main() -> anyhow::Result<()> {
         )
         .init();
 
+    let cfg = Config::load()?;
     let dev_mode = std::env::var("RONITNATH_DEV").is_ok_and(|v| v == "1" || v == "true");
     let manifest = assets::AssetManifest::load("ui/dist/.vite/manifest.json", dev_mode);
-    let state = AppState { manifest };
+    let state = AppState {
+        manifest,
+        domain: cfg.domain.clone(),
+    };
 
     let app = Router::new()
         .merge(routes::router())
@@ -34,13 +43,11 @@ async fn main() -> anyhow::Result<()> {
         .with_state(state)
         .layer(TraceLayer::new_for_http());
 
-    let host = std::env::var("HOST").unwrap_or_else(|_| "0.0.0.0".to_owned());
-    let port = std::env::var("PORT").unwrap_or_else(|_| "8080".to_owned());
-    let addr: SocketAddr = format!("{host}:{port}")
+    let addr: SocketAddr = format!("{}:{}", cfg.host, cfg.port)
         .parse()
-        .with_context(|| format!("invalid bind address {host}:{port}"))?;
+        .with_context(|| format!("invalid bind address {}:{}", cfg.host, cfg.port))?;
 
-    tracing::info!(%addr, "listening");
+    tracing::info!(%addr, domain = %cfg.domain, "listening");
     let listener = tokio::net::TcpListener::bind(&addr).await?;
     axum::serve(listener, app)
         .with_graceful_shutdown(shutdown_signal())
