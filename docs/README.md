@@ -1,11 +1,11 @@
 # ronitnath
 
 Public site for **ronitnath.com** — personal landing page over a starfield
-background. One route, one card: name, tagline, and four links (GitHub,
-Instagram, LinkedIn, Email).
+background plus a lightweight `/events` placeholder. The home route renders one
+card: name, tagline, and four links (GitHub, Instagram, LinkedIn, Email).
 
-This repo is intentionally minimal. It contains only the public content
-and the canonical frontend shape. No calendar, no database, no auth.
+This repo is intentionally minimal. It contains only public content and the
+canonical frontend shape. No calendar, no database, no auth.
 
 ## Stack
 
@@ -29,6 +29,10 @@ GET /
   └─ browser loads site.ts
        └─ hydrateIslands(registry) mounts <ModeToggle/> into each
           element with a `data-island` attribute matching a registry key.
+
+GET /events
+  └─ axum route → render::render_events(&state)
+       └─ askama renders templates/events.html (extends _base.html)
 ```
 
 Vite's manifest plumbs hashed filenames through the server at startup so
@@ -48,6 +52,7 @@ templates/
   _base.html      # <html> shell, starfield + nebula layers, inline
                   # theme-cookie hydrator, body block, manifest links/scripts
   home.html       # home-card: name, tagline, 4 social links
+  events.html     # simple events placeholder
 
 ui/
   entries/site.ts             # sole vite entry → compiled to ui/dist/assets/
@@ -57,7 +62,11 @@ ui/
     mode-toggle.tsx
   src/styles/
     theme.css.ts              # OKLCH dark + light palettes; Agency Bold display
-    global.css.ts             # nav / starfield / nebula / home-card
+    global.css.ts             # style entrypoint importing split files
+    base.css.ts               # font, reset, base document styles
+    atmosphere.css.ts         # starfield and nebula background
+    layout.css.ts             # nav and main layout
+    pages.css.ts              # home and events page styles
     mode-toggle.css.ts
 
 static/
@@ -75,14 +84,14 @@ Dockerfile
 - **Theme cookie.** `__rn_theme`. Read by the inline script in
   `_base.html` before paint to prevent FOUC. Written by the `ModeToggle`
   island on click.
-- **Starfield is CSS-only.** Three stacked divs (`.stars-dim`,
-  `.stars-med`, `.stars-bright`) backed by layered radial-gradient
-  backgrounds with slow twinkle keyframes. No per-star JS.
+- **Atmosphere is CSS-only.** Three stacked starfield divs (`.stars-dim`,
+  `.stars-med`, `.stars-bright`) plus the nebula layer are backed by layered
+  radial-gradient backgrounds with slow twinkle keyframes. No per-star JS.
 - **Font.** `Agency Bold` for the display heading, preloaded from
   `/static/fonts/agency-bold.ttf` in the base template head. Body text
   uses the system UI stack.
 - **No calendar, no htmx.** The previous version wired a `/calendar` route
-  backed by sqlx — intentionally dropped here.
+  backed by sqlx. `/events` is currently static public content.
 
 ## See also
 
