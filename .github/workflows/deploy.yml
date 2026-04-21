@@ -21,7 +21,7 @@ jobs:
     outputs:
       tag: ${{ steps.meta.outputs.tag }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - id: meta
         run: echo "tag=${GITHUB_SHA::12}" >> "$GITHUB_OUTPUT"
@@ -55,7 +55,7 @@ jobs:
       contents: read
       packages: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Login to GHCR
         run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
