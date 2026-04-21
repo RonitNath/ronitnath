@@ -27,20 +27,26 @@ jobs:
         run: echo "tag=${GITHUB_SHA::12}" >> "$GITHUB_OUTPUT"
 
       - name: Login to GHCR
-        run: echo "${{ secrets.GITHUB_TOKEN }}" | podman login ghcr.io -u "${{ github.actor }}" --password-stdin
+        env:
+          CONTAINER_HOST: unix:///run/podman/podman.sock
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | podman --remote login ghcr.io -u "${{ github.actor }}" --password-stdin
 
       - name: Build image
+        env:
+          CONTAINER_HOST: unix:///run/podman/podman.sock
         run: |
-          podman build \
+          podman --remote build \
             -f docker/ronitnath.Dockerfile \
             -t "$IMAGE:${{ steps.meta.outputs.tag }}" \
             -t "$IMAGE:latest" \
             .
 
       - name: Push image
+        env:
+          CONTAINER_HOST: unix:///run/podman/podman.sock
         run: |
-          podman push "$IMAGE:${{ steps.meta.outputs.tag }}"
-          podman push "$IMAGE:latest"
+          podman --remote push "$IMAGE:${{ steps.meta.outputs.tag }}"
+          podman --remote push "$IMAGE:latest"
 
   deploy:
     runs-on: [self-hosted, nexus-deploy]
