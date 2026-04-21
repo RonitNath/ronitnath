@@ -1,0 +1,11 @@
+services:
+  ronitnath:
+    image: ghcr.io/ronitnath/ronitnath:latest
+    container_name: ronitnath
+    restart: unless-stopped
+    ports:
+      - "18080:8080"
+    environment:
+      HOST: 0.0.0.0
+      PORT: "8080"
+    pull_policy: always
