@@ -1,3 +1,5 @@
+name: ronitnath
+
 services:
   ronitnath:
     image: ghcr.io/ronitnath/ronitnath:latest
