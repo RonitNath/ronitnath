@@ -30,6 +30,11 @@ HOST=127.0.0.1 PORT=3000 cargo run
 `/ui-dev/<entry>.js` if the entry isn't in the manifest — useful once a
 vite dev-server flow is wired.
 
+For local admin access, visit `/enter`. Debug builds automatically route this
+through a dev-admin cookie when the Isoastra client secret is still the
+placeholder `dev-only-change-me`; release builds keep auth disabled and return
+`503` until real SSO credentials are configured.
+
 ## Edit loop
 
 **UI changes** (`ui/src/**`, `ui/entries/**`):

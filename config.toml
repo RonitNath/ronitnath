@@ -1,3 +1,21 @@
 host = "0.0.0.0"
 port = 8080
 domain = "ronitnath.com"
+database_url = "sqlite://./data/ronitnath.db"
+public_base_url = "https://ronitnath.com"
+token_secret = "dev-only-change-me-dev-only-change-me"
+
+[isoastra]
+issuer = "https://isoastra.com"
+client_id = "ronitnath"
+client_secret = "dev-only-change-me"
+redirect_uri = "https://ronitnath.com/auth/callback"
+
+[session]
+cookie_name = "rn_sid"
+cookie_secure = true
+expiry_hours = 24
+
+[admins]
+identity_ids = []
+emails = []

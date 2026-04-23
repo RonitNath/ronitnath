@@ -1,0 +1,37 @@
+{% extends "_base.html" %}
+{% block title %}RSVP — {{ event_title }} | Ronit Nath{% endblock %}
+{% block content %}
+<section class="rsvp-page" aria-labelledby="rsvp-title">
+<div class="rsvp-content">
+<p class="events-kicker">RSVP</p>
+<h1 id="rsvp-title" class="rsvp-title">{{ event_title }}</h1>
+<p class="rsvp-greeting">Hi {{ invitee_name }} — let us know if you can make it.</p>
+<div class="event-meta">
+<div class="event-meta-row">
+<span class="event-meta-label">When</span>
+<span class="event-meta-value">{{ starts_at }}</span>
+</div>
+{%- if let Some(loc) = location_name.as_ref() %}
+<div class="event-meta-row">
+<span class="event-meta-label">Where</span>
+<span class="event-meta-value">{{ loc }}</span>
+</div>
+{%- endif %}
+</div>
+{%- if waitlisted %}
+<div class="events-banner" role="status">
+<span class="events-banner-label">Waitlist</span>
+<span class="events-banner-text">You're on the waitlist. Exact location details will appear after approval.</span>
+</div>
+{%- endif %}
+{%- if rsvp_closed %}
+<div class="events-banner" role="status">
+<span class="events-banner-label">RSVP closed</span>
+<span class="events-banner-text">The host has closed edits for this event.</span>
+</div>
+{%- else %}
+<div class="rsvp-form-mount" data-island="rsvp-form" data-bootstrap="{{ bootstrap }}"></div>
+{%- endif %}
+</div>
+</section>
+{% endblock %}

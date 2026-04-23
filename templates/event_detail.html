@@ -1,0 +1,91 @@
+{% extends "_base.html" %}
+{% block title %}{{ title }} | Ronit Nath{% endblock %}
+{% block content %}
+<section class="event-page" aria-labelledby="event-title">
+<div class="event-content">
+<p class="events-kicker">{% if is_admin %}Managing event{% else %}Event{% endif %}</p>
+<h1 id="event-title" class="event-title">{{ title }}</h1>
+{%- if let Some(sub) = subtitle.as_ref() %}
+<p class="event-subtitle">{{ sub }}</p>
+{%- endif %}
+<div class="event-meta">
+<div class="event-meta-row">
+<span class="event-meta-label">When</span>
+<span class="event-meta-value">{{ when }}</span>
+</div>
+{%- if let Some(name) = location_name.as_ref() %}
+<div class="event-meta-row">
+<span class="event-meta-label">Where</span>
+<span class="event-meta-value">
+{{ name }}
+{%- if let Some(addr) = address.as_ref() %} · {{ addr }}{%- endif %}
+{%- if let Some(url) = map_url.as_ref() %} · <a href="{{ url }}" rel="noopener noreferrer" target="_blank">map</a>{%- endif %}
+</span>
+</div>
+{%- endif %}
+{%- if display_capacity %}
+<div class="event-meta-row">
+<span class="event-meta-label">Going</span>
+<span class="event-meta-value">
+{{ public_confirmed }}
+{%- if let Some(c) = cap %} / {{ c }}{%- endif %}
+</span>
+</div>
+{%- endif %}
+</div>
+{%- if let Some(summary) = summary.as_ref() %}
+<p class="event-summary">{{ summary }}</p>
+{%- endif %}
+{%- if !details_markdown.is_empty() %}
+<div class="event-details">
+<pre class="event-details-pre">{{ details_markdown }}</pre>
+</div>
+{%- endif %}
+{%- if !schedule.is_empty() %}
+<section class="event-schedule">
+<h2 class="event-section-heading">Schedule</h2>
+<ul class="event-schedule-list">
+{%- for item in schedule %}
+<li class="event-schedule-item">
+<div class="event-schedule-head">
+<strong>{{ item.title }}</strong>
+{%- if let Some(when) = item.when.as_ref() %}
+<span class="event-schedule-time">
+{{ when }}
+</span>
+{%- endif %}
+</div>
+{%- if let Some(det) = item.details.as_ref() %}
+<p class="event-schedule-details">{{ det }}</p>
+{%- endif %}
+{%- if let Some(loc) = item.location_name.as_ref() %}
+<p class="event-schedule-loc">{{ loc }}</p>
+{%- endif %}
+</li>
+{%- endfor %}
+</ul>
+</section>
+{%- endif %}
+<div class="event-actions">
+<a class="btn btn-ghost" href="/events/{{ event_ref }}/ics">Add to calendar</a>
+{%- if signup_open_public %}
+<a class="btn btn-primary" href="/events/{{ event_ref }}/signup" data-test="signup-link">Sign up</a>
+{%- endif %}
+</div>
+{%- if is_admin %}
+{%- if let Some(boot) = admin_bootstrap.as_ref() %}
+<section class="admin-panel" data-island="admin-event-controls" data-bootstrap="{{ boot }}">
+<h2 class="event-section-heading">Admin controls</h2>
+<p class="admin-hint">Status: <strong data-test="event-status">{{ status }}</strong> · Visibility: <strong data-test="event-visibility">{{ visibility }}</strong> · Signup: <strong data-test="event-signup-mode">{{ signup_mode }}</strong></p>
+<div class="admin-grid">
+<div class="admin-card" data-slot="status-controls"></div>
+<div class="admin-card" data-slot="capacity"></div>
+<div class="admin-card admin-card-wide" data-slot="invitees"></div>
+<div class="admin-card admin-card-wide" data-slot="signup-token"></div>
+</div>
+</section>
+{%- endif %}
+{%- endif %}
+</div>
+</section>
+{% endblock %}

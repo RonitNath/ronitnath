@@ -10,4 +10,10 @@ services:
     environment:
       HOST: 0.0.0.0
       PORT: "8080"
+      DATABASE_URL: sqlite:///app/data/ronitnath.db
+    volumes:
+      - ronitnath-data:/app/data
     pull_policy: always
+
+volumes:
+  ronitnath-data:

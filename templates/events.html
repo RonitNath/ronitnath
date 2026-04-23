@@ -3,12 +3,60 @@
 {% block content %}
 <section class="events-page" aria-labelledby="events-title">
 <div class="events-content">
-<p class="events-kicker">Invitations</p>
+<div class="events-header">
+<div>
+<p class="events-kicker">{% if is_admin %}Admin{% else %}Invitations{% endif %}</p>
 <h1 id="events-title" class="events-title">Events</h1>
-<div class="events-banner" role="status">
-<span class="events-banner-label">Coming soon</span>
-<span class="events-banner-text">This page will host invitations and details for events I organize.</span>
 </div>
+{%- if is_admin %}
+{%- if let Some(boot) = admin_bootstrap.as_ref() %}
+<div class="admin-toolbar" data-island="admin-events-list" data-bootstrap="{{ boot }}">
+<button type="button" class="btn btn-primary" data-action="create">New event</button>
+<a href="/dev/logout" class="btn btn-ghost" data-test="logout-link">Log out</a>
+</div>
+{%- endif %}
+{%- endif %}
+</div>
+{%- if events.is_empty() %}
+<div class="events-banner" role="status">
+<span class="events-banner-label">Nothing here yet</span>
+<span class="events-banner-text">
+{%- if is_admin %}Create the first event with the button above.
+{%- else %}Check back soon — invitations will appear here when published.
+{%- endif %}
+</span>
+</div>
+{%- else %}
+<ul class="events-list">
+{%- for event in events %}
+<li class="event-card">
+<a class="event-card-link" href="/events/{{ event.ref_ }}">
+<div class="event-card-head">
+<h2 class="event-card-title">{{ event.title }}</h2>
+{%- if is_admin %}
+<span class="event-card-status" data-status="{{ event.status }}">{{ event.status }}</span>
+{%- endif %}
+</div>
+{%- if let Some(subtitle) = event.subtitle.as_ref() %}
+<p class="event-card-subtitle">{{ subtitle }}</p>
+{%- endif %}
+<div class="event-card-meta">
+<span class="event-card-date">{{ event.starts_at }}</span>
+{%- if let Some(loc) = event.location_name.as_ref() %}
+<span class="event-card-loc">{{ loc }}</span>
+{%- endif %}
+{%- if is_admin %}
+<span class="event-card-vis">{{ event.visibility }} · {{ event.signup_mode }}</span>
+{%- endif %}
+</div>
+{%- if let Some(summary) = event.summary.as_ref() %}
+<p class="event-card-summary">{{ summary }}</p>
+{%- endif %}
+</a>
+</li>
+{%- endfor %}
+</ul>
+{%- endif %}
 </div>
 </section>
 {% endblock %}

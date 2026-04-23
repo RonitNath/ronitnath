@@ -22,7 +22,8 @@ Run:
 docker run --rm -p 8080:8080 ronitnath:latest
 ```
 
-Exposes port `8080`. Bind-mount or edit `config.toml` to change defaults.
+Exposes port `8080`. Bind-mount `/app/data` if event state should survive
+container replacement.
 
 ## Configuration
 
@@ -32,6 +33,8 @@ Exposes port `8080`. Bind-mount or edit `config.toml` to change defaults.
 host = "0.0.0.0"
 port = 8080
 domain = "ronitnath.com"
+database_url = "sqlite://./data/ronitnath.db"
+public_base_url = "https://ronitnath.com"
 ```
 
 Environment variables override, in this order of precedence:
@@ -39,9 +42,14 @@ Environment variables override, in this order of precedence:
 - `HOST` — bind address
 - `PORT` — bind port (must parse as `u16`)
 - `DOMAIN` — canonical hostname, surfaced to logs
+- `DATABASE_URL` — SQLite URL; live compose uses
+  `sqlite:///app/data/ronitnath.db`
+- `PUBLIC_BASE_URL` — canonical URL used when generating RSVP/signup links
+- `EVENT_TOKEN_SECRET` — HMAC/session secret
+- `ISOASTRA_*`, `SESSION_*`, `ADMIN_*` — auth and admin allowlist settings
 
-All three are optional. If `config.toml` is missing, `Config::default()`
-values apply.
+All are optional. If `config.toml` is missing, `Config::default()` values
+apply.
 
 ## Health check
 
@@ -50,8 +58,9 @@ container-orchestrator liveness probes.
 
 ## Operational notes
 
-- **No persistent state.** No database, no filesystem writes, no secrets.
-  Safe to run multiple replicas and redeploy freely.
+- **Persistent state.** Events and sessions are SQLite-backed. The live
+  compose file mounts `ronitnath-data` at `/app/data`; do not bake local
+  `data/` into images or commits.
 - **Template & asset baking.** Askama templates compile into the binary at
   build time, so runtime has no template filesystem dependency — but
   `ui/dist/` and `static/` are read from disk to serve hashed assets and

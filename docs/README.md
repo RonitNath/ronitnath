@@ -1,11 +1,11 @@
 # ronitnath
 
 Public site for **ronitnath.com** — personal landing page over a starfield
-background plus a lightweight `/events` placeholder. The home route renders one
-card: name, tagline, and four links (GitHub, Instagram, LinkedIn, Email).
+background plus a private-events RSVP system. The home route renders one card:
+name, tagline, and four links (GitHub, Instagram, LinkedIn, Email).
 
-This repo is intentionally minimal. It contains only public content and the
-canonical frontend shape. No calendar, no database, no auth.
+The events surface uses SQLite-backed admin tooling, invite links, self-signup
+waitlists, RSVP forms, and location privacy controls.
 
 ## Stack
 
@@ -45,6 +45,8 @@ src/
   main.rs         # tokio runtime, config load, router wiring
   config.rs       # host / port / domain from config.toml + env overrides
   assets.rs       # vite manifest parser → entry + css lookup
+  db.rs           # sqlite pool + migrations
+  events/         # event models, storage, service logic, tokens, QR helpers
   render.rs       # HomeTemplate + render helpers
   routes.rs       # axum Router + per-path handlers
 
@@ -52,14 +54,21 @@ templates/
   _base.html      # <html> shell, starfield + nebula layers, inline
                   # theme-cookie hydrator, body block, manifest links/scripts
   home.html       # home-card: name, tagline, 4 social links
-  events.html     # simple events placeholder
+  events.html
+  event_detail.html
+  event_rsvp.html
+  event_signup.html
 
 ui/
   entries/site.ts             # sole vite entry → compiled to ui/dist/assets/
   src/islands/
     hydrate.ts                # scans for [data-island], mounts Solid components
-    registry.ts               # { "mode-toggle": ModeToggle }
+    registry.ts               # Solid island registry
     mode-toggle.tsx
+    admin-event-controls.tsx
+    admin-events-list.tsx
+    rsvp-form.tsx
+    signup-form.tsx
   src/styles/
     theme.css.ts              # OKLCH dark + light palettes; Agency Bold display
     global.css.ts             # style entrypoint importing split files
@@ -90,8 +99,8 @@ Dockerfile
 - **Font.** `Agency Bold` for the display heading, preloaded from
   `/static/fonts/agency-bold.ttf` in the base template head. Body text
   uses the system UI stack.
-- **No calendar, no htmx.** The previous version wired a `/calendar` route
-  backed by sqlx. `/events` is currently static public content.
+- **Events are data-backed.** SQLite migrations live in `migrations/`.
+  Local runtime state is written under `data/`, which is ignored by git.
 
 ## See also
 

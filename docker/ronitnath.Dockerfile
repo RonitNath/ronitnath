@@ -31,6 +31,7 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked \
 COPY Cargo.toml Cargo.lock rust-toolchain.toml clippy.toml ./
 COPY src ./src
 COPY templates ./templates
+COPY migrations ./migrations
 RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked \
     --mount=type=cache,target=/usr/local/cargo/git,sharing=locked \
     cargo build --release --locked --bin ronitnath
@@ -41,6 +42,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
+RUN mkdir -p /app/data && chown 1000:1000 /app/data
 COPY --from=rust-builder /app/target/release/ronitnath /usr/local/bin/ronitnath
 COPY templates ./templates
 COPY static ./static

@@ -1,0 +1,42 @@
+{% extends "_base.html" %}
+{% block title %}Sign up — {{ event_title }} | Ronit Nath{% endblock %}
+{% block content %}
+<section class="rsvp-page" aria-labelledby="signup-title">
+<div class="rsvp-content">
+<p class="events-kicker">Sign up</p>
+<h1 id="signup-title" class="rsvp-title">{{ event_title }}</h1>
+<div class="event-meta">
+<div class="event-meta-row">
+<span class="event-meta-label">When</span>
+<span class="event-meta-value">{{ starts_at }}</span>
+</div>
+{%- if let Some(loc) = location_name.as_ref() %}
+<div class="event-meta-row">
+<span class="event-meta-label">Where</span>
+<span class="event-meta-value">{{ loc }}</span>
+</div>
+{%- endif %}
+<div class="event-meta-row">
+<span class="event-meta-label">Going</span>
+<span class="event-meta-value" data-test="signup-capacity">
+{{ public_confirmed }}
+{%- if let Some(c) = cap %} / {{ c }}{%- endif %}
+</span>
+</div>
+</div>
+{%- if signup_allowed %}
+<div class="rsvp-form-mount" data-island="signup-form" data-bootstrap="{{ bootstrap }}"></div>
+{%- else if capacity_reached %}
+<div class="events-banner" role="status">
+<span class="events-banner-label">Full</span>
+<span class="events-banner-text">Signups are closed — this event has reached capacity.</span>
+</div>
+{%- else %}
+<div class="events-banner" role="status">
+<span class="events-banner-label">Invite only</span>
+<span class="events-banner-text">This event isn't open for self signup.</span>
+</div>
+{%- endif %}
+</div>
+</section>
+{% endblock %}

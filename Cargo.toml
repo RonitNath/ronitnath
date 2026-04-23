@@ -12,13 +12,36 @@ path = "src/main.rs"
 anyhow = "1"
 askama = "0.15"
 axum = { version = "0.8", features = ["macros"] }
+base64 = "0.22"
+chrono = { version = "0.4", features = ["serde"] }
+hmac = "0.12"
+jsonwebtoken = "9"
+qrcode = "0.14"
+rand = "0.8"
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+sha2 = "0.10"
+sqlx = { version = "0.8", features = ["runtime-tokio-rustls", "sqlite", "chrono", "migrate"] }
+subtle = "2"
+thiserror = "2"
+time = "0.3"
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "signal", "net"] }
 toml = "0.8"
-tower-http = { version = "0.6", features = ["fs", "trace", "compression-gzip"] }
+tower_governor = "0.8"
+tower-http = { version = "0.6", features = ["fs", "trace", "compression-gzip", "limit", "set-header"] }
+tower-sessions = { version = "0.14", features = ["private"] }
+tower-sessions-sqlx-store = { version = "0.15", features = ["sqlite"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
+ulid = { version = "1", features = ["serde"] }
+urlencoding = "2"
+uuid = { version = "1", features = ["v4", "serde"] }
+
+[dev-dependencies]
+http-body-util = "0.1"
+tempfile = "3"
+tower = "0.5"
 
 [lints.clippy]
 pedantic = { level = "warn", priority = -1 }

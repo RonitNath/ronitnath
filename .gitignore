@@ -1,6 +1,11 @@
 /target
+/data
 /ui/node_modules
 /ui/dist
+/ui/test-results
+/ui/tests/e2e/.tmp
+/ui/tests/e2e/screenshots
+/ui/playwright-report
 /static/ui
 .env
 .env.*
