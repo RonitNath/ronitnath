@@ -2,7 +2,7 @@ name: ronitnath
 
 services:
   ronitnath:
-    image: ghcr.io/ronitnath/ronitnath:latest
+    image: 127.0.0.1:5000/ronitnath/ronitnath:latest
     container_name: ronitnath
     restart: unless-stopped
     ports:

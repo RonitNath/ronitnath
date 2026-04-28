@@ -10,14 +10,14 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  IMAGE: ghcr.io/ronitnath/ronitnath
+  LOCAL_IMAGE: 100.88.31.199:5000/ronitnath/ronitnath
+  GHCR_IMAGE: ghcr.io/ronitnath/ronitnath
 
 jobs:
   build:
     runs-on: [self-hosted, delenda]
     permissions:
       contents: read
-      packages: write
     outputs:
       tag: ${{ steps.meta.outputs.tag }}
     steps:
@@ -26,39 +26,32 @@ jobs:
       - id: meta
         run: echo "tag=${GITHUB_SHA::12}" >> "$GITHUB_OUTPUT"
 
-      - name: Login to GHCR
-        env:
-          CONTAINER_HOST: unix:///run/podman/podman.sock
-        run: echo "${{ secrets.GITHUB_TOKEN }}" | podman --remote login ghcr.io -u "${{ github.actor }}" --password-stdin
-
       - name: Build image
         env:
           CONTAINER_HOST: unix:///run/podman/podman.sock
         run: |
           podman --remote build \
             -f docker/ronitnath.Dockerfile \
-            -t "$IMAGE:${{ steps.meta.outputs.tag }}" \
-            -t "$IMAGE:latest" \
+            -t "$LOCAL_IMAGE:${{ steps.meta.outputs.tag }}" \
+            -t "$LOCAL_IMAGE:latest" \
+            -t "$GHCR_IMAGE:${{ steps.meta.outputs.tag }}" \
+            -t "$GHCR_IMAGE:latest" \
             .
 
-      - name: Push image
+      - name: Push to local registry (deploy critical path)
         env:
           CONTAINER_HOST: unix:///run/podman/podman.sock
         run: |
-          podman --remote push "$IMAGE:${{ steps.meta.outputs.tag }}"
-          podman --remote push "$IMAGE:latest"
+          podman --remote push --tls-verify=false "$LOCAL_IMAGE:${{ steps.meta.outputs.tag }}"
+          podman --remote push --tls-verify=false "$LOCAL_IMAGE:latest"
 
   deploy:
     runs-on: [self-hosted, nexus-deploy]
     needs: build
     permissions:
       contents: read
-      packages: read
     steps:
       - uses: actions/checkout@v6
-
-      - name: Login to GHCR
-        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
 
       - name: Drop legacy container if unmanaged
         run: |
@@ -88,3 +81,22 @@ jobs:
           echo "health check failed"
           docker logs --tail 100 ronitnath || true
           exit 1
+
+  ghcr-backup:
+    runs-on: [self-hosted, delenda]
+    needs: build
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Login to GHCR
+        env:
+          CONTAINER_HOST: unix:///run/podman/podman.sock
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | podman --remote login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+      - name: Push to GHCR
+        env:
+          CONTAINER_HOST: unix:///run/podman/podman.sock
+        run: |
+          podman --remote push "$GHCR_IMAGE:${{ needs.build.outputs.tag }}"
+          podman --remote push "$GHCR_IMAGE:latest"
