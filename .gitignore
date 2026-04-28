@@ -11,3 +11,7 @@
 .env.*
 !.env.example
 .DS_Store
+
+# Local-only agent + tooling artifacts
+.claude/worktrees/
+.playwright-mcp/
