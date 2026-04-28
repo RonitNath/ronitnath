@@ -61,7 +61,7 @@ impl Default for Config {
 impl Default for IsoastraConfig {
     fn default() -> Self {
         Self {
-            issuer: "https://isoastra.com".to_owned(),
+            issuer: "https://auth.isoastra.com".to_owned(),
             client_id: "ronitnath".to_owned(),
             client_secret: DEFAULT_ISOASTRA_CLIENT_SECRET.to_owned(),
             redirect_uri: "https://ronitnath.com/auth/callback".to_owned(),

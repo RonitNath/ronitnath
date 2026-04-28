@@ -44,10 +44,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /app
 RUN mkdir -p /app/data && chown 1000:1000 /app/data
 COPY --from=rust-builder /app/target/release/ronitnath /usr/local/bin/ronitnath
-COPY templates ./templates
-COPY static ./static
-COPY config.toml ./config.toml
-COPY --from=ui-builder /app/ui/dist ./ui/dist
+COPY --chmod=0644 templates ./templates
+COPY --chmod=0644 static ./static
+COPY --chmod=0644 config.toml ./config.toml
+COPY --from=ui-builder --chmod=0644 /app/ui/dist ./ui/dist
+RUN chmod -R a+rX /app/templates /app/static /app/ui
 ENV HOST=0.0.0.0 PORT=8080
 EXPOSE 8080
 USER 1000:1000
