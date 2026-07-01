@@ -1,0 +1,11 @@
+{% extends "_layout.html" %}
+
+{% block title %}{{ status }} · stage_1{% endblock %}
+
+{% block content %}
+<section class="hero">
+    <h1>{{ status }}</h1>
+    <p class="subtitle">{{ message }}</p>
+    <p><a class="auth-link auth-link-primary" href="/">Back to home</a></p>
+</section>
+{% endblock %}

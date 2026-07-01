@@ -1,0 +1,193 @@
+/* Page chrome: top bar, navigation, auth links, the mobile drawer, and the
+   main content container. */
+
+/* Top bar: left logo, center nav, right auth.
+   `.brand` and `.auth` each take an equal flex share so the natural-width
+   `.nav` between them sits centered. */
+.topbar {
+    position: relative;
+    display: flex;
+    align-items: center;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 0 2rem;
+    height: 60px;
+    box-shadow: var(--shadow);
+}
+
+.brand {
+    flex: 1;
+    font-weight: 700;
+    font-size: 1.15rem;
+    color: var(--text);
+    text-decoration: none;
+}
+
+/* `.menu` is a layout-only wrapper: it disappears on desktop so its children
+   (`.nav`, `.auth`) become direct flex items of `.topbar`. */
+.menu {
+    display: contents;
+}
+
+.nav {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.nav a {
+    padding: 0.5rem 0.9rem;
+    border-radius: var(--radius);
+    color: var(--muted);
+    text-decoration: none;
+    font-weight: 500;
+    font-size: 0.95rem;
+}
+
+.nav a:hover {
+    background: var(--bg);
+    color: var(--text);
+}
+
+.nav a.active {
+    background: var(--primary);
+    color: #fff;
+}
+
+/* Right-hand chrome */
+.auth {
+    flex: 1;
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.auth-link {
+    padding: 0.5rem 0.9rem;
+    border-radius: var(--radius);
+    color: var(--text);
+    text-decoration: none;
+    font-weight: 500;
+    font-size: 0.95rem;
+}
+
+.auth-link:hover {
+    background: var(--bg);
+}
+
+.auth-link-primary {
+    background: var(--primary);
+    color: #fff;
+}
+
+.auth-link-primary:hover {
+    background: var(--primary-dark, #2c5282);
+}
+
+/* Hamburger button — hidden on desktop, shown on mobile. */
+.nav-toggle {
+    display: none;
+    flex-direction: column;
+    justify-content: center;
+    gap: 4px;
+    width: 40px;
+    height: 40px;
+    padding: 0 9px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+    cursor: pointer;
+}
+
+.nav-toggle-bar {
+    display: block;
+    height: 2px;
+    background: var(--text);
+    border-radius: 2px;
+}
+
+/* Overlay behind the open drawer — hidden until the drawer opens. */
+.drawer-overlay {
+    display: none;
+}
+
+.content {
+    max-width: 980px;
+    margin: 2rem auto;
+    padding: 0 1.5rem;
+}
+
+/* ---- Mobile: logo hidden, nav collapses into a left drawer ---------------- */
+@media (max-width: 640px) {
+    .topbar {
+        padding: 0 1rem;
+    }
+
+    .nav-toggle {
+        display: flex;
+        margin-left: auto;
+    }
+
+    /* Logo recenters: hamburger sits in the flow on the left, logo is
+       absolutely centered so the left button can't push it off-center. */
+    .brand {
+        flex: none;
+        display: block;
+        position: absolute;
+        left: 50%;
+        transform: translateX(-50%);
+    }
+
+    /* `.menu` becomes an off-canvas left drawer. */
+    .menu {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+        position: fixed;
+        top: 0;
+        left: 0;
+        z-index: 30;
+        width: 260px;
+        max-width: 80vw;
+        height: 100vh;
+        padding: 1.25rem 1rem;
+        background: var(--surface);
+        border-right: 1px solid var(--border);
+        box-shadow: var(--shadow);
+        transform: translateX(-100%);
+        transition: transform 0.2s ease;
+    }
+
+    .menu.open {
+        transform: translateX(0);
+    }
+
+    .nav,
+    .auth {
+        flex: none;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.25rem;
+    }
+
+    .auth {
+        justify-content: flex-start;
+        margin-top: auto;
+        border-top: 1px solid var(--border);
+        padding-top: 1rem;
+    }
+
+    .nav a,
+    .auth-link {
+        text-align: left;
+    }
+
+    /* Dim + capture clicks behind the open drawer. */
+    .drawer-overlay.open {
+        display: block;
+        position: fixed;
+        inset: 0;
+        z-index: 20;
+        background: rgba(0, 0, 0, 0.4);
+    }
+}

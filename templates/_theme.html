@@ -1,0 +1,45 @@
+<style>
+  /* Critical-path only: just enough tokens to color first paint before
+     base.css loads, so there's no flash of the wrong theme. Keep the dark
+     and light values here identical to the matching blocks in base.css. */
+  :root {
+    color-scheme: dark;
+    --bg: #12141a;
+    --surface: #1b1e26;
+    --text: #e8eaed;
+  }
+  @media (prefers-color-scheme: light) {
+    :root:not([data-theme="dark"]) {
+      color-scheme: light;
+      --bg: #f7f8fa;
+      --surface: #ffffff;
+      --text: #1a202c;
+    }
+  }
+  :root[data-theme="light"] {
+    color-scheme: light;
+    --bg: #f7f8fa;
+    --surface: #ffffff;
+    --text: #1a202c;
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #12141a;
+    --surface: #1b1e26;
+    --text: #e8eaed;
+  }
+  html {
+    background: var(--bg);
+    color: var(--text);
+  }
+</style>
+<script>
+  (function () {
+    try {
+      var saved = localStorage.getItem("theme");
+      if (saved === "light" || saved === "dark") {
+        document.documentElement.setAttribute("data-theme", saved);
+      }
+    } catch (e) {}
+  })();
+</script>

@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{% block title %}stage_1{% endblock %}</title>
+    {% include "_theme.html" %}
+    <link rel="stylesheet" href="/static/css/base.css" />
+    <link rel="stylesheet" href="/static/css/layout.css" />
+    <link rel="stylesheet" href="/static/css/components.css" />
+</head>
+<body>
+    <header class="topbar">
+        <button class="nav-toggle" type="button" aria-label="Open menu"
+                aria-controls="menu" aria-expanded="false">
+            <span class="nav-toggle-bar"></span>
+            <span class="nav-toggle-bar"></span>
+            <span class="nav-toggle-bar"></span>
+        </button>
+
+        <a class="brand" href="/">stage_1</a>
+
+        <!-- Center nav + right-hand auth. On desktop `.menu` is `display:
+             contents`, so `.nav` and `.auth` lay out directly in the topbar.
+             On mobile it becomes the slide-in left drawer. -->
+        <div class="menu" id="menu">
+            <nav class="nav">
+                <a href="/" class="{% if nav_active == "home" %}active{% endif %}">Home</a>
+                <a href="/about" class="{% if nav_active == "about" %}active{% endif %}">About</a>
+            </nav>
+            <div class="auth">
+                <button class="theme-toggle" id="theme-toggle" type="button"
+                        aria-label="Toggle color theme">
+                    <span class="theme-toggle-icon" aria-hidden="true"></span>
+                </button>
+                <a class="auth-link" href="#">Sign in</a>
+                <a class="auth-link auth-link-primary" href="#">Sign up</a>
+            </div>
+        </div>
+
+        <div class="drawer-overlay" id="drawer-overlay" hidden></div>
+    </header>
+    <main class="content">
+        {% block content %}{% endblock %}
+    </main>
+    <script src="/static/js/main.js"></script>
+    <script src="/static/js/nav.js"></script>
+    <script src="/static/js/theme.js"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,49 @@
+/* Reusable building blocks. Stub file — add shared components (cards, buttons,
+   badges, tables) here as the app grows, one block per component. */
+
+/* Centered hero used by the template home page. */
+.hero {
+    text-align: center;
+    padding: 4rem 1rem;
+}
+
+.hero h1 {
+    margin: 0 0 0.5rem;
+    font-size: 2rem;
+}
+
+.hero .subtitle {
+    margin: 0 auto;
+    max-width: 44ch;
+    color: var(--muted);
+}
+
+/* Theme toggle button. The icon shows what clicking switches *to*, so it
+   mirrors the same explicit-choice-then-system-preference-then-dark
+   cascade as base.css: sun (switch to light) while dark, moon (switch to
+   dark) while light. */
+.theme-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+    cursor: pointer;
+}
+
+.theme-toggle-icon::before {
+    content: "\2600\FE0F";
+}
+
+:root[data-theme="light"] .theme-toggle-icon::before {
+    content: "\1F319";
+}
+
+@media (prefers-color-scheme: light) {
+    :root:not([data-theme="dark"]) .theme-toggle-icon::before {
+        content: "\1F319";
+    }
+}
