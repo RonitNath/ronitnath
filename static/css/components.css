@@ -47,3 +47,88 @@
         content: "\1F319";
     }
 }
+
+/* Guestbook island: entry list + submit form. */
+.guestbook {
+    max-width: 44rem;
+    margin: 0 auto;
+    padding: 0 1rem 4rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.guestbook-form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    padding: 1rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+}
+
+.guestbook-form input,
+.guestbook-form textarea {
+    width: 100%;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--bg);
+    color: var(--text);
+    font: inherit;
+}
+
+.guestbook-form textarea {
+    resize: vertical;
+    min-height: 4rem;
+}
+
+.guestbook-form button {
+    align-self: flex-start;
+    padding: 0.5rem 1.25rem;
+    border: none;
+    border-radius: var(--radius);
+    background: var(--primary);
+    color: #fff;
+    font: inherit;
+    font-weight: 500;
+    cursor: pointer;
+}
+
+.guestbook-form button:disabled {
+    opacity: 0.6;
+    cursor: default;
+}
+
+.guestbook-error {
+    color: #e57373;
+}
+
+.guestbook-entries {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.guestbook-entry {
+    padding: 0.75rem 1rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+}
+
+.guestbook-entry p {
+    margin: 0.25rem 0;
+}
+
+.guestbook-entry .author {
+    font-weight: 600;
+}
+
+.guestbook-entry .created-at {
+    font-size: 0.85rem;
+}

@@ -1,0 +1,4 @@
+[env]
+# Where `#[ts(export)]` types land when `cargo test` runs. Committed to the
+# repo so a fresh fork typechecks the frontend without running cargo first.
+TS_RS_EXPORT_DIR = { value = "ts/src/generated", relative = true }

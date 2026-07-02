@@ -1,0 +1,62 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT id as \"id: i32\", author, message, created_at\n               FROM guestbook_entries ORDER BY id",
+  "describe": {
+    "columns": [
+      {
+        "name": "id: i32",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "guestbook_entries",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "name": "author",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "guestbook_entries",
+            "name": "author"
+          }
+        }
+      },
+      {
+        "name": "message",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "guestbook_entries",
+            "name": "message"
+          }
+        }
+      },
+      {
+        "name": "created_at",
+        "ordinal": 3,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "guestbook_entries",
+            "name": "created_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "f82f6f44ae43aeba6468fb631f0596e50c1ae497471b1c25e31dd6b6e054758c"
+}

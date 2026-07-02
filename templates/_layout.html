@@ -27,6 +27,7 @@
             <nav class="nav">
                 <a href="/" class="{% if nav_active == "home" %}active{% endif %}">Home</a>
                 <a href="/about" class="{% if nav_active == "about" %}active{% endif %}">About</a>
+                <a href="/guestbook" class="{% if nav_active == "guestbook" %}active{% endif %}">Guestbook</a>
             </nav>
             <div class="auth">
                 <button class="theme-toggle" id="theme-toggle" type="button"
@@ -43,9 +44,7 @@
     <main class="content">
         {% block content %}{% endblock %}
     </main>
-    <script src="/static/js/main.js"></script>
-    <script src="/static/js/nav.js"></script>
-    <script src="/static/js/theme.js"></script>
+    <script type="module" src="/static/dist/site.js"></script>
     {% block scripts %}{% endblock %}
 </body>
 </html>

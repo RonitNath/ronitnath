@@ -1,2 +1,5 @@
 /target
 /data
+.env
+/ts/node_modules
+/static/dist
