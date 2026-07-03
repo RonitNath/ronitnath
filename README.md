@@ -17,9 +17,12 @@ read [AGENTS.md](AGENTS.md) first.
       config.rs        Environment-sourced runtime configuration.
       state.rs         Shared application state (AppState — store handle, uptime).
       error.rs         Crate-wide error type and its HTTP/JSON representation.
+      security_headers.rs  CSP + baseline security response headers.
+      rate_limit.rs    Per-client rate limiting for unauthenticated writes.
       telemetry.rs     Tracing / logging + per-request span setup.
       openapi.rs        OpenAPI document root.
       view.rs          Template-rendering helper.
+      test_util.rs     Router-test harness (in-memory app + oneshot helpers).
       store/           Persistence boundary — one file per table, query macros only.
         mod.rs         Pool setup, migrations.
         guestbook.rs   Demo table's types + queries.
@@ -59,6 +62,16 @@ For active development, run both watchers side by side (see AGENTS.md):
 
     cargo watch -w src -w templates -w migrations -x run
     cd ts && bun run watch
+
+## Hardening
+
+Every response gets baseline security headers (CSP included) and a request
+id; unauthenticated write routes are rate-limited; requests time out and
+oversized bodies are rejected; the server drains in-flight requests on
+shutdown. All tunable via env vars — see AGENTS.md's "Hardening" section.
+This template stops short of anything that assumes a logged-in actor
+(sessions, CSRF, roles, audit log) by design — that's a separate, hardened
+fork.
 
 ## Tech stack
 
