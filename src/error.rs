@@ -29,6 +29,17 @@ pub enum AppError {
     #[error("{0}")]
     Invalid(String),
 
+    /// Authenticated, but not allowed to do this (role check or CSRF
+    /// mismatch) (→ 403).
+    #[error("{0}")]
+    Forbidden(String),
+
+    /// Login failed: unknown email or wrong password (→ 401). Kept
+    /// distinct from `Invalid` (422) since "who are you" and "that
+    /// request doesn't make sense" are different failure classes.
+    #[error("{0}")]
+    InvalidCredentials(String),
+
     /// A template failed to render (→ 500).
     #[error("template render failed")]
     Render(#[from] askama::Error),
@@ -48,6 +59,8 @@ impl AppError {
         match self {
             AppError::NotFound => StatusCode::NOT_FOUND,
             AppError::Invalid(_) => StatusCode::UNPROCESSABLE_ENTITY,
+            AppError::Forbidden(_) => StatusCode::FORBIDDEN,
+            AppError::InvalidCredentials(_) => StatusCode::UNAUTHORIZED,
             AppError::Render(_) | AppError::Db(_) | AppError::Other(_) => {
                 StatusCode::INTERNAL_SERVER_ERROR
             }
@@ -59,6 +72,8 @@ impl AppError {
         match self {
             AppError::NotFound => "The page you were looking for doesn't exist.".to_string(),
             AppError::Invalid(message) => message.clone(),
+            AppError::Forbidden(message) => message.clone(),
+            AppError::InvalidCredentials(message) => message.clone(),
             AppError::Render(_) | AppError::Db(_) | AppError::Other(_) => {
                 "Something went wrong on our end.".to_string()
             }
@@ -101,6 +116,7 @@ struct ErrorTemplate {
     status: u16,
     message: String,
     request_id: String,
+    current_user: Option<crate::auth::extract::NavUser>,
 }
 
 #[derive(Serialize)]
@@ -121,6 +137,10 @@ pub async fn render_error_pages(request: Request, next: Next) -> Response {
         .and_then(|id| id.header_value().to_str().ok())
         .unwrap_or("-")
         .to_string();
+    // Read before `next.run` consumes `request` — inserted by
+    // `auth::middleware::attach_session`, which must sit outside (run
+    // before) this middleware in the layer stack.
+    let current_user = crate::auth::extract::nav_user_from_extensions(request.extensions());
 
     let response = next.run(request).await;
     let Some(meta) = response.extensions().get::<ErrorMeta>() else {
@@ -143,6 +163,7 @@ pub async fn render_error_pages(request: Request, next: Next) -> Response {
         status: meta.status.as_u16(),
         message: meta.message.clone(),
         request_id,
+        current_user,
     };
 
     match page.render() {

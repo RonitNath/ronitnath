@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM factors WHERE id = ?1 AND identity_id = ?2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "f1721faf3247c6226271313e11d34bedb9e3d11795b73a68b8a5dfdd7412c115"
+}

@@ -1,0 +1,62 @@
+{% extends "_layout.html" %}
+
+{% block title %}Settings · stage_2{% endblock %}
+
+{% block content %}
+<section class="hero">
+    <h1>Settings</h1>
+    <p class="subtitle">{{ account_name }}</p>
+</section>
+
+{% if is_admin %}
+<p class="muted"><a href="/account">Manage account</a></p>
+{% endif %}
+
+{% if let Some(token) = minted_token %}
+<section class="auth-form-card">
+    <p><strong>New API token — copy it now, it won't be shown again:</strong></p>
+    <p><code>{{ token }}</code></p>
+</section>
+{% endif %}
+
+<section class="auth-form-card">
+    <h2>Login methods</h2>
+    <ul>
+        {% for factor in factors %}
+        <li>
+            {{ factor.kind }}{% if let Some(external_id) = factor.external_id %} ({{ external_id }}){% endif %}
+            {% if can_remove_factor %}
+            <form method="post" action="/settings/factors/{{ factor.id }}/remove" class="inline-form">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+                <button type="submit">Remove</button>
+            </form>
+            {% endif %}
+        </li>
+        {% endfor %}
+    </ul>
+    <form method="post" action="/settings/tokens">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+        <button type="submit">Mint new API token</button>
+    </form>
+</section>
+
+<section class="auth-form-card">
+    <h2>Active sessions</h2>
+    <ul>
+        {% for session in sessions %}
+        <li>
+            since {{ session.created_at }}, last seen {{ session.last_seen_at }}
+            {% if session.is_current %}(this session){% endif %}
+            {% if let Some(ip) = session.ip %} — {{ ip }}{% endif %}
+            {% if let Some(ua) = session.user_agent %} — {{ ua }}{% endif %}
+            {% if !session.is_current %}
+            <form method="post" action="/settings/sessions/{{ session.id }}/revoke" class="inline-form">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+                <button type="submit">Revoke</button>
+            </form>
+            {% endif %}
+        </li>
+        {% endfor %}
+    </ul>
+</section>
+{% endblock %}

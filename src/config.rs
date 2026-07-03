@@ -27,6 +27,15 @@ pub struct Config {
     /// the server sits behind ingress that sets the header itself —
     /// otherwise a client can spoof it to dodge the limiter.
     pub trust_proxy: bool,
+    /// Sets the session cookie's `Secure` flag and `__Host-` prefix. Only
+    /// true once the server is actually behind TLS — a plain HTTP local
+    /// dev server can't set a `Secure` cookie the browser will accept.
+    pub cookie_secure: bool,
+    /// Session lifetime (sliding — see `sessions.last_seen_at`).
+    pub session_ttl_secs: i64,
+    /// `open` (default) lets anyone hit `/signup`; `closed` returns 404
+    /// there for deployments that provision identities out-of-band.
+    pub signup_open: bool,
 }
 
 fn env_or(key: &str, default: &str) -> String {
@@ -50,6 +59,9 @@ impl Config {
             max_body_bytes: env_or_parse("MAX_BODY_BYTES", 1_048_576),
             rate_limit_per_minute: env_or_parse("RATE_LIMIT_PER_MINUTE", 10),
             trust_proxy: env_or_parse("TRUSTED_PROXY", false),
+            cookie_secure: env_or_parse("COOKIE_SECURE", false),
+            session_ttl_secs: env_or_parse("SESSION_TTL_SECS", 30 * 24 * 60 * 60),
+            signup_open: env_or("AUTH_SIGNUP", "open") != "closed",
         }
     }
 
@@ -64,6 +76,9 @@ impl Config {
             max_body_bytes: 1024,
             rate_limit_per_minute: 10,
             trust_proxy: false,
+            cookie_secure: false,
+            session_ttl_secs: 30 * 24 * 60 * 60,
+            signup_open: true,
         }
     }
 }

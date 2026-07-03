@@ -1,10 +1,10 @@
 //! Home page.
 
 use askama::Template;
-use axum::{extract::State, response::Response};
+use axum::response::Response;
 
+use crate::auth::extract::{NavContext, NavUser};
 use crate::error::AppError;
-use crate::state::AppState;
 use crate::view::render;
 
 /// The home page template.
@@ -12,9 +12,13 @@ use crate::view::render;
 #[template(path = "home.html")]
 struct HomeTemplate {
     nav_active: &'static str,
+    current_user: Option<NavUser>,
 }
 
 /// Serves the home page.
-pub async fn index(State(_state): State<AppState>) -> Result<Response, AppError> {
-    render(HomeTemplate { nav_active: "home" })
+pub async fn index(NavContext(current_user): NavContext) -> Result<Response, AppError> {
+    render(HomeTemplate {
+        nav_active: "home",
+        current_user,
+    })
 }

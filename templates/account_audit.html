@@ -1,0 +1,26 @@
+{% extends "_layout.html" %}
+
+{% block title %}Audit log · stage_2{% endblock %}
+
+{% block content %}
+<section class="hero">
+    <h1>Audit log</h1>
+</section>
+<section class="auth-form-card">
+    <table>
+        <thead>
+            <tr><th>When</th><th>Who</th><th>Action</th><th>Entity</th></tr>
+        </thead>
+        <tbody>
+            {% for entry in entries %}
+            <tr>
+                <td>{{ entry.at }}</td>
+                <td>{% if let Some(name) = entry.identity_display_name %}{{ name }}{% else %}—{% endif %}</td>
+                <td>{{ entry.action }}</td>
+                <td>{{ entry.entity }}{% if let Some(id) = entry.entity_id %} #{{ id }}{% endif %}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</section>
+{% endblock %}

@@ -1,0 +1,50 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT m.account_id as \"account_id: i64\", a.name as account_name, m.role\n               FROM memberships m\n               JOIN accounts a ON a.id = m.account_id AND a.deleted_at IS NULL\n               WHERE m.identity_id = ?1\n               ORDER BY m.id\n               LIMIT 1",
+  "describe": {
+    "columns": [
+      {
+        "name": "account_id: i64",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "memberships",
+            "name": "account_id"
+          }
+        }
+      },
+      {
+        "name": "account_name",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "accounts",
+            "name": "name"
+          }
+        }
+      },
+      {
+        "name": "role",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "memberships",
+            "name": "role"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "4d21ec40e9bc1b474ff16e5edf6089c1abaaacc8d56720f23e1827eb0e5ea1c3"
+}

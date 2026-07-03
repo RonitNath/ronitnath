@@ -1,0 +1,20 @@
+{% extends "_layout.html" %}
+
+{% block title %}Account · stage_2{% endblock %}
+
+{% block content %}
+<section class="hero">
+    <h1>Account</h1>
+</section>
+<section class="auth-form-card">
+    <form method="post" action="/account">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+        <label>
+            Account name
+            <input type="text" name="name" value="{{ account_name }}" required />
+        </label>
+        <button type="submit" class="auth-link auth-link-primary">Rename</button>
+    </form>
+    <p class="muted"><a href="/account/audit">View audit log</a></p>
+</section>
+{% endblock %}

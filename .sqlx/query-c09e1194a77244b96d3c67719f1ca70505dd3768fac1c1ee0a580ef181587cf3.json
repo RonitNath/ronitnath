@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "INSERT INTO guestbook_entries (author, message)\n               VALUES (?1, ?2)\n               RETURNING id as \"id: i32\", author, message, created_at",
+  "query": "SELECT id as \"id: i32\", author, message, created_at\n               FROM guestbook_entries WHERE account_id = ?1 ORDER BY id",
   "describe": {
     "columns": [
       {
@@ -49,7 +49,7 @@
       }
     ],
     "parameters": {
-      "Right": 2
+      "Right": 1
     },
     "nullable": [
       false,
@@ -58,5 +58,5 @@
       false
     ]
   },
-  "hash": "714016f948520766debb40e80797212ec7e36409fd64ca2f17558b080d0c57df"
+  "hash": "c09e1194a77244b96d3c67719f1ca70505dd3768fac1c1ee0a580ef181587cf3"
 }

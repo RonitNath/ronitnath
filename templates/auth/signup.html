@@ -1,0 +1,31 @@
+{% extends "_layout.html" %}
+
+{% block title %}Sign up · stage_2{% endblock %}
+
+{% block content %}
+<section class="hero">
+    <h1>Sign up</h1>
+</section>
+{% if signup_open %}
+<section class="auth-form-card">
+    <form method="post" action="/signup">
+        <label>
+            Name
+            <input type="text" name="display_name" required autocomplete="name" />
+        </label>
+        <label>
+            Email
+            <input type="email" name="email" required autocomplete="email" />
+        </label>
+        <label>
+            Password
+            <input type="password" name="password" required minlength="8" autocomplete="new-password" />
+        </label>
+        <button type="submit" class="auth-link auth-link-primary">Sign up</button>
+    </form>
+    <p class="muted">Already have an account? <a href="/login">Sign in</a>.</p>
+</section>
+{% else %}
+<p class="subtitle">Signup is closed on this deployment.</p>
+{% endif %}
+{% endblock %}

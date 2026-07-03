@@ -1,17 +1,23 @@
-# Plan: stage_1_secure — hardened fork template
+# Plan: stage_2 — hardened fork template
+
+> **Naming note**: this "stage_2" is unrelated to the stage-1/stage-2
+> *build-phase* vocabulary in `~/dev/context/procedures/building.md` (mock
+> UI → wired persistence, both phases inside one forked repo). This
+> stage_2 is a sibling *template* to stage_1 — a separate repo that forks
+> fork instead of stage_1 when they're multi-user or internet-facing. Same
+> word, different axis; don't conflate the two when reading building.md.
 
 Status: planned. **This plan lives in stage_1 only until the fork exists.**
-Sequence: (1) stage_1 lands `2026-07-stage1-hardening-and-http-tests.md`;
-(2) stage_1 is forked to `stage_1_secure`; (3) this file moves to the fork
+Sequence: (1) stage_1 lands `2026-07-stage1-hardening-and-http-tests.md`
+(done); (2) stage_1 is forked to `stage_2`; (3) this file moves to the fork
 and is **deleted from stage_1** to keep the base template clean.
 
-stage_1_secure is a git fork of stage_1 that periodically `git merge`s from
+stage_2 is a git fork of stage_1 that periodically `git merge`s from
 stage_1 upstream — never a copy. Downstream rule: internal/single-user
-tools fork stage_1; anything multi-user or internet-facing forks
-stage_1_secure. To keep merges clean, all auth code lives in new modules;
-stage_1's existing files are touched in as few, well-marked places as
-possible (`app.rs` layer stack + route table, `Cargo.toml`, `_layout.html`
-nav).
+tools fork stage_1; anything multi-user or internet-facing forks stage_2.
+To keep merges clean, all auth code lives in new modules; stage_1's
+existing files are touched in as few, well-marked places as possible
+(`app.rs` layer stack + route table, `Cargo.toml`, `_layout.html` nav).
 
 ## Decisions (defaults chosen; revisit before implementation)
 
@@ -282,5 +288,5 @@ stated "real multi-step user flow" threshold — add it in this fork
 - stage_1 files modified: `app.rs` (one marked block in the route table +
   layer stack), `config.rs` (appended fields), `Cargo.toml`, `_layout.html`
   (nav auth widget), AGENTS.md/README (fork-specific sections appended).
-- After forking: delete `docs/plans/2026-07-secure-fork-template.md` from
-  stage_1; this file becomes the fork's implementation plan.
+- After forking: delete `docs/plans/2026-07-stage2-hardened-fork-template.md`
+  from stage_1; this file becomes the fork's implementation plan.

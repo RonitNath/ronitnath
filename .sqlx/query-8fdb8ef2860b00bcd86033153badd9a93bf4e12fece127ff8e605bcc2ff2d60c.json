@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO factors (identity_id, kind, external_id, secret_hash) VALUES (?1, 'password', ?2, ?3)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "8fdb8ef2860b00bcd86033153badd9a93bf4e12fece127ff8e605bcc2ff2d60c"
+}

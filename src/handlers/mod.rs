@@ -5,8 +5,11 @@
 //! structs they render.
 
 pub mod about;
+pub mod account;
+pub mod auth;
 pub mod client_errors;
 pub mod errors;
 pub mod guestbook;
 pub mod health;
 pub mod home;
+pub mod settings;

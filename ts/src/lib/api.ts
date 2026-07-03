@@ -18,6 +18,13 @@ async function errorMessage(res: Response, fallback: string): Promise<string> {
   return typeof body?.error === "string" ? body.error : fallback;
 }
 
+// Read once per call rather than cached: a page never changes this after
+// load, but re-reading keeps the helper simple and correct if that ever
+// changes (e.g. a future SPA-style nav that swaps the meta tag).
+function csrfToken(): string {
+  return document.querySelector('meta[name="csrf-token"]')?.getAttribute("content") ?? "";
+}
+
 export async function fetchGuestbook(): Promise<GuestbookEntry[]> {
   const res = await fetch("/api/guestbook");
   if (!res.ok) {
@@ -31,7 +38,7 @@ export async function postGuestbookEntry(
 ): Promise<GuestbookEntry> {
   const res = await fetch("/api/guestbook", {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: { "content-type": "application/json", "x-csrf-token": csrfToken() },
     body: JSON.stringify(entry),
   });
   if (!res.ok) {

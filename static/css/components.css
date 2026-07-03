@@ -132,3 +132,19 @@
 .guestbook-entry .created-at {
     font-size: 0.85rem;
 }
+
+/* Settings/account list rows embed a one-button form (remove/revoke) next
+   to inline text — `style="display:inline"` would violate the CSP's
+   style-src (no unsafe-inline), so this is a class instead. */
+.auth-form-card {
+    padding: 1rem 1.5rem;
+    margin: 1.5rem auto;
+    max-width: 40rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+}
+
+.inline-form {
+    display: inline;
+}

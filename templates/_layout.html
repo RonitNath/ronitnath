@@ -3,7 +3,10 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>{% block title %}stage_1{% endblock %}</title>
+    <title>{% block title %}stage_2{% endblock %}</title>
+    {% if let Some(user) = current_user %}
+    <meta name="csrf-token" content="{{ user.csrf_token }}" />
+    {% endif %}
     {% include "_theme.html" %}
     <link rel="stylesheet" href="/static/css/base.css" />
     <link rel="stylesheet" href="/static/css/layout.css" />
@@ -18,7 +21,7 @@
             <span class="nav-toggle-bar"></span>
         </button>
 
-        <a class="brand" href="/">stage_1</a>
+        <a class="brand" href="/">stage_2</a>
 
         <!-- Center nav + right-hand auth. On desktop `.menu` is `display:
              contents`, so `.nav` and `.auth` lay out directly in the topbar.
@@ -34,8 +37,16 @@
                         aria-label="Toggle color theme">
                     <span class="theme-toggle-icon" aria-hidden="true"></span>
                 </button>
-                <a class="auth-link" href="#">Sign in</a>
-                <a class="auth-link auth-link-primary" href="#">Sign up</a>
+                {% if let Some(user) = current_user %}
+                <a class="auth-link" href="/settings">{{ user.display_name }}</a>
+                <form method="post" action="/logout" class="auth-logout-form">
+                    <input type="hidden" name="csrf_token" value="{{ user.csrf_token }}" />
+                    <button class="auth-link" type="submit">Sign out</button>
+                </form>
+                {% else %}
+                <a class="auth-link" href="/login">Sign in</a>
+                <a class="auth-link auth-link-primary" href="/signup">Sign up</a>
+                {% endif %}
             </div>
         </div>
 
