@@ -2,13 +2,13 @@
 //! just an `api_token` factor), and active sessions (revoke).
 
 use askama::Template;
+use axum::Form;
 use axum::extract::{Path, State};
 use axum::response::{IntoResponse, Redirect, Response};
-use axum::Form;
 use serde::Deserialize;
 
 use crate::auth::extract::NavUser;
-use crate::auth::{AccountScope, Role, api_token, csrf};
+use crate::auth::{AccountScope, Role, api_token, csrf, oidc};
 use crate::error::AppError;
 use crate::state::AppState;
 use crate::store::factors::Factor;
@@ -27,6 +27,7 @@ struct SettingsTemplate {
     minted_token: Option<String>,
     csrf_token: String,
     is_admin: bool,
+    oidc_providers: Vec<oidc::OidcProviderButton>,
 }
 
 async fn render_page(
@@ -54,10 +55,14 @@ async fn render_page(
         minted_token,
         csrf_token,
         is_admin: scope.role >= Role::Admin,
+        oidc_providers: state.oidc().buttons(),
     })
 }
 
-pub async fn page(State(state): State<AppState>, scope: AccountScope) -> Result<Response, AppError> {
+pub async fn page(
+    State(state): State<AppState>,
+    scope: AccountScope,
+) -> Result<Response, AppError> {
     render_page(&state, &scope, None).await
 }
 
@@ -100,7 +105,10 @@ pub async fn remove_factor(
             "can't remove your last login method — link another factor first".into(),
         ));
     }
-    state.store().delete_factor(factor_id, scope.identity_id).await?;
+    state
+        .store()
+        .delete_factor(factor_id, scope.identity_id)
+        .await?;
     state
         .store()
         .audit(
@@ -123,7 +131,10 @@ pub async fn revoke_session(
     Form(form): Form<CsrfForm>,
 ) -> Result<Response, AppError> {
     csrf::verify(&scope, &form.csrf_token)?;
-    state.store().revoke_session(session_id, scope.identity_id).await?;
+    state
+        .store()
+        .revoke_session(session_id, scope.identity_id)
+        .await?;
     state
         .store()
         .audit(

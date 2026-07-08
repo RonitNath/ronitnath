@@ -148,3 +148,17 @@
 .inline-form {
     display: inline;
 }
+
+/* OIDC RP factor: server-rendered SSO buttons on login/settings. */
+.oidc-login {
+    margin-top: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.oidc-button {
+    display: inline-flex;
+    justify-content: center;
+    border: 1px solid var(--border);
+}

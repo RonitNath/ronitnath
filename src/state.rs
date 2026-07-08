@@ -3,12 +3,13 @@
 use std::sync::Arc;
 use std::time::Instant;
 
+use crate::auth::oidc::OidcRegistry;
 use crate::store::Store;
 
 /// Auth knobs every request needs — split out from [`crate::config::Config`]
 /// because that struct also carries things (bind address, body limits)
 /// nothing in `src/auth` should have to know about.
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub struct AuthConfig {
     /// Whether to set the `Secure` cookie flag (and use the `__Host-`
     /// prefix). Only true behind TLS — see [`crate::auth::session`].
@@ -33,6 +34,7 @@ struct Inner {
     store: Store,
     started_at: Instant,
     auth: AuthConfig,
+    oidc: OidcRegistry,
 }
 
 impl AppState {
@@ -43,6 +45,18 @@ impl AppState {
                 store,
                 started_at: Instant::now(),
                 auth,
+                oidc: OidcRegistry::empty(),
+            }),
+        }
+    }
+
+    pub fn with_oidc(self, oidc: OidcRegistry) -> Self {
+        Self {
+            inner: Arc::new(Inner {
+                store: self.inner.store.clone(),
+                started_at: self.inner.started_at,
+                auth: self.inner.auth.clone(),
+                oidc,
             }),
         }
     }
@@ -52,7 +66,11 @@ impl AppState {
     }
 
     pub fn auth_config(&self) -> AuthConfig {
-        self.inner.auth
+        self.inner.auth.clone()
+    }
+
+    pub fn oidc(&self) -> &OidcRegistry {
+        &self.inner.oidc
     }
 
     pub fn uptime(&self) -> std::time::Duration {

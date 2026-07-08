@@ -19,6 +19,16 @@
         </label>
         <button type="submit" class="auth-link auth-link-primary">Sign in</button>
     </form>
+    {% if !oidc_providers.is_empty() %}
+    <div class="oidc-login">
+        <p class="muted">Or use SSO:</p>
+        {% for provider in oidc_providers %}
+        <a class="auth-link auth-link-primary oidc-button" href="/auth/oidc/{{ provider.key }}/start?next={{ next }}">
+            Continue with {{ provider.display_name }}
+        </a>
+        {% endfor %}
+    </div>
+    {% endif %}
     <p class="muted">No account? <a href="/signup">Sign up</a>.</p>
 </section>
 {% endblock %}

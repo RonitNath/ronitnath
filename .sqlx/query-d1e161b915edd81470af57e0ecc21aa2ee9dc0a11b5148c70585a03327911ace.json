@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO pending_auth (kind, token_hash, factor_kind, state, identity_id, account_id, expires_at)\n               VALUES ('oidc', ?1, 'oidc', ?2, ?3, ?4, ?5)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 5
+    },
+    "nullable": []
+  },
+  "hash": "d1e161b915edd81470af57e0ecc21aa2ee9dc0a11b5148c70585a03327911ace"
+}

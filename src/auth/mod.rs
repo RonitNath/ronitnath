@@ -5,11 +5,9 @@
 //! `docs/plans/2026-07-stage2-hardened-fork-template.md`. This module is
 //! organized by concern rather than by table:
 //!
-//! - [`password`] / [`api_token`] — the two phase-1 login mechanisms.
-//!   Later phases add `oidc`/`magic_link`/`qr_device` here behind a
-//!   `FactorKind` trait (see the plan doc) — not introduced yet since
-//!   there's only one synchronous mechanism (`password`) to generalize
-//!   from; a trait with a single implementation is just ceremony.
+//! - [`password`] / [`api_token`] / [`oidc`] — login mechanisms. `oidc`
+//!   is the first redirect-based factor; further asynchronous kinds can
+//!   share its pending-auth shape when they land.
 //! - [`session`] — cookie plumbing (token generation, hashing).
 //! - [`csrf`] — the synchronizer-token check for mutating requests.
 //! - [`middleware`] — resolves the session cookie once per request.
@@ -22,6 +20,7 @@ pub mod csrf;
 pub mod extract;
 pub mod login;
 pub mod middleware;
+pub mod oidc;
 pub mod password;
 pub mod session;
 

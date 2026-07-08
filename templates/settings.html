@@ -38,6 +38,16 @@
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
         <button type="submit">Mint new API token</button>
     </form>
+    {% if !oidc_providers.is_empty() %}
+    <div class="oidc-login">
+        <p class="muted">Link SSO:</p>
+        {% for provider in oidc_providers %}
+        <a class="auth-link oidc-button" href="/auth/oidc/{{ provider.key }}/start?intent=link&csrf_token={{ csrf_token }}">
+            Link {{ provider.display_name }}
+        </a>
+        {% endfor %}
+    </div>
+    {% endif %}
 </section>
 
 <section class="auth-form-card">

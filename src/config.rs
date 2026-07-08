@@ -36,6 +36,9 @@ pub struct Config {
     /// `open` (default) lets anyone hit `/signup`; `closed` returns 404
     /// there for deployments that provision identities out-of-band.
     pub signup_open: bool,
+    /// JSON provider registry for OIDC relying-party login. Missing file =
+    /// no configured providers and no login-page changes.
+    pub oidc_providers_path: String,
 }
 
 fn env_or(key: &str, default: &str) -> String {
@@ -62,6 +65,7 @@ impl Config {
             cookie_secure: env_or_parse("COOKIE_SECURE", false),
             session_ttl_secs: env_or_parse("SESSION_TTL_SECS", 30 * 24 * 60 * 60),
             signup_open: env_or("AUTH_SIGNUP", "open") != "closed",
+            oidc_providers_path: env_or("OIDC_PROVIDERS_PATH", "data/oidc_providers.json"),
         }
     }
 
@@ -79,6 +83,7 @@ impl Config {
             cookie_secure: false,
             session_ttl_secs: 30 * 24 * 60 * 60,
             signup_open: true,
+            oidc_providers_path: "data/missing-test-oidc-providers.json".into(),
         }
     }
 }

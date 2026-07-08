@@ -26,3 +26,5 @@ argon2 = "0.5.3"
 axum-extra = { version = "0.12.6", features = ["cookie"] }
 time = { version = "0.3.53", features = ["macros", "formatting", "parsing"] }
 rand_core = { version = "0.6", features = ["getrandom", "std"] }
+openidconnect = "4.0.1"
+chrono = "0.4"
