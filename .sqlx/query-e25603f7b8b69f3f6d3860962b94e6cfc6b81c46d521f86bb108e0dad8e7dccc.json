@@ -1,0 +1,122 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT l.id as \"id!: i64\", l.person_id, p.name as \"person_name?: String\",\n                      l.token_plain, l.label, l.tier, l.revoked_at,\n                      l.uses as \"uses!: i64\", l.last_used_at\n               FROM event_links l\n               LEFT JOIN people p ON p.account_id = l.account_id AND p.id = l.person_id\n               WHERE l.account_id = ?1 AND l.event_id = ?2\n               ORDER BY l.person_id IS NOT NULL, p.name COLLATE NOCASE, l.created_at",
+  "describe": {
+    "columns": [
+      {
+        "name": "id!: i64",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "event_links",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "name": "person_id",
+        "ordinal": 1,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "event_links",
+            "name": "person_id"
+          }
+        }
+      },
+      {
+        "name": "person_name?: String",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "people",
+            "name": "name"
+          }
+        }
+      },
+      {
+        "name": "token_plain",
+        "ordinal": 3,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "event_links",
+            "name": "token_plain"
+          }
+        }
+      },
+      {
+        "name": "label",
+        "ordinal": 4,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "event_links",
+            "name": "label"
+          }
+        }
+      },
+      {
+        "name": "tier",
+        "ordinal": 5,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "event_links",
+            "name": "tier"
+          }
+        }
+      },
+      {
+        "name": "revoked_at",
+        "ordinal": 6,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "event_links",
+            "name": "revoked_at"
+          }
+        }
+      },
+      {
+        "name": "uses!: i64",
+        "ordinal": 7,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "event_links",
+            "name": "uses"
+          }
+        }
+      },
+      {
+        "name": "last_used_at",
+        "ordinal": 8,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "event_links",
+            "name": "last_used_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false,
+      true,
+      true,
+      false,
+      false,
+      false,
+      true,
+      false,
+      true
+    ]
+  },
+  "hash": "e25603f7b8b69f3f6d3860962b94e6cfc6b81c46d521f86bb108e0dad8e7dccc"
+}

@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE events SET notice_html = ?3, updated_at = datetime('now')\n                       WHERE account_id = ?1 AND id = ?2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "c4919e1354f04c0b1d977e8aef7c2d4bfe5d4ac7d4583d067a7ef81fa80f7dda"
+}

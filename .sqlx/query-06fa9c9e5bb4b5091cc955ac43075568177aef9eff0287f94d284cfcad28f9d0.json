@@ -1,0 +1,117 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT a.person_id as \"person_id!: i64\", p.name as person_name, p.nickname, p.group_label,\n                      a.status, a.party_size as \"party_size!: i64\", a.note, a.updated_at,\n                      COALESCE((\n                          SELECT GROUP_CONCAT(\n                              si.segment_key || ':' || sr.status\n                              || CASE WHEN sr.paid = 1 THEN ' paid' ELSE '' END\n                              || CASE sr.attended WHEN 1 THEN ' ✓went' WHEN 0 THEN ' ✗skipped' ELSE '' END,\n                              ' · ')\n                          FROM segment_rsvps sr\n                          JOIN schedule_items si\n                            ON si.account_id = sr.account_id AND si.id = sr.schedule_item_id\n                          WHERE sr.account_id = a.account_id\n                            AND sr.person_id = a.person_id\n                            AND si.event_id = a.event_id\n                      ), '') as \"segments!: String\"\n               FROM attendance a\n               JOIN people p ON p.account_id = a.account_id AND p.id = a.person_id\n               WHERE a.account_id = ?1 AND a.event_id = ?2\n               ORDER BY p.group_label, p.name COLLATE NOCASE",
+  "describe": {
+    "columns": [
+      {
+        "name": "person_id!: i64",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "attendance",
+            "name": "person_id"
+          }
+        }
+      },
+      {
+        "name": "person_name",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "people",
+            "name": "name"
+          }
+        }
+      },
+      {
+        "name": "nickname",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "people",
+            "name": "nickname"
+          }
+        }
+      },
+      {
+        "name": "group_label",
+        "ordinal": 3,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "people",
+            "name": "group_label"
+          }
+        }
+      },
+      {
+        "name": "status",
+        "ordinal": 4,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "attendance",
+            "name": "status"
+          }
+        }
+      },
+      {
+        "name": "party_size!: i64",
+        "ordinal": 5,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "attendance",
+            "name": "party_size"
+          }
+        }
+      },
+      {
+        "name": "note",
+        "ordinal": 6,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "attendance",
+            "name": "note"
+          }
+        }
+      },
+      {
+        "name": "updated_at",
+        "ordinal": 7,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "attendance",
+            "name": "updated_at"
+          }
+        }
+      },
+      {
+        "name": "segments!: String",
+        "ordinal": 8,
+        "type_info": "Text",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "06fa9c9e5bb4b5091cc955ac43075568177aef9eff0287f94d284cfcad28f9d0"
+}

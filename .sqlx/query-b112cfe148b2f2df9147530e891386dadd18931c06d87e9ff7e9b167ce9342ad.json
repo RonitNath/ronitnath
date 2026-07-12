@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO event_links\n                   (account_id, event_id, person_id, token_hash, token_plain, label, tier)\n               VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)\n               RETURNING id as \"id!: i64\"",
+  "describe": {
+    "columns": [
+      {
+        "name": "id!: i64",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "event_links",
+            "name": "id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 7
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "b112cfe148b2f2df9147530e891386dadd18931c06d87e9ff7e9b167ce9342ad"
+}

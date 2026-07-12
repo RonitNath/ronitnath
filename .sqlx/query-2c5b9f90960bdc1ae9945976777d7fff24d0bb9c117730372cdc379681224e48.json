@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE people\n               SET name = ?3, nickname = ?4\n               WHERE account_id = ?1 AND id = ?2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": []
+  },
+  "hash": "2c5b9f90960bdc1ae9945976777d7fff24d0bb9c117730372cdc379681224e48"
+}

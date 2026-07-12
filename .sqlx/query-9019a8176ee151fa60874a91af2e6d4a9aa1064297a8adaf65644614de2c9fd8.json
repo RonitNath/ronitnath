@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE schedule_items\n               SET sort_order = ?3, time_label = ?4, title = ?5, detail = ?6,\n                   tier = ?7, segment_key = ?8\n               WHERE account_id = ?1 AND id = ?2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 8
+    },
+    "nullable": []
+  },
+  "hash": "9019a8176ee151fa60874a91af2e6d4a9aa1064297a8adaf65644614de2c9fd8"
+}

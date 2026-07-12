@@ -1,0 +1,76 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT p.id as \"id!: i64\", p.name, p.nickname, p.group_label,\n                      COUNT(a.id) as \"events_attended!: i64\",\n                      COALESCE(GROUP_CONCAT(e.title, ' · '), '') as \"events_list!: String\"\n               FROM people p\n               LEFT JOIN attendance a\n                      ON a.account_id = p.account_id\n                     AND a.person_id = p.id\n                     AND a.status IN ('going', 'attended')\n               LEFT JOIN events e ON e.account_id = p.account_id AND e.id = a.event_id\n               WHERE p.account_id = ?1\n               GROUP BY p.id\n               ORDER BY p.name COLLATE NOCASE",
+  "describe": {
+    "columns": [
+      {
+        "name": "id!: i64",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "people",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "name": "name",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "people",
+            "name": "name"
+          }
+        }
+      },
+      {
+        "name": "nickname",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "people",
+            "name": "nickname"
+          }
+        }
+      },
+      {
+        "name": "group_label",
+        "ordinal": 3,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "people",
+            "name": "group_label"
+          }
+        }
+      },
+      {
+        "name": "events_attended!: i64",
+        "ordinal": 4,
+        "type_info": "Integer",
+        "origin": "Expression"
+      },
+      {
+        "name": "events_list!: String",
+        "ordinal": 5,
+        "type_info": "Text",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "3ee2c07197ba16457c75ad5221b9811721d33e2db8033ea9e8d35a8fb83043b1"
+}

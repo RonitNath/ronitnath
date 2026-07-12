@@ -1,0 +1,98 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT id as \"id!: i64\", sort_order as \"sort_order!: i64\", time_label, title,\n                      detail, tier, segment_key\n               FROM schedule_items\n               WHERE account_id = ?1 AND event_id = ?2 AND (tier = 'public' OR ?3 = 1)\n               ORDER BY sort_order, id",
+  "describe": {
+    "columns": [
+      {
+        "name": "id!: i64",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "schedule_items",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "name": "sort_order!: i64",
+        "ordinal": 1,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "schedule_items",
+            "name": "sort_order"
+          }
+        }
+      },
+      {
+        "name": "time_label",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "schedule_items",
+            "name": "time_label"
+          }
+        }
+      },
+      {
+        "name": "title",
+        "ordinal": 3,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "schedule_items",
+            "name": "title"
+          }
+        }
+      },
+      {
+        "name": "detail",
+        "ordinal": 4,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "schedule_items",
+            "name": "detail"
+          }
+        }
+      },
+      {
+        "name": "tier",
+        "ordinal": 5,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "schedule_items",
+            "name": "tier"
+          }
+        }
+      },
+      {
+        "name": "segment_key",
+        "ordinal": 6,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "schedule_items",
+            "name": "segment_key"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "49b3072b17c97b97b17887615c8566a5c4658bf6606303bb529f68f795c10d53"
+}

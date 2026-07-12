@@ -1,0 +1,40 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT si.id as \"schedule_item_id!: i64\",\n                      COALESCE(SUM(CASE WHEN sr.status = 'in' THEN 1 ELSE 0 END), 0) as \"in_count!: i64\",\n                      COALESCE(SUM(CASE WHEN sr.status = 'maybe' THEN 1 ELSE 0 END), 0) as \"maybe_count!: i64\"\n               FROM schedule_items si\n               LEFT JOIN segment_rsvps sr\n                 ON sr.account_id = si.account_id AND sr.schedule_item_id = si.id\n               WHERE si.account_id = ?1 AND si.event_id = ?2 AND si.segment_key IS NOT NULL\n               GROUP BY si.id",
+  "describe": {
+    "columns": [
+      {
+        "name": "schedule_item_id!: i64",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "schedule_items",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "name": "in_count!: i64",
+        "ordinal": 1,
+        "type_info": "Integer",
+        "origin": "Expression"
+      },
+      {
+        "name": "maybe_count!: i64",
+        "ordinal": 2,
+        "type_info": "Integer",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "eda263b65f83e09535aa48630ffc55880ff310ab68b33ed148958a0e009ffb85"
+}

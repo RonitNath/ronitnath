@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO segment_rsvps (account_id, schedule_item_id, person_id, status, paid, attended)\n               SELECT si.account_id, si.id, ?4, COALESCE(?5, 'in'), COALESCE(?6, 0), ?7\n               FROM schedule_items si\n               WHERE si.account_id = ?1 AND si.event_id = ?2 AND si.segment_key = ?3\n               ON CONFLICT (schedule_item_id, person_id) DO UPDATE SET\n                   status = COALESCE(?5, status),\n                   paid = COALESCE(?6, paid),\n                   attended = COALESCE(?7, attended),\n                   updated_at = datetime('now')",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 7
+    },
+    "nullable": []
+  },
+  "hash": "1193a5e9367f8cfe10de5cf8fb100ffc6fa341a1ce159831204d576be56ea745"
+}

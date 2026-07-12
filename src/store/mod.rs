@@ -7,11 +7,17 @@
 //! method signatures.
 
 pub mod accounts;
+pub mod attendance;
 pub mod audit;
+pub mod event_links;
+pub mod events;
 pub mod factors;
 pub mod guestbook;
 pub mod identities;
 pub mod memberships;
+pub mod people;
+pub mod schedule_items;
+pub mod segment_rsvps;
 pub mod sessions;
 
 use std::str::FromStr;

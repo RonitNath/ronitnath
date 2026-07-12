@@ -1,0 +1,38 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT sr.schedule_item_id as \"schedule_item_id!: i64\", sr.status\n               FROM segment_rsvps sr\n               JOIN schedule_items si ON si.id = sr.schedule_item_id\n               WHERE sr.account_id = ?1 AND si.event_id = ?2 AND sr.person_id = ?3",
+  "describe": {
+    "columns": [
+      {
+        "name": "schedule_item_id!: i64",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "segment_rsvps",
+            "name": "schedule_item_id"
+          }
+        }
+      },
+      {
+        "name": "status",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "segment_rsvps",
+            "name": "status"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "e96b69e4cccdc5325b47f763f2b636135c1975b57b608b03fda11e266b602bc5"
+}

@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE event_links SET revoked_at = datetime('now')\n             WHERE account_id = ?1 AND id = ?2 AND revoked_at IS NULL",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "bd1ff502c73ecc1c0a7bfaa44ca8e48574bfe6832172065603b01da775c47a10"
+}
