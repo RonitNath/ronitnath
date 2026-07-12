@@ -3,9 +3,9 @@
 //! pattern to copy for any other admin-only route.
 
 use askama::Template;
+use axum::Form;
 use axum::extract::State;
 use axum::response::{IntoResponse, Redirect, Response};
-use axum::Form;
 use serde::Deserialize;
 
 use crate::auth::extract::NavUser;
@@ -31,6 +31,7 @@ pub async fn page(scope: AccountScope) -> Result<Response, AppError> {
         current_user: Some(NavUser {
             display_name: scope.display_name,
             csrf_token: scope.csrf_token.clone().unwrap_or_default(),
+            is_guest: false,
         }),
         account_name: scope.account_name,
         csrf_token: scope.csrf_token.unwrap_or_default(),
@@ -54,7 +55,10 @@ pub async fn rename(
         return Err(AppError::Invalid("account name must not be empty".into()));
     }
 
-    state.store().rename_account(scope.account_id, form.name.trim()).await?;
+    state
+        .store()
+        .rename_account(scope.account_id, form.name.trim())
+        .await?;
     state
         .store()
         .audit(
@@ -78,7 +82,10 @@ struct AuditTemplate {
     entries: Vec<AuditEntry>,
 }
 
-pub async fn audit(State(state): State<AppState>, scope: AccountScope) -> Result<Response, AppError> {
+pub async fn audit(
+    State(state): State<AppState>,
+    scope: AccountScope,
+) -> Result<Response, AppError> {
     scope.require(Role::Admin)?;
     let entries = state.store().list_audit_log(scope.account_id, 100).await?;
     render(AuditTemplate {
@@ -86,6 +93,7 @@ pub async fn audit(State(state): State<AppState>, scope: AccountScope) -> Result
         current_user: Some(NavUser {
             display_name: scope.display_name,
             csrf_token: scope.csrf_token.unwrap_or_default(),
+            is_guest: false,
         }),
         entries,
     })

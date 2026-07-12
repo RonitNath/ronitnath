@@ -47,6 +47,7 @@ async fn render_page(
         current_user: Some(NavUser {
             display_name: scope.display_name.clone(),
             csrf_token: csrf_token.clone(),
+            is_guest: false,
         }),
         account_name: scope.account_name.clone(),
         can_remove_factor: factors.len() > 1,

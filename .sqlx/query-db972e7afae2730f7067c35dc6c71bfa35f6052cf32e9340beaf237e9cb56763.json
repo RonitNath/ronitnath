@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT s.id as \"session_id: i64\", s.csrf_token,\n                      s.identity_id as \"identity_id: i64\", i.display_name,\n                      s.account_id as \"account_id: i64\", a.name as account_name,\n                      m.role\n               FROM sessions s\n               JOIN identities i ON i.id = s.identity_id AND i.deleted_at IS NULL\n               JOIN accounts a ON a.id = s.account_id AND a.deleted_at IS NULL\n               JOIN memberships m ON m.identity_id = s.identity_id AND m.account_id = s.account_id\n               WHERE s.token_hash = ?1\n                 AND s.revoked_at IS NULL\n                 AND s.expires_at > datetime('now')",
+  "query": "SELECT s.id as \"session_id: i64\", s.csrf_token,\n                      s.identity_id as \"identity_id: i64\", i.display_name,\n                      s.account_id as \"account_id: i64\", a.name as account_name,\n                      a.purpose as account_purpose, m.role\n               FROM sessions s\n               JOIN identities i ON i.id = s.identity_id AND i.deleted_at IS NULL\n               JOIN accounts a ON a.id = s.account_id AND a.deleted_at IS NULL\n               JOIN memberships m ON m.identity_id = s.identity_id AND m.account_id = s.account_id\n               WHERE s.token_hash = ?1\n                 AND s.revoked_at IS NULL\n                 AND s.expires_at > datetime('now')",
   "describe": {
     "columns": [
       {
@@ -70,8 +70,19 @@
         }
       },
       {
-        "name": "role",
+        "name": "account_purpose",
         "ordinal": 6,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "accounts",
+            "name": "purpose"
+          }
+        }
+      },
+      {
+        "name": "role",
+        "ordinal": 7,
         "type_info": "Text",
         "origin": {
           "Table": {
@@ -91,8 +102,9 @@
       false,
       false,
       false,
+      false,
       false
     ]
   },
-  "hash": "cf56bf11c2827500f8e72c61a309aecacc52fd2ebf5d6fd5b384d74ab4e6f04f"
+  "hash": "db972e7afae2730f7067c35dc6c71bfa35f6052cf32e9340beaf237e9cb56763"
 }

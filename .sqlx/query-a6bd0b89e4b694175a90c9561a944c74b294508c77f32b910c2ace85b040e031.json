@@ -1,0 +1,21 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT COUNT(*) as \"count!: i64\" FROM people p\n            WHERE p.account_id = ?1 AND p.id = ?2\n              AND NOT EXISTS (SELECT 1 FROM person_identity_links pil\n                              WHERE pil.person_id = p.id AND pil.unlinked_at IS NULL)",
+  "describe": {
+    "columns": [
+      {
+        "name": "count!: i64",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "a6bd0b89e4b694175a90c9561a944c74b294508c77f32b910c2ace85b040e031"
+}

@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE person_identity_links SET unlinked_at = datetime('now')\n            WHERE account_id = ?1 AND person_id = ?2 AND unlinked_at IS NULL\n            RETURNING identity_id as \"identity_id!: i64\"",
+  "describe": {
+    "columns": [
+      {
+        "name": "identity_id!: i64",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "person_identity_links",
+            "name": "identity_id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "b0c06ccb71aef234427fb368a94ec4dbdabaea727d31918b49226a7d3bbd50f6"
+}

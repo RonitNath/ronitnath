@@ -42,7 +42,7 @@ impl Viewer {
     }
 
     /// Applies the binding match table. The link wins over a mismatched guest;
-    /// Owner always wins. Phase 4 will surface `MismatchNote` in the UI.
+    /// Owner always wins; handlers surface the returned mismatch note.
     pub fn combine_with_link(self, link: Option<&ResolvedLink>) -> (Self, Option<MismatchNote>) {
         let token = link.map(|link| Viewer::LinkHolder {
             person_id: link.person_id,
@@ -93,9 +93,16 @@ impl FromRequestParts<AppState> for Viewer {
             Some(ctx) if state.owner_account_id() == Some(ctx.account_id) => Viewer::Owner {
                 identity_id: ctx.identity_id,
             },
-            // person_identity_links arrives in phase 4. A session on any
-            // non-owner account is deliberately anonymous until then.
-            _ => Viewer::Anonymous,
+            Some(ctx) => match state.store().active_guest_binding(ctx.identity_id).await {
+                Ok(Some(binding)) if Some(binding.owner_account_id) == state.owner_account_id() => {
+                    Viewer::Guest {
+                        identity_id: ctx.identity_id,
+                        person_id: binding.person_id,
+                    }
+                }
+                _ => Viewer::Anonymous,
+            },
+            None => Viewer::Anonymous,
         };
         Ok(viewer)
     }

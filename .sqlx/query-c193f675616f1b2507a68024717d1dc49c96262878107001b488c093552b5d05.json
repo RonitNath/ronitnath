@@ -1,0 +1,98 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT f.id as \"id: i64\", f.identity_id as \"identity_id: i64\", f.kind,\n                      f.external_id, f.secret_hash, f.created_at, f.last_used_at\n               FROM people p\n               JOIN person_identity_links pil ON pil.account_id = p.account_id\n                    AND pil.person_id = p.id AND pil.unlinked_at IS NULL\n               JOIN factors f ON f.identity_id = pil.identity_id AND f.kind = 'password'\n                    AND f.external_id = 'guest:' || p.id\n               WHERE lower(p.recovery_email) = ?1\n               ORDER BY f.id LIMIT 2",
+  "describe": {
+    "columns": [
+      {
+        "name": "id: i64",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "factors",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "name": "identity_id: i64",
+        "ordinal": 1,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "factors",
+            "name": "identity_id"
+          }
+        }
+      },
+      {
+        "name": "kind",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "factors",
+            "name": "kind"
+          }
+        }
+      },
+      {
+        "name": "external_id",
+        "ordinal": 3,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "factors",
+            "name": "external_id"
+          }
+        }
+      },
+      {
+        "name": "secret_hash",
+        "ordinal": 4,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "factors",
+            "name": "secret_hash"
+          }
+        }
+      },
+      {
+        "name": "created_at",
+        "ordinal": 5,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "factors",
+            "name": "created_at"
+          }
+        }
+      },
+      {
+        "name": "last_used_at",
+        "ordinal": 6,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "factors",
+            "name": "last_used_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      true,
+      false,
+      true
+    ]
+  },
+  "hash": "c193f675616f1b2507a68024717d1dc49c96262878107001b488c093552b5d05"
+}

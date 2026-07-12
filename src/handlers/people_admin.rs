@@ -11,7 +11,8 @@ use crate::auth::extract::NavUser;
 use crate::auth::{AccountScope, Role, csrf};
 use crate::error::AppError;
 use crate::state::AppState;
-use crate::store::people::PersonHistory;
+use crate::store::people::{Person, PersonHistory};
+use crate::store::person_identity_links::ClaimStatus;
 use crate::view::render;
 
 #[derive(Template)]
@@ -37,6 +38,7 @@ pub async fn page(
         current_user: Some(NavUser {
             display_name: scope.display_name.clone(),
             csrf_token: scope.csrf_token.clone().unwrap_or_default(),
+            is_guest: false,
         }),
         csrf_token: scope.csrf_token.unwrap_or_default(),
         people,
@@ -83,6 +85,77 @@ pub async fn update(
         )
         .await?;
     Ok(Redirect::to(safe_return_to(&form.return_to)).into_response())
+}
+
+#[derive(Template)]
+#[template(path = "people/claim_status.html")]
+struct ClaimStatusTemplate {
+    nav_active: &'static str,
+    current_user: Option<NavUser>,
+    csrf_token: String,
+    person: Person,
+    status: Option<ClaimStatus>,
+}
+
+pub async fn claim_status(
+    State(state): State<AppState>,
+    scope: AccountScope,
+    Path(person_id): Path<i64>,
+) -> Result<Response, AppError> {
+    scope.require(Role::Admin)?;
+    let person = state
+        .store()
+        .find_person(scope.account_id, person_id)
+        .await?
+        .ok_or(AppError::NotFound)?;
+    let status = state
+        .store()
+        .claim_status(scope.account_id, person_id)
+        .await?;
+    render(ClaimStatusTemplate {
+        nav_active: "people",
+        current_user: Some(NavUser {
+            display_name: scope.display_name.clone(),
+            csrf_token: scope.csrf_token.clone().unwrap_or_default(),
+            is_guest: false,
+        }),
+        csrf_token: scope.csrf_token.unwrap_or_default(),
+        person,
+        status,
+    })
+}
+
+#[derive(Deserialize)]
+pub struct ForceUnlinkForm {
+    csrf_token: String,
+}
+
+pub async fn force_unlink(
+    State(state): State<AppState>,
+    scope: AccountScope,
+    Path(person_id): Path<i64>,
+    Form(form): Form<ForceUnlinkForm>,
+) -> Result<Response, AppError> {
+    scope.require(Role::Admin)?;
+    csrf::verify(&scope, &form.csrf_token)?;
+    let identity_id = state
+        .store()
+        .force_unlink_guest(scope.account_id, person_id)
+        .await?
+        .ok_or(AppError::NotFound)?;
+    state
+        .store()
+        .audit(
+            Some(scope.identity_id),
+            Some(scope.account_id),
+            None,
+            "guest.force_unlinked",
+            "person",
+            Some(&person_id.to_string()),
+            &serde_json::json!({"identity_id": identity_id}),
+        )
+        .await?;
+    Ok(Redirect::to(&format!("/people/{person_id}/claim-status")).into_response())
 }
 
 fn safe_return_to(value: &str) -> &str {

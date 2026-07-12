@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO person_identity_links (account_id, person_id, identity_id)\n            VALUES (?1, ?2, ?3)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "7b39775092f66f2477122ebc235067910b2bd0fbea9d374e539d627091b8c48a"
+}

@@ -19,7 +19,13 @@ use crate::error::AppError;
 /// comment on why that's safe), so `scope.csrf_token` being `None` always
 /// passes.
 pub fn verify(scope: &AccountScope, submitted: &str) -> Result<(), AppError> {
-    match &scope.csrf_token {
+    verify_optional(scope.csrf_token.as_deref(), submitted)
+}
+
+/// Checks a cookie-session synchronizer value. `None` means this request is
+/// anonymous and therefore has no ambient cookie authority to defend.
+pub fn verify_optional(expected: Option<&str>, submitted: &str) -> Result<(), AppError> {
+    match expected {
         None => Ok(()),
         Some(expected) if constant_time_eq(expected, submitted) => Ok(()),
         Some(_) => Err(AppError::Forbidden("missing or invalid CSRF token".into())),
@@ -31,5 +37,8 @@ fn constant_time_eq(a: &str, b: &str) -> bool {
     if a.len() != b.len() {
         return false;
     }
-    a.iter().zip(b.iter()).fold(0u8, |acc, (x, y)| acc | (x ^ y)) == 0
+    a.iter()
+        .zip(b.iter())
+        .fold(0u8, |acc, (x, y)| acc | (x ^ y))
+        == 0
 }

@@ -31,6 +31,7 @@ fn nav_user(scope: &AccountScope) -> Option<NavUser> {
     Some(NavUser {
         display_name: scope.display_name.clone(),
         csrf_token: scope.csrf_token.clone().unwrap_or_default(),
+        is_guest: false,
     })
 }
 

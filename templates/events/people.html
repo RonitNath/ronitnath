@@ -29,7 +29,7 @@
                 <td data-label="Group">{{ person.group_label }}</td>
                 <td data-label="Events">{{ person.events_attended }}</td>
                 <td data-label="History" class="muted">{{ person.events_list }}</td>
-                <td data-label="Edit"><a href="#person-{{ person.id }}">#</a></td>
+                <td data-label="Edit"><a href="#person-{{ person.id }}">Edit</a> · <a href="/people/{{ person.id }}/claim-status">Claim</a></td>
             </tr>
             {% endfor %}
         </tbody>

@@ -38,6 +38,7 @@ pub async fn index(scope: AccountScope) -> Result<Response, AppError> {
         current_user: Some(NavUser {
             display_name: scope.display_name,
             csrf_token: scope.csrf_token.unwrap_or_default(),
+            is_guest: false,
         }),
         account_name: scope.account_name,
     })
@@ -90,5 +91,10 @@ pub async fn api_create(
         )));
     }
 
-    Ok(Json(state.store().add_guestbook_entry(scope.account_id, entry).await?))
+    Ok(Json(
+        state
+            .store()
+            .add_guestbook_entry(scope.account_id, entry)
+            .await?,
+    ))
 }

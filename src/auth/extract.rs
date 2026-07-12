@@ -3,11 +3,11 @@
 //! the request. Also [`NavContext`], the lightweight "is anyone logged in"
 //! read every page (even public ones) uses to render the nav.
 
+use axum::Json;
 use axum::extract::FromRequestParts;
 use axum::http::request::Parts;
 use axum::http::{Extensions, StatusCode, header};
 use axum::response::{IntoResponse, Redirect, Response};
-use axum::Json;
 use serde_json::json;
 
 use crate::auth::Role;
@@ -21,6 +21,7 @@ use crate::store::sessions::SessionContext;
 pub struct NavUser {
     pub display_name: String,
     pub csrf_token: String,
+    pub is_guest: bool,
 }
 
 /// Reads the session context [`crate::auth::middleware::attach_session`]
@@ -35,6 +36,7 @@ pub fn nav_user_from_extensions(extensions: &Extensions) -> Option<NavUser> {
         .map(|ctx| NavUser {
             display_name: ctx.display_name,
             csrf_token: ctx.csrf_token,
+            is_guest: ctx.account_purpose == "guest",
         })
 }
 
@@ -86,7 +88,10 @@ impl AccountScope {
 impl FromRequestParts<AppState> for AccountScope {
     type Rejection = Response;
 
-    async fn from_request_parts(parts: &mut Parts, state: &AppState) -> Result<Self, Self::Rejection> {
+    async fn from_request_parts(
+        parts: &mut Parts,
+        state: &AppState,
+    ) -> Result<Self, Self::Rejection> {
         if let Some(token) = bearer_token(&parts.headers) {
             return match crate::auth::api_token::verify(state.store(), token).await {
                 Ok(Some(verified)) => Ok(AccountScope {
@@ -121,6 +126,53 @@ impl FromRequestParts<AppState> for AccountScope {
                 })
             }
             false => Err(unauthenticated(parts)),
+        }
+    }
+}
+
+/// A claimed guest session, resolved back to the owner's account and person.
+/// The session's own guest account is deliberately not exposed to domain handlers.
+pub struct GuestScope {
+    pub identity_id: i64,
+    pub owner_account_id: i64,
+    pub person_id: i64,
+    pub person_name: String,
+    pub session_id: i64,
+    pub csrf_token: String,
+}
+
+impl FromRequestParts<AppState> for GuestScope {
+    type Rejection = Response;
+
+    async fn from_request_parts(
+        parts: &mut Parts,
+        state: &AppState,
+    ) -> Result<Self, Self::Rejection> {
+        let Some(ctx) = parts
+            .extensions
+            .get::<Option<SessionContext>>()
+            .cloned()
+            .flatten()
+        else {
+            return Err(unauthenticated(parts));
+        };
+        let binding = state
+            .store()
+            .active_guest_binding(ctx.identity_id)
+            .await
+            .ok()
+            .flatten()
+            .filter(|binding| Some(binding.owner_account_id) == state.owner_account_id());
+        match binding {
+            Some(binding) => Ok(Self {
+                identity_id: ctx.identity_id,
+                owner_account_id: binding.owner_account_id,
+                person_id: binding.person_id,
+                person_name: binding.person_name,
+                session_id: ctx.session_id,
+                csrf_token: ctx.csrf_token,
+            }),
+            None => Err(unauthenticated(parts)),
         }
     }
 }

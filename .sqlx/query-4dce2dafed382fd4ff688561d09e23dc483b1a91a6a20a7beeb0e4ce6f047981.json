@@ -1,0 +1,62 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT pil.account_id as \"owner_account_id!: i64\", pil.person_id as \"person_id!: i64\",\n                      p.name as person_name, pil.identity_id as \"identity_id!: i64\"\n               FROM person_identity_links pil\n               JOIN people p ON p.account_id = pil.account_id AND p.id = pil.person_id\n               WHERE pil.identity_id = ?1 AND pil.unlinked_at IS NULL",
+  "describe": {
+    "columns": [
+      {
+        "name": "owner_account_id!: i64",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "person_identity_links",
+            "name": "account_id"
+          }
+        }
+      },
+      {
+        "name": "person_id!: i64",
+        "ordinal": 1,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "person_identity_links",
+            "name": "person_id"
+          }
+        }
+      },
+      {
+        "name": "person_name",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "people",
+            "name": "name"
+          }
+        }
+      },
+      {
+        "name": "identity_id!: i64",
+        "ordinal": 3,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "person_identity_links",
+            "name": "identity_id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "4dce2dafed382fd4ff688561d09e23dc483b1a91a6a20a7beeb0e4ce6f047981"
+}

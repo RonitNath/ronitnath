@@ -20,6 +20,7 @@ pub struct SessionContext {
     pub display_name: String,
     pub account_id: i64,
     pub account_name: String,
+    pub account_purpose: String,
     pub role: String,
 }
 
@@ -66,13 +67,16 @@ impl Store {
     /// revoked/expired, or the membership backing it no longer exists (the
     /// join requires a live `memberships` row) — all three read as "not
     /// authenticated" to the caller.
-    pub async fn find_session_context(&self, token_hash: &str) -> sqlx::Result<Option<SessionContext>> {
+    pub async fn find_session_context(
+        &self,
+        token_hash: &str,
+    ) -> sqlx::Result<Option<SessionContext>> {
         sqlx::query_as!(
             SessionContext,
             r#"SELECT s.id as "session_id: i64", s.csrf_token,
                       s.identity_id as "identity_id: i64", i.display_name,
                       s.account_id as "account_id: i64", a.name as account_name,
-                      m.role
+                      a.purpose as account_purpose, m.role
                FROM sessions s
                JOIN identities i ON i.id = s.identity_id AND i.deleted_at IS NULL
                JOIN accounts a ON a.id = s.account_id AND a.deleted_at IS NULL
@@ -98,7 +102,11 @@ impl Store {
         Ok(())
     }
 
-    pub async fn list_sessions(&self, identity_id: i64, current_session_id: i64) -> sqlx::Result<Vec<SessionSummary>> {
+    pub async fn list_sessions(
+        &self,
+        identity_id: i64,
+        current_session_id: i64,
+    ) -> sqlx::Result<Vec<SessionSummary>> {
         let rows = sqlx::query!(
             r#"SELECT id as "id: i64", created_at, last_seen_at, user_agent, ip
                FROM sessions

@@ -1,0 +1,16 @@
+{% extends "_layout.html" %}
+{% block title %}Claim status · {{ person.name }}{% endblock %}
+{% block content %}
+<section class="hero"><h1>{{ person.name }}</h1><p class="subtitle">Guest account claim status</p></section>
+<section class="admin-card">
+{% if let Some(claim) = status %}
+  <dl><dt>Claimed</dt><dd>{{ claim.claimed_at }}</dd><dt>Identity</dt><dd>{{ claim.display_name }} (#{{ claim.identity_id }})</dd><dt>Login factors</dt><dd>{{ claim.factor_count }}</dd></dl>
+  <form method="post" action="/people/{{ person.id }}/claim-status/unlink">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+    <button type="submit" class="danger">Force unlink</button>
+  </form>
+{% else %}
+  <p>Not claimed.</p>
+{% endif %}
+</section>
+{% endblock %}

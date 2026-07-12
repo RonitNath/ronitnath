@@ -39,7 +39,8 @@ pub async fn signup(
         ));
     }
 
-    let hash = password::hash(password_plain).map_err(|e| anyhow::anyhow!("hashing password: {e}"))?;
+    let hash =
+        password::hash(password_plain).map_err(|e| anyhow::anyhow!("hashing password: {e}"))?;
     let (identity_id, account_id) = state
         .store()
         .signup_with_password(display_name, &email, &hash)
@@ -74,7 +75,10 @@ pub async fn login(
     ctx: RequestContext<'_>,
 ) -> Result<LoginOutcome, AppError> {
     let email = email.trim().to_lowercase();
-    let factor = state.store().find_factor_by_external("password", &email).await?;
+    let factor = state
+        .store()
+        .find_factor_by_external("password", &email)
+        .await?;
 
     // `password::verify` always runs — against a dummy hash when `factor`
     // is `None` — so "unknown email" and "wrong password" take the same
@@ -87,9 +91,19 @@ pub async fn login(
     if !verified {
         state
             .store()
-            .audit(None, None, ctx.request_id, "login.failed", "identity", None, &json!({ "email": email }))
+            .audit(
+                None,
+                None,
+                ctx.request_id,
+                "login.failed",
+                "identity",
+                None,
+                &json!({ "email": email }),
+            )
             .await?;
-        return Err(AppError::InvalidCredentials("incorrect email or password".into()));
+        return Err(AppError::InvalidCredentials(
+            "incorrect email or password".into(),
+        ));
     }
     let factor = factor.expect("verify() only returns true against a real hash");
 
@@ -97,7 +111,12 @@ pub async fn login(
         .store()
         .find_primary_membership(factor.identity_id)
         .await?
-        .ok_or_else(|| anyhow::anyhow!("identity {} has a password factor but no membership", factor.identity_id))?;
+        .ok_or_else(|| {
+            anyhow::anyhow!(
+                "identity {} has a password factor but no membership",
+                factor.identity_id
+            )
+        })?;
 
     state.store().touch_factor_last_used(factor.id).await?;
     state
@@ -116,8 +135,67 @@ pub async fn login(
     issue_session(state, factor.identity_id, membership.account_id, ctx).await
 }
 
+/// Guest login uses recovery email only as a locator; the password factor keeps
+/// its synthetic `guest:{person_id}` external id. Unknown/ambiguous emails still
+/// execute the same dummy Argon2 verification as admin login.
+pub async fn guest_login(
+    state: &AppState,
+    email: &str,
+    password_plain: &str,
+    ctx: RequestContext<'_>,
+) -> Result<LoginOutcome, AppError> {
+    let email = email.trim().to_lowercase();
+    let factor = state.store().find_guest_password_by_email(&email).await?;
+    let verified = password::verify(
+        password_plain,
+        factor.as_ref().and_then(|f| f.secret_hash.as_deref()),
+    );
+    if !verified {
+        state
+            .store()
+            .audit(
+                None,
+                state.owner_account_id(),
+                ctx.request_id,
+                "guest.login.failed",
+                "identity",
+                None,
+                &json!({ "identifier_kind": "recovery_email" }),
+            )
+            .await?;
+        return Err(AppError::InvalidCredentials(
+            "incorrect email or password".into(),
+        ));
+    }
+    let factor = factor.expect("verify() only returns true against a real hash");
+    let membership = state
+        .store()
+        .find_primary_membership(factor.identity_id)
+        .await?
+        .ok_or_else(|| {
+            anyhow::anyhow!("guest identity {} has no membership", factor.identity_id)
+        })?;
+    state.store().touch_factor_last_used(factor.id).await?;
+    state
+        .store()
+        .audit(
+            Some(factor.identity_id),
+            state.owner_account_id(),
+            ctx.request_id,
+            "guest.login.succeeded",
+            "identity",
+            Some(&factor.identity_id.to_string()),
+            &json!({}),
+        )
+        .await?;
+    issue_session(state, factor.identity_id, membership.account_id, ctx).await
+}
+
 pub async fn logout(state: &AppState, session_id: i64, identity_id: i64) -> Result<(), AppError> {
-    state.store().revoke_session(session_id, identity_id).await?;
+    state
+        .store()
+        .revoke_session(session_id, identity_id)
+        .await?;
     Ok(())
 }
 
@@ -143,8 +221,19 @@ async fn issue_session(
 
     state
         .store()
-        .create_session(identity_id, account_id, &token_hash, &csrf_token, &expires_at, ctx.user_agent, ctx.ip)
+        .create_session(
+            identity_id,
+            account_id,
+            &token_hash,
+            &csrf_token,
+            &expires_at,
+            ctx.user_agent,
+            ctx.ip,
+        )
         .await?;
 
-    Ok(LoginOutcome { raw_token, ttl_secs })
+    Ok(LoginOutcome {
+        raw_token,
+        ttl_secs,
+    })
 }

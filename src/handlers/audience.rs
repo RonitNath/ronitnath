@@ -81,6 +81,7 @@ pub async fn page(
         current_user: Some(NavUser {
             display_name: scope.display_name.clone(),
             csrf_token: scope.csrf_token.clone().unwrap_or_default(),
+            is_guest: false,
         }),
         csrf_token: scope.csrf_token.clone().unwrap_or_default(),
         grants: store
