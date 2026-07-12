@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT sr.schedule_item_id as \"schedule_item_id!: i64\", sr.status\n               FROM segment_rsvps sr\n               JOIN schedule_items si ON si.id = sr.schedule_item_id\n               WHERE sr.account_id = ?1 AND si.event_id = ?2 AND sr.person_id = ?3",
+  "query": "SELECT sr.schedule_item_id as \"schedule_item_id!: i64\", sr.status\n               FROM segment_rsvps sr\n               JOIN schedule_items si\n                 ON si.account_id = sr.account_id AND si.id = sr.schedule_item_id\n               WHERE sr.account_id = ?1 AND si.event_id = ?2 AND sr.person_id = ?3\n                 AND ?4 >= 2 AND (si.tier = 'public' OR ?4 = 3)\n               ORDER BY si.sort_order, si.id",
   "describe": {
     "columns": [
       {
@@ -27,12 +27,12 @@
       }
     ],
     "parameters": {
-      "Right": 3
+      "Right": 4
     },
     "nullable": [
       false,
       false
     ]
   },
-  "hash": "e96b69e4cccdc5325b47f763f2b636135c1975b57b608b03fda11e266b602bc5"
+  "hash": "66d8e4ed87132f68b4dc42fd16a7edb9d062abb295e9da727817832bb33d36f9"
 }

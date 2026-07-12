@@ -129,7 +129,9 @@ async fn build_view(
     let schedule = store
         .list_schedule(link.account_id, event.id, level)
         .await?;
-    let segment_counts = store.segment_counts(link.account_id, event.id).await?;
+    let segment_counts = store
+        .segment_counts(link.account_id, event.id, level)
+        .await?;
 
     let person = match link.person_id {
         Some(person_id) => match store.find_person(link.account_id, person_id).await? {
@@ -139,7 +141,7 @@ async fn build_view(
                     .find_attendance(link.account_id, event.id, person_id)
                     .await?,
                 segments: store
-                    .list_segment_rsvps_for_person(link.account_id, event.id, person_id)
+                    .list_segment_rsvps_for_person(link.account_id, event.id, person_id, level)
                     .await?,
             }),
             None => None,

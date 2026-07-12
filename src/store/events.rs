@@ -372,7 +372,12 @@ mod tests {
 
         let busy = serde_json::to_value(event.view_for(Level::Busy).unwrap()).unwrap();
         assert_eq!(busy["starts_at"], "2026-07-04 13:00");
+        // Capability links floor public hits to Summary and private hits to
+        // Full, so Busy is currently reachable only by future browsing
+        // surfaces. Guard the exact serialized/template input shape here.
         assert!(busy.get("title").is_none());
+        assert!(busy.get("summary").is_none());
+        assert!(busy.get("greeting").is_none());
         assert!(busy.get("address").is_none());
         assert!(busy.get("entry_instructions").is_none());
 

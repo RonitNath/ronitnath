@@ -7,6 +7,7 @@ use ts_rs::TS;
 use utoipa::ToSchema;
 
 use super::Store;
+use crate::access::level::Level;
 
 #[derive(Debug, Serialize, sqlx::FromRow, TS, ToSchema)]
 #[ts(export)]
@@ -96,16 +97,22 @@ impl Store {
         account_id: i64,
         event_id: i64,
         person_id: i64,
+        level: Level,
     ) -> sqlx::Result<Vec<SegmentRsvp>> {
+        let level = level as i64;
         sqlx::query_as!(
             SegmentRsvp,
             r#"SELECT sr.schedule_item_id as "schedule_item_id!: i64", sr.status
                FROM segment_rsvps sr
-               JOIN schedule_items si ON si.id = sr.schedule_item_id
-               WHERE sr.account_id = ?1 AND si.event_id = ?2 AND sr.person_id = ?3"#,
+               JOIN schedule_items si
+                 ON si.account_id = sr.account_id AND si.id = sr.schedule_item_id
+               WHERE sr.account_id = ?1 AND si.event_id = ?2 AND sr.person_id = ?3
+                 AND ?4 >= 2 AND (si.tier = 'public' OR ?4 = 3)
+               ORDER BY si.sort_order, si.id"#,
             account_id,
             event_id,
             person_id,
+            level,
         )
         .fetch_all(&self.pool)
         .await
@@ -115,7 +122,9 @@ impl Store {
         &self,
         account_id: i64,
         event_id: i64,
+        level: Level,
     ) -> sqlx::Result<Vec<SegmentCount>> {
+        let level = level as i64;
         sqlx::query_as!(
             SegmentCount,
             r#"SELECT si.id as "schedule_item_id!: i64",
@@ -125,9 +134,12 @@ impl Store {
                LEFT JOIN segment_rsvps sr
                  ON sr.account_id = si.account_id AND sr.schedule_item_id = si.id
                WHERE si.account_id = ?1 AND si.event_id = ?2 AND si.segment_key IS NOT NULL
-               GROUP BY si.id"#,
+                 AND ?3 >= 2 AND (si.tier = 'public' OR ?3 = 3)
+               GROUP BY si.id
+               ORDER BY si.sort_order, si.id"#,
             account_id,
             event_id,
+            level,
         )
         .fetch_all(&self.pool)
         .await
@@ -136,7 +148,11 @@ impl Store {
     /// Live count of guests marked `in` for a named segment (e.g.
     /// `sleepover`) — for the public landing page, unscoped like
     /// `Store::public_attendee_count`.
-    pub async fn public_segment_in_count(&self, event_id: i64, segment_key: &str) -> sqlx::Result<i64> {
+    pub async fn public_segment_in_count(
+        &self,
+        event_id: i64,
+        segment_key: &str,
+    ) -> sqlx::Result<i64> {
         let row = sqlx::query!(
             r#"SELECT COALESCE(SUM(CASE WHEN sr.status = 'in' THEN 1 ELSE 0 END), 0) as "count!: i64"
                FROM segment_rsvps sr

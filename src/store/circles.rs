@@ -93,8 +93,8 @@ impl Store {
         account_id: i64,
         circle_id: i64,
         person_id: i64,
-    ) -> sqlx::Result<()> {
-        sqlx::query!(
+    ) -> sqlx::Result<u64> {
+        Ok(sqlx::query!(
             r#"INSERT INTO circle_members (account_id, circle_id, person_id)
             SELECT ?1, c.id, p.id FROM circles c JOIN people p ON p.account_id = c.account_id
             WHERE c.account_id = ?1 AND c.id = ?2 AND p.id = ?3"#,
@@ -103,8 +103,8 @@ impl Store {
             person_id
         )
         .execute(&self.pool)
-        .await?;
-        Ok(())
+        .await?
+        .rows_affected())
     }
 
     pub async fn remove_circle_member(

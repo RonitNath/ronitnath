@@ -163,10 +163,14 @@ pub async fn add_member(
 ) -> Result<Response, AppError> {
     scope.require(Role::Admin)?;
     csrf::verify(&scope, &form.csrf_token)?;
-    state
+    if state
         .store()
         .add_circle_member(scope.account_id, id, form.person_id)
-        .await?;
+        .await?
+        == 0
+    {
+        return Err(AppError::NotFound);
+    }
     state
         .store()
         .audit(
@@ -194,10 +198,14 @@ pub async fn remove_member(
 ) -> Result<Response, AppError> {
     scope.require(Role::Admin)?;
     csrf::verify(&scope, &form.csrf_token)?;
-    state
+    if state
         .store()
         .remove_circle_member(scope.account_id, id, person_id)
-        .await?;
+        .await?
+        == 0
+    {
+        return Err(AppError::NotFound);
+    }
     state
         .store()
         .audit(

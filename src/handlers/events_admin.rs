@@ -174,7 +174,9 @@ pub async fn detail_page(
     let schedule = store
         .list_schedule(scope.account_id, event_id, Level::Full)
         .await?;
-    let segment_counts = store.segment_counts(scope.account_id, event_id).await?;
+    let segment_counts = store
+        .segment_counts(scope.account_id, event_id, Level::Full)
+        .await?;
     let raw_links = store.list_event_links(scope.account_id, event_id).await?;
     let attendance = store.list_attendance(scope.account_id, event_id).await?;
     let people = store.list_people(scope.account_id).await?;

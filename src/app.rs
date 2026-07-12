@@ -940,6 +940,221 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn guest_json_redacts_private_segment_ids_at_summary_and_includes_them_at_full() {
+        use crate::access::level::Level;
+        use crate::auth::session::hash_token;
+
+        let (app, store) = test_site_app().await;
+        let (event_id, public_token, _, public_item, private_item) = seed_event(&store).await;
+        let person = store.create_person(1, "Segment Guest", "").await.unwrap();
+        store
+            .upsert_segment_rsvp(1, public_item, person.id, "in")
+            .await
+            .unwrap();
+        store
+            .upsert_segment_rsvp(1, private_item, person.id, "maybe")
+            .await
+            .unwrap();
+        let public_person_token = "summary-segment-person";
+        let private_person_token = "full-segment-person";
+        for (raw, tier) in [
+            (public_person_token, "public"),
+            (private_person_token, "private"),
+        ] {
+            store
+                .create_event_link(
+                    1,
+                    event_id,
+                    Some(person.id),
+                    &hash_token(raw),
+                    raw,
+                    "person",
+                    tier,
+                )
+                .await
+                .unwrap();
+        }
+
+        let (status, _, body) = get(&app, &format!("/api/e/{public_token}")).await;
+        assert_eq!(status, StatusCode::OK);
+        let summary_shared: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(
+            summary_shared["segment_counts"],
+            serde_json::json!([{
+                "schedule_item_id": public_item,
+                "in_count": 1,
+                "maybe_count": 0
+            }])
+        );
+
+        let (status, _, body) = get(&app, &format!("/api/e/{public_person_token}")).await;
+        assert_eq!(status, StatusCode::OK);
+        let summary_person: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(
+            summary_person["person"]["segments"],
+            serde_json::json!([{"schedule_item_id": public_item, "status": "in"}])
+        );
+        assert_eq!(
+            summary_person["schedule"],
+            serde_json::json!([{
+                "id": public_item,
+                "sort_order": 0,
+                "time_label": "1:00 PM",
+                "title": "Board games",
+                "detail": "",
+                "tier": "public",
+                "segment_key": "board_games"
+            }])
+        );
+
+        let (status, _, body) = get(&app, &format!("/api/e/{private_person_token}")).await;
+        assert_eq!(status, StatusCode::OK);
+        let full: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(
+            full["segment_counts"],
+            serde_json::json!([
+                {"schedule_item_id": public_item, "in_count": 1, "maybe_count": 0},
+                {"schedule_item_id": private_item, "in_count": 0, "maybe_count": 1}
+            ])
+        );
+        assert_eq!(
+            full["person"]["segments"],
+            serde_json::json!([
+                {"schedule_item_id": public_item, "status": "in"},
+                {"schedule_item_id": private_item, "status": "maybe"}
+            ])
+        );
+        assert_eq!(
+            store
+                .segment_counts(1, event_id, Level::Summary)
+                .await
+                .unwrap()
+                .len(),
+            1
+        );
+    }
+
+    #[tokio::test]
+    async fn person_include_hidden_is_hidden_when_browsing_but_links_apply_tier_floors() {
+        use crate::access::level::Level;
+        use crate::auth::session::hash_token;
+        use crate::auth::viewer::Viewer;
+
+        let (app, store) = test_site_app().await;
+        let (event_id, _, _, _, _) = seed_event(&store).await;
+        let person = store.create_person(1, "Hidden Guest", "").await.unwrap();
+        let policy = store
+            .find_audience_policy(1, "event", event_id)
+            .await
+            .unwrap()
+            .unwrap();
+        store
+            .set_person_override(1, policy.id, person.id, Some("include"), Some("hidden"))
+            .await
+            .unwrap();
+        let inputs = store
+            .audience_inputs_for_event(1, event_id, Some(person.id))
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            inputs
+                .level_for(&Viewer::LinkHolder {
+                    person_id: Some(person.id),
+                    event_id,
+                })
+                .unwrap(),
+            Level::Hidden,
+            "include:hidden must suppress the event on browsing surfaces"
+        );
+
+        for (raw, tier) in [
+            ("hidden-public-link", "public"),
+            ("hidden-private-link", "private"),
+        ] {
+            store
+                .create_event_link(
+                    1,
+                    event_id,
+                    Some(person.id),
+                    &hash_token(raw),
+                    raw,
+                    "person",
+                    tier,
+                )
+                .await
+                .unwrap();
+        }
+        let (status, _, body) = get(&app, "/api/e/hidden-public-link").await;
+        assert_eq!(status, StatusCode::OK);
+        let summary: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(summary["event"]["title"], "Test Party");
+        assert!(summary["event"]["address"].is_null());
+        let (status, _, body) = get(&app, "/api/e/hidden-private-link").await;
+        assert_eq!(status, StatusCode::OK);
+        let full: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(full["event"]["address"], "1 Secret St");
+    }
+
+    #[tokio::test]
+    async fn person_circle_full_grant_beats_summary_public_level_end_to_end() {
+        use crate::auth::session::hash_token;
+
+        let (app, store) = test_site_app().await;
+        let (event_id, _, _, _, _) = seed_event(&store).await;
+        let person = store
+            .create_person(1, "Full Circle Guest", "")
+            .await
+            .unwrap();
+        let circle_id = store.create_circle(1, "Inner Circle").await.unwrap();
+        assert_eq!(
+            store
+                .add_circle_member(1, circle_id, person.id)
+                .await
+                .unwrap(),
+            1
+        );
+        let policy = store
+            .find_audience_policy(1, "event", event_id)
+            .await
+            .unwrap()
+            .unwrap();
+        store
+            .set_public_level(1, policy.id, "summary")
+            .await
+            .unwrap();
+        store
+            .set_circle_grant(1, policy.id, circle_id, Some("full"))
+            .await
+            .unwrap();
+        let raw = "circle-full-person-link";
+        store
+            .create_event_link(
+                1,
+                event_id,
+                Some(person.id),
+                &hash_token(raw),
+                raw,
+                "person",
+                "public",
+            )
+            .await
+            .unwrap();
+
+        let (status, _, body) = get(&app, &format!("/api/e/{raw}")).await;
+        assert_eq!(status, StatusCode::OK);
+        let view: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(view["event"]["address"], "1 Secret St");
+        assert!(
+            view["schedule"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|item| item["tier"] == "private")
+        );
+    }
+
+    #[tokio::test]
     async fn person_exclude_beats_public_and_circles_while_multi_circle_uses_max() {
         use crate::auth::session::hash_token;
 
@@ -1287,6 +1502,79 @@ mod tests {
         store.revoke_event_link(1, public_link.id).await.unwrap();
         let (status, _, _) = get(&app, &format!("/e/{public_token}")).await;
         assert_eq!(status, StatusCode::NOT_FOUND);
+    }
+
+    #[tokio::test]
+    async fn circle_member_cross_account_ids_return_404_without_auditing() {
+        let (app, store) = test_app().await;
+        let owner = signup(&app, "Owner", "circle-owner@example.com", "password123").await;
+        let owner_account = authed_account(&store, "circle-owner@example.com").await;
+        let owner_circle = store
+            .create_circle(owner_account, "Owner Circle")
+            .await
+            .unwrap();
+        let owner_person = store
+            .create_person(owner_account, "Owner Person", "")
+            .await
+            .unwrap();
+
+        signup(&app, "Other", "circle-other@example.com", "password123").await;
+        let other_account = authed_account(&store, "circle-other@example.com").await;
+        let other_circle = store
+            .create_circle(other_account, "Other Circle")
+            .await
+            .unwrap();
+        let other_person = store
+            .create_person(other_account, "Other Person", "")
+            .await
+            .unwrap();
+
+        let added_before = store
+            .count_audit_events("circle.member_added")
+            .await
+            .unwrap();
+        for (circle_id, person_id) in [
+            (other_circle, owner_person.id),
+            (owner_circle, other_person.id),
+        ] {
+            let form = format!("person_id={person_id}&csrf_token={}", owner.csrf_token);
+            let (status, _, _) = post_form_with_cookie(
+                &app,
+                &format!("/circles/{circle_id}/members"),
+                &form,
+                Some(&owner.cookie),
+            )
+            .await;
+            assert_eq!(status, StatusCode::NOT_FOUND);
+        }
+        assert_eq!(
+            store
+                .count_audit_events("circle.member_added")
+                .await
+                .unwrap(),
+            added_before
+        );
+
+        let removed_before = store
+            .count_audit_events("circle.member_removed")
+            .await
+            .unwrap();
+        let form = format!("csrf_token={}", owner.csrf_token);
+        let (status, _, _) = post_form_with_cookie(
+            &app,
+            &format!("/circles/{owner_circle}/members/{}/delete", other_person.id),
+            &form,
+            Some(&owner.cookie),
+        )
+        .await;
+        assert_eq!(status, StatusCode::NOT_FOUND);
+        assert_eq!(
+            store
+                .count_audit_events("circle.member_removed")
+                .await
+                .unwrap(),
+            removed_before
+        );
     }
 
     #[tokio::test]
