@@ -14,8 +14,8 @@ Events keeps :3117/:3118 until cutover; both run side by side on nexus.
 | # | Phase | File | Status |
 |---|-------|------|--------|
 | 0 | Bootstrap (repo, two-bin split) | phase-0-bootstrap.md | done |
-| 1 | Design brief + token port | phase-1-design.md | in progress |
-| 2 | Domain port from events | phase-2-domain-port.md | pending |
+| 1 | Design brief + token port | phase-1-design.md | done |
+| 2 | Domain port from events | phase-2-domain-port.md | in progress |
 | 3 | Visibility (circles + levels) | phase-3-visibility.md | pending |
 | 4 | Guest accounts (claim + password) | phase-4-guest-accounts.md | pending |
 | 5 | Photos | phase-5-photos.md | pending |
@@ -31,3 +31,5 @@ evidence, worktree clean) before the next is dispatched.
 | Phase | Leg | Worker | Model/effort | Job/commit | Evidence |
 |-------|-----|--------|--------------|------------|----------|
 | 0 | two-bin split | pi_codex | gpt-5.6-sol / medium | job 7663a885 → 36f98c1, 635beb9 | 26/26 tests (orchestrator re-ran); both bins booted, healthz ok; admin /login 200, site /login 404; sqlx cache committed; docker unavailable on mu — compose validated at deploy. Deviation (accepted): site owns migrations, admin fails fast on stale schema (connect_existing). |
+| 1 | design brief + token port | claude sonnet | sonnet / default | 9334ba6 | Brief + tokens + atmosphere + home/auth restyle; 2 real bugs fixed (CRLF→CSP hash normalization — upstream to stage_2; :user-invalid). Screenshots vs legacy at 360-1280 dark+light, viewed by orchestrator. Deviations accepted: 768px mobile breakpoint, localStorage theme kept, static/css/ paths. |
+| 1 | gate fix round | pi_codex | gpt-5.6-sol / medium (luna broken via MCP — memory) | job 4b1ef265 → 0485a2e | 27/27 tests incl. new site_home_does_not_advertise_auth; orchestrator live-verified: site-bin HTML has zero /login//signup refs, nav = Home/About + monochrome SVG toggle, both themes screenshot-verified. |
