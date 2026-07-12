@@ -2684,6 +2684,7 @@ mod tests {
             .count_audit_events("guest.login.failed")
             .await
             .unwrap();
+        let dummy_before = crate::auth::password::dummy_verify_count();
         assert_eq!(
             post_form(
                 &app,
@@ -2694,6 +2695,8 @@ mod tests {
             .0,
             StatusCode::UNAUTHORIZED
         );
+        assert!(crate::auth::password::dummy_verify_count() > dummy_before,
+            "unknown guest identifiers must execute the dummy Argon2 verify");
         assert_eq!(
             store
                 .count_audit_events("guest.login.failed")
