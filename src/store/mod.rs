@@ -45,6 +45,31 @@ impl Store {
         Ok(store)
     }
 
+    /// Opens an existing database without applying migrations. The admin
+    /// bin uses this so schema changes are applied by `site` first.
+    pub async fn connect_existing(database_url: &str) -> anyhow::Result<Self> {
+        let options = SqliteConnectOptions::from_str(database_url)?.create_if_missing(false);
+        let pool = SqlitePoolOptions::new().connect_with(options).await?;
+        let expected = MIGRATOR
+            .iter()
+            .map(|migration| migration.version)
+            .max()
+            .ok_or_else(|| anyhow::anyhow!("no embedded migrations"))?;
+        let applied = sqlx::query_scalar!(
+            r#"SELECT MAX(version) as "version?: i64" FROM _sqlx_migrations"#
+        )
+        .fetch_optional(&pool)
+        .await?
+        .flatten();
+        match applied {
+            Some(version) if version == expected => Ok(Self { pool }),
+            Some(version) => anyhow::bail!(
+                "database migration version {version} is not current; expected {expected}"
+            ),
+            None => anyhow::bail!("database has no applied migrations; start site first"),
+        }
+    }
+
     /// An in-memory, migrated database for tests. Each call gets its own
     /// isolated instance, so tests can run in parallel (validation.md).
     #[cfg(test)]

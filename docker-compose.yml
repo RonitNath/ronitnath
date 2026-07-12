@@ -1,5 +1,5 @@
-# Public site and mesh-only admin share one sqlite store (WAL). Both bins
-# safely apply pending sqlx migrations during startup.
+# Public site and mesh-only admin share one sqlite store (WAL). The site
+# owns migrations; admin retries until that migrated store is available.
 services:
   ronitnath-site:
     build: .

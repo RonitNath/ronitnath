@@ -175,10 +175,13 @@ fn auth_config(config: &Config) -> AuthConfig {
     }
 }
 
-async fn state(config: &Config) -> AppState {
-    let store = Store::connect(&config.database_url)
-        .await
-        .unwrap_or_else(|e| panic!("failed to open database at {}: {e}", config.database_url));
+async fn state(config: &Config, migrate: bool) -> AppState {
+    let store = if migrate {
+        Store::connect(&config.database_url).await
+    } else {
+        Store::connect_existing(&config.database_url).await
+    }
+    .unwrap_or_else(|e| panic!("failed to open database at {}: {e}", config.database_url));
     let oidc = auth::oidc::OidcRegistry::from_path(&config.oidc_providers_path)
         .await
         .unwrap_or_else(|e| {
@@ -192,13 +195,13 @@ async fn state(config: &Config) -> AppState {
 
 pub async fn run_site() {
     let config = Config::from_env();
-    let app = build_site_router(state(&config).await, &config);
+    let app = build_site_router(state(&config, true).await, &config);
     serve(app, &config.bind_addr).await;
 }
 
 pub async fn run_admin() {
     let config = Config::from_env();
-    let app = build_admin_router(state(&config).await, &config);
+    let app = build_admin_router(state(&config, false).await, &config);
     serve(app, &config.admin_bind_addr).await;
 }
 
