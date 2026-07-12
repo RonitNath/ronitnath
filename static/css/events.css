@@ -19,12 +19,25 @@
 .event-schedule li { display: grid; grid-template-columns: 6rem 1fr; gap: 1rem; padding: .75rem 0; border-bottom: 1px solid var(--border); }
 .schedule-time { color: var(--fg-muted); font-variant-numeric: tabular-nums; text-align: right; }
 
-/* July 4 is the one poster theme: accent, atmosphere, and display face only. */
+/* July 4 is the one poster theme: accent, atmosphere, and display face only.
+   Saira Condensed is the face the original invite shipped with. */
+@font-face {
+    font-family: "Saira Condensed";
+    font-weight: 600;
+    font-display: swap;
+    src: url("/static/fonts/saira-condensed-600-latin.woff2") format("woff2");
+}
+@font-face {
+    font-family: "Saira Condensed";
+    font-weight: 700;
+    font-display: swap;
+    src: url("/static/fonts/saira-condensed-700-latin.woff2") format("woff2");
+}
 .event-poster-july4 {
     --accent: oklch(0.78 0.14 80);
     --accent-hover: oklch(0.84 0.13 80);
     --accent-fg: oklch(0.10 0.02 80);
-    --font-display: Georgia, serif;
+    --font-display: "Saira Condensed", system-ui, sans-serif;
 }
 .event-poster-july4::before {
     content: "";

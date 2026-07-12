@@ -135,6 +135,15 @@ h3 {
     margin: 0 0 0.5rem;
 }
 
+/* Content links take the accent token (poster themes re-tint them via
+   --accent). Component classes (nav, pills) override with their own rules. */
+a {
+    color: var(--accent);
+}
+a:hover {
+    color: var(--accent-hover);
+}
+
 /* Utilities */
 .hidden {
     display: none !important;
