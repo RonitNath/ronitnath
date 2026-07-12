@@ -1,25 +1,31 @@
 /* Page chrome: top bar, navigation, auth links, the mobile drawer, and the
-   main content container. */
+   main content container. Visual language ported from the legacy
+   ronitnath.com nav (transparent bar, uppercase small-caps links, bordered
+   icon button) — see docs/design.md. */
 
 /* Top bar: left logo, center nav, right auth.
    `.brand` and `.auth` each take an equal flex share so the natural-width
-   `.nav` between them sits centered. */
+   `.nav` between them sits centered. Transparent background (not a filled
+   surface) + border-bottom, matching the legacy site exactly. Sits above
+   the fixed atmosphere layer via z-index. */
 .topbar {
     position: relative;
+    z-index: 1;
     display: flex;
     align-items: center;
-    background: var(--surface);
+    background: transparent;
     border-bottom: 1px solid var(--border);
-    padding: 0 2rem;
-    height: 60px;
-    box-shadow: var(--shadow);
+    padding: 0.85rem 2rem;
 }
 
 .brand {
     flex: 1;
-    font-weight: 700;
-    font-size: 1.15rem;
-    color: var(--text);
+    font-family: var(--font-body);
+    font-weight: 600;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--fg);
     text-decoration: none;
 }
 
@@ -31,26 +37,30 @@
 
 .nav {
     display: flex;
-    gap: 0.5rem;
+    gap: 1.5rem;
 }
 
 .nav a {
-    padding: 0.5rem 0.9rem;
-    border-radius: var(--radius);
-    color: var(--muted);
+    padding: 0.35rem 0;
+    color: var(--fg-muted);
     text-decoration: none;
-    font-weight: 500;
-    font-size: 0.95rem;
+    font-weight: 400;
+    font-size: 0.875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border-bottom: 2px solid transparent;
+    transition:
+        color 0.15s ease,
+        border-color 0.15s ease;
 }
 
 .nav a:hover {
-    background: var(--bg);
-    color: var(--text);
+    color: var(--fg);
 }
 
 .nav a.active {
-    background: var(--primary);
-    color: #fff;
+    color: var(--accent);
+    border-bottom-color: var(--accent);
 }
 
 /* Right-hand chrome */
@@ -59,29 +69,38 @@
     display: flex;
     justify-content: flex-end;
     align-items: center;
-    gap: 0.5rem;
+    gap: 0.75rem;
 }
 
 .auth-link {
     padding: 0.5rem 0.9rem;
+    border: 1px solid transparent;
     border-radius: var(--radius);
-    color: var(--text);
+    background: transparent;
+    color: var(--fg);
     text-decoration: none;
     font-weight: 500;
-    font-size: 0.95rem;
+    font-size: 0.9rem;
 }
 
 .auth-link:hover {
-    background: var(--bg);
+    background: var(--bg-subtle);
 }
 
 .auth-link-primary {
-    background: var(--primary);
-    color: #fff;
+    border: 1px solid var(--accent);
+    background: var(--accent);
+    color: var(--accent-fg);
 }
 
 .auth-link-primary:hover {
-    background: var(--primary-dark, #2c5282);
+    background: var(--accent-hover);
+    border-color: var(--accent-hover);
+    color: var(--accent-fg);
+}
+
+.auth-logout-form {
+    display: contents;
 }
 
 /* Hamburger button — hidden on desktop, shown on mobile. */
@@ -92,17 +111,17 @@
     gap: 4px;
     width: 40px;
     height: 40px;
-    padding: 0 9px;
+    padding: 0;
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    background: var(--surface);
-    cursor: pointer;
+    background: var(--bg-muted);
 }
 
 .nav-toggle-bar {
     display: block;
     height: 2px;
-    background: var(--text);
+    margin: 0 9px;
+    background: var(--fg);
     border-radius: 2px;
 }
 
@@ -112,15 +131,17 @@
 }
 
 .content {
-    max-width: 980px;
+    position: relative;
+    z-index: 1;
+    max-width: var(--col-content);
     margin: 2rem auto;
     padding: 0 1.5rem;
 }
 
 /* ---- Mobile: logo hidden, nav collapses into a left drawer ---------------- */
-@media (max-width: 640px) {
+@media (max-width: 768px) {
     .topbar {
-        padding: 0 1rem;
+        padding: 0.85rem 1rem;
     }
 
     .nav-toggle {
@@ -151,7 +172,7 @@
         max-width: 80vw;
         height: 100vh;
         padding: 1.25rem 1rem;
-        background: var(--surface);
+        background: var(--bg-muted);
         border-right: 1px solid var(--border);
         box-shadow: var(--shadow);
         transform: translateX(-100%);
@@ -168,6 +189,18 @@
         flex-direction: column;
         align-items: stretch;
         gap: 0.25rem;
+    }
+
+    .nav a {
+        border-bottom: none;
+        border-left: 2px solid transparent;
+        padding: 0.6rem 0.5rem;
+    }
+
+    .nav a.active {
+        border-bottom-color: transparent;
+        border-left-color: var(--accent);
+        background: var(--bg-subtle);
     }
 
     .auth {

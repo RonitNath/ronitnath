@@ -1,45 +1,48 @@
 <style>
-  /* Critical-path only: just enough tokens to color first paint before
-     base.css loads, so there's no flash of the wrong theme. Keep the dark
-     and light values here identical to the matching blocks in base.css. */
+  /* Critical-path only: just enough tokens (bg/fg) to color first paint
+     before base.css loads, so there's no flash of the wrong theme. Keep the
+     dark and light values here identical to the matching blocks in
+     base.css (docs/design.md has the full token table + provenance). */
   :root {
     color-scheme: dark;
-    --bg: #12141a;
-    --surface: #1b1e26;
-    --text: #e8eaed;
+    --bg: oklch(0.06 0.005 240);
+    --fg: oklch(0.96 0.002 80);
   }
   @media (prefers-color-scheme: light) {
     :root:not([data-theme="dark"]) {
       color-scheme: light;
-      --bg: #f7f8fa;
-      --surface: #ffffff;
-      --text: #1a202c;
+      --bg: oklch(0.97 0.003 240);
+      --fg: oklch(0.15 0.010 240);
     }
   }
   :root[data-theme="light"] {
     color-scheme: light;
-    --bg: #f7f8fa;
-    --surface: #ffffff;
-    --text: #1a202c;
+    --bg: oklch(0.97 0.003 240);
+    --fg: oklch(0.15 0.010 240);
   }
   :root[data-theme="dark"] {
     color-scheme: dark;
-    --bg: #12141a;
-    --surface: #1b1e26;
-    --text: #e8eaed;
+    --bg: oklch(0.06 0.005 240);
+    --fg: oklch(0.96 0.002 80);
   }
   html {
     background: var(--bg);
-    color: var(--text);
+    color: var(--fg);
   }
 </style>
 <script>
   (function () {
     try {
       var saved = localStorage.getItem("theme");
-      if (saved === "light" || saved === "dark") {
-        document.documentElement.setAttribute("data-theme", saved);
-      }
-    } catch (e) {}
+      var theme =
+        saved === "light" || saved === "dark"
+          ? saved
+          : matchMedia("(prefers-color-scheme: light)").matches
+            ? "light"
+            : "dark";
+      document.documentElement.setAttribute("data-theme", theme);
+    } catch (e) {
+      document.documentElement.setAttribute("data-theme", "dark");
+    }
   })();
 </script>

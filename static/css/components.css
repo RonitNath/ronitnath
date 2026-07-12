@@ -1,37 +1,112 @@
-/* Reusable building blocks. Stub file — add shared components (cards, buttons,
-   badges, tables) here as the app grows, one block per component. */
+/* Reusable building blocks. One block per component — see docs/design.md
+   for the tokens and rules these implement (bordered-pill buttons, radius
+   0.25rem, column widths, no shadows outside the topbar). */
 
-/* Centered hero used by the template home page. */
-.hero {
+/* ---------- Home hero: fills the viewport below the topbar and centers
+   the identity card, matching the legacy site's layout exactly. --------- */
+.home-hero {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: calc(100vh - 4rem);
+    padding: 2rem 1rem;
+}
+
+.home-card {
+    max-width: var(--col-narrow);
     text-align: center;
-    padding: 4rem 1rem;
+}
+
+.home-card h1 {
+    font-family: var(--font-display);
+    font-size: clamp(2.25rem, 6vw, 3.25rem);
+    letter-spacing: 0.03em;
+    margin: 0 0 0.5rem;
+}
+
+.home-card .tagline {
+    margin: 0 auto 1.5rem;
+    font-size: 1.125rem;
+    color: var(--fg-muted);
+}
+
+/* Bordered-pill social/contact buttons on the home card. */
+.social-links {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 1rem;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.social-links a {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.4rem 0.9rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: transparent;
+    color: var(--fg);
+    text-decoration: none;
+    font-size: 0.875rem;
+    transition:
+        border-color 0.15s ease,
+        color 0.15s ease,
+        background-color 0.15s ease;
+}
+
+.social-links a:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: var(--bg-subtle);
+}
+
+/* Lighter-weight centered header used by non-home marketing-flavored pages
+   (about, error, auth entry). Not full-viewport like .home-hero — these
+   pages have content below the fold. */
+.hero {
+    position: relative;
+    z-index: 1;
+    text-align: center;
+    max-width: var(--col-narrow);
+    margin: 0 auto;
+    padding: 3rem 1rem 1.5rem;
 }
 
 .hero h1 {
+    font-family: var(--font-display);
+    font-size: clamp(1.75rem, 5vw, 2.5rem);
+    letter-spacing: 0.02em;
     margin: 0 0 0.5rem;
-    font-size: 2rem;
 }
 
 .hero .subtitle {
     margin: 0 auto;
     max-width: 44ch;
-    color: var(--muted);
+    color: var(--fg-muted);
 }
 
-/* Theme toggle button. The icon shows what clicking switches *to*, so it
-   mirrors the same explicit-choice-then-system-preference-then-dark
-   cascade as base.css: sun (switch to light) while dark, moon (switch to
-   dark) while light. */
+/* Theme toggle button: bordered icon square, matches the legacy site's
+   sun/moon toggle exactly (transparent fill, border, --radius corners). */
 .theme-toggle {
     display: flex;
     align-items: center;
     justify-content: center;
     width: 36px;
     height: 36px;
+    padding: 0;
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    background: var(--surface);
-    cursor: pointer;
+    background: transparent;
+}
+
+.theme-toggle:hover {
+    border-color: var(--accent);
+    background: var(--bg-subtle);
 }
 
 .theme-toggle-icon::before {
@@ -50,7 +125,9 @@
 
 /* Guestbook island: entry list + submit form. */
 .guestbook {
-    max-width: 44rem;
+    position: relative;
+    z-index: 1;
+    max-width: var(--col-content);
     margin: 0 auto;
     padding: 0 1rem 4rem;
     display: flex;
@@ -62,47 +139,18 @@
     display: flex;
     flex-direction: column;
     gap: 0.75rem;
-    padding: 1rem;
-    background: var(--surface);
+    padding: 1.25rem;
+    background: var(--bg-muted);
     border: 1px solid var(--border);
     border-radius: var(--radius);
-}
-
-.guestbook-form input,
-.guestbook-form textarea {
-    width: 100%;
-    padding: 0.5rem 0.75rem;
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    background: var(--bg);
-    color: var(--text);
-    font: inherit;
-}
-
-.guestbook-form textarea {
-    resize: vertical;
-    min-height: 4rem;
 }
 
 .guestbook-form button {
     align-self: flex-start;
-    padding: 0.5rem 1.25rem;
-    border: none;
-    border-radius: var(--radius);
-    background: var(--primary);
-    color: #fff;
-    font: inherit;
-    font-weight: 500;
-    cursor: pointer;
-}
-
-.guestbook-form button:disabled {
-    opacity: 0.6;
-    cursor: default;
 }
 
 .guestbook-error {
-    color: #e57373;
+    color: var(--danger);
 }
 
 .guestbook-entries {
@@ -116,7 +164,7 @@
 
 .guestbook-entry {
     padding: 0.75rem 1rem;
-    background: var(--surface);
+    background: var(--bg-muted);
     border: 1px solid var(--border);
     border-radius: var(--radius);
 }
@@ -131,18 +179,61 @@
 
 .guestbook-entry .created-at {
     font-size: 0.85rem;
+    color: var(--fg-subtle);
 }
 
 /* Settings/account list rows embed a one-button form (remove/revoke) next
    to inline text — `style="display:inline"` would violate the CSP's
    style-src (no unsafe-inline), so this is a class instead. */
 .auth-form-card {
-    padding: 1rem 1.5rem;
+    position: relative;
+    z-index: 1;
+    padding: 1.5rem;
     margin: 1.5rem auto;
-    max-width: 40rem;
-    background: var(--surface);
+    max-width: var(--col-narrow);
+    background: var(--bg-muted);
     border: 1px solid var(--border);
     border-radius: var(--radius);
+    text-align: left;
+}
+
+/* Rows carry more than a label (IP, user agent, table columns) — give them
+   the content column instead of the narrow hero/form column. */
+.auth-form-card.wide {
+    max-width: var(--col-content);
+}
+
+.auth-form-card form {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.auth-form-card h2 {
+    font-family: var(--font-display);
+    font-size: 1.25rem;
+    margin: 0 0 0.75rem;
+}
+
+.auth-form-card ul {
+    list-style: none;
+    margin: 0 0 1rem;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.auth-form-card li {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.6rem 0.75rem;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font-size: 0.9rem;
 }
 
 .inline-form {
@@ -151,7 +242,7 @@
 
 /* OIDC RP factor: server-rendered SSO buttons on login/settings. */
 .oidc-login {
-    margin-top: 1rem;
+    margin-top: 0.5rem;
     display: flex;
     flex-direction: column;
     gap: 0.75rem;
@@ -161,4 +252,10 @@
     display: inline-flex;
     justify-content: center;
     border: 1px solid var(--border);
+    background: transparent;
+    color: var(--fg);
+}
+
+.oidc-button:hover {
+    background: var(--bg-subtle);
 }

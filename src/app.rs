@@ -249,7 +249,7 @@ mod tests {
                 .starts_with("text/html")
         );
         let body = String::from_utf8(body.to_vec()).unwrap();
-        assert!(body.contains("stage_2"));
+        assert!(body.contains("Ronit Nath"));
     }
 
     #[tokio::test]
@@ -291,11 +291,18 @@ mod tests {
             .unwrap();
 
         // Drift guard: hash the <script> the router actually served and
-        // confirm it's the same hash the CSP header allows.
+        // confirm it's the same hash the CSP header allows. Normalize
+        // CRLF/CR to LF first — that's what the HTML spec does while
+        // tokenizing (and so what a real browser hashes for a CSP
+        // hash-source), and what `inline_tag_hash` in security_headers.rs
+        // does too; without matching that here, this test would only prove
+        // self-consistency with whatever line endings happen to be on disk
+        // (see `core.autocrlf` on Windows checkouts), not actual
+        // browser-CSP correctness.
         let body = String::from_utf8(body.to_vec()).unwrap();
         let start = body.find("<script>").unwrap() + "<script>".len();
         let end = start + body[start..].find("</script>").unwrap();
-        let served_script = &body[start..end];
+        let served_script = body[start..end].replace("\r\n", "\n").replace('\r', "\n");
         let digest = Sha256::digest(served_script.as_bytes());
         let hash = base64::engine::general_purpose::STANDARD.encode(digest);
         assert!(

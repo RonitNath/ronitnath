@@ -30,7 +30,20 @@ fn inline_tag_hash(tag: &str) -> String {
         .unwrap_or_else(|| panic!("_theme.html's <{tag}> is never closed"))
         + start;
     let body = &THEME_TEMPLATE[start..end];
-    format!("'sha256-{}'", BASE64.encode(Sha256::digest(body.as_bytes())))
+    // The HTML spec normalizes CR/CRLF to LF while tokenizing the input
+    // stream, *before* a script/style element's text content is extracted
+    // — so that's what browsers hash for a CSP hash-source too. Checkouts
+    // with `core.autocrlf=true` (Windows) put CRLF on disk; without this
+    // normalization the hash computed here would only match what a
+    // same-line-ending-convention Rust test recomputes from the same raw
+    // bytes, not what an actual browser allows, and the inline
+    // script/style would silently fail CSP in local dev while `cargo test`
+    // stayed green.
+    let normalized = body.replace("\r\n", "\n").replace('\r', "\n");
+    format!(
+        "'sha256-{}'",
+        BASE64.encode(Sha256::digest(normalized.as_bytes()))
+    )
 }
 
 /// The CSP value, computed once. `pub(crate)` so router tests can assert it

@@ -3,16 +3,24 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>{% block title %}stage_2{% endblock %}</title>
+    <title>{% block title %}Ronit Nath{% endblock %}</title>
     {% if let Some(user) = current_user %}
     <meta name="csrf-token" content="{{ user.csrf_token }}" />
     {% endif %}
     {% include "_theme.html" %}
     <link rel="stylesheet" href="/static/css/base.css" />
+    <link rel="stylesheet" href="/static/css/atmosphere.css" />
     <link rel="stylesheet" href="/static/css/layout.css" />
     <link rel="stylesheet" href="/static/css/components.css" />
 </head>
 <body>
+    <div class="starfield" aria-hidden="true">
+        <div class="stars-dim"></div>
+        <div class="stars-med"></div>
+        <div class="stars-bright"></div>
+    </div>
+    <div class="nebula" aria-hidden="true"></div>
+
     <header class="topbar">
         <button class="nav-toggle" type="button" aria-label="Open menu"
                 aria-controls="menu" aria-expanded="false">
@@ -21,7 +29,7 @@
             <span class="nav-toggle-bar"></span>
         </button>
 
-        <a class="brand" href="/">stage_2</a>
+        <a class="brand" href="/">Ronit Nath</a>
 
         <!-- Center nav + right-hand auth. On desktop `.menu` is `display:
              contents`, so `.nav` and `.auth` lay out directly in the topbar.
