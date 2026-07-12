@@ -18,8 +18,8 @@ Events keeps :3117/:3118 until cutover; both run side by side on nexus.
 | 2 | Domain port from events | phase-2-domain-port.md | done |
 | 3 | Visibility (circles + levels) | phase-3-visibility.md | done |
 | 4 | Guest accounts (claim + password) | phase-4-guest-accounts.md | done |
-| 5 | Photos | phase-5-photos.md | in progress |
-| 6 | Calendar | phase-6-calendar.md | pending |
+| 5 | Photos | phase-5-photos.md | done |
+| 6 | Calendar | phase-6-calendar.md | in progress |
 | 7 | Prod data migration (dry run) | phase-7-import.md | pending |
 | 8 | Cutover (operator, by hand) | phase-8-cutover.md | pending |
 
@@ -40,3 +40,7 @@ evidence, worktree clean) before the next is dispatched.
 | 4 | guest accounts build | pi_codex | gpt-5.6-sol / high | job 6b93d348 → 77967bb, 8610f51, 2bd2072 | 77/77 tests; live claim→logout→login→/my→session-RSVP→revoke transcript; rulings appended to Amendments (recovery-email login fails-closed w/ dummy verify; /my/events floors only with own live link; claimed links 404). |
 | 4 | independent security review | pi_codex (read-only, detached @2bd2072) | gpt-5.6-sol / high | job d3348b19 | Verdict FAIL: BLOCKER (mismatch-session RSVP attributed to token person, no CSRF) + 3 SHOULD-FIX (claim race 500s, guest login unscoped by account, force-unlink session redirect-loop). Claim capability/GuestScope isolation/oracle/cookie flags clean. |
 | 4 | security fix round | pi_codex | gpt-5.6-sol / high | job 4b0b1c85 → 0f98701 | 81/81 tests (orchestrator re-ran + read the CSRF/attribution branch); session-guest RSVP: CSRF required, writes attribute to session person, render stays token-scoped; BEGIN IMMEDIATE claims → race maps to 4xx; login lookup owner-account-scoped; force-unlink revokes all identity sessions, /logout works on any live session; 5 reviewer-named regression tests added. |
+| 5 | photos build | pi_codex | gpt-5.6-sol / high | job ffd2e2f8 → 8264ab9, a5cf585, 5e677c6 | 84/84 tests; EXIF-safe WebP pipeline, attendee-gated serve/upload/delete, content-hash dedup, photos-gc; live upload/variant/404 curl transcript. |
+| 5 | independent security review | pi_codex (read-only, detached @5e677c6) | gpt-5.6-sol / high | job cc87256a | Verdict FAIL: BLOCKER (unbounded decode = decompression-bomb DoS on public upload) + 4 SHOULD-FIX (GC/upload race, substring body-limit bypass, EXIF UTF-8 panic, raw filename). Path safety/authz/EXIF-strip/CSRF/serve-type clean. |
+| 5 | security fix round | pi_codex | gpt-5.6-sol / high | job 4ae155af → 6a2606f | 89/89 tests (orchestrator re-ran + read caps/spawn_blocking); decode capped 8192²/50MP + spawn_blocking + 2-permit semaphore; atomic temp+rename with writer-lock-serialized GC; structural photo/non-photo router split; ASCII-validated EXIF; filename sanitized 255B. |
+| 5 | gallery visual gate + polish | orchestrator (agent-browser) + self | — | 48cdba4 | Live gallery/lightbox/upload/dedup verified by orchestrator (2 real JPEGs, variants served, non-attendee 404, dedup 3 rows/2 keys). One completeness gap fixed: ::file-selector-button tokenized (native date/checkbox chrome stays per documented base.css decision). |
