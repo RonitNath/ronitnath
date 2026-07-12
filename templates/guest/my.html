@@ -1,0 +1,11 @@
+{% extends "_layout.html" %}
+{% block title %}My events{% endblock %}
+{% block content %}
+<section class="hero"><h1>My events</h1><p class="subtitle">Upcoming invitations for you.</p></section>
+<section class="admin-card">
+{% for event in events %}
+  <article><h2><a href="/my/events/{{ event.id }}">{{ event.title }}</a></h2><p>{{ event.starts_at|human_dt }} · {% if let Some(rsvp) = event.rsvp_status %}RSVP: {{ rsvp }}{% else %}No RSVP yet{% endif %}</p></article>
+{% endfor %}
+{% if events.is_empty() %}<p class="muted">No upcoming invitations right now.</p>{% endif %}
+</section>
+{% endblock %}

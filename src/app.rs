@@ -36,6 +36,37 @@ pub fn build_site_router(state: AppState, config: &Config) -> Router {
         .routes(routes!(handlers::health::healthz))
         .merge(client_error_api(&rate_limiter))
         .route("/e/{token}", get(handlers::event_public::page))
+        .merge(
+            OpenApiRouter::new()
+                .route(
+                    "/e/{token}/claim",
+                    get(handlers::guest_accounts::claim_page)
+                        .post(handlers::guest_accounts::claim_submit),
+                )
+                .route(
+                    "/login",
+                    get(handlers::guest_accounts::login_page)
+                        .post(handlers::guest_accounts::login_submit),
+                )
+                .route_layer(middleware::from_fn_with_state(
+                    rate_limiter.clone(),
+                    rate_limit::enforce,
+                )),
+        )
+        .route("/logout", post(handlers::guest_accounts::logout_submit))
+        .route("/my", get(handlers::guest_accounts::my_page))
+        .route(
+            "/my/events/{event_id}",
+            get(handlers::guest_accounts::my_event_page),
+        )
+        .route(
+            "/api/my/events/{event_id}",
+            get(handlers::guest_accounts::api_my_view),
+        )
+        .route(
+            "/api/my/events/{event_id}/rsvp",
+            post(handlers::guest_accounts::api_my_rsvp),
+        )
         .route("/events/{event_ref}/ics", get(handlers::event_public::ics))
         .routes(routes!(handlers::event_public::api_view))
         .merge(
@@ -124,6 +155,14 @@ pub fn build_admin_router(state: AppState, config: &Config) -> Router {
         )
         .route("/people", get(handlers::people_admin::page))
         .route("/people/{person_id}", post(handlers::people_admin::update))
+        .route(
+            "/people/{person_id}/claim-status",
+            get(handlers::people_admin::claim_status),
+        )
+        .route(
+            "/people/{person_id}/claim-status/unlink",
+            post(handlers::people_admin::force_unlink),
+        )
         .route(
             "/login",
             get(handlers::auth::login_page).post(handlers::auth::login_submit),
@@ -407,9 +446,16 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn site_has_no_auth_routes() {
+    async fn site_has_guest_login_but_no_signup_route() {
         let (app, _store) = test_site_app().await;
-        let (status, _, _) = get(&app, "/login").await;
+        let (status, _, body) = get(&app, "/login").await;
+        assert_eq!(status, StatusCode::OK);
+        assert!(
+            !String::from_utf8(body.to_vec())
+                .unwrap()
+                .contains("Sign up")
+        );
+        let (status, _, _) = get(&app, "/signup").await;
         assert_eq!(status, StatusCode::NOT_FOUND);
     }
 
@@ -2334,6 +2380,363 @@ mod tests {
             status,
             StatusCode::UNPROCESSABLE_ENTITY,
             "OIDC factors use the existing last-factor guard"
+        );
+    }
+
+    async fn phase4_fixture() -> (axum::Router, crate::store::Store, i64, i64, String, i64) {
+        use crate::auth::session::hash_token;
+        use crate::store::events::EventFields;
+
+        let store = crate::store::Store::connect_in_memory().await;
+        let (event_id, _, _, _, _) = seed_event(&store).await;
+        let event = store.find_event(1, event_id).await.unwrap().unwrap();
+        store
+            .update_event(
+                1,
+                event_id,
+                &EventFields {
+                    slug: event.slug,
+                    title: event.title,
+                    tagline: event.tagline,
+                    starts_at: "2099-07-04 13:00".into(),
+                    ends_at: event.ends_at,
+                    timezone: event.timezone,
+                    status: event.status,
+                    summary: event.summary,
+                    area_name: event.area_name,
+                    address: event.address,
+                    entry_instructions: event.entry_instructions,
+                    private_details: event.private_details,
+                    notice_html: event.notice_html,
+                    quick_plan_html: event.quick_plan_html,
+                },
+            )
+            .await
+            .unwrap();
+        let person = store.create_person(1, "Maya Guest", "").await.unwrap();
+        let policy = store
+            .find_audience_policy(1, "event", event_id)
+            .await
+            .unwrap()
+            .unwrap();
+        store
+            .set_person_override(1, policy.id, person.id, Some("include"), Some("full"))
+            .await
+            .unwrap();
+        let raw = "maya-phase4-link".to_string();
+        let link_id = store
+            .create_event_link(
+                1,
+                event_id,
+                Some(person.id),
+                &hash_token(&raw),
+                &raw,
+                "Maya",
+                "private",
+            )
+            .await
+            .unwrap();
+        let config = crate::config::Config::for_tests();
+        let state = crate::state::AppState::new(store.clone(), super::test_auth_config(&config))
+            .with_owner_account_id(Some(1));
+        (
+            super::build_site_router(state, &config),
+            store,
+            event_id,
+            person.id,
+            raw,
+            link_id,
+        )
+    }
+
+    async fn claim_guest(app: &axum::Router, raw: &str, email: &str) -> Authed {
+        let form = format!(
+            "password=password123&password_confirm=password123&recovery_email={}&csrf_token=",
+            email.replace('@', "%40")
+        );
+        let (status, headers, _) = post_form(app, &format!("/e/{raw}/claim"), &form).await;
+        assert_eq!(status, StatusCode::SEE_OTHER);
+        let cookie = extract_cookie(&headers, "session");
+        let (status, _, body) = get_with_cookie(app, "/my", &cookie).await;
+        assert_eq!(status, StatusCode::OK);
+        Authed {
+            cookie,
+            csrf_token: crate::test_util::extract_csrf_token(&body),
+        }
+    }
+
+    #[tokio::test]
+    async fn guest_claim_logout_login_session_rsvp_and_link_revocation_roundtrip() {
+        use crate::auth::session::hash_token;
+        let (app, store, event_id, person_id, raw, link_id) = phase4_fixture().await;
+        assert_eq!(
+            get(&app, &format!("/e/{raw}/claim")).await.0,
+            StatusCode::OK
+        );
+        let guest = claim_guest(&app, &raw, "maya@example.com").await;
+        let (_, _, my_body) = get_with_cookie(&app, "/my", &guest.cookie).await;
+        assert!(
+            String::from_utf8(my_body.to_vec())
+                .unwrap()
+                .contains("Test Party")
+        );
+
+        let rsvp = serde_json::json!({"name": null, "status": "going", "party_size": 2, "note": "session", "segments": []});
+        assert_eq!(
+            post_json_authed(
+                &app,
+                &format!("/api/my/events/{event_id}/rsvp"),
+                &rsvp,
+                &guest.cookie,
+                None
+            )
+            .await
+            .0,
+            StatusCode::FORBIDDEN
+        );
+        assert_eq!(
+            post_json_authed(
+                &app,
+                &format!("/api/my/events/{event_id}/rsvp"),
+                &rsvp,
+                &guest.cookie,
+                Some(&guest.csrf_token)
+            )
+            .await
+            .0,
+            StatusCode::OK
+        );
+        assert_eq!(
+            store
+                .find_attendance(1, event_id, person_id)
+                .await
+                .unwrap()
+                .unwrap()
+                .party_size,
+            2
+        );
+
+        let logout = format!("csrf_token={}", guest.csrf_token);
+        assert_eq!(
+            post_form_with_cookie(&app, "/logout", &logout, Some(&guest.cookie))
+                .await
+                .0,
+            StatusCode::SEE_OTHER
+        );
+        let (status, headers, _) = post_form(
+            &app,
+            "/login",
+            "email=maya%40example.com&password=password123",
+        )
+        .await;
+        assert_eq!(status, StatusCode::SEE_OTHER);
+        let login_cookie = extract_cookie(&headers, "session");
+        assert_eq!(
+            get_with_cookie(&app, "/my", &login_cookie).await.0,
+            StatusCode::OK
+        );
+
+        store.revoke_event_link(1, link_id).await.unwrap();
+        assert_eq!(
+            get(&app, &format!("/e/{raw}")).await.0,
+            StatusCode::NOT_FOUND
+        );
+        assert_eq!(
+            post_form(
+                &app,
+                "/login",
+                "email=maya%40example.com&password=password123"
+            )
+            .await
+            .0,
+            StatusCode::SEE_OTHER,
+            "revoking the claim link must not revoke password login"
+        );
+        let remint = "maya-reminted-link";
+        store
+            .create_event_link(
+                1,
+                event_id,
+                Some(person_id),
+                &hash_token(remint),
+                remint,
+                "remint",
+                "private",
+            )
+            .await
+            .unwrap();
+        assert_eq!(get(&app, &format!("/e/{remint}")).await.0, StatusCode::OK);
+        assert_eq!(
+            get(&app, &format!("/e/{remint}/claim")).await.0,
+            StatusCode::NOT_FOUND,
+            "already-claimed links use the documented 404 ruling"
+        );
+    }
+
+    #[tokio::test]
+    async fn claim_parity_mismatch_banner_and_sessioned_claim_csrf() {
+        use crate::auth::session::hash_token;
+        let (app, store, event_id, _, raw, _) = phase4_fixture().await;
+        let guest = claim_guest(&app, &raw, "maya@example.com").await;
+        assert_eq!(
+            get(&app, "/e/no-such-link/claim").await.0,
+            StatusCode::NOT_FOUND
+        );
+        let shared = "shared-claim-check";
+        store
+            .create_event_link(
+                1,
+                event_id,
+                None,
+                &hash_token(shared),
+                shared,
+                "shared",
+                "public",
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            get(&app, &format!("/e/{shared}/claim")).await.0,
+            StatusCode::NOT_FOUND
+        );
+
+        let other = store.create_person(1, "Other Guest", "").await.unwrap();
+        let other_raw = "other-person-link";
+        store
+            .create_event_link(
+                1,
+                event_id,
+                Some(other.id),
+                &hash_token(other_raw),
+                other_raw,
+                "other",
+                "private",
+            )
+            .await
+            .unwrap();
+        let (_, _, body) = get_with_cookie(&app, &format!("/e/{other_raw}"), &guest.cookie).await;
+        let body = String::from_utf8(body.to_vec()).unwrap();
+        assert!(body.contains("Viewing as Other Guest; signed in as Maya Guest"));
+        let form = "password=password123&password_confirm=password123&recovery_email=other%40example.com&csrf_token=";
+        assert_eq!(
+            post_form_with_cookie(
+                &app,
+                &format!("/e/{other_raw}/claim"),
+                form,
+                Some(&guest.cookie)
+            )
+            .await
+            .0,
+            StatusCode::FORBIDDEN
+        );
+    }
+
+    #[tokio::test]
+    async fn force_unlink_allows_reclaim_and_orphans_old_guest_session() {
+        let (site, store, _, person_id, raw, _) = phase4_fixture().await;
+        let old = claim_guest(&site, &raw, "maya@example.com").await;
+        let owner = seed_session(&store, 1, 1).await;
+        let config = crate::config::Config::for_tests();
+        let admin_state =
+            crate::state::AppState::new(store.clone(), super::test_auth_config(&config))
+                .with_owner_account_id(Some(1));
+        let admin = super::build_admin_router(admin_state, &config);
+        let form = format!("csrf_token={}", owner.csrf_token);
+        assert_eq!(
+            post_form_with_cookie(
+                &admin,
+                &format!("/people/{person_id}/claim-status/unlink"),
+                &form,
+                Some(&owner.cookie)
+            )
+            .await
+            .0,
+            StatusCode::SEE_OTHER
+        );
+        assert_eq!(
+            get_with_cookie(&site, "/my", &old.cookie).await.0,
+            StatusCode::SEE_OTHER
+        );
+        assert_eq!(
+            get(&site, &format!("/e/{raw}/claim")).await.0,
+            StatusCode::OK
+        );
+        let reclaimed = claim_guest(&site, &raw, "maya-new@example.com").await;
+        assert_eq!(
+            get_with_cookie(&site, "/my", &reclaimed.cookie).await.0,
+            StatusCode::OK
+        );
+        assert_eq!(
+            store
+                .claim_status(1, person_id)
+                .await
+                .unwrap()
+                .unwrap()
+                .factor_count,
+            1
+        );
+    }
+
+    #[tokio::test]
+    async fn guest_login_unknown_identifier_is_audited_and_guest_scope_is_owner_scoped() {
+        let (app, store, _, _, raw, _) = phase4_fixture().await;
+        let before = store
+            .count_audit_events("guest.login.failed")
+            .await
+            .unwrap();
+        assert_eq!(
+            post_form(
+                &app,
+                "/login",
+                "email=unknown%40example.com&password=password123"
+            )
+            .await
+            .0,
+            StatusCode::UNAUTHORIZED
+        );
+        assert_eq!(
+            store
+                .count_audit_events("guest.login.failed")
+                .await
+                .unwrap(),
+            before + 1
+        );
+
+        // An active binding belonging to a different account cannot become a
+        // GuestScope for this site's configured owner account.
+        let (_, other_account) = store
+            .signup_with_password("Other", "other@example.com", "hash")
+            .await
+            .unwrap();
+        let other_person = store
+            .create_person(other_account, "Cross Account", "")
+            .await
+            .unwrap();
+        let password_hash = crate::auth::password::hash("password123").unwrap();
+        let raw_session = crate::auth::session::generate_token();
+        store
+            .claim_guest(
+                other_account,
+                other_person.id,
+                "Cross Account",
+                Some("cross@example.com"),
+                &password_hash,
+                &crate::auth::session::hash_token(&raw_session),
+                "csrf",
+                "9999-01-01 00:00:00",
+                None,
+                None,
+            )
+            .await
+            .unwrap();
+        let cookie = format!("session={raw_session}");
+        assert_eq!(
+            get_with_cookie(&app, "/my", &cookie).await.0,
+            StatusCode::SEE_OTHER
+        );
+        assert_eq!(
+            get(&app, &format!("/e/{raw}/claim")).await.0,
+            StatusCode::OK
         );
     }
 

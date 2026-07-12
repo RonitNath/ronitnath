@@ -1,0 +1,13 @@
+{% extends "_layout.html" %}
+{% block title %}Guest sign in{% endblock %}
+{% block content %}
+<section class="auth-card">
+  <h1>Find your invitations</h1>
+  <p>Use the recovery email and password you chose when you claimed an invitation.</p>
+  <form method="post">
+    <label>Recovery email <input type="email" name="email" required autocomplete="email" /></label>
+    <label>Password <input type="password" name="password" required autocomplete="current-password" /></label>
+    <button type="submit">Sign in</button>
+  </form>
+</section>
+{% endblock %}

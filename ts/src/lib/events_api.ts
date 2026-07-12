@@ -3,8 +3,8 @@ import type { GuestView } from "../generated/GuestView";
 import type { RsvpSubmit } from "../generated/RsvpSubmit";
 import type { RsvpResult } from "../generated/RsvpResult";
 
-// Guest endpoints are token-authenticated (the capability URL), not
-// session-authenticated — no CSRF header here, unlike lib/api.ts.
+// Link endpoints are capability-authenticated; /api/my endpoints use the
+// ambient guest session and therefore carry the synchronizer header.
 
 const scheduleItemSchema = z.object({
   id: z.number(),
@@ -67,18 +67,23 @@ async function errorMessage(res: Response, fallback: string): Promise<string> {
   return typeof body?.error === "string" ? body.error : fallback;
 }
 
-export async function fetchGuestView(token: string): Promise<GuestView> {
-  const res = await fetch(`/api/e/${encodeURIComponent(token)}`);
+export async function fetchGuestView(endpoint: string): Promise<GuestView> {
+  const res = await fetch(endpoint);
   if (!res.ok) {
     throw new Error(await errorMessage(res, `Couldn't load this event (${res.status}).`));
   }
   return guestViewSchema.parse(await res.json());
 }
 
-export async function postRsvp(token: string, submit: RsvpSubmit): Promise<RsvpResult> {
-  const res = await fetch(`/api/e/${encodeURIComponent(token)}/rsvp`, {
+export async function postRsvp(endpoint: string, submit: RsvpSubmit): Promise<RsvpResult> {
+  const sessionScoped = endpoint.startsWith("/api/my/");
+  const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute("content") ?? "";
+  const res = await fetch(`${endpoint}/rsvp`, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: {
+      "content-type": "application/json",
+      ...(sessionScoped ? { "x-csrf-token": csrf } : {}),
+    },
     body: JSON.stringify(submit),
   });
   if (!res.ok) {

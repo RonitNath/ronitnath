@@ -13,6 +13,7 @@ pub mod client_errors;
 pub mod errors;
 pub mod event_public;
 pub mod events_admin;
+pub mod guest_accounts;
 pub mod guestbook;
 pub mod health;
 pub mod home;

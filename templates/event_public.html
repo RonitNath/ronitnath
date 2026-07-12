@@ -4,6 +4,7 @@
 
 {% block content %}
 <article class="event-page{% if poster_theme %} event-poster-july4{% endif %}">
+{% if let Some(note) = mismatch_note %}<aside class="event-notice" role="note">{{ note }}</aside>{% endif %}
 {% match view.event %}
 {% when EventView::Busy with (busy) %}
     <header class="event-hero busy-view" data-visibility="busy">
@@ -32,7 +33,7 @@
     {% if !view.schedule.is_empty() %}<section class="event-section" id="schedule"><h2>Schedule</h2><ol class="event-schedule">
         {% for item in view.schedule %}<li><span class="schedule-time">{{ item.time_label }}</span><div><strong>{{ item.title }}</strong>{% if !item.detail.is_empty() %}<p class="prewrap muted">{{ item.detail|safe }}</p>{% endif %}</div></li>{% endfor %}
     </ol></section>{% endif %}
-    <section class="event-section" id="manage"><h2>Your reservation</h2><p class="muted">No RSVP needed — this just helps with planning. Update it whenever plans change.</p><div id="event-rsvp-island" data-token="{{ token }}"><p class="muted">Loading reservation form…</p></div></section>
+    <section class="event-section" id="manage"><h2>Your reservation</h2><p class="muted">No RSVP needed — this just helps with planning. Update it whenever plans change.</p><div id="event-rsvp-island" data-endpoint="{{ rsvp_endpoint }}"><p class="muted">Loading reservation form…</p></div></section>
 {% endmatch %}
 </article>
 {% endblock %}

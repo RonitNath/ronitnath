@@ -20,7 +20,7 @@ use ts_rs::TS;
 use utoipa::ToSchema;
 
 use crate::access::level::Level;
-use crate::auth::extract::NavUser;
+use crate::auth::extract::{NavContext, NavUser};
 use crate::auth::session::hash_token;
 use crate::auth::viewer::Viewer;
 use crate::dates as filters;
@@ -92,7 +92,7 @@ pub struct RsvpResult {
 
 /// Resolves a raw token or answers 404. Unknown and revoked tokens are
 /// indistinguishable by design.
-async fn resolve(store: &Store, token: &str) -> Result<(ResolvedLink, Event), AppError> {
+pub(crate) async fn resolve(store: &Store, token: &str) -> Result<(ResolvedLink, Event), AppError> {
     let link = store
         .resolve_event_link(&hash_token(token))
         .await?
@@ -120,7 +120,7 @@ async fn direct_level(
     Ok(inputs.level_for_direct_hit(viewer, &link.tier)?)
 }
 
-async fn build_view(
+pub(crate) async fn build_view(
     store: &Store,
     link: &ResolvedLink,
     event: &Event,
@@ -166,9 +166,10 @@ async fn build_view(
 struct EventPublicTemplate {
     nav_active: &'static str,
     current_user: Option<NavUser>,
-    token: String,
+    rsvp_endpoint: String,
     poster_theme: bool,
     view: GuestView,
+    mismatch_note: Option<String>,
 }
 
 /// The guest event page. Server-renders the level-appropriate info so the
@@ -176,18 +177,42 @@ struct EventPublicTemplate {
 pub async fn page(
     State(state): State<AppState>,
     session_viewer: Viewer,
+    NavContext(current_user): NavContext,
     Path(token): Path<String>,
 ) -> Result<Response, AppError> {
     let (link, event) = resolve(state.store(), &token).await?;
-    let (viewer, _mismatch) = session_viewer.combine_with_link(Some(&link));
+    let (viewer, mismatch) = session_viewer.combine_with_link(Some(&link));
     let level = direct_level(state.store(), &link, &viewer).await?;
     let view = build_view(state.store(), &link, &event, level).await?;
+    let mismatch_note = if let Some(note) = mismatch {
+        let signed_in = state
+            .store()
+            .find_person(link.account_id, note.guest_person_id)
+            .await?
+            .map(|p| p.name)
+            .unwrap_or_else(|| "another guest".into());
+        let link_person = match link.person_id {
+            Some(id) => state
+                .store()
+                .find_person(link.account_id, id)
+                .await?
+                .map(|p| p.name)
+                .unwrap_or_else(|| "this guest".into()),
+            None => "a shared link".into(),
+        };
+        Some(format!(
+            "Viewing as {link_person}; signed in as {signed_in}"
+        ))
+    } else {
+        None
+    };
     render(EventPublicTemplate {
         nav_active: "events",
-        current_user: None,
-        token,
+        current_user,
+        rsvp_endpoint: format!("/api/e/{token}"),
         poster_theme: event.slug == "july4-2026",
         view,
+        mismatch_note,
     })
 }
 

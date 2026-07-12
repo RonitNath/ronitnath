@@ -2,8 +2,8 @@ import { render } from "solid-js/web";
 import EventRsvp from "../islands/EventRsvp";
 
 const mount = document.getElementById("event-rsvp-island");
-const token = mount?.dataset.token;
-if (mount && token) {
+const endpoint = mount?.dataset.endpoint;
+if (mount && endpoint) {
   mount.textContent = "";
-  render(() => <EventRsvp token={token} />, mount);
+  render(() => <EventRsvp endpoint={endpoint} />, mount);
 }

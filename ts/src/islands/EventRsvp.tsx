@@ -6,8 +6,8 @@ const PERSONAL_LINK_KEY = "gather-personal-link";
 
 /** The guest RSVP island: overall yes/maybe/no, party size, a note, and a
  *  per-segment in/maybe/out row for each RSVP-able block of the day. */
-export default function EventRsvp(props: { token: string }) {
-  const [view] = createResource(() => props.token, fetchGuestView);
+export default function EventRsvp(props: { endpoint: string }) {
+  const [view] = createResource(() => props.endpoint, fetchGuestView);
 
   const [status, setStatus] = createSignal<string | null>(null);
   const [name, setName] = createSignal("");
@@ -62,7 +62,7 @@ export default function EventRsvp(props: { token: string }) {
       const chosen: SegmentChoice[] = Object.entries(segments()).map(
         ([id, s]) => ({ schedule_item_id: Number(id), status: s }),
       );
-      const result = await postRsvp(props.token, {
+      const result = await postRsvp(props.endpoint, {
         name: personalized() ? null : name(),
         status: status()!,
         party_size: partySize(),

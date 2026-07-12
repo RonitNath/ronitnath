@@ -1,0 +1,15 @@
+{% extends "_layout.html" %}
+{% block title %}Claim your invitation{% endblock %}
+{% block content %}
+<section class="auth-card">
+  <h1>Hi {{ person_name }}</h1>
+  <p>Choose a password to keep your invitations and replies in one place.</p>
+  <form method="post">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+    <label>Password <input type="password" name="password" minlength="8" required autocomplete="new-password" /></label>
+    <label>Confirm password <input type="password" name="password_confirm" minlength="8" required autocomplete="new-password" /></label>
+    <label>Recovery email <span class="muted">(optional)</span><input type="email" name="recovery_email" autocomplete="email" /></label>
+    <button type="submit">Claim my invitation</button>
+  </form>
+</section>
+{% endblock %}
