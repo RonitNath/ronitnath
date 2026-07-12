@@ -1,16 +1,16 @@
-# stage_2 — agent instructions
+# ronitnath.com — agent instructions
 
-stage_2 is stage_1 plus a full auth model (identity/account/membership/
-factor — see README.md) — a hardened fork for anything multi-user or
-internet-facing. Extend it — never replace a piece wholesale. One module
-per feature area (see organization.md in your cross-machine context, if you
-have one).
+ronitnath.com is a product fork of stage_2 and retains its full auth model
+(identity/account/membership/factor — see README.md). Extend it — never
+replace a piece wholesale. One module per feature area (see organization.md
+in your cross-machine context, if you have one).
 
 ## Dev loop
 
-Find an open port, then run both watchers and keep them alive:
+Find two open ports, then run both Rust bins and the frontend watcher:
 
-    BIND_ADDR=127.0.0.1:<port> cargo watch -w src -w templates -w migrations -x run
+    BIND_ADDR=127.0.0.1:<site-port> cargo watch -w src -w templates -w migrations -x 'run --bin site'
+    ADMIN_BIND_ADDR=127.0.0.1:<admin-port> cargo watch -w src -w templates -w migrations -x 'run --bin admin'
     cd ts && bun run watch
 
 Never use `vite dev` or a dev-server proxy. Always hit the real axum server
@@ -215,20 +215,10 @@ themes for anything layout- or theme-related.
 
 ## Merge discipline (fork hygiene)
 
-`git remote -v` should show `upstream` pointing at stage_1 — `git fetch
-upstream && git merge upstream/main` periodically. To keep merges clean:
-
-- New code lives in `src/auth/`, `src/store/{identities,accounts,
-  memberships,factors,sessions,audit}.rs`, `src/handlers/{auth,settings,
-  account}.rs`, `templates/auth/`, `templates/{settings,account,
-  account_audit}.html` — files stage_1 will never touch.
-- stage_1 files touched: `app.rs` (route table + one middleware layer),
-  `config.rs`/`state.rs` (appended fields), `Cargo.toml`, `_layout.html`
-  (nav auth widget), `error.rs` (added `Forbidden`/`InvalidCredentials`
-  variants + `current_user` on `ErrorTemplate`), `handlers/{home,about}.rs`
-  and their templates (added `current_user`), `store/guestbook.rs` +
-  `handlers/guestbook.rs` (account-scoped — this one diverges from
-  upstream's unscoped version on purpose; expect a conflict there on every
-  merge and keep the scoped version), `test_util.rs` (auth helpers),
-  `ts/src/lib/api.ts` (CSRF header), `openapi.rs`/`telemetry.rs`
-  (title/log-target renamed to `stage_2`).
+`git remote -v` should show `upstream` pointing at stage_2 — `git fetch
+upstream && git merge upstream/main` periodically. Keep product features in
+new feature-area modules. The intentional fork seams are `src/bin/{site,admin}.rs`,
+router composition in `src/app.rs`, the two bind addresses in `src/config.rs`,
+and deployment/identity files. Preserve the public/admin trust-boundary split
+when resolving upstream changes: site has no session middleware or auth routes;
+admin retains the full stage_2 auth surface.

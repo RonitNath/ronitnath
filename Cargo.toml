@@ -1,7 +1,16 @@
 [package]
-name = "stage_2"
+name = "ronitnath"
 version = "0.1.0"
 edition = "2024"
+default-run = "site"
+
+[[bin]]
+name = "site"
+path = "src/bin/site.rs"
+
+[[bin]]
+name = "admin"
+path = "src/bin/admin.rs"
 
 [dependencies]
 anyhow = "1"

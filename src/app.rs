@@ -28,25 +28,23 @@ use crate::state::{AppState, AuthConfig};
 use crate::store::Store;
 use crate::telemetry;
 
-/// Builds the application router.
-///
-/// Keep this a readable table of contents: declare routes here and put the
-/// request logic in [`crate::handlers`]. Page routes use the plain `.route()`
-/// pass-through; JSON API routes go through `.routes(routes!(...))` so they
-/// show up in `/api/openapi.json` too.
-pub fn build_router(state: AppState, config: &Config) -> Router {
-    // `client-errors` is the only unauthenticated write route left in
-    // stage_2 — guestbook writes now require an `AccountScope` (see
-    // `handlers::guestbook`), so they no longer need IP-based rate
-    // limiting on top of that.
+/// Builds the deliberately unauthenticated public surface for `site`.
+pub fn build_site_router(state: AppState, config: &Config) -> Router {
     let rate_limiter = RateLimiter::new(config.rate_limit_per_minute, config.trust_proxy);
-    let client_error_api = OpenApiRouter::new()
-        .routes(routes!(handlers::client_errors::report))
-        .route_layer(middleware::from_fn_with_state(
-            rate_limiter.clone(),
-            rate_limit::enforce,
-        ));
+    let (router, api) = OpenApiRouter::with_openapi(ApiDoc::openapi())
+        .route("/", get(handlers::home::index))
+        .routes(routes!(handlers::health::healthz))
+        .merge(client_error_api(&rate_limiter))
+        .nest_service("/static", ServeDir::new("static"))
+        .fallback(handlers::errors::not_found)
+        .with_state(state.clone())
+        .split_for_parts();
+    apply_layers(with_openapi_json(router, api), state, config, false)
+}
 
+/// Builds the full authenticated/admin surface, preserving the stage_2 routes.
+pub fn build_admin_router(state: AppState, config: &Config) -> Router {
+    let rate_limiter = RateLimiter::new(config.rate_limit_per_minute, config.trust_proxy);
     let (router, api) = OpenApiRouter::with_openapi(ApiDoc::openapi())
         .route("/", get(handlers::home::index))
         .route("/about", get(handlers::about::index))
@@ -56,7 +54,7 @@ pub fn build_router(state: AppState, config: &Config) -> Router {
             handlers::guestbook::api_create
         ))
         .routes(routes!(handlers::health::healthz))
-        .merge(client_error_api)
+        .merge(client_error_api(&rate_limiter))
         .route(
             "/login",
             get(handlers::auth::login_page).post(handlers::auth::login_submit),
@@ -66,7 +64,6 @@ pub fn build_router(state: AppState, config: &Config) -> Router {
             get(handlers::auth::signup_page).post(handlers::auth::signup_submit),
         )
         .route("/logout", post(handlers::auth::logout_submit))
-        // OIDC RP factor routes: no-op unless providers are configured.
         .route("/auth/oidc/{key}/start", get(handlers::auth::oidc_start))
         .route(
             "/auth/oidc/{key}/callback",
@@ -89,60 +86,21 @@ pub fn build_router(state: AppState, config: &Config) -> Router {
         .route("/account/audit", get(handlers::account::audit))
         .nest_service("/static", ServeDir::new("static"))
         .fallback(handlers::errors::not_found)
-        // Layered individually (not via one `ServiceBuilder`): bundling the
-        // `from_fn` error-page middleware together with `tower_http`'s
-        // generic body-rewrapping layers (timeout, body-limit) in a single
-        // `ServiceBuilder` stack defeats rustc's inference before it ever
-        // reaches a concrete `Router` to anchor against. Each `.layer()`
-        // call here resolves against the router directly instead.
-        //
-        // Router::layer's *last* call becomes the *outermost* wrapper (the
-        // opposite of `ServiceBuilder`, where the first call is outermost)
-        // — so this list reads innermost-first. Outer-to-inner, a request
-        // actually passes through: SetRequestId, Propagate, the security
-        // headers, Trace, attach_session, the error-page middleware,
-        // Timeout, then the body-size limit, then the route.
-        //
-        // Timeout and body-limit sit innermost because both rewrap the
-        // request/response body into types `Trace`'s `make_span` and the
-        // error-page middleware's `Request` extractor aren't generic over
-        // — those two are pinned to the plain `Body` type.
-        .layer(RequestBodyLimitLayer::new(config.max_body_bytes))
-        .layer(TimeoutLayer::with_status_code(
-            StatusCode::REQUEST_TIMEOUT,
-            Duration::from_secs(config.request_timeout_secs),
-        ))
-        // Renders the templated page for any AppError response. Must sit
-        // inside (run after) attach_session, since the error page's nav
-        // needs the session context attach_session inserts.
-        .layer(middleware::from_fn(error::render_error_pages))
-        // Resolves the session cookie once per request into request
-        // extensions — `AccountScope`, the nav, and render_error_pages all
-        // read the result from there instead of re-querying.
-        .layer(middleware::from_fn_with_state(
-            state.clone(),
-            auth::middleware::attach_session,
-        ))
-        .layer(
-            TraceLayer::new_for_http()
-                .make_span_with(telemetry::make_span)
-                .on_response(telemetry::on_response),
-        )
-        .layer(security_headers::content_security_policy())
-        .layer(security_headers::referrer_policy())
-        .layer(security_headers::x_frame_options())
-        .layer(security_headers::x_content_type_options())
-        // Propagate + the security headers wrap everything below, including
-        // the timeout layer: if a request times out, the layers *inside*
-        // the timeout (trace, error pages, the handler) never run for it,
-        // so anything that must land on every response has to sit out here.
-        .layer(PropagateRequestIdLayer::x_request_id())
-        // Assign (or trust an inbound) x-request-id before anything else
-        // runs, so every later layer can rely on it.
-        .layer(SetRequestIdLayer::x_request_id(MakeRequestUuid))
-        .with_state(state)
+        .with_state(state.clone())
         .split_for_parts();
+    apply_layers(with_openapi_json(router, api), state, config, true)
+}
 
+fn client_error_api(rate_limiter: &RateLimiter) -> OpenApiRouter<AppState> {
+    OpenApiRouter::new()
+        .routes(routes!(handlers::client_errors::report))
+        .route_layer(middleware::from_fn_with_state(
+            rate_limiter.clone(),
+            rate_limit::enforce,
+        ))
+}
+
+fn with_openapi_json(router: Router, api: utoipa::openapi::OpenApi) -> Router {
     router.route(
         "/api/openapi.json",
         get(move || {
@@ -152,15 +110,50 @@ pub fn build_router(state: AppState, config: &Config) -> Router {
     )
 }
 
-/// Waits for Ctrl+C or SIGTERM so [`run`] can drain in-flight requests
-/// before the process exits, instead of dropping connections on deploy.
+fn apply_layers(router: Router, state: AppState, config: &Config, attach_sessions: bool) -> Router {
+    // Layered individually (not via one `ServiceBuilder`): bundling the
+    // `from_fn` error-page middleware with generic body-rewrapping layers
+    // defeats rustc inference before a concrete `Router` anchors it.
+    //
+    // Router::layer's last call is outermost. Request flow is request-id,
+    // security headers, trace, optional session resolution, error pages,
+    // timeout, body limit, then route. Session resolution must remain outside
+    // error rendering because error-page navigation reads its context.
+    let router = router
+        .layer(RequestBodyLimitLayer::new(config.max_body_bytes))
+        .layer(TimeoutLayer::with_status_code(
+            StatusCode::REQUEST_TIMEOUT,
+            Duration::from_secs(config.request_timeout_secs),
+        ))
+        .layer(middleware::from_fn(error::render_error_pages));
+    let router = if attach_sessions {
+        router.layer(middleware::from_fn_with_state(
+            state,
+            auth::middleware::attach_session,
+        ))
+    } else {
+        router
+    };
+    router
+        .layer(
+            TraceLayer::new_for_http()
+                .make_span_with(telemetry::make_span)
+                .on_response(telemetry::on_response),
+        )
+        .layer(security_headers::content_security_policy())
+        .layer(security_headers::referrer_policy())
+        .layer(security_headers::x_frame_options())
+        .layer(security_headers::x_content_type_options())
+        .layer(PropagateRequestIdLayer::x_request_id())
+        .layer(SetRequestIdLayer::x_request_id(MakeRequestUuid))
+}
+
 async fn shutdown_signal() {
     let ctrl_c = async {
         tokio::signal::ctrl_c()
             .await
             .expect("failed to install Ctrl+C handler");
     };
-
     #[cfg(unix)]
     let terminate = async {
         tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
@@ -170,11 +163,7 @@ async fn shutdown_signal() {
     };
     #[cfg(not(unix))]
     let terminate = std::future::pending::<()>();
-
-    tokio::select! {
-        _ = ctrl_c => {},
-        _ = terminate => {},
-    }
+    tokio::select! { _ = ctrl_c => {}, _ = terminate => {} }
     info!("shutting down");
 }
 
@@ -186,17 +175,10 @@ fn auth_config(config: &Config) -> AuthConfig {
     }
 }
 
-/// Builds the app and serves it until the process is terminated.
-pub async fn run() {
-    let config = Config::from_env();
+async fn state(config: &Config) -> AppState {
     let store = Store::connect(&config.database_url)
         .await
-        .unwrap_or_else(|e| {
-            panic!(
-                "failed to connect to database at {}: {e}",
-                config.database_url
-            )
-        });
+        .unwrap_or_else(|e| panic!("failed to open database at {}: {e}", config.database_url));
     let oidc = auth::oidc::OidcRegistry::from_path(&config.oidc_providers_path)
         .await
         .unwrap_or_else(|e| {
@@ -205,14 +187,26 @@ pub async fn run() {
                 config.oidc_providers_path
             )
         });
-    let state = AppState::new(store, auth_config(&config)).with_oidc(oidc);
-    let app = build_router(state, &config);
+    AppState::new(store, auth_config(config)).with_oidc(oidc)
+}
 
-    let listener = tokio::net::TcpListener::bind(&config.bind_addr)
+pub async fn run_site() {
+    let config = Config::from_env();
+    let app = build_site_router(state(&config).await, &config);
+    serve(app, &config.bind_addr).await;
+}
+
+pub async fn run_admin() {
+    let config = Config::from_env();
+    let app = build_admin_router(state(&config).await, &config);
+    serve(app, &config.admin_bind_addr).await;
+}
+
+async fn serve(app: Router, bind_addr: &str) {
+    let listener = tokio::net::TcpListener::bind(bind_addr)
         .await
-        .unwrap_or_else(|e| panic!("failed to bind {}: {e}", config.bind_addr));
+        .unwrap_or_else(|e| panic!("failed to bind {bind_addr}: {e}"));
     info!("listening on http://{}", listener.local_addr().unwrap());
-
     axum::serve(
         listener,
         app.into_make_service_with_connect_info::<SocketAddr>(),
@@ -235,7 +229,7 @@ mod tests {
 
     use crate::test_util::{
         Authed, extract_cookie, get, get_with_cookie, post_bytes, post_form, post_form_with_cookie,
-        post_json_authed, post_json_from, seed_session, signup, test_app,
+        post_json_authed, post_json_from, seed_session, signup, test_app, test_site_app,
     };
 
     #[tokio::test]
@@ -322,6 +316,13 @@ mod tests {
         }
         let (status, _, _) = post_json_from(&app, "/api/client-errors", &body, addr).await;
         assert_eq!(status, StatusCode::TOO_MANY_REQUESTS);
+    }
+
+    #[tokio::test]
+    async fn site_has_no_auth_routes() {
+        let (app, _store) = test_site_app().await;
+        let (status, _, _) = get(&app, "/login").await;
+        assert_eq!(status, StatusCode::NOT_FOUND);
     }
 
     #[tokio::test]
@@ -882,7 +883,7 @@ mod tests {
         let config = crate::config::Config::for_tests();
         let state = crate::state::AppState::new(store.clone(), super::test_auth_config(&config))
             .with_oidc(registry);
-        (super::build_router(state, &config), store, op)
+        (super::build_admin_router(state, &config), store, op)
     }
 
     async fn run_oidc_login(

@@ -7,5 +7,5 @@
 use utoipa::OpenApi;
 
 #[derive(OpenApi)]
-#[openapi(info(title = "stage_2", description = "Demo API surface for the stage_2 hardened template"))]
+#[openapi(info(title = "ronitnath.com", description = "API surface for ronitnath.com"))]
 pub struct ApiDoc;

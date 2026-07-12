@@ -1,0 +1,31 @@
+# Public site and mesh-only admin share one sqlite store (WAL). Both bins
+# safely apply pending sqlx migrations during startup.
+services:
+  ronitnath-site:
+    build: .
+    image: ronitnath:latest
+    command: site
+    restart: unless-stopped
+    environment:
+      RUST_LOG: info
+      TRUSTED_PROXY: "true"
+    volumes:
+      - ./data:/app/data
+    ports:
+      - "127.0.0.1:3130:3130"
+      - "10.0.0.1:3130:3130"
+
+  ronitnath-admin:
+    image: ronitnath:latest
+    command: admin
+    restart: unless-stopped
+    depends_on:
+      - ronitnath-site
+    environment:
+      AUTH_SIGNUP: closed
+      RUST_LOG: info
+    volumes:
+      - ./data:/app/data
+    ports:
+      - "127.0.0.1:3131:3131"
+      - "100.88.31.199:3131:3131"

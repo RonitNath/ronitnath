@@ -9,6 +9,7 @@ use crate::state::AppState;
 
 #[derive(Serialize, ToSchema)]
 pub struct Health {
+    service: &'static str,
     status: &'static str,
     version: &'static str,
     git_hash: &'static str,
@@ -24,6 +25,7 @@ pub struct Health {
 )]
 pub async fn healthz(State(state): State<AppState>) -> Json<Health> {
     Json(Health {
+        service: "ronitnath",
         status: "ok",
         version: env!("CARGO_PKG_VERSION"),
         git_hash: env!("GIT_HASH"),

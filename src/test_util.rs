@@ -1,5 +1,5 @@
 //! Shared helpers for HTTP-level ("router") tests — see AGENTS.md → "Router
-//! tests". Exercises [`crate::app::build_router`] directly through
+//! tests". Exercises the split routers directly through
 //! `tower::ServiceExt::oneshot`: no listener, no port, so it stays inside
 //! the existing "<~1s, parallel-safe" test budget (see AGENTS.md).
 
@@ -12,7 +12,7 @@ use axum::http::{HeaderMap, Request, StatusCode, header};
 use serde::Serialize;
 use tower::ServiceExt;
 
-use crate::app::{build_router, test_auth_config};
+use crate::app::{build_admin_router, build_site_router, test_auth_config};
 use crate::auth::session;
 use crate::config::Config;
 use crate::state::AppState;
@@ -28,7 +28,15 @@ pub async fn test_app() -> (Router, Store) {
     let store = Store::connect_in_memory().await;
     let config = Config::for_tests();
     let state = AppState::new(store.clone(), test_auth_config(&config));
-    (build_router(state, &config), store)
+    (build_admin_router(state, &config), store)
+}
+
+/// A fresh public router with no session/auth middleware or auth routes.
+pub async fn test_site_app() -> (Router, Store) {
+    let store = Store::connect_in_memory().await;
+    let config = Config::for_tests();
+    let state = AppState::new(store.clone(), test_auth_config(&config));
+    (build_site_router(state, &config), store)
 }
 
 /// Source address for tests that don't care about rate limiting; use
@@ -36,10 +44,19 @@ pub async fn test_app() -> (Router, Store) {
 const DEFAULT_IP: IpAddr = IpAddr::V4(Ipv4Addr::new(203, 0, 113, 1));
 
 pub async fn get(app: &Router, path: &str) -> (StatusCode, HeaderMap, Bytes) {
-    send(app, Request::get(path).body(Body::empty()).unwrap(), DEFAULT_IP).await
+    send(
+        app,
+        Request::get(path).body(Body::empty()).unwrap(),
+        DEFAULT_IP,
+    )
+    .await
 }
 
-pub async fn get_with_cookie(app: &Router, path: &str, cookie: &str) -> (StatusCode, HeaderMap, Bytes) {
+pub async fn get_with_cookie(
+    app: &Router,
+    path: &str,
+    cookie: &str,
+) -> (StatusCode, HeaderMap, Bytes) {
     let request = Request::get(path)
         .header(header::COOKIE, cookie)
         .body(Body::empty())
@@ -53,7 +70,14 @@ pub async fn post_json_from<T: Serialize>(
     body: &T,
     ip: IpAddr,
 ) -> (StatusCode, HeaderMap, Bytes) {
-    post_bytes_from(app, path, "application/json", serde_json::to_vec(body).unwrap(), ip).await
+    post_bytes_from(
+        app,
+        path,
+        "application/json",
+        serde_json::to_vec(body).unwrap(),
+        ip,
+    )
+    .await
 }
 
 /// A JSON POST carrying a session cookie and (optionally) a CSRF header —
@@ -71,7 +95,14 @@ pub async fn post_json_authed<T: Serialize>(
     if let Some(token) = csrf_token {
         builder = builder.header("x-csrf-token", token);
     }
-    send(app, builder.body(Body::from(serde_json::to_vec(body).unwrap())).unwrap(), DEFAULT_IP).await
+    send(
+        app,
+        builder
+            .body(Body::from(serde_json::to_vec(body).unwrap()))
+            .unwrap(),
+        DEFAULT_IP,
+    )
+    .await
 }
 
 pub async fn post_bytes(
@@ -110,11 +141,17 @@ pub async fn post_form_with_cookie(
     form: &str,
     cookie: Option<&str>,
 ) -> (StatusCode, HeaderMap, Bytes) {
-    let mut builder = Request::post(path).header(header::CONTENT_TYPE, "application/x-www-form-urlencoded");
+    let mut builder =
+        Request::post(path).header(header::CONTENT_TYPE, "application/x-www-form-urlencoded");
     if let Some(c) = cookie {
         builder = builder.header(header::COOKIE, c);
     }
-    send(app, builder.body(Body::from(form.to_string())).unwrap(), DEFAULT_IP).await
+    send(
+        app,
+        builder.body(Body::from(form.to_string())).unwrap(),
+        DEFAULT_IP,
+    )
+    .await
 }
 
 /// Pulls a `name=value` pair (dropping cookie attributes) out of a
@@ -127,7 +164,8 @@ pub fn extract_cookie(headers: &HeaderMap, name: &str) -> String {
         .find_map(|v| {
             let s = v.to_str().ok()?;
             let prefix = format!("{name}=");
-            s.starts_with(&prefix).then(|| s.split(';').next().unwrap().to_string())
+            s.starts_with(&prefix)
+                .then(|| s.split(';').next().unwrap().to_string())
         })
         .unwrap_or_else(|| panic!("no Set-Cookie for {name} in {headers:?}"))
 }
@@ -158,11 +196,19 @@ pub async fn signup(app: &Router, display_name: &str, email: &str, password: &st
         urlencoding(password)
     );
     let (status, headers, _) = post_form(app, "/signup", &form).await;
-    assert_eq!(status, StatusCode::SEE_OTHER, "signup should redirect on success");
+    assert_eq!(
+        status,
+        StatusCode::SEE_OTHER,
+        "signup should redirect on success"
+    );
     let cookie = extract_cookie(&headers, "session");
 
     let (status, _, body) = get_with_cookie(app, "/settings", &cookie).await;
-    assert_eq!(status, StatusCode::OK, "signed-up identity should be able to load /settings");
+    assert_eq!(
+        status,
+        StatusCode::OK,
+        "signed-up identity should be able to load /settings"
+    );
     let csrf_token = extract_csrf_token(&body);
 
     Authed { cookie, csrf_token }
@@ -178,7 +224,15 @@ pub async fn seed_session(store: &Store, identity_id: i64, account_id: i64) -> A
     let token_hash = session::hash_token(&raw_token);
     let csrf_token = session::generate_token();
     store
-        .create_session(identity_id, account_id, &token_hash, &csrf_token, "9999-01-01 00:00:00", None, None)
+        .create_session(
+            identity_id,
+            account_id,
+            &token_hash,
+            &csrf_token,
+            "9999-01-01 00:00:00",
+            None,
+            None,
+        )
         .await
         .unwrap();
     Authed {
@@ -206,7 +260,11 @@ fn urlencoding(s: &str) -> String {
 /// exists once there's a real listener. Rate-limiting middleware reads
 /// this, so every test helper goes through here rather than calling
 /// `oneshot` directly.
-async fn send(app: &Router, mut request: Request<Body>, ip: IpAddr) -> (StatusCode, HeaderMap, Bytes) {
+async fn send(
+    app: &Router,
+    mut request: Request<Body>,
+    ip: IpAddr,
+) -> (StatusCode, HeaderMap, Bytes) {
     request
         .extensions_mut()
         .insert(ConnectInfo(SocketAddr::new(ip, 0)));

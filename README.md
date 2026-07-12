@@ -1,13 +1,12 @@
-# stage_2
+# ronitnath.com
 
-The hardened fork of [stage_1](https://github.com/RonitNath/stage_1) — fork
-this instead of stage_1 when the app is multi-user or internet-facing.
-Everything stage_1 gives you (Axum + Askama, typed TypeScript + Solid
-frontend, sqlx/sqlite, hardening middleware) plus a full identity/account/
-factor auth model on top. Agents: read [AGENTS.md](AGENTS.md) first.
+The unified ronitnath.com application, forked from
+[stage_2](https://github.com/RonitNath/stage_2). It keeps stage_2's hardened
+identity/account/factor auth foundation while separating the public site from
+the authenticated admin surface. Agents: read [AGENTS.md](AGENTS.md) first.
 
-stage_2 tracks stage_1 upstream via `git merge` (see AGENTS.md's "Merge
-discipline") — it's a fork, not a copy.
+This repository tracks stage_2 upstream via `git merge` (see AGENTS.md's
+"Merge discipline") — it is a product fork, not a copy.
 
 ## The auth model
 
@@ -27,8 +26,9 @@ Full design rationale in `docs/plans/2026-07-stage2-hardened-fork-template.md`.
 ## Layout
 
     src/
-      main.rs         Entry point — loads .env, initializes telemetry, starts the server.
-      app.rs          Router assembly, layer stack, server bootstrap.
+      bin/site.rs     Public entry point (port 3130; no session middleware).
+      bin/admin.rs    Authenticated admin entry point (port 3131).
+      app.rs          Split router assembly, shared layer stack, server bootstrap.
       config.rs       Environment-sourced runtime configuration.
       state.rs        Shared application state (AppState — store handle, uptime, AuthConfig).
       error.rs        Crate-wide error type and its HTTP/JSON representation.
@@ -66,24 +66,23 @@ rather than growing any single file — see AGENTS.md for the full checklist.
 
 ## Running
 
-A fresh clone works with zero setup:
+A fresh clone works with zero setup. Start the public site first so it creates
+and migrates the shared `data/app.db`, then start admin in another terminal:
 
-    cargo run
+    cargo run --bin site
+    cargo run --bin admin
 
-This creates and migrates `data/app.db` automatically. Binds to
-`127.0.0.1:3000` by default; override with `BIND_ADDR`:
-
-    BIND_ADDR=0.0.0.0:8080 cargo run
-
-Sign up at `/signup` — there's no seeded demo account (a hardened template
-shouldn't ship baked-in credentials). Pages render without the frontend
+They bind to `127.0.0.1:3130` and `127.0.0.1:3131` by default; override with
+`BIND_ADDR` and `ADMIN_BIND_ADDR`. Sign up through admin at `/signup` — there
+is no seeded demo account. Pages render without the frontend
 built, but islands (e.g. `/guestbook`) need it once:
 
     cd ts && bun install && bun run build
 
 For active development, run both watchers side by side (see AGENTS.md):
 
-    cargo watch -w src -w templates -w migrations -x run
+    cargo watch -w src -w templates -w migrations -x 'run --bin site'
+    cargo watch -w src -w templates -w migrations -x 'run --bin admin'
     cd ts && bun run watch
 
 ## Hardening

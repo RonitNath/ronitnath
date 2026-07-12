@@ -7,8 +7,10 @@ use std::str::FromStr;
 /// Add new tunables here (and read them in [`Config::from_env`]) rather than
 /// reaching for `std::env::var` from inside handlers.
 pub struct Config {
-    /// Address the HTTP server binds to.
+    /// Address the public site server binds to.
     pub bind_addr: String,
+    /// Address the authenticated admin server binds to.
+    pub admin_bind_addr: String,
     /// sqlite connection string. Defaults to a repo-relative file so a fresh
     /// fork runs with zero setup; override via `.env` when you need sqlx-cli
     /// (see AGENTS.md).
@@ -56,7 +58,8 @@ impl Config {
     /// Loads configuration from the environment, falling back to local defaults.
     pub fn from_env() -> Self {
         Self {
-            bind_addr: env_or("BIND_ADDR", "127.0.0.1:3000"),
+            bind_addr: env_or("BIND_ADDR", "127.0.0.1:3130"),
+            admin_bind_addr: env_or("ADMIN_BIND_ADDR", "127.0.0.1:3131"),
             database_url: env_or("DATABASE_URL", "sqlite:data/app.db"),
             request_timeout_secs: env_or_parse("REQUEST_TIMEOUT_SECS", 30),
             max_body_bytes: env_or_parse("MAX_BODY_BYTES", 1_048_576),
@@ -75,6 +78,7 @@ impl Config {
     pub fn for_tests() -> Self {
         Self {
             bind_addr: "127.0.0.1:0".into(),
+            admin_bind_addr: "127.0.0.1:0".into(),
             database_url: "sqlite::memory:".into(),
             request_timeout_secs: 30,
             max_body_bytes: 1024,
