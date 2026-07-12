@@ -18,4 +18,5 @@ pub mod guestbook;
 pub mod health;
 pub mod home;
 pub mod people_admin;
+pub mod photos;
 pub mod settings;

@@ -21,3 +21,11 @@ for (const button of document.querySelectorAll<HTMLButtonElement>(".copy-btn")) 
     }
   });
 }
+
+for (const form of document.querySelectorAll<HTMLFormElement>(".photo-upload-form")) {
+  form.addEventListener("submit", () => {
+    const status = form.querySelector<HTMLElement>(".photo-upload-status");
+    if (status) status.textContent = "Uploading…";
+    form.querySelector<HTMLButtonElement>("button[type=submit]")?.setAttribute("disabled", "");
+  });
+}

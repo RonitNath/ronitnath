@@ -27,7 +27,8 @@ use crate::store::Store;
 pub async fn test_app() -> (Router, Store) {
     let store = Store::connect_in_memory().await;
     let config = Config::for_tests();
-    let state = AppState::new(store.clone(), test_auth_config(&config));
+    let state = AppState::new(store.clone(), test_auth_config(&config))
+        .with_photo_storage_dir(config.photo_storage_dir.clone());
     (build_admin_router(state, &config), store)
 }
 
@@ -35,7 +36,8 @@ pub async fn test_app() -> (Router, Store) {
 pub async fn test_site_app() -> (Router, Store) {
     let store = Store::connect_in_memory().await;
     let config = Config::for_tests();
-    let state = AppState::new(store.clone(), test_auth_config(&config));
+    let state = AppState::new(store.clone(), test_auth_config(&config))
+        .with_photo_storage_dir(config.photo_storage_dir.clone());
     (build_site_router(state, &config), store)
 }
 
@@ -103,6 +105,20 @@ pub async fn post_json_authed<T: Serialize>(
         DEFAULT_IP,
     )
     .await
+}
+
+pub async fn post_multipart(
+    app: &Router,
+    path: &str,
+    boundary: &str,
+    body: Vec<u8>,
+    cookie: Option<&str>,
+) -> (StatusCode, HeaderMap, Bytes) {
+    let mut builder = Request::post(path)
+        .header(header::CONTENT_TYPE, format!("multipart/form-data; boundary={boundary}"))
+        .header(header::CONTENT_LENGTH, body.len());
+    if let Some(cookie) = cookie { builder = builder.header(header::COOKIE, cookie); }
+    send(app, builder.body(Body::from(body)).unwrap(), DEFAULT_IP).await
 }
 
 pub async fn post_bytes(

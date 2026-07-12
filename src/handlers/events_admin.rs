@@ -159,6 +159,7 @@ struct EventDetailTemplate {
     going: i64,
     maybe: i64,
     heads: i64,
+    photos: Vec<crate::handlers::photos::GalleryPhoto>,
 }
 
 pub async fn detail_page(
@@ -182,6 +183,11 @@ pub async fn detail_page(
     let attendance = store.list_attendance(scope.account_id, event_id).await?;
     let people = store.list_people(scope.account_id).await?;
     let (going, maybe, heads) = store.attendance_counts(scope.account_id, event_id).await?;
+    let photo_viewer = crate::auth::viewer::Viewer::Owner { identity_id: scope.identity_id };
+    let photos = crate::handlers::photos::gallery(
+        &state, scope.account_id, event_id, &photo_viewer,
+        &format!("/events/{event_id}/photos"),
+    ).await?;
 
     let count_by_item: HashMap<i64, (i64, i64)> = segment_counts
         .into_iter()
@@ -202,6 +208,7 @@ pub async fn detail_page(
         going,
         maybe,
         heads,
+        photos,
     })
 }
 

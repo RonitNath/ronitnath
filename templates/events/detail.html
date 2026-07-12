@@ -132,6 +132,22 @@
     </form>
 </section>
 
+<section class="admin-card" id="photos">
+    <h2>Photos</h2>
+    {% if photos.is_empty() %}<p class="muted">No photos yet. Upload the first event photo below.</p>{% else %}
+    <div class="photo-grid">{% for photo in photos %}<figure class="photo-card">
+        <img src="{{ photo.thumb_url }}" loading="lazy" alt="{{ photo.caption }}" />
+        {% if !photo.caption.is_empty() %}<figcaption>{{ photo.caption }}</figcaption>{% endif %}
+        <form method="post" enctype="multipart/form-data" action="{{ photo.delete_url }}"><input type="hidden" name="csrf_token" value="{{ csrf_token }}" /><button class="danger" type="submit">Delete photo</button></form>
+    </figure>{% endfor %}</div>{% endif %}
+    <form method="post" enctype="multipart/form-data" action="/events/{{ event.id }}/photos" class="admin-form photo-upload-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+        <label>Photo <input type="file" name="photo" accept="image/jpeg,image/png,image/webp" required /></label>
+        <label>Caption (optional) <input type="text" name="caption" maxlength="500" /></label>
+        <button type="submit">Upload photo</button><span class="photo-upload-status muted" aria-live="polite"></span>
+    </form>
+</section>
+
 <section class="admin-card" id="links">
     <h2>Links</h2>
     <p class="muted">Public links hide address and entry instructions; private links show everything.</p>

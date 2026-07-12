@@ -62,6 +62,16 @@
 .rsvp-saved { border: 1px solid var(--success); border-radius: var(--radius); padding: .75rem 1rem; }
 .rsvp-personal-link { overflow-wrap: anywhere; }
 
+.photo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr)); gap: 1rem; margin: 1rem 0; }
+.photo-card { margin: 0; padding: .5rem; background: var(--bg-muted); border: 1px solid var(--border); border-radius: var(--radius); }
+.photo-card img { display: block; width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: var(--radius); }
+.photo-open { display: block; width: 100%; padding: 0; border: 0; background: transparent; }
+.photo-card figcaption { margin: .5rem 0; color: var(--fg-muted); }
+.photo-upload-form { display: flex; flex-wrap: wrap; gap: .75rem; align-items: end; padding-top: 1rem; }
+.photo-dialog { max-width: min(90vw, 70rem); background: var(--bg-muted); color: var(--fg); border: 1px solid var(--border); border-radius: var(--radius); }
+.photo-dialog::backdrop { background: color-mix(in oklch, var(--bg) 80%, transparent); }
+.photo-dialog img { display: block; max-width: 100%; max-height: 75vh; margin: auto; }
+
 .admin-card, .stat-card {
     background: var(--bg-muted);
     border: 1px solid var(--border);

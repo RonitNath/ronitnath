@@ -172,6 +172,10 @@ struct EventPublicTemplate {
     poster_theme: bool,
     view: GuestView,
     mismatch_note: Option<String>,
+    photos: Vec<crate::handlers::photos::GalleryPhoto>,
+    photo_upload_url: String,
+    photo_csrf: String,
+    show_photos: bool,
 }
 
 /// The guest event page. Server-renders the level-appropriate info so the
@@ -186,6 +190,12 @@ pub async fn page(
     let (viewer, mismatch) = session_viewer.combine_with_link(Some(&link));
     let level = direct_level(state.store(), &link, &viewer).await?;
     let view = build_view(state.store(), &link, &event, level).await?;
+    let show_photos = crate::handlers::photos::attendee(&state, link.account_id, event.id, &viewer).await?;
+    let photo_prefix = format!("/e/{token}/photos");
+    let photos = if show_photos {
+        crate::handlers::photos::gallery(&state, link.account_id, event.id, &viewer, &photo_prefix).await?
+    } else { Vec::new() };
+    let photo_csrf = current_user.as_ref().map(|u| u.csrf_token.clone()).unwrap_or_default();
     let mismatch_note = if let Some(note) = mismatch {
         let signed_in = state
             .store()
@@ -215,6 +225,10 @@ pub async fn page(
         poster_theme: event.slug == "july4-2026",
         view,
         mismatch_note,
+        photos,
+        photo_upload_url: photo_prefix,
+        photo_csrf,
+        show_photos,
     })
 }
 

@@ -33,6 +33,24 @@
     {% if !view.schedule.is_empty() %}<section class="event-section" id="schedule"><h2>Schedule</h2><ol class="event-schedule">
         {% for item in view.schedule %}<li><span class="schedule-time">{{ item.time_label }}</span><div><strong>{{ item.title }}</strong>{% if !item.detail.is_empty() %}<p class="prewrap muted">{{ item.detail|safe }}</p>{% endif %}</div></li>{% endfor %}
     </ol></section>{% endif %}
+    {% if show_photos %}<section class="event-section" id="photos">
+        <h2>Photos</h2>
+        {% if photos.is_empty() %}<p class="muted">No photos yet. Add the first photo from this event below.</p>{% else %}
+        <div class="photo-grid">
+            {% for photo in photos %}<figure class="photo-card">
+                <button type="button" class="photo-open" data-photo-src="{{ photo.medium_url }}" data-photo-caption="{{ photo.caption }}"><img src="{{ photo.thumb_url }}" loading="lazy" alt="{{ photo.caption }}" /></button>
+                {% if !photo.caption.is_empty() %}<figcaption>{{ photo.caption }}</figcaption>{% endif %}
+                {% if photo.can_delete %}<form method="post" enctype="multipart/form-data" action="{{ photo.delete_url }}"><input type="hidden" name="csrf_token" value="{{ photo_csrf }}" /><button type="submit" class="danger">Delete photo</button></form>{% endif %}
+            </figure>{% endfor %}
+        </div>{% endif %}
+        <form method="post" enctype="multipart/form-data" action="{{ photo_upload_url }}" class="photo-upload-form">
+            <input type="hidden" name="csrf_token" value="{{ photo_csrf }}" />
+            <label>Photo <input type="file" name="photo" accept="image/jpeg,image/png,image/webp" required /></label>
+            <label>Caption (optional) <input type="text" name="caption" maxlength="500" /></label>
+            <button type="submit">Upload photo</button><span class="photo-upload-status muted" aria-live="polite"></span>
+        </form>
+        <dialog class="photo-dialog"><img alt="" /><p class="photo-dialog-caption"></p><form method="dialog"><button>Close</button></form></dialog>
+    </section>{% endif %}
     <section class="event-section" id="manage"><h2>Your reservation</h2><p class="muted">No RSVP needed — this just helps with planning. Update it whenever plans change.</p><div id="event-rsvp-island" data-endpoint="{{ rsvp_endpoint }}"><p class="muted">Loading reservation form…</p></div></section>
 {% endmatch %}
 </article>

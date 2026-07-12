@@ -7,3 +7,24 @@ if (mount && endpoint) {
   mount.textContent = "";
   render(() => <EventRsvp endpoint={endpoint} />, mount);
 }
+
+const dialog = document.querySelector<HTMLDialogElement>(".photo-dialog");
+document.querySelectorAll<HTMLButtonElement>(".photo-open").forEach((button) => {
+  button.addEventListener("click", () => {
+    const image = dialog?.querySelector<HTMLImageElement>("img");
+    const caption = dialog?.querySelector<HTMLElement>(".photo-dialog-caption");
+    if (!dialog || !image || !caption || !button.dataset.photoSrc) return;
+    image.src = button.dataset.photoSrc;
+    image.alt = button.dataset.photoCaption || "Event photo";
+    caption.textContent = button.dataset.photoCaption || "";
+    dialog.showModal();
+  });
+});
+
+document.querySelectorAll<HTMLFormElement>(".photo-upload-form").forEach((form) => {
+  form.addEventListener("submit", () => {
+    const status = form.querySelector<HTMLElement>(".photo-upload-status");
+    if (status) status.textContent = "Uploading…";
+    form.querySelector<HTMLButtonElement>("button[type=submit]")?.setAttribute("disabled", "");
+  });
+});
