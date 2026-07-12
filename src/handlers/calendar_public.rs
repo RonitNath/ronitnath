@@ -8,6 +8,9 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use chrono::{Datelike, NaiveDate};
+
+const MIN_CALENDAR_YEAR: i32 = 1970;
+const MAX_CALENDAR_YEAR: i32 = 2100;
 use serde::Deserialize;
 
 use crate::{
@@ -68,7 +71,7 @@ pub async fn page(
     Query(query): Query<MonthQuery>,
 ) -> Result<Response, AppError> {
     let first = parse_month(query.month.as_deref())?;
-    let next = next_month(first);
+    let next = next_month(first)?;
     let account_id = match state.owner_account_id() {
         Some(id) => id,
         None => match state.store().find_primary_account().await? {
@@ -92,12 +95,15 @@ fn calendar_response(
     current_user: Option<NavUser>,
     items: Vec<CalendarItem>,
 ) -> Result<Response, AppError> {
-    let next = next_month(first);
-    let previous = if first.month() == 1 {
-        NaiveDate::from_ymd_opt(first.year() - 1, 12, 1).unwrap()
+    let next = next_month(first)?;
+    let (previous_year, previous_month) = if first.month() == 1 {
+        (first.year().checked_sub(1), 12)
     } else {
-        NaiveDate::from_ymd_opt(first.year(), first.month() - 1, 1).unwrap()
+        (Some(first.year()), first.month() - 1)
     };
+    let previous = previous_year
+        .and_then(|year| NaiveDate::from_ymd_opt(year, previous_month, 1))
+        .ok_or_else(|| AppError::Invalid("month is outside the supported range".into()))?;
     let mut days = Vec::new();
     let mut cursor = first;
     while cursor < next {
@@ -111,9 +117,11 @@ fn calendar_response(
                 .cloned()
                 .collect(),
         });
-        cursor = cursor.succ_opt().unwrap();
+        cursor = cursor
+            .succ_opt()
+            .ok_or_else(|| AppError::Invalid("month is outside the supported range".into()))?;
     }
-    render(CalendarTemplate {
+    let mut response = render(CalendarTemplate {
         nav_active: "calendar",
         current_user,
         month_label: first.format("%B %Y").to_string(),
@@ -122,25 +130,39 @@ fn calendar_response(
         leading_blanks: first.weekday().num_days_from_sunday() as usize,
         days,
         agenda: items,
-    })
+    })?;
+    response.headers_mut().insert(
+        header::CACHE_CONTROL,
+        header::HeaderValue::from_static("private, no-store"),
+    );
+    Ok(response)
 }
 
 fn parse_month(value: Option<&str>) -> Result<NaiveDate, AppError> {
-    match value {
+    let parsed = match value {
         Some(value) => NaiveDate::parse_from_str(&format!("{value}-01"), "%Y-%m-%d")
-            .map_err(|_| AppError::Invalid("month must be YYYY-MM".into())),
+            .map_err(|_| AppError::Invalid("month must be YYYY-MM".into()))?,
         None => {
             let today = chrono::Local::now().date_naive();
-            Ok(NaiveDate::from_ymd_opt(today.year(), today.month(), 1).unwrap())
+            NaiveDate::from_ymd_opt(today.year(), today.month(), 1)
+                .ok_or_else(|| AppError::Invalid("current month is invalid".into()))?
         }
+    };
+    if !(MIN_CALENDAR_YEAR..=MAX_CALENDAR_YEAR).contains(&parsed.year()) {
+        return Err(AppError::Invalid(format!(
+            "month year must be between {MIN_CALENDAR_YEAR} and {MAX_CALENDAR_YEAR}"
+        )));
     }
+    Ok(parsed)
 }
-fn next_month(first: NaiveDate) -> NaiveDate {
-    if first.month() == 12 {
-        NaiveDate::from_ymd_opt(first.year() + 1, 1, 1).unwrap()
+fn next_month(first: NaiveDate) -> Result<NaiveDate, AppError> {
+    let (year, month) = if first.month() == 12 {
+        (first.year().checked_add(1), 1)
     } else {
-        NaiveDate::from_ymd_opt(first.year(), first.month() + 1, 1).unwrap()
-    }
+        (Some(first.year()), first.month() + 1)
+    };
+    year.and_then(|year| NaiveDate::from_ymd_opt(year, month, 1))
+        .ok_or_else(|| AppError::Invalid("month is outside the supported range".into()))
 }
 
 async fn union_for_range(
@@ -267,7 +289,9 @@ pub async fn feed(
         .resolve_calendar_feed(&hash_token(token))
         .await?
         .ok_or(AppError::NotFound)?;
-    state.store().touch_calendar_feed(feed.id).await?;
+    if state.store().touch_calendar_feed(feed.id).await? == 0 {
+        return Err(AppError::NotFound);
+    }
     let viewer = Viewer::FeedHolder {
         person_id: feed.person_id,
     };
@@ -322,7 +346,10 @@ pub async fn feed(
     }
     body.push_str("END:VCALENDAR\r\n");
     Ok((
-        [(header::CONTENT_TYPE, "text/calendar; charset=utf-8")],
+        [
+            (header::CONTENT_TYPE, "text/calendar; charset=utf-8"),
+            (header::CACHE_CONTROL, "private, no-store"),
+        ],
         body,
     )
         .into_response())
@@ -401,6 +428,25 @@ mod tests {
 
     fn text(body: axum::body::Bytes) -> String {
         String::from_utf8(body.to_vec()).unwrap()
+    }
+
+    #[tokio::test]
+    async fn chrono_extreme_month_boundaries_are_clean_client_errors() {
+        let store = Store::connect_in_memory().await;
+        let (_, account_id) = store
+            .signup_with_password("Owner", "month-boundary@example.com", "hash")
+            .await
+            .unwrap();
+        let app = site(&store, account_id).await;
+        for path in [
+            "/calendar?month=%2B262142-12",
+            "/calendar?month=-262143-01",
+            "/calendar?month=2101-01",
+            "/calendar?month=not-a-month",
+        ] {
+            let status = get(&app, path).await.0;
+            assert!(status.is_client_error(), "{path} returned {status}");
+        }
     }
 
     #[tokio::test]
@@ -556,6 +602,43 @@ mod tests {
         }
     }
 
+    #[tokio::test]
+    async fn calendar_guest_and_feed_are_isolated_from_other_accounts() {
+        let store = Store::connect_in_memory().await;
+        let (_, account_a) = store
+            .signup_with_password("Owner A", "calendar-a@example.com", "hash")
+            .await
+            .unwrap();
+        let (_, account_b) = store
+            .signup_with_password("Owner B", "calendar-b@example.com", "hash")
+            .await
+            .unwrap();
+        let person_a = store.create_person(account_a, "Guest A", "").await.unwrap();
+        let a_id = entry(&store, account_a, "ACCOUNT A ONLY", "2099-08-10 10:00").await;
+        let b_id = entry(&store, account_b, "ACCOUNT B SECRET", "2099-08-10 10:00").await;
+        set_public(&store, account_a, "calendar_entry", a_id, "summary").await;
+        set_public(&store, account_b, "calendar_entry", b_id, "summary").await;
+
+        let cookie = guest_cookie(&store, account_a, person_a.id).await;
+        let raw = "account-a-feed";
+        store
+            .mint_calendar_feed(account_a, person_a.id, &hash_token(raw), raw)
+            .await
+            .unwrap();
+        let app = site(&store, account_a).await;
+
+        let (_, _, page_body) = get_with_cookie(&app, "/calendar?month=2099-08", &cookie).await;
+        let page_body = text(page_body);
+        assert!(page_body.contains("ACCOUNT A ONLY"));
+        assert!(!page_body.contains("ACCOUNT B SECRET"));
+
+        let (status, _, feed_body) = get(&app, &format!("/calendar/{raw}.ics")).await;
+        assert_eq!(status, StatusCode::OK);
+        let feed_body = text(feed_body);
+        assert!(feed_body.contains("ACCOUNT A ONLY"));
+        assert!(!feed_body.contains("ACCOUNT B SECRET"));
+    }
+
     fn vevent<'a>(body: &'a str, uid: &str) -> &'a str {
         let uid = format!("UID:{uid}@ronitnath.com");
         let uid_at = body.find(&uid).unwrap_or_else(|| panic!("missing {uid}"));
@@ -565,7 +648,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn person_feed_redacts_each_level_and_revocation_is_immediate() {
+    async fn person_feed_redaction_revoke_use_race_double_mint_and_no_store() {
         let store = Store::connect_in_memory().await;
         let (_, account_id) = store
             .signup_with_password("Owner", "feed-owner@example.com", "hash")
@@ -650,10 +733,15 @@ mod tests {
         }
 
         let raw = "person-feed-token";
-        store
+        let first_mint = store
             .mint_calendar_feed(account_id, person.id, &hash_token(raw), raw)
             .await
             .unwrap();
+        let second_mint = store
+            .mint_calendar_feed(account_id, person.id, &hash_token(raw), raw)
+            .await
+            .unwrap();
+        assert_eq!(first_mint.id, second_mint.id, "double mint must upsert");
         let app = site(&store, account_id).await;
         assert_eq!(
             get(&app, &format!("/calendar/{raw}")).await.0,
@@ -668,6 +756,7 @@ mod tests {
                 .unwrap()
                 .starts_with("text/calendar")
         );
+        assert_eq!(headers[header::CACHE_CONTROL], "private, no-store");
         let body = text(body);
         let busy = vevent(&body, &format!("entry-{busy_id}"));
         assert!(busy.contains("SUMMARY:Busy"));
@@ -689,10 +778,23 @@ mod tests {
         assert!(full.contains("LOCATION:Full Entry Location"));
         assert!(full.contains("DESCRIPTION:Full Entry Notes"));
 
+        let resolved_before_revoke = store
+            .resolve_calendar_feed(&hash_token(raw))
+            .await
+            .unwrap()
+            .unwrap();
         store
             .revoke_calendar_feed(account_id, person.id)
             .await
             .unwrap();
+        assert_eq!(
+            store
+                .touch_calendar_feed(resolved_before_revoke.id)
+                .await
+                .unwrap(),
+            0,
+            "a revoke between resolve and conditional touch must win"
+        );
         assert_eq!(get(&app, &path).await.0, StatusCode::NOT_FOUND);
         assert_eq!(
             get(&app, "/calendar/not-a-token.ics").await.0,

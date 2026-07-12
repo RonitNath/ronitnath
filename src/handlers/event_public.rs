@@ -271,7 +271,10 @@ pub async fn ics(
         ),
     );
     Ok((
-        [(header::CONTENT_TYPE, "text/calendar; charset=utf-8")],
+        [
+            (header::CONTENT_TYPE, "text/calendar; charset=utf-8"),
+            (header::CACHE_CONTROL, "private, no-store"),
+        ],
         body,
     )
         .into_response())
@@ -285,21 +288,47 @@ pub(crate) fn format_vevent(
     location: Option<&str>,
     description: Option<&str>,
 ) -> String {
-    let mut body = format!(
-        "BEGIN:VEVENT\r\nUID:{}@ronitnath.com\r\nSUMMARY:{}\r\nDTSTART:{}\r\nDTEND:{}\r\n",
-        escape_ics(uid),
-        escape_ics(summary),
-        ics_datetime(starts_at),
-        ics_datetime(ends_at)
-    );
+    let mut body = String::new();
+    for line in [
+        "BEGIN:VEVENT".to_owned(),
+        format!("UID:{}@ronitnath.com", escape_ics(uid)),
+        format!("SUMMARY:{}", escape_ics(summary)),
+        format!("DTSTART:{}", ics_datetime(starts_at)),
+        format!("DTEND:{}", ics_datetime(ends_at)),
+    ] {
+        push_ics_line(&mut body, &line);
+    }
     if let Some(location) = location.filter(|value| !value.is_empty()) {
-        body.push_str(&format!("LOCATION:{}\r\n", escape_ics(location)));
+        push_ics_line(&mut body, &format!("LOCATION:{}", escape_ics(location)));
     }
     if let Some(description) = description.filter(|value| !value.is_empty()) {
-        body.push_str(&format!("DESCRIPTION:{}\r\n", escape_ics(description)));
+        push_ics_line(
+            &mut body,
+            &format!("DESCRIPTION:{}", escape_ics(description)),
+        );
     }
-    body.push_str("END:VEVENT\r\n");
+    push_ics_line(&mut body, "END:VEVENT");
     body
+}
+
+/// Writes one RFC 5545 content line, folding at 75 octets. Continuations
+/// reserve one octet for their leading space, and iteration by `char` keeps
+/// every split on a UTF-8 codepoint boundary.
+fn push_ics_line(output: &mut String, line: &str) {
+    let mut octets = 0usize;
+    let mut continuation = false;
+    for ch in line.chars() {
+        let width = ch.len_utf8();
+        let limit = if continuation { 74 } else { 75 };
+        if octets + width > limit {
+            output.push_str("\r\n ");
+            octets = 0;
+            continuation = true;
+        }
+        output.push(ch);
+        octets += width;
+    }
+    output.push_str("\r\n");
 }
 
 pub(crate) fn ics_datetime(value: &str) -> String {
@@ -322,6 +351,34 @@ pub(crate) fn escape_ics(value: &str) -> String {
         .replace(';', "\\;")
         .replace('\n', "\\n")
         .replace('\r', "")
+}
+
+#[cfg(test)]
+mod ics_tests {
+    use super::format_vevent;
+
+    #[test]
+    fn hostile_and_long_utf8_ics_text_is_escaped_and_folded_safely() {
+        let hostile = "hello\nBEGIN:VEVENT,semi;";
+        let long_utf8 = format!("{hostile} {}", "🙂é".repeat(50));
+        let output = format_vevent(
+            "hostile",
+            &long_utf8,
+            "2099-07-12 10:00",
+            "2099-07-12 11:00",
+            Some(&long_utf8),
+            Some(hostile),
+        );
+        assert!(output.is_char_boundary(output.len()));
+        for line in output.split("\r\n").filter(|line| !line.is_empty()) {
+            assert!(line.len() <= 75, "overlong ICS line: {} octets", line.len());
+        }
+        let unfolded = output.replace("\r\n ", "");
+        assert!(unfolded.contains("SUMMARY:hello\\nBEGIN:VEVENT\\,semi\\;"));
+        assert!(unfolded.contains("DESCRIPTION:hello\\nBEGIN:VEVENT\\,semi\\;"));
+        assert!(!output.contains("hello\nBEGIN:VEVENT"));
+        assert!(output.contains("\r\n "), "long field was not folded");
+    }
 }
 
 #[utoipa::path(

@@ -63,10 +63,11 @@ impl Store {
             .fetch_one(&self.pool).await
     }
 
-    pub async fn touch_calendar_feed(&self, id: i64) -> sqlx::Result<()> {
-        sqlx::query!("UPDATE calendar_feed_tokens SET last_used_at=datetime('now') WHERE id=?1 AND revoked_at IS NULL", id)
-            .execute(&self.pool).await?;
-        Ok(())
+    /// Marks a feed use only while it is still live. A zero result means a
+    /// revoke won the race after token resolution and callers must fail closed.
+    pub async fn touch_calendar_feed(&self, id: i64) -> sqlx::Result<u64> {
+        Ok(sqlx::query!("UPDATE calendar_feed_tokens SET last_used_at=datetime('now') WHERE id=?1 AND revoked_at IS NULL", id)
+            .execute(&self.pool).await?.rows_affected())
     }
 
     pub async fn revoke_calendar_feed(&self, account_id: i64, person_id: i64) -> sqlx::Result<u64> {

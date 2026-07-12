@@ -28,6 +28,13 @@ pub struct PersonOverrideRow {
 }
 
 #[derive(Debug)]
+pub struct AudienceUpdate {
+    pub public_level: String,
+    pub circles: Vec<(i64, Option<String>)>,
+    pub people: Vec<(i64, Option<String>, Option<String>)>,
+}
+
+#[derive(Debug)]
 pub struct AudienceInputs {
     pub policy: AudiencePolicyRow,
     pub overrides: Vec<PersonOverrideRow>,
@@ -278,6 +285,86 @@ impl Store {
                 account_id, policy_id, circle_id).execute(&self.pool).await?;
         }
         Ok(())
+    }
+
+    /// Applies a fully validated editor submission and its audit record as
+    /// one transaction, so malformed forms can never partially broaden access.
+    #[allow(clippy::too_many_arguments)]
+    pub async fn apply_audience_update(
+        &self,
+        account_id: i64,
+        policy_id: i64,
+        identity_id: i64,
+        subject_type: &str,
+        subject_id: i64,
+        update: &AudienceUpdate,
+    ) -> sqlx::Result<()> {
+        let mut tx = self.pool.begin().await?;
+        sqlx::query!(
+            "UPDATE audience_policies SET public_level = ?3 WHERE account_id = ?1 AND id = ?2",
+            account_id,
+            policy_id,
+            update.public_level
+        )
+        .execute(&mut *tx)
+        .await?;
+        for (circle_id, level) in &update.circles {
+            if let Some(level) = level {
+                sqlx::query!(
+                    r#"INSERT INTO audience_circle_grants (account_id, policy_id, circle_id, level)
+                    SELECT ?1, p.id, c.id, ?4 FROM audience_policies p
+                    JOIN circles c ON c.account_id = p.account_id
+                    WHERE p.account_id = ?1 AND p.id = ?2 AND c.id = ?3
+                    ON CONFLICT(policy_id, circle_id) DO UPDATE SET level = excluded.level"#,
+                    account_id,
+                    policy_id,
+                    circle_id,
+                    level
+                )
+                .execute(&mut *tx)
+                .await?;
+            } else {
+                sqlx::query!("DELETE FROM audience_circle_grants WHERE account_id = ?1 AND policy_id = ?2 AND circle_id = ?3",
+                    account_id, policy_id, circle_id).execute(&mut *tx).await?;
+            }
+        }
+        for (person_id, kind, level) in &update.people {
+            if let Some(kind) = kind {
+                sqlx::query!(
+                    r#"INSERT INTO audience_person_overrides
+                        (account_id, policy_id, person_id, override_kind, level)
+                    SELECT ?1, p.id, person.id, ?4, ?5 FROM audience_policies p
+                    JOIN people person ON person.account_id = p.account_id
+                    WHERE p.account_id = ?1 AND p.id = ?2 AND person.id = ?3
+                    ON CONFLICT(policy_id, person_id) DO UPDATE SET
+                        override_kind = excluded.override_kind, level = excluded.level"#,
+                    account_id,
+                    policy_id,
+                    person_id,
+                    kind,
+                    level
+                )
+                .execute(&mut *tx)
+                .await?;
+            } else {
+                sqlx::query!("DELETE FROM audience_person_overrides WHERE account_id = ?1 AND policy_id = ?2 AND person_id = ?3",
+                    account_id, policy_id, person_id).execute(&mut *tx).await?;
+            }
+        }
+        let entity_id = subject_id.to_string();
+        let detail = serde_json::json!({"public_level": update.public_level}).to_string();
+        sqlx::query!(
+            r#"INSERT INTO audit_log (identity_id, account_id, request_id, action, entity, entity_id, detail)
+               VALUES (?1, ?2, NULL, 'audience.updated', ?3, ?4, ?5)"#,
+            identity_id,
+            account_id,
+            subject_type,
+            entity_id,
+            detail,
+        )
+        .execute(&mut *tx)
+        .await?;
+        tx.commit().await
     }
 
     pub async fn set_person_override(

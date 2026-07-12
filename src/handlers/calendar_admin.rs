@@ -10,7 +10,6 @@ use serde::Deserialize;
 use std::collections::HashMap;
 
 use crate::{
-    access::level::Level,
     auth::{
         AccountScope, Role, csrf,
         extract::NavUser,
@@ -237,67 +236,22 @@ pub async fn audience_save(
         &scope,
         form.get("csrf_token").map(String::as_str).unwrap_or(""),
     )?;
-    let public = form
-        .get("public_level")
-        .ok_or_else(|| AppError::Invalid("public level is required".into()))?;
-    public
-        .parse::<Level>()
-        .map_err(|e| AppError::Invalid(e.into()))?;
     let store = state.store();
     let policy = store
         .find_audience_policy(scope.account_id, "calendar_entry", id)
         .await?
         .ok_or(AppError::NotFound)?;
+    let circles = store.list_circles(scope.account_id).await?;
+    let people = store.list_people(scope.account_id).await?;
+    let update = super::audience::parse_update(&form, &circles, &people)?;
     store
-        .set_public_level(scope.account_id, policy.id, public)
-        .await?;
-    for circle in store.list_circles(scope.account_id).await? {
-        let value = form
-            .get(&format!("circle_{}", circle.id))
-            .map(String::as_str)
-            .unwrap_or("none");
-        let level = if value == "none" {
-            None
-        } else {
-            value
-                .parse::<Level>()
-                .map_err(|e| AppError::Invalid(e.into()))?;
-            Some(value)
-        };
-        store
-            .set_circle_grant(scope.account_id, policy.id, circle.id, level)
-            .await?;
-    }
-    for person in store.list_people(scope.account_id).await? {
-        let value = form
-            .get(&format!("person_{}", person.id))
-            .map(String::as_str)
-            .unwrap_or("none");
-        let (kind, level) = if value == "none" {
-            (None, None)
-        } else if value == "exclude" {
-            (Some("exclude"), None)
-        } else if let Some(level) = value.strip_prefix("include:") {
-            level
-                .parse::<Level>()
-                .map_err(|e| AppError::Invalid(e.into()))?;
-            (Some("include"), Some(level))
-        } else {
-            return Err(AppError::Invalid("invalid person override".into()));
-        };
-        store
-            .set_person_override(scope.account_id, policy.id, person.id, kind, level)
-            .await?;
-    }
-    store
-        .audit(
-            Some(scope.identity_id),
-            Some(scope.account_id),
-            None,
-            "audience.updated",
+        .apply_audience_update(
+            scope.account_id,
+            policy.id,
+            scope.identity_id,
             "calendar_entry",
-            Some(&id.to_string()),
-            &serde_json::json!({"public_level":public}),
+            id,
+            &update,
         )
         .await?;
     Ok(Redirect::to(&format!("/calendar/entries/{id}/audience")).into_response())
@@ -458,6 +412,47 @@ mod tests {
                 .unwrap()
                 .public_level,
             "summary"
+        );
+
+        // The full form is validated before the transaction starts: a bad
+        // late person field cannot commit an earlier public/circle broadening.
+        let circle = store.create_circle(account_id, "Friends").await.unwrap();
+        let malformed_person = store
+            .create_person(account_id, "Malformed Override", "")
+            .await
+            .unwrap();
+        let audit_before = store.list_audit_log(account_id, 100).await.unwrap().len();
+        let malformed = format!(
+            "csrf_token={}&public_level=full&circle_{}=full&person_{}=bogus",
+            owner.csrf_token, circle, malformed_person.id
+        );
+        assert!(
+            post_form_with_cookie(
+                &app,
+                &format!("/calendar/entries/{}/audience", entry.id),
+                &malformed,
+                Some(&owner.cookie),
+            )
+            .await
+            .0
+            .is_client_error()
+        );
+        let policy = store
+            .find_audience_policy(account_id, "calendar_entry", entry.id)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(policy.public_level, "summary");
+        assert!(
+            store
+                .list_audience_grants(account_id, policy.id)
+                .await
+                .unwrap()
+                .is_empty()
+        );
+        assert_eq!(
+            store.list_audit_log(account_id, 100).await.unwrap().len(),
+            audit_before
         );
 
         let person = store
