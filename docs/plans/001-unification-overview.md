@@ -17,8 +17,8 @@ Events keeps :3117/:3118 until cutover; both run side by side on nexus.
 | 1 | Design brief + token port | phase-1-design.md | done |
 | 2 | Domain port from events | phase-2-domain-port.md | done |
 | 3 | Visibility (circles + levels) | phase-3-visibility.md | done |
-| 4 | Guest accounts (claim + password) | phase-4-guest-accounts.md | in progress |
-| 5 | Photos | phase-5-photos.md | pending |
+| 4 | Guest accounts (claim + password) | phase-4-guest-accounts.md | done |
+| 5 | Photos | phase-5-photos.md | in progress |
 | 6 | Calendar | phase-6-calendar.md | pending |
 | 7 | Prod data migration (dry run) | phase-7-import.md | pending |
 | 8 | Cutover (operator, by hand) | phase-8-cutover.md | pending |
@@ -37,3 +37,6 @@ evidence, worktree clean) before the next is dispatched.
 | 3 | visibility build | pi_codex ×2 + codex exec | gpt-5.6-sol / high ×2 (both died: provider_transport_failure ~7.7min) → codex exec gpt-5.5/high finished | bf7564a | 69/69 tests; contract Amendments (direct-hit tier floor; 0027 renumber). Worker correctly refused my contradictory busy-curl instruction (public link floors Summary). |
 | 3 | independent security review | pi_codex (read-only, detached worktree) | gpt-5.6-sol / high | job ab761dff | Verdict FAIL: 1 BLOCKER (RSVP JSON leaked private segment IDs/counts at Summary), 2 SHOULD-FIX (silent cross-account circle no-ops + missing tests). IDOR/CSRF/chokepoints/semantics otherwise clean. |
 | 3 | security fix round | pi_codex | gpt-5.6-sol / high | job c6fd36f3 → 74413d4 | 73/73 tests (orchestrator re-ran); segment_counts + list_segment_rsvps_for_person now Level-aware at store chokepoint (SQL: >=Summary for any, =Full for private — orchestrator read the queries); circle membership 404s on zero rows, audits only real mutations; admin passes Full explicitly. |
+| 4 | guest accounts build | pi_codex | gpt-5.6-sol / high | job 6b93d348 → 77967bb, 8610f51, 2bd2072 | 77/77 tests; live claim→logout→login→/my→session-RSVP→revoke transcript; rulings appended to Amendments (recovery-email login fails-closed w/ dummy verify; /my/events floors only with own live link; claimed links 404). |
+| 4 | independent security review | pi_codex (read-only, detached @2bd2072) | gpt-5.6-sol / high | job d3348b19 | Verdict FAIL: BLOCKER (mismatch-session RSVP attributed to token person, no CSRF) + 3 SHOULD-FIX (claim race 500s, guest login unscoped by account, force-unlink session redirect-loop). Claim capability/GuestScope isolation/oracle/cookie flags clean. |
+| 4 | security fix round | pi_codex | gpt-5.6-sol / high | job 4b0b1c85 → 0f98701 | 81/81 tests (orchestrator re-ran + read the CSRF/attribution branch); session-guest RSVP: CSRF required, writes attribute to session person, render stays token-scoped; BEGIN IMMEDIATE claims → race maps to 4xx; login lookup owner-account-scoped; force-unlink revokes all identity sessions, /logout works on any live session; 5 reviewer-named regression tests added. |
