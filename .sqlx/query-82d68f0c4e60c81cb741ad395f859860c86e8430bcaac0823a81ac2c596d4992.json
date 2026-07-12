@@ -1,0 +1,122 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO calendar_entries\n            (account_id, title, location, starts_at, ends_at, timezone, notes)\n            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)\n            RETURNING id as \"id!: i64\", title, location, starts_at, ends_at, timezone, notes, created_at, updated_at",
+  "describe": {
+    "columns": [
+      {
+        "name": "id!: i64",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "calendar_entries",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "name": "title",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "calendar_entries",
+            "name": "title"
+          }
+        }
+      },
+      {
+        "name": "location",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "calendar_entries",
+            "name": "location"
+          }
+        }
+      },
+      {
+        "name": "starts_at",
+        "ordinal": 3,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "calendar_entries",
+            "name": "starts_at"
+          }
+        }
+      },
+      {
+        "name": "ends_at",
+        "ordinal": 4,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "calendar_entries",
+            "name": "ends_at"
+          }
+        }
+      },
+      {
+        "name": "timezone",
+        "ordinal": 5,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "calendar_entries",
+            "name": "timezone"
+          }
+        }
+      },
+      {
+        "name": "notes",
+        "ordinal": 6,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "calendar_entries",
+            "name": "notes"
+          }
+        }
+      },
+      {
+        "name": "created_at",
+        "ordinal": 7,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "calendar_entries",
+            "name": "created_at"
+          }
+        }
+      },
+      {
+        "name": "updated_at",
+        "ordinal": 8,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "calendar_entries",
+            "name": "updated_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 7
+    },
+    "nullable": [
+      null,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "82d68f0c4e60c81cb741ad395f859860c86e8430bcaac0823a81ac2c596d4992"
+}

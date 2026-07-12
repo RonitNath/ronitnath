@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM audience_policies WHERE account_id=?1 AND subject_type='calendar_entry' AND subject_id=?2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "6438de31f2144e3553ffcf14eacdf004765213e78bfd46747ca15aeae9e8a285"
+}

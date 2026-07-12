@@ -10,6 +10,8 @@ pub mod accounts;
 pub mod attendance;
 pub mod audience;
 pub mod audit;
+pub mod calendar_entries;
+pub mod calendar_feed_tokens;
 pub mod circles;
 pub mod event_links;
 pub mod events;

@@ -376,6 +376,8 @@ Content-hash over UUID: free de-dup when two guests upload the same shot (second
 - **Phase 5 ingest formats (2026-07-12):** HEIC is deferred because the selected minimal `image` feature set cannot decode it; magic-byte admission is JPEG, PNG, and WebP only. Every stored output, including the stripped original, is normalized to lossless WebP, so the content hash is over deterministic EXIF-free WebP bytes and the layout is consistently `{sha256}[.thumb|.medium].webp`.
 - **Phase 5 storage ordering (2026-07-12):** ingest stages complete variants, takes SQLite's writer lock, inserts an uncommitted photo row, atomically renames all variants, then commits; GC takes the same writer lock, re-checks live references, unlinks, purges, and commits, so no visible live row lacks files and GC cannot race a publish.
 - **Phase 5 dedup timing (2026-07-12):** the content-dedup timing side channel is accepted as low severity for this personal-site threat model.
+- **Phase 6 migration mappings (2026-07-12):** semantic `0029_calendar_entries` is repository migration `0032_calendar_entries`; semantic `0030_calendar_feed_tokens` is repository migration `0033_calendar_feed_tokens`, preserving sequential sqlx versions after phase 5.
+- **Phase 6 feed viewer (2026-07-12):** a calendar feed resolves to `Viewer::FeedHolder { person_id }`, a standing person-bound capability with no event id and no direct-hit floor. Calendar pages and feeds both use plain `level_for`; only `/e/{token}` may use `level_for_direct_hit`.
 
 ### Critical Files for Implementation
 

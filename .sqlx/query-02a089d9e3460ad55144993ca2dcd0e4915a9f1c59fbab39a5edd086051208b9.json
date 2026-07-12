@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM calendar_entries WHERE account_id=?1 AND id=?2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "02a089d9e3460ad55144993ca2dcd0e4915a9f1c59fbab39a5edd086051208b9"
+}

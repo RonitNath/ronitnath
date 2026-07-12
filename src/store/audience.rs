@@ -121,8 +121,29 @@ impl Store {
         event_id: i64,
         person_id: Option<i64>,
     ) -> sqlx::Result<Option<AudienceInputs>> {
+        self.audience_inputs(account_id, "event", event_id, person_id)
+            .await
+    }
+
+    pub async fn audience_inputs_for_calendar_entry(
+        &self,
+        account_id: i64,
+        entry_id: i64,
+        person_id: Option<i64>,
+    ) -> sqlx::Result<Option<AudienceInputs>> {
+        self.audience_inputs(account_id, "calendar_entry", entry_id, person_id)
+            .await
+    }
+
+    async fn audience_inputs(
+        &self,
+        account_id: i64,
+        subject_type: &str,
+        subject_id: i64,
+        person_id: Option<i64>,
+    ) -> sqlx::Result<Option<AudienceInputs>> {
         let Some(policy) = self
-            .find_audience_policy(account_id, "event", event_id)
+            .find_audience_policy(account_id, subject_type, subject_id)
             .await?
         else {
             return Ok(None);
