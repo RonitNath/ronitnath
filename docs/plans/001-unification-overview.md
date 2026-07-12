@@ -30,3 +30,4 @@ evidence, worktree clean) before the next is dispatched.
 
 | Phase | Leg | Worker | Model/effort | Job/commit | Evidence |
 |-------|-----|--------|--------------|------------|----------|
+| 0 | two-bin split | pi_codex | gpt-5.6-sol / medium | job 7663a885-a899-443d-aed9-083ecb7f8012 | pending |
