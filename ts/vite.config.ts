@@ -13,6 +13,8 @@ export default defineConfig({
       input: {
         site: "src/entries/site.ts",
         guestbook: "src/entries/guestbook.tsx",
+        event_rsvp: "src/entries/event_rsvp.tsx",
+        events_admin: "src/entries/events_admin.tsx",
       },
       output: {
         entryFileNames: "[name].js",

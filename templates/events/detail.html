@@ -1,0 +1,202 @@
+{% extends "_layout.html" %}
+
+{% block title %}{{ event.title }} · admin{% endblock %}
+
+{% block content %}
+<section class="hero event-overview-hero">
+    <h1>{{ event.title }}</h1>
+    <p class="subtitle">
+        <span class="status-pill status-{{ event.status }}">{{ event.status }}</span>
+        · {{ event.starts_at|human_dt }}
+    </p>
+</section>
+
+<dl class="stat-grid" id="headcounts">
+    <div class="stat-card"><dt class="stat-label">Going</dt><dd class="stat-value">{{ going }}</dd></div>
+    <div class="stat-card"><dt class="stat-label">Maybe</dt><dd class="stat-value">{{ maybe }}</dd></div>
+    <div class="stat-card stat-card-total"><dt class="stat-label">Total heads</dt><dd class="stat-value">{{ heads }}</dd></div>
+</dl>
+
+<section class="admin-card event-facts" id="event-facts">
+    <h2>Event facts</h2>
+    <dl class="fact-list">
+        <div><dt>Slug</dt><dd>{{ event.slug }}</dd></div>
+        <div><dt>Area</dt><dd>{{ event.area_name }}</dd></div>
+        <div><dt>Address</dt><dd>{{ event.address }}</dd></div>
+        <div><dt>Timezone</dt><dd>{{ event.timezone }}</dd></div>
+    </dl>
+    {% if event.summary.len() > 0 %}<p>{{ event.summary }}</p>{% endif %}
+</section>
+
+<section class="admin-card segment-counts" id="segments">
+    <h2>Segments</h2>
+    <div class="table-scroll">
+    <table class="admin-table responsive-table segment-counts-table">
+        <thead>
+            <tr><th>Segment</th><th>Tier</th><th>Maybe</th><th>In</th></tr>
+        </thead>
+        <tbody>
+            {% for segment in segments %}
+            <tr id="segment-{{ segment.schedule_item_id }}" class="segment-row">
+                <td data-label="Segment"><span class="muted">{{ segment.time_label }}</span> {{ segment.title }} <code class="segment-key">{{ segment.segment_key }}</code></td>
+                <td data-label="Tier"><span class="status-pill tier-{{ segment.tier }}">{{ segment.tier }}</span></td>
+                <td data-label="Maybe" class="segment-maybe-count">{{ segment.maybe_count }}</td>
+                <td data-label="In" class="segment-cap-cell">
+                    <span class="segment-in-count">{{ segment.in_count }}</span>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    </div>
+    {% if segments.is_empty() %}<p class="muted">No RSVP-able segments.</p>{% endif %}
+</section>
+
+<section class="admin-card" id="rsvps">
+    <h2>RSVPs</h2>
+    <div class="table-scroll">
+    <table class="admin-table responsive-table rsvp-table">
+        <thead>
+            <tr><th>Person</th><th>Nickname</th><th>Group</th><th>RSVP</th><th>Note</th><th>Segments</th><th>Updated</th><th>Links</th></tr>
+        </thead>
+        <tbody>
+            {% for row in attendance %}
+            <tr id="rsvp-person-{{ row.person_id }}" class="rsvp-row status-{{ row.status }}">
+                <td data-label="Person">
+                    <form method="post" action="/people/{{ row.person_id }}" class="inline-person-form">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+                        <input type="hidden" name="return_to" value="/events/{{ event.id }}#rsvps" />
+                        <label class="sr-label">Name <input type="text" name="name" value="{{ row.person_name }}" required /></label>
+                        <input type="hidden" name="nickname" value="{{ row.nickname }}" />
+                        <button type="submit">Save name</button>
+                    </form>
+                </td>
+                <td data-label="Nickname">
+                    <form method="post" action="/people/{{ row.person_id }}" class="inline-person-form">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+                        <input type="hidden" name="return_to" value="/events/{{ event.id }}#rsvps" />
+                        <input type="hidden" name="name" value="{{ row.person_name }}" />
+                        <label class="sr-label">Nickname <input type="text" name="nickname" value="{{ row.nickname }}" /></label>
+                        <button type="submit">Save nick</button>
+                    </form>
+                </td>
+                <td data-label="Group">{{ row.group_label }}</td>
+                <td data-label="RSVP">
+                    <form method="post" action="/events/{{ event.id }}/attendance/{{ row.person_id }}" class="inline-attendance-form">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+                        <label>Status
+                            <select name="status">
+                                <option value="none" {% if row.status == "none" %}selected{% endif %}>none</option>
+                                <option value="going" {% if row.status == "going" %}selected{% endif %}>going</option>
+                                <option value="maybe" {% if row.status == "maybe" %}selected{% endif %}>maybe</option>
+                                <option value="no" {% if row.status == "no" %}selected{% endif %}>no</option>
+                                <option value="attended" {% if row.status == "attended" %}selected{% endif %}>attended</option>
+                            </select>
+                        </label>
+                        <label>Party <input class="input-xs" type="number" min="1" name="party_size" value="{{ row.party_size }}" /></label>
+                        <button type="submit">Save RSVP</button>
+                    </form>
+                </td>
+                <td data-label="Note" class="muted">{{ row.note }}</td>
+                <td data-label="Segments" class="muted">{{ row.segments }}</td>
+                <td data-label="Updated" class="muted">{{ row.updated_at|human_dt }}</td>
+                <td data-label="Links"><a href="#links">links</a></td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    </div>
+    {% if attendance.is_empty() %}<p class="muted">No RSVPs yet.</p>{% endif %}
+
+    <h3>Bulk add</h3>
+    <form method="post" action="/events/{{ event.id }}/people/bulk" class="admin-form bulk-add-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+        <label>One per line — <code>Name</code> or <code>Name | group</code>. Existing names are matched, not duplicated.
+            <textarea name="names" rows="5" placeholder="Priya | Berkeley crew&#10;Dev | Fremont crew"></textarea>
+        </label>
+        <div class="admin-form-row">
+            <label>Mark as
+                <select name="status">
+                    <option value="none">none (fresh invite)</option>
+                    <option value="going">going</option>
+                    <option value="maybe">maybe</option>
+                    <option value="attended">attended (backfill a past event)</option>
+                </select>
+            </label>
+            <label class="checkbox-label">
+                <input type="checkbox" name="mint_links" value="1" checked /> Mint personalized private links
+            </label>
+            <button type="submit">Add guests</button>
+        </div>
+    </form>
+</section>
+
+<section class="admin-card" id="links">
+    <h2>Links</h2>
+    <p class="muted">Public links hide address and entry instructions; private links show everything.</p>
+    <div class="table-scroll">
+    <table class="admin-table responsive-table link-activity-table">
+        <thead>
+            <tr><th>Label</th><th>Tier</th><th>Person</th><th>Uses</th><th>Last used</th><th>Copy</th><th>QR</th><th></th></tr>
+        </thead>
+        <tbody>
+            {% for link in links %}
+            <tr id="link-{{ link.row.id }}" class="link-row {% if link.row.revoked_at.is_some() %}row-revoked{% endif %} {% if link.never_used_personal %}never-used-personal{% endif %}">
+                <td data-label="Label">{{ link.row.label }}</td>
+                <td data-label="Tier"><span class="status-pill tier-{{ link.row.tier }}">{{ link.row.tier }}</span></td>
+                <td data-label="Person">{% if let Some(name) = link.row.person_name %}{{ name }}{% else %}<span class="muted">shared</span>{% endif %}</td>
+                <td data-label="Uses" class="link-uses">{{ link.row.uses }}</td>
+                <td data-label="Last used" class="link-last-used">{% if let Some(at) = link.row.last_used_at %}{{ at|human_dt }}{% else %}<span class="muted">never</span>{% endif %}</td>
+                <td data-label="Copy" class="row-actions">
+                    {% if link.row.revoked_at.is_some() %}
+                    <span class="muted">revoked</span>
+                    {% else %}
+                    <button type="button" class="copy-btn" data-copy="{{ link.url }}" data-copy-url="{{ link.url }}">Copy URL</button>
+                    {% if let Some(text) = link.invite_text %}
+                    <button type="button" class="copy-btn" data-copy="{{ text }}" data-copy-invite-text="{{ text }}">Copy invite text</button>
+                    {% endif %}
+                    {% endif %}
+                </td>
+                <td data-label="QR" class="link-qr-svg">
+                    <details class="qr-details">
+                        <summary>Show QR</summary>
+                        <div class="qr-large">{{ link.qr_svg|safe }}</div>
+                    </details>
+                </td>
+                <td data-label="" class="row-actions">
+                    {% if link.row.revoked_at.is_none() %}
+                    <form method="post" action="/events/{{ event.id }}/links/{{ link.row.id }}/revoke">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+                        <button type="submit" class="danger">Revoke</button>
+                    </form>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    </div>
+
+    <h3>Mint link</h3>
+    <form method="post" action="/events/{{ event.id }}/links" class="admin-form admin-form-row link-mint-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+        <label>Label <input type="text" name="label" placeholder="group chat / flyer / Alice" /></label>
+        <label>Tier
+            <select name="tier"><option value="public">public</option><option value="private">private</option></select>
+        </label>
+        <label>Person
+            <input type="text" name="person_name" list="people-options" placeholder="shared link if blank" />
+        </label>
+        <datalist id="people-options">
+            {% for person in people %}
+            <option value="{{ person.name }}">{{ person.nickname }}</option>
+            {% endfor %}
+        </datalist>
+        <button type="submit">Mint</button>
+    </form>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script type="module" src="/static/dist/events_admin.js"></script>
+{% endblock %}

@@ -1,0 +1,42 @@
+{% extends "_layout.html" %}
+
+{% block title %}People{% endblock %}
+
+{% block content %}
+<section class="hero people-hero">
+    <h1>People</h1>
+    <p class="subtitle">Everyone across every gathering — the longitudinal view. Add people from an event overview.</p>
+</section>
+
+<section class="admin-card people-table-card">
+    <div class="table-scroll">
+    <table class="admin-table responsive-table people-table">
+        <thead>
+            <tr><th>Name / nickname</th><th>Group</th><th>Events</th><th>History</th><th>Edit</th></tr>
+        </thead>
+        <tbody>
+            {% for person in people %}
+            <tr id="person-{{ person.id }}">
+                <td data-label="Name / nickname">
+                    <form method="post" action="/people/{{ person.id }}" class="inline-person-form">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+                        <input type="hidden" name="return_to" value="/people#person-{{ person.id }}" />
+                        <label>Name <input type="text" name="name" value="{{ person.name }}" required /></label>
+                        <label>Nickname <input type="text" name="nickname" value="{{ person.nickname }}" /></label>
+                        <button type="submit">Save</button>
+                    </form>
+                </td>
+                <td data-label="Group">{{ person.group_label }}</td>
+                <td data-label="Events">{{ person.events_attended }}</td>
+                <td data-label="History" class="muted">{{ person.events_list }}</td>
+                <td data-label="Edit"><a href="#person-{{ person.id }}">#</a></td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    </div>
+    {% if people.is_empty() %}
+    <p class="muted">Nobody yet. Bulk-add guests from an event page.</p>
+    {% endif %}
+</section>
+{% endblock %}

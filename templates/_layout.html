@@ -12,6 +12,7 @@
     <link rel="stylesheet" href="/static/css/atmosphere.css" />
     <link rel="stylesheet" href="/static/css/layout.css" />
     <link rel="stylesheet" href="/static/css/components.css" />
+    <link rel="stylesheet" href="/static/css/events.css" />
 </head>
 <body>
     <div class="starfield" aria-hidden="true">
@@ -40,6 +41,8 @@
                 <a href="/about" class="{% if nav_active == "about" %}active{% endif %}">About</a>
                 {% if let Some(user) = current_user %}
                 <a href="/guestbook" class="{% if nav_active == "guestbook" %}active{% endif %}">Guestbook</a>
+                <a href="/events" class="{% if nav_active == "events" %}active{% endif %}">Events</a>
+                <a href="/people" class="{% if nav_active == "people" %}active{% endif %}">People</a>
                 {% endif %}
             </nav>
             <div class="auth">
