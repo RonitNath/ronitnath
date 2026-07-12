@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO photos\n               (account_id, event_id, uploaded_by_identity_id, uploaded_by_person_id, storage_key,\n                original_filename, mime_type, byte_size, width, height, caption, taken_at)\n               VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)\n               RETURNING id as \"id!: i64\"",
+  "describe": {
+    "columns": [
+      {
+        "name": "id!: i64",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "photos",
+            "name": "id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 12
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "ff39d927ba4939f6e64f8534005b4c84aee8027f87b46fae4370fe12c8ba39f1"
+}

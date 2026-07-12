@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM photo_variants WHERE account_id = ?1 AND photo_id = ?2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "f23e1379a018c0e3868f60f0f8e4152b28cabd4d6522f8f70715963a6cc437a3"
+}

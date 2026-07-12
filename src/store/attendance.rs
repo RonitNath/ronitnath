@@ -34,6 +34,26 @@ pub struct AttendanceRow {
 }
 
 impl Store {
+    pub async fn is_event_attendee(
+        &self,
+        account_id: i64,
+        event_id: i64,
+        person_id: i64,
+    ) -> sqlx::Result<bool> {
+        sqlx::query_scalar!(
+            r#"SELECT EXISTS(
+                SELECT 1 FROM attendance
+                WHERE account_id = ?1 AND event_id = ?2 AND person_id = ?3
+                  AND status IN ('going', 'attended')
+            ) as "exists!: bool""#,
+            account_id,
+            event_id,
+            person_id,
+        )
+        .fetch_one(&self.pool)
+        .await
+    }
+
     pub async fn find_attendance(
         &self,
         account_id: i64,

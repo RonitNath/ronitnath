@@ -1,0 +1,74 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT kind, storage_key, width, height, byte_size as \"byte_size!: i64\"\n               FROM photo_variants WHERE account_id = ?1 AND photo_id = ?2 ORDER BY kind",
+  "describe": {
+    "columns": [
+      {
+        "name": "kind",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "photo_variants",
+            "name": "kind"
+          }
+        }
+      },
+      {
+        "name": "storage_key",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "photo_variants",
+            "name": "storage_key"
+          }
+        }
+      },
+      {
+        "name": "width",
+        "ordinal": 2,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "photo_variants",
+            "name": "width"
+          }
+        }
+      },
+      {
+        "name": "height",
+        "ordinal": 3,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "photo_variants",
+            "name": "height"
+          }
+        }
+      },
+      {
+        "name": "byte_size!: i64",
+        "ordinal": 4,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "photo_variants",
+            "name": "byte_size"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      true,
+      false
+    ]
+  },
+  "hash": "c5db77206c3c0798ec95a49ca73385c89c0e3c9b2bf4c671fc34cce0af67dbee"
+}

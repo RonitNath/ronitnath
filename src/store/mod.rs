@@ -19,6 +19,7 @@ pub mod identities;
 pub mod memberships;
 pub mod people;
 pub mod person_identity_links;
+pub mod photos;
 pub mod schedule_items;
 pub mod segment_rsvps;
 pub mod sessions;

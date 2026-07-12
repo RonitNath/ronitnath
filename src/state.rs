@@ -37,6 +37,7 @@ struct Inner {
     oidc: OidcRegistry,
     public_url: String,
     owner_account_id: Option<i64>,
+    photo_storage_dir: std::path::PathBuf,
 }
 
 impl AppState {
@@ -50,6 +51,7 @@ impl AppState {
                 oidc: OidcRegistry::empty(),
                 public_url: "http://127.0.0.1:3130".into(),
                 owner_account_id: None,
+                photo_storage_dir: "data/photos".into(),
             }),
         }
     }
@@ -63,6 +65,7 @@ impl AppState {
                 oidc,
                 public_url: self.inner.public_url.clone(),
                 owner_account_id: self.inner.owner_account_id,
+                photo_storage_dir: self.inner.photo_storage_dir.clone(),
             }),
         }
     }
@@ -76,6 +79,7 @@ impl AppState {
                 oidc: self.inner.oidc.clone(),
                 public_url,
                 owner_account_id: self.inner.owner_account_id,
+                photo_storage_dir: self.inner.photo_storage_dir.clone(),
             }),
         }
     }
@@ -89,8 +93,27 @@ impl AppState {
                 oidc: self.inner.oidc.clone(),
                 public_url: self.inner.public_url.clone(),
                 owner_account_id,
+                photo_storage_dir: self.inner.photo_storage_dir.clone(),
             }),
         }
+    }
+
+    pub fn with_photo_storage_dir(self, photo_storage_dir: impl Into<std::path::PathBuf>) -> Self {
+        Self {
+            inner: Arc::new(Inner {
+                store: self.inner.store.clone(),
+                started_at: self.inner.started_at,
+                auth: self.inner.auth.clone(),
+                oidc: self.inner.oidc.clone(),
+                public_url: self.inner.public_url.clone(),
+                owner_account_id: self.inner.owner_account_id,
+                photo_storage_dir: photo_storage_dir.into(),
+            }),
+        }
+    }
+
+    pub fn photo_storage_dir(&self) -> &std::path::Path {
+        &self.inner.photo_storage_dir
     }
 
     pub fn owner_account_id(&self) -> Option<i64> {

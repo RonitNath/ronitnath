@@ -1,0 +1,74 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT v.kind, v.storage_key, v.width, v.height, v.byte_size as \"byte_size!: i64\"\n               FROM photo_variants v\n               JOIN photos p ON p.account_id = v.account_id AND p.id = v.photo_id\n               WHERE p.account_id = ?1 AND p.event_id = ?2 AND p.id = ?3 AND v.kind = ?4\n                 AND p.deleted_at IS NULL\n                 AND (?6 = 1 OR EXISTS (\n                     SELECT 1 FROM attendance a\n                     WHERE a.account_id = ?1 AND a.event_id = ?2 AND a.person_id = ?5\n                       AND a.status IN ('going', 'attended')\n                 ))",
+  "describe": {
+    "columns": [
+      {
+        "name": "kind",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "photo_variants",
+            "name": "kind"
+          }
+        }
+      },
+      {
+        "name": "storage_key",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "photo_variants",
+            "name": "storage_key"
+          }
+        }
+      },
+      {
+        "name": "width",
+        "ordinal": 2,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "photo_variants",
+            "name": "width"
+          }
+        }
+      },
+      {
+        "name": "height",
+        "ordinal": 3,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "photo_variants",
+            "name": "height"
+          }
+        }
+      },
+      {
+        "name": "byte_size!: i64",
+        "ordinal": 4,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "photo_variants",
+            "name": "byte_size"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 6
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      true,
+      false
+    ]
+  },
+  "hash": "bc5d5b2346f41a87ab037247de6945ee5e36850a732bcd005ab29b0227134073"
+}

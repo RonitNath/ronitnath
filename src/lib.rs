@@ -7,6 +7,7 @@ pub mod config;
 pub mod error;
 pub mod handlers;
 pub mod openapi;
+pub mod photos;
 pub mod rate_limit;
 pub mod security_headers;
 pub mod state;

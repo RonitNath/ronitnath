@@ -1,0 +1,21 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT EXISTS(SELECT 1 FROM photos\n               WHERE account_id = ?1 AND event_id = ?2 AND storage_key = ?3 AND deleted_at IS NULL) as \"exists!: bool\"",
+  "describe": {
+    "columns": [
+      {
+        "name": "exists!: bool",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "2d2f8b8af97938a4109b048fef3535c7d4a09692c892d3f58cf018e5ebcf5622"
+}

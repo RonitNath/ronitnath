@@ -37,6 +37,7 @@ async fn dispatch() -> anyhow::Result<()> {
         Some("set-invite") => set_invite(&args).await,
         Some("set-headcount") => set_headcount(&args).await,
         Some("set-audience") => set_audience(&args).await,
+        Some("photos-gc") => photos_gc(&args).await,
         Some(flag) if flag == "-h" || flag == "--help" => {
             print_usage(&args[0]);
             Ok(())
@@ -73,6 +74,7 @@ fn print_usage(bin: &str) {
     eprintln!("  {bin} set-audience <event-slug> --public <level>");
     eprintln!("  {bin} set-audience <event-slug> --circle \"<name>=<level>\"");
     eprintln!("  {bin} set-audience <event-slug> --person \"<name>=<include:level|exclude>\"");
+    eprintln!("  {bin} photos-gc --older-than <days>");
 }
 
 async fn open_cli_store() -> anyhow::Result<(Config, Store, i64)> {
@@ -391,6 +393,15 @@ async fn set_audience(args: &[String]) -> anyhow::Result<()> {
             &serde_json::json!({"source": "cli"}),
         )
         .await?;
+    Ok(())
+}
+
+async fn photos_gc(args: &[String]) -> anyhow::Result<()> {
+    let days: i64 = required_flag(args, "--older-than")?.parse().context("--older-than must be a non-negative integer")?;
+    if days < 0 { bail!("--older-than must be non-negative"); }
+    let (config, store, account_id) = open_cli_store().await?;
+    let count = ronitnath::photos::gc(&store, std::path::Path::new(&config.photo_storage_dir), account_id, days).await?;
+    println!("purged {count} deleted photo(s)");
     Ok(())
 }
 

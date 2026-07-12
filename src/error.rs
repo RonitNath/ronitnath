@@ -29,6 +29,10 @@ pub enum AppError {
     #[error("{0}")]
     Invalid(String),
 
+    /// A route-specific request body limit was exceeded (→ 413).
+    #[error("request body is too large")]
+    PayloadTooLarge,
+
     /// Authenticated, but not allowed to do this (role check or CSRF
     /// mismatch) (→ 403).
     #[error("{0}")]
@@ -59,6 +63,7 @@ impl AppError {
         match self {
             AppError::NotFound => StatusCode::NOT_FOUND,
             AppError::Invalid(_) => StatusCode::UNPROCESSABLE_ENTITY,
+            AppError::PayloadTooLarge => StatusCode::PAYLOAD_TOO_LARGE,
             AppError::Forbidden(_) => StatusCode::FORBIDDEN,
             AppError::InvalidCredentials(_) => StatusCode::UNAUTHORIZED,
             AppError::Render(_) | AppError::Db(_) | AppError::Other(_) => {
@@ -72,6 +77,7 @@ impl AppError {
         match self {
             AppError::NotFound => "The page you were looking for doesn't exist.".to_string(),
             AppError::Invalid(message) => message.clone(),
+            AppError::PayloadTooLarge => "The uploaded file is too large.".to_string(),
             AppError::Forbidden(message) => message.clone(),
             AppError::InvalidCredentials(message) => message.clone(),
             AppError::Render(_) | AppError::Db(_) | AppError::Other(_) => {

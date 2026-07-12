@@ -1,6 +1,11 @@
 //! Runtime configuration, sourced from the environment.
 
 use std::str::FromStr;
+#[cfg(test)]
+use std::sync::atomic::{AtomicU64, Ordering};
+
+#[cfg(test)]
+static TEST_PHOTO_DIR: AtomicU64 = AtomicU64::new(1);
 
 /// Process configuration resolved once at startup.
 ///
@@ -21,6 +26,10 @@ pub struct Config {
     /// Maximum accepted request body size, in bytes. Applies to every
     /// route — raise it per-handler later if a specific upload needs more.
     pub max_body_bytes: usize,
+    /// Maximum multipart photo upload body; scoped only to photo routes.
+    pub photo_max_body_bytes: usize,
+    /// Root directory for content-addressed event photo files.
+    pub photo_storage_dir: String,
     /// Requests per minute allowed per client on unauthenticated write
     /// endpoints (see [`crate::rate_limit`]).
     pub rate_limit_per_minute: u32,
@@ -65,6 +74,8 @@ impl Config {
             database_url: env_or("DATABASE_URL", "sqlite:data/app.db"),
             request_timeout_secs: env_or_parse("REQUEST_TIMEOUT_SECS", 30),
             max_body_bytes: env_or_parse("MAX_BODY_BYTES", 1_048_576),
+            photo_max_body_bytes: env_or_parse("PHOTO_MAX_BODY_BYTES", 15 * 1024 * 1024),
+            photo_storage_dir: env_or("PHOTO_STORAGE_DIR", "data/photos"),
             rate_limit_per_minute: env_or_parse("RATE_LIMIT_PER_MINUTE", 10),
             trust_proxy: env_or_parse("TRUSTED_PROXY", false),
             cookie_secure: env_or_parse("COOKIE_SECURE", false),
@@ -87,6 +98,14 @@ impl Config {
             database_url: "sqlite::memory:".into(),
             request_timeout_secs: 30,
             max_body_bytes: 1024,
+            photo_max_body_bytes: 4096,
+            photo_storage_dir: std::env::temp_dir()
+                .join(format!(
+                    "ronitnath-photo-tests-{}-{}",
+                    std::process::id(),
+                    TEST_PHOTO_DIR.fetch_add(1, Ordering::Relaxed)
+                ))
+                .to_string_lossy().into_owned(),
             rate_limit_per_minute: 10,
             trust_proxy: false,
             cookie_secure: false,
