@@ -28,6 +28,12 @@ pub struct Config {
     pub max_body_bytes: usize,
     /// Maximum multipart photo upload body; scoped only to photo routes.
     pub photo_max_body_bytes: usize,
+    /// Maximum decoded pixels accepted for a photo.
+    pub photo_max_pixels: u64,
+    /// Maximum width or height accepted for a photo.
+    pub photo_max_side: u32,
+    /// Concurrent decode/re-encode jobs admitted per process.
+    pub photo_ingest_concurrency: usize,
     /// Root directory for content-addressed event photo files.
     pub photo_storage_dir: String,
     /// Requests per minute allowed per client on unauthenticated write
@@ -75,6 +81,9 @@ impl Config {
             request_timeout_secs: env_or_parse("REQUEST_TIMEOUT_SECS", 30),
             max_body_bytes: env_or_parse("MAX_BODY_BYTES", 1_048_576),
             photo_max_body_bytes: env_or_parse("PHOTO_MAX_BODY_BYTES", 15 * 1024 * 1024),
+            photo_max_pixels: env_or_parse("PHOTO_MAX_PIXELS", 50_000_000),
+            photo_max_side: env_or_parse("PHOTO_MAX_SIDE", 8_192),
+            photo_ingest_concurrency: env_or_parse("PHOTO_INGEST_CONCURRENCY", 2),
             photo_storage_dir: env_or("PHOTO_STORAGE_DIR", "data/photos"),
             rate_limit_per_minute: env_or_parse("RATE_LIMIT_PER_MINUTE", 10),
             trust_proxy: env_or_parse("TRUSTED_PROXY", false),
@@ -99,13 +108,17 @@ impl Config {
             request_timeout_secs: 30,
             max_body_bytes: 1024,
             photo_max_body_bytes: 4096,
+            photo_max_pixels: 50_000_000,
+            photo_max_side: 8_192,
+            photo_ingest_concurrency: 2,
             photo_storage_dir: std::env::temp_dir()
                 .join(format!(
                     "ronitnath-photo-tests-{}-{}",
                     std::process::id(),
                     TEST_PHOTO_DIR.fetch_add(1, Ordering::Relaxed)
                 ))
-                .to_string_lossy().into_owned(),
+                .to_string_lossy()
+                .into_owned(),
             rate_limit_per_minute: 10,
             trust_proxy: false,
             cookie_secure: false,

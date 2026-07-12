@@ -374,6 +374,8 @@ Content-hash over UUID: free de-dup when two guests upload the same shot (second
 - **Phase 4 session event level (2026-07-12):** `/my/events/{event_id}` uses `level_for_direct_hit` with the person's own live, unrevoked event-link tier when one exists; otherwise it uses plain `level_for`. The capability floor therefore applies only while that person still holds a live link, while `/my` remains a browsing surface using plain `level_for` and listing only levels at least Summary.
 - **Phase 5 migration mappings (2026-07-12):** semantic `0031_photos` is repository migration `0030_photos`; semantic `0032_photo_variants` is repository migration `0031_photo_variants`, preserving sequential sqlx versions after phase 4.
 - **Phase 5 ingest formats (2026-07-12):** HEIC is deferred because the selected minimal `image` feature set cannot decode it; magic-byte admission is JPEG, PNG, and WebP only. Every stored output, including the stripped original, is normalized to lossless WebP, so the content hash is over deterministic EXIF-free WebP bytes and the layout is consistently `{sha256}[.thumb|.medium].webp`.
+- **Phase 5 storage ordering (2026-07-12):** ingest stages complete variants, takes SQLite's writer lock, inserts an uncommitted photo row, atomically renames all variants, then commits; GC takes the same writer lock, re-checks live references, unlinks, purges, and commits, so no visible live row lacks files and GC cannot race a publish.
+- **Phase 5 dedup timing (2026-07-12):** the content-dedup timing side channel is accepted as low severity for this personal-site threat model.
 
 ### Critical Files for Implementation
 

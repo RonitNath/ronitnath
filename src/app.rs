@@ -6,7 +6,6 @@ use std::time::Duration;
 use axum::http::StatusCode;
 use axum::middleware;
 use axum::routing::{get, post};
-use axum::response::{IntoResponse, Response};
 use axum::{Json, Router};
 use tower_http::limit::RequestBodyLimitLayer;
 use tower_http::request_id::{MakeRequestUuid, PropagateRequestIdLayer, SetRequestIdLayer};
@@ -60,7 +59,6 @@ pub fn build_site_router(state: AppState, config: &Config) -> Router {
             "/my/events/{event_id}",
             get(handlers::guest_accounts::my_event_page),
         )
-        .merge(photo_site_routes(config.photo_max_body_bytes, &rate_limiter))
         .route(
             "/api/my/events/{event_id}",
             get(handlers::guest_accounts::api_my_view),
@@ -83,9 +81,17 @@ pub fn build_site_router(state: AppState, config: &Config) -> Router {
         .fallback(handlers::errors::not_found)
         .with_state(state.clone())
         .split_for_parts();
+    // Apply the global cap to the non-photo router before merging the photo
+    // router. This structural split makes it impossible for a path substring
+    // to bypass the 1 MiB policy; photo routes carry their own 15 MiB cap.
+    let router =
+        with_openapi_json(router, api).layer(RequestBodyLimitLayer::new(config.max_body_bytes));
+    let (photo_router, _) = photo_site_routes(config.photo_max_body_bytes, &rate_limiter)
+        .with_state(state.clone())
+        .split_for_parts();
     // Public capability pages may recognize the owner session, but the site
     // router still exposes none of the admin auth/account routes.
-    apply_layers(with_openapi_json(router, api), state, config, true)
+    apply_layers(router.merge(photo_router), state, config, true)
 }
 
 /// Builds the full authenticated/admin surface, preserving the stage_2 routes.
@@ -113,7 +119,6 @@ pub fn build_admin_router(state: AppState, config: &Config) -> Router {
             "/events/{event_id}/audience",
             get(handlers::audience::page).post(handlers::audience::save),
         )
-        .merge(photo_admin_routes(config.photo_max_body_bytes))
         .route(
             "/circles",
             get(handlers::circles::list).post(handlers::circles::create),
@@ -199,29 +204,61 @@ pub fn build_admin_router(state: AppState, config: &Config) -> Router {
         .fallback(handlers::errors::not_found)
         .with_state(state.clone())
         .split_for_parts();
-    apply_layers(with_openapi_json(router, api), state, config, true)
+    let router =
+        with_openapi_json(router, api).layer(RequestBodyLimitLayer::new(config.max_body_bytes));
+    let (photo_router, _) = photo_admin_routes(config.photo_max_body_bytes)
+        .with_state(state.clone())
+        .split_for_parts();
+    apply_layers(router.merge(photo_router), state, config, true)
 }
 
 fn photo_site_routes(limit: usize, rate_limiter: &RateLimiter) -> OpenApiRouter<AppState> {
     let token_upload = OpenApiRouter::new()
         .route("/e/{token}/photos", post(handlers::photos::upload_token))
-        .route_layer(middleware::from_fn_with_state(rate_limiter.clone(), rate_limit::enforce))
+        .route_layer(middleware::from_fn_with_state(
+            rate_limiter.clone(),
+            rate_limit::enforce,
+        ))
         .route_layer(RequestBodyLimitLayer::new(limit));
     OpenApiRouter::new()
         .merge(token_upload)
-        .route("/e/{token}/photos/{photo_id}/{variant}", get(handlers::photos::serve_token))
-        .route("/e/{token}/photos/{photo_id}/delete", post(handlers::photos::delete_token))
-        .route("/my/events/{event_id}/photos", post(handlers::photos::upload_my))
-        .route("/my/events/{event_id}/photos/{photo_id}/{variant}", get(handlers::photos::serve_my))
-        .route("/my/events/{event_id}/photos/{photo_id}/delete", post(handlers::photos::delete_my))
+        .route(
+            "/e/{token}/photos/{photo_id}/{variant}",
+            get(handlers::photos::serve_token),
+        )
+        .route(
+            "/e/{token}/photos/{photo_id}/delete",
+            post(handlers::photos::delete_token),
+        )
+        .route(
+            "/my/events/{event_id}/photos",
+            post(handlers::photos::upload_my),
+        )
+        .route(
+            "/my/events/{event_id}/photos/{photo_id}/{variant}",
+            get(handlers::photos::serve_my),
+        )
+        .route(
+            "/my/events/{event_id}/photos/{photo_id}/delete",
+            post(handlers::photos::delete_my),
+        )
         .route_layer(RequestBodyLimitLayer::new(limit))
 }
 
 fn photo_admin_routes(limit: usize) -> OpenApiRouter<AppState> {
     OpenApiRouter::new()
-        .route("/events/{event_id}/photos", post(handlers::photos::upload_admin))
-        .route("/events/{event_id}/photos/{photo_id}/{variant}", get(handlers::photos::serve_admin))
-        .route("/events/{event_id}/photos/{photo_id}/delete", post(handlers::photos::delete_admin))
+        .route(
+            "/events/{event_id}/photos",
+            post(handlers::photos::upload_admin),
+        )
+        .route(
+            "/events/{event_id}/photos/{photo_id}/{variant}",
+            get(handlers::photos::serve_admin),
+        )
+        .route(
+            "/events/{event_id}/photos/{photo_id}/delete",
+            post(handlers::photos::delete_admin),
+        )
         .route_layer(RequestBodyLimitLayer::new(limit))
 }
 
@@ -254,14 +291,6 @@ fn apply_layers(router: Router, state: AppState, config: &Config, attach_session
     // timeout, body limit, then route. Session resolution must remain outside
     // error rendering because error-page navigation reads its context.
     let router = router
-        // The outer cap accommodates photo routes, which also carry their
-        // explicit route-local cap. Non-photo requests are held to the global
-        // limit by `enforce_global_body_limit` below.
-        .layer(RequestBodyLimitLayer::new(config.photo_max_body_bytes.max(config.max_body_bytes)))
-        .layer(middleware::from_fn_with_state(
-            config.max_body_bytes,
-            enforce_global_body_limit,
-        ))
         .layer(TimeoutLayer::with_status_code(
             StatusCode::REQUEST_TIMEOUT,
             Duration::from_secs(config.request_timeout_secs),
@@ -287,21 +316,6 @@ fn apply_layers(router: Router, state: AppState, config: &Config, attach_session
         .layer(security_headers::x_content_type_options())
         .layer(PropagateRequestIdLayer::x_request_id())
         .layer(SetRequestIdLayer::x_request_id(MakeRequestUuid))
-}
-
-async fn enforce_global_body_limit(
-    axum::extract::State(limit): axum::extract::State<usize>,
-    request: axum::extract::Request,
-    next: middleware::Next,
-) -> Response {
-    if request.uri().path().contains("/photos") {
-        return next.run(request).await;
-    }
-    let (parts, body) = request.into_parts();
-    match axum::body::to_bytes(body, limit).await {
-        Ok(bytes) => next.run(axum::http::Request::from_parts(parts, axum::body::Body::from(bytes))).await,
-        Err(_) => StatusCode::PAYLOAD_TOO_LARGE.into_response(),
-    }
 }
 
 async fn shutdown_signal() {
@@ -357,6 +371,11 @@ async fn state(config: &Config, migrate: bool) -> AppState {
         .with_public_url(config.public_url.clone())
         .with_owner_account_id(owner_account_id)
         .with_photo_storage_dir(config.photo_storage_dir.clone())
+        .with_photo_limits(
+            config.photo_max_pixels,
+            config.photo_max_side,
+            config.photo_ingest_concurrency,
+        )
 }
 
 pub async fn run_site() {
@@ -398,9 +417,8 @@ mod tests {
 
     use crate::test_util::{
         Authed, extract_cookie, get, get_with_cookie, post_bytes, post_form, post_form_with_cookie,
-        post_multipart,
-        post_form_with_request_id, post_json_authed, post_json_from, seed_session, signup,
-        test_app, test_site_app,
+        post_form_with_request_id, post_json_authed, post_json_from, post_multipart, seed_session,
+        signup, test_app, test_site_app,
     };
 
     #[tokio::test]
@@ -2993,6 +3011,152 @@ mod tests {
         );
     }
 
+    struct PhotoRouteFixture {
+        app: axum::Router,
+        store: crate::store::Store,
+        account_id: i64,
+        event_id: i64,
+        other_event_id: i64,
+        person_id: i64,
+        identity_id: i64,
+        token: String,
+        other_token: String,
+        cookie: String,
+        csrf: String,
+        png: Vec<u8>,
+        root: String,
+    }
+
+    async fn photo_route_fixture() -> PhotoRouteFixture {
+        use crate::auth::session::{generate_token, hash_token};
+        use image::{DynamicImage, ImageFormat};
+        use std::io::Cursor;
+
+        let store = crate::store::Store::connect_in_memory().await;
+        let (_, account_id) = store
+            .signup_with_password("Host", "host@example.com", "hash")
+            .await
+            .unwrap();
+        let event = store
+            .create_event(account_id, "photo-a", "Photo A", "2026-07-04 13:00")
+            .await
+            .unwrap();
+        let other = store
+            .create_event(account_id, "photo-b", "Photo B", "2026-07-05 13:00")
+            .await
+            .unwrap();
+        for (event_id, slug, title, starts_at) in [
+            (event.id, "photo-a", "Photo A", "2026-07-04 13:00"),
+            (other.id, "photo-b", "Photo B", "2026-07-05 13:00"),
+        ] {
+            store
+                .update_event(
+                    account_id,
+                    event_id,
+                    &crate::store::events::EventFields {
+                        slug: slug.into(),
+                        title: title.into(),
+                        tagline: String::new(),
+                        starts_at: starts_at.into(),
+                        ends_at: None,
+                        timezone: "America/Los_Angeles".into(),
+                        status: "published".into(),
+                        summary: String::new(),
+                        area_name: String::new(),
+                        address: String::new(),
+                        entry_instructions: String::new(),
+                        private_details: String::new(),
+                        notice_html: String::new(),
+                        quick_plan_html: String::new(),
+                    },
+                )
+                .await
+                .unwrap();
+        }
+        let person = store
+            .create_person(account_id, "Attendee", "")
+            .await
+            .unwrap();
+        for event_id in [event.id, other.id] {
+            store
+                .upsert_attendance(account_id, event_id, person.id, "going", 1, "")
+                .await
+                .unwrap();
+        }
+        let token = "photo-fixture-a".to_string();
+        let other_token = "photo-fixture-b".to_string();
+        store
+            .create_event_link(
+                account_id,
+                event.id,
+                Some(person.id),
+                &hash_token(&token),
+                &token,
+                "a",
+                "private",
+            )
+            .await
+            .unwrap();
+        store
+            .create_event_link(
+                account_id,
+                other.id,
+                Some(person.id),
+                &hash_token(&other_token),
+                &other_token,
+                "b",
+                "private",
+            )
+            .await
+            .unwrap();
+        let raw_session = generate_token();
+        let csrf = generate_token();
+        let (identity_id, _) = store
+            .claim_guest(
+                account_id,
+                person.id,
+                "Attendee",
+                None,
+                "hash",
+                &hash_token(&raw_session),
+                &csrf,
+                "9999-01-01 00:00:00",
+                None,
+                None,
+            )
+            .await
+            .unwrap();
+        let config = crate::config::Config::for_tests();
+        let root = config.photo_storage_dir.clone();
+        let state = crate::state::AppState::new(store.clone(), super::test_auth_config(&config))
+            .with_owner_account_id(Some(account_id))
+            .with_photo_storage_dir(root.clone())
+            .with_photo_limits(
+                config.photo_max_pixels,
+                config.photo_max_side,
+                config.photo_ingest_concurrency,
+            );
+        let mut png = Cursor::new(Vec::new());
+        DynamicImage::new_rgb8(3, 2)
+            .write_to(&mut png, ImageFormat::Png)
+            .unwrap();
+        PhotoRouteFixture {
+            app: super::build_site_router(state, &config),
+            store,
+            account_id,
+            event_id: event.id,
+            other_event_id: other.id,
+            person_id: person.id,
+            identity_id,
+            token,
+            other_token,
+            cookie: format!("session={raw_session}"),
+            csrf,
+            png: png.into_inner(),
+            root,
+        }
+    }
+
     fn photo_multipart(boundary: &str, csrf: &str, image: &[u8], extra: usize) -> Vec<u8> {
         let mut body = format!(
             "--{boundary}\r\nContent-Disposition: form-data; name=\"csrf_token\"\r\n\r\n{csrf}\r\n--{boundary}\r\nContent-Disposition: form-data; name=\"caption\"\r\n\r\nA tiny photo\r\n--{boundary}\r\nContent-Disposition: form-data; name=\"photo\"; filename=\"tiny.png\"\r\nContent-Type: application/octet-stream\r\n\r\n"
@@ -3004,69 +3168,446 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn oversized_non_photo_route_uses_global_limit() {
+        let (app, _) = test_site_app().await;
+        assert_eq!(
+            post_bytes(
+                &app,
+                "/api/client-errors",
+                "application/json",
+                vec![b'x'; 1025]
+            )
+            .await
+            .0,
+            StatusCode::PAYLOAD_TOO_LARGE
+        );
+    }
+
+    #[tokio::test]
+    async fn token_and_my_photo_failures_are_identical_not_found() {
+        let fixture = photo_route_fixture().await;
+        let boundary = "photo-not-found";
+        assert_eq!(
+            post_multipart(
+                &fixture.app,
+                &format!("/e/{}/photos", fixture.token),
+                boundary,
+                photo_multipart(boundary, "", &fixture.png, 0),
+                None
+            )
+            .await
+            .0,
+            StatusCode::SEE_OTHER
+        );
+        let id = fixture
+            .store
+            .list_photos_admin(fixture.account_id, fixture.event_id)
+            .await
+            .unwrap()[0]
+            .id;
+
+        let pairs = [
+            (
+                format!("/e/{}/photos/{id}/invalid", fixture.token),
+                format!("/my/events/{}/photos/{id}/invalid", fixture.event_id),
+            ),
+            (
+                format!("/e/{}/photos/{}/thumb", fixture.token, id + 9999),
+                format!("/my/events/{}/photos/{}/thumb", fixture.event_id, id + 9999),
+            ),
+            (
+                format!("/e/{}/photos/{id}/thumb", fixture.other_token),
+                format!("/my/events/{}/photos/{id}/thumb", fixture.other_event_id),
+            ),
+        ];
+        for (token_path, my_path) in pairs {
+            assert_eq!(
+                get(&fixture.app, &token_path).await.0,
+                StatusCode::NOT_FOUND
+            );
+            assert_eq!(
+                get_with_cookie(&fixture.app, &my_path, &fixture.cookie)
+                    .await
+                    .0,
+                StatusCode::NOT_FOUND
+            );
+        }
+        fixture
+            .store
+            .soft_delete_photo(
+                fixture.account_id,
+                fixture.event_id,
+                id,
+                None,
+                Some(fixture.person_id),
+                false,
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            get(
+                &fixture.app,
+                &format!("/e/{}/photos/{id}/thumb", fixture.token)
+            )
+            .await
+            .0,
+            StatusCode::NOT_FOUND
+        );
+        assert_eq!(
+            get_with_cookie(
+                &fixture.app,
+                &format!("/my/events/{}/photos/{id}/thumb", fixture.event_id),
+                &fixture.cookie
+            )
+            .await
+            .0,
+            StatusCode::NOT_FOUND
+        );
+        let _ = tokio::fs::remove_dir_all(fixture.root).await;
+    }
+
+    #[tokio::test]
+    async fn session_photo_upload_delete_require_csrf_on_token_and_my_routes_and_attribute_identity()
+     {
+        let fixture = photo_route_fixture().await;
+        let boundary = "photo-csrf";
+        for csrf in ["", "wrong"] {
+            assert_eq!(
+                post_multipart(
+                    &fixture.app,
+                    &format!("/e/{}/photos", fixture.token),
+                    boundary,
+                    photo_multipart(boundary, csrf, &fixture.png, 0),
+                    Some(&fixture.cookie)
+                )
+                .await
+                .0,
+                StatusCode::FORBIDDEN
+            );
+            assert_eq!(
+                post_multipart(
+                    &fixture.app,
+                    &format!("/my/events/{}/photos", fixture.event_id),
+                    boundary,
+                    photo_multipart(boundary, csrf, &fixture.png, 0),
+                    Some(&fixture.cookie)
+                )
+                .await
+                .0,
+                StatusCode::FORBIDDEN
+            );
+        }
+        assert_eq!(
+            post_multipart(
+                &fixture.app,
+                &format!("/e/{}/photos", fixture.token),
+                boundary,
+                photo_multipart(boundary, &fixture.csrf, &fixture.png, 0),
+                Some(&fixture.cookie)
+            )
+            .await
+            .0,
+            StatusCode::SEE_OTHER
+        );
+        assert_eq!(
+            post_multipart(
+                &fixture.app,
+                &format!("/my/events/{}/photos", fixture.event_id),
+                boundary,
+                photo_multipart(boundary, &fixture.csrf, &fixture.png, 0),
+                Some(&fixture.cookie)
+            )
+            .await
+            .0,
+            StatusCode::SEE_OTHER
+        );
+        let photos = fixture
+            .store
+            .list_photos_admin(fixture.account_id, fixture.event_id)
+            .await
+            .unwrap();
+        assert_eq!(photos.len(), 2);
+        assert!(
+            photos
+                .iter()
+                .all(|photo| photo.uploaded_by_identity_id == Some(fixture.identity_id))
+        );
+        for (id, path) in [
+            (
+                photos[0].id,
+                format!("/e/{}/photos/{}/delete", fixture.token, photos[0].id),
+            ),
+            (
+                photos[1].id,
+                format!(
+                    "/my/events/{}/photos/{}/delete",
+                    fixture.event_id, photos[1].id
+                ),
+            ),
+        ] {
+            for csrf in ["", "wrong"] {
+                let form = format!("--{boundary}\r\nContent-Disposition: form-data; name=\"csrf_token\"\r\n\r\n{csrf}\r\n--{boundary}--\r\n").into_bytes();
+                assert_eq!(
+                    post_multipart(&fixture.app, &path, boundary, form, Some(&fixture.cookie))
+                        .await
+                        .0,
+                    StatusCode::FORBIDDEN,
+                    "photo {id}"
+                );
+            }
+        }
+        let _ = tokio::fs::remove_dir_all(fixture.root).await;
+    }
+
+    #[tokio::test]
     async fn photo_routes_enforce_attendance_stream_dedup_and_uploader_delete() {
-        use std::io::Cursor;
-        use image::{DynamicImage, ImageFormat};
         use crate::auth::session::{generate_token, hash_token};
+        use image::{DynamicImage, ImageFormat};
+        use std::io::Cursor;
 
         let store = crate::store::Store::connect_in_memory().await;
-        let (_, account_id) = store.signup_with_password("Host", "host@example.com", "hash").await.unwrap();
-        let event = store.create_event(account_id, "photo-event", "Photo Event", "2026-07-04 13:00").await.unwrap();
-        store.update_event(account_id, event.id, &crate::store::events::EventFields {
-            slug: "photo-event".into(), title: "Photo Event".into(), tagline: String::new(),
-            starts_at: "2026-07-04 13:00".into(), ends_at: None, timezone: "America/Los_Angeles".into(),
-            status: "published".into(), summary: String::new(), area_name: String::new(), address: String::new(),
-            entry_instructions: String::new(), private_details: String::new(), notice_html: String::new(), quick_plan_html: String::new(),
-        }).await.unwrap();
-        let attendee = store.create_person(account_id, "Attendee", "").await.unwrap();
-        store.upsert_attendance(account_id, event.id, attendee.id, "going", 1, "").await.unwrap();
+        let (_, account_id) = store
+            .signup_with_password("Host", "host@example.com", "hash")
+            .await
+            .unwrap();
+        let event = store
+            .create_event(account_id, "photo-event", "Photo Event", "2026-07-04 13:00")
+            .await
+            .unwrap();
+        store
+            .update_event(
+                account_id,
+                event.id,
+                &crate::store::events::EventFields {
+                    slug: "photo-event".into(),
+                    title: "Photo Event".into(),
+                    tagline: String::new(),
+                    starts_at: "2026-07-04 13:00".into(),
+                    ends_at: None,
+                    timezone: "America/Los_Angeles".into(),
+                    status: "published".into(),
+                    summary: String::new(),
+                    area_name: String::new(),
+                    address: String::new(),
+                    entry_instructions: String::new(),
+                    private_details: String::new(),
+                    notice_html: String::new(),
+                    quick_plan_html: String::new(),
+                },
+            )
+            .await
+            .unwrap();
+        let attendee = store
+            .create_person(account_id, "Attendee", "")
+            .await
+            .unwrap();
+        store
+            .upsert_attendance(account_id, event.id, attendee.id, "going", 1, "")
+            .await
+            .unwrap();
         let token = "photo-attendee";
-        store.create_event_link(account_id, event.id, Some(attendee.id), &hash_token(token), token, "attendee", "private").await.unwrap();
-        let outsider = store.create_person(account_id, "Outsider", "").await.unwrap();
+        store
+            .create_event_link(
+                account_id,
+                event.id,
+                Some(attendee.id),
+                &hash_token(token),
+                token,
+                "attendee",
+                "private",
+            )
+            .await
+            .unwrap();
+        let outsider = store
+            .create_person(account_id, "Outsider", "")
+            .await
+            .unwrap();
         let outsider_token = "photo-outsider";
-        store.create_event_link(account_id, event.id, Some(outsider.id), &hash_token(outsider_token), outsider_token, "outsider", "private").await.unwrap();
+        store
+            .create_event_link(
+                account_id,
+                event.id,
+                Some(outsider.id),
+                &hash_token(outsider_token),
+                outsider_token,
+                "outsider",
+                "private",
+            )
+            .await
+            .unwrap();
         let shared_token = "photo-shared";
-        store.create_event_link(account_id, event.id, None, &hash_token(shared_token), shared_token, "shared", "private").await.unwrap();
+        store
+            .create_event_link(
+                account_id,
+                event.id,
+                None,
+                &hash_token(shared_token),
+                shared_token,
+                "shared",
+                "private",
+            )
+            .await
+            .unwrap();
 
         let guest_session = generate_token();
         let guest_csrf = generate_token();
-        store.claim_guest(account_id, attendee.id, "Attendee", None, "hash", &hash_token(&guest_session), &guest_csrf, "9999-01-01 00:00:00", None, None).await.unwrap();
+        store
+            .claim_guest(
+                account_id,
+                attendee.id,
+                "Attendee",
+                None,
+                "hash",
+                &hash_token(&guest_session),
+                &guest_csrf,
+                "9999-01-01 00:00:00",
+                None,
+                None,
+            )
+            .await
+            .unwrap();
         let cookie = format!("session={guest_session}");
         let config = crate::config::Config::for_tests();
         let root = config.photo_storage_dir.clone();
         let state = crate::state::AppState::new(store.clone(), super::test_auth_config(&config))
-            .with_owner_account_id(Some(account_id)).with_photo_storage_dir(root.clone());
+            .with_owner_account_id(Some(account_id))
+            .with_photo_storage_dir(root.clone());
         let app = super::build_site_router(state, &config);
         let mut png = Cursor::new(Vec::new());
-        DynamicImage::new_rgb8(3, 2).write_to(&mut png, ImageFormat::Png).unwrap();
+        DynamicImage::new_rgb8(3, 2)
+            .write_to(&mut png, ImageFormat::Png)
+            .unwrap();
         let png = png.into_inner();
         let boundary = "photo-test-boundary";
 
-        assert_eq!(post_multipart(&app, &format!("/e/{shared_token}/photos"), boundary, photo_multipart(boundary, "", &png, 0), None).await.0, StatusCode::NOT_FOUND);
-        assert_eq!(post_multipart(&app, &format!("/e/{outsider_token}/photos"), boundary, photo_multipart(boundary, "", &png, 0), None).await.0, StatusCode::NOT_FOUND);
-        assert_eq!(post_multipart(&app, &format!("/e/{token}/photos"), boundary, photo_multipart(boundary, "", &png, 0), None).await.0, StatusCode::SEE_OTHER);
-        assert_eq!(post_multipart(&app, &format!("/e/{token}/photos"), boundary, photo_multipart(boundary, "", &png, 5000), None).await.0, StatusCode::PAYLOAD_TOO_LARGE);
+        assert_eq!(
+            post_multipart(
+                &app,
+                &format!("/e/{shared_token}/photos"),
+                boundary,
+                photo_multipart(boundary, "", &png, 0),
+                None
+            )
+            .await
+            .0,
+            StatusCode::NOT_FOUND
+        );
+        assert_eq!(
+            post_multipart(
+                &app,
+                &format!("/e/{outsider_token}/photos"),
+                boundary,
+                photo_multipart(boundary, "", &png, 0),
+                None
+            )
+            .await
+            .0,
+            StatusCode::NOT_FOUND
+        );
+        assert_eq!(
+            post_multipart(
+                &app,
+                &format!("/e/{token}/photos"),
+                boundary,
+                photo_multipart(boundary, "", &png, 0),
+                None
+            )
+            .await
+            .0,
+            StatusCode::SEE_OTHER
+        );
+        assert_eq!(
+            post_multipart(
+                &app,
+                &format!("/e/{token}/photos"),
+                boundary,
+                photo_multipart(boundary, "", &png, 5000),
+                None
+            )
+            .await
+            .0,
+            StatusCode::PAYLOAD_TOO_LARGE
+        );
         let photos = store.list_photos_admin(account_id, event.id).await.unwrap();
         assert_eq!(photos.len(), 1);
         let id = photos[0].id;
-        assert_eq!(store.list_photo_variants(account_id, id).await.unwrap().len(), 3);
+        assert_eq!(
+            store
+                .list_photo_variants(account_id, id)
+                .await
+                .unwrap()
+                .len(),
+            3
+        );
         let token_bytes = get(&app, &format!("/e/{token}/photos/{id}/medium")).await;
-        let my_bytes = get_with_cookie(&app, &format!("/my/events/{}/photos/{id}/medium", event.id), &cookie).await;
+        let my_bytes = get_with_cookie(
+            &app,
+            &format!("/my/events/{}/photos/{id}/medium", event.id),
+            &cookie,
+        )
+        .await;
         assert_eq!(token_bytes.0, StatusCode::OK);
         assert_eq!(my_bytes.0, StatusCode::OK);
         assert_eq!(token_bytes.2, my_bytes.2);
-        assert_eq!(token_bytes.1.get(header::CACHE_CONTROL).unwrap(), "private, immutable");
-        assert_eq!(get(&app, &format!("/e/{outsider_token}/photos/{id}/thumb")).await.0, StatusCode::NOT_FOUND);
+        assert_eq!(
+            token_bytes.1.get(header::CACHE_CONTROL).unwrap(),
+            "private, immutable"
+        );
+        assert_eq!(
+            get(&app, &format!("/e/{outsider_token}/photos/{id}/thumb"))
+                .await
+                .0,
+            StatusCode::NOT_FOUND
+        );
 
-        assert_eq!(post_multipart(&app, &format!("/my/events/{}/photos", event.id), boundary, photo_multipart(boundary, &guest_csrf, &png, 0), Some(&cookie)).await.0, StatusCode::SEE_OTHER);
+        assert_eq!(
+            post_multipart(
+                &app,
+                &format!("/my/events/{}/photos", event.id),
+                boundary,
+                photo_multipart(boundary, &guest_csrf, &png, 0),
+                Some(&cookie)
+            )
+            .await
+            .0,
+            StatusCode::SEE_OTHER
+        );
         let photos = store.list_photos_admin(account_id, event.id).await.unwrap();
         assert_eq!(photos.len(), 2);
         assert_eq!(photos[0].storage_key, photos[1].storage_key);
-        store.upsert_attendance(account_id, event.id, outsider.id, "going", 1, "").await.unwrap();
-        assert_eq!(post_multipart(&app, &format!("/e/{outsider_token}/photos/{id}/delete"), boundary, photo_multipart(boundary, "", &png, 0), None).await.0, StatusCode::NOT_FOUND);
+        store
+            .upsert_attendance(account_id, event.id, outsider.id, "going", 1, "")
+            .await
+            .unwrap();
+        assert_eq!(
+            post_multipart(
+                &app,
+                &format!("/e/{outsider_token}/photos/{id}/delete"),
+                boundary,
+                photo_multipart(boundary, "", &png, 0),
+                None
+            )
+            .await
+            .0,
+            StatusCode::NOT_FOUND
+        );
         let delete_form = format!("--{boundary}\r\nContent-Disposition: form-data; name=\"csrf_token\"\r\n\r\n\r\n--{boundary}--\r\n").into_bytes();
-        assert_eq!(post_multipart(&app, &format!("/e/{token}/photos/{id}/delete"), boundary, delete_form, None).await.0, StatusCode::SEE_OTHER);
-        assert_eq!(get(&app, &format!("/e/{token}/photos/{id}/thumb")).await.0, StatusCode::NOT_FOUND);
+        assert_eq!(
+            post_multipart(
+                &app,
+                &format!("/e/{token}/photos/{id}/delete"),
+                boundary,
+                delete_form,
+                None
+            )
+            .await
+            .0,
+            StatusCode::SEE_OTHER
+        );
+        assert_eq!(
+            get(&app, &format!("/e/{token}/photos/{id}/thumb")).await.0,
+            StatusCode::NOT_FOUND
+        );
         let _ = tokio::fs::remove_dir_all(root).await;
     }
 

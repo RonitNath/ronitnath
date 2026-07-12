@@ -3,6 +3,8 @@
 use std::sync::Arc;
 use std::time::Instant;
 
+use tokio::sync::{OwnedSemaphorePermit, Semaphore};
+
 use crate::auth::oidc::OidcRegistry;
 use crate::store::Store;
 
@@ -38,6 +40,9 @@ struct Inner {
     public_url: String,
     owner_account_id: Option<i64>,
     photo_storage_dir: std::path::PathBuf,
+    photo_max_pixels: u64,
+    photo_max_side: u32,
+    photo_ingest_semaphore: Arc<Semaphore>,
 }
 
 impl AppState {
@@ -52,6 +57,9 @@ impl AppState {
                 public_url: "http://127.0.0.1:3130".into(),
                 owner_account_id: None,
                 photo_storage_dir: "data/photos".into(),
+                photo_max_pixels: crate::photos::DEFAULT_MAX_IMAGE_PIXELS,
+                photo_max_side: crate::photos::DEFAULT_MAX_IMAGE_SIDE,
+                photo_ingest_semaphore: Arc::new(Semaphore::new(2)),
             }),
         }
     }
@@ -59,13 +67,8 @@ impl AppState {
     pub fn with_oidc(self, oidc: OidcRegistry) -> Self {
         Self {
             inner: Arc::new(Inner {
-                store: self.inner.store.clone(),
-                started_at: self.inner.started_at,
-                auth: self.inner.auth.clone(),
                 oidc,
-                public_url: self.inner.public_url.clone(),
-                owner_account_id: self.inner.owner_account_id,
-                photo_storage_dir: self.inner.photo_storage_dir.clone(),
+                ..self.inner.as_ref().clone_inner()
             }),
         }
     }
@@ -73,13 +76,8 @@ impl AppState {
     pub fn with_public_url(self, public_url: String) -> Self {
         Self {
             inner: Arc::new(Inner {
-                store: self.inner.store.clone(),
-                started_at: self.inner.started_at,
-                auth: self.inner.auth.clone(),
-                oidc: self.inner.oidc.clone(),
                 public_url,
-                owner_account_id: self.inner.owner_account_id,
-                photo_storage_dir: self.inner.photo_storage_dir.clone(),
+                ..self.inner.as_ref().clone_inner()
             }),
         }
     }
@@ -87,13 +85,8 @@ impl AppState {
     pub fn with_owner_account_id(self, owner_account_id: Option<i64>) -> Self {
         Self {
             inner: Arc::new(Inner {
-                store: self.inner.store.clone(),
-                started_at: self.inner.started_at,
-                auth: self.inner.auth.clone(),
-                oidc: self.inner.oidc.clone(),
-                public_url: self.inner.public_url.clone(),
                 owner_account_id,
-                photo_storage_dir: self.inner.photo_storage_dir.clone(),
+                ..self.inner.as_ref().clone_inner()
             }),
         }
     }
@@ -101,19 +94,42 @@ impl AppState {
     pub fn with_photo_storage_dir(self, photo_storage_dir: impl Into<std::path::PathBuf>) -> Self {
         Self {
             inner: Arc::new(Inner {
-                store: self.inner.store.clone(),
-                started_at: self.inner.started_at,
-                auth: self.inner.auth.clone(),
-                oidc: self.inner.oidc.clone(),
-                public_url: self.inner.public_url.clone(),
-                owner_account_id: self.inner.owner_account_id,
                 photo_storage_dir: photo_storage_dir.into(),
+                ..self.inner.as_ref().clone_inner()
+            }),
+        }
+    }
+
+    pub fn with_photo_limits(self, max_pixels: u64, max_side: u32, concurrency: usize) -> Self {
+        Self {
+            inner: Arc::new(Inner {
+                photo_max_pixels: max_pixels,
+                photo_max_side: max_side,
+                photo_ingest_semaphore: Arc::new(Semaphore::new(concurrency.max(1))),
+                ..self.inner.as_ref().clone_inner()
             }),
         }
     }
 
     pub fn photo_storage_dir(&self) -> &std::path::Path {
         &self.inner.photo_storage_dir
+    }
+
+    pub fn photo_max_pixels(&self) -> u64 {
+        self.inner.photo_max_pixels
+    }
+
+    pub fn photo_max_side(&self) -> u32 {
+        self.inner.photo_max_side
+    }
+
+    pub async fn photo_ingest_permit(&self) -> OwnedSemaphorePermit {
+        self.inner
+            .photo_ingest_semaphore
+            .clone()
+            .acquire_owned()
+            .await
+            .expect("photo ingest semaphore closed")
     }
 
     pub fn owner_account_id(&self) -> Option<i64> {
@@ -138,5 +154,22 @@ impl AppState {
 
     pub fn uptime(&self) -> std::time::Duration {
         self.inner.started_at.elapsed()
+    }
+}
+
+impl Inner {
+    fn clone_inner(&self) -> Self {
+        Self {
+            store: self.store.clone(),
+            started_at: self.started_at,
+            auth: self.auth.clone(),
+            oidc: self.oidc.clone(),
+            public_url: self.public_url.clone(),
+            owner_account_id: self.owner_account_id,
+            photo_storage_dir: self.photo_storage_dir.clone(),
+            photo_max_pixels: self.photo_max_pixels,
+            photo_max_side: self.photo_max_side,
+            photo_ingest_semaphore: self.photo_ingest_semaphore.clone(),
+        }
     }
 }

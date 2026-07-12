@@ -26,11 +26,29 @@ pub struct GalleryPhoto {
     pub can_delete: bool,
 }
 
+const MAX_ORIGINAL_FILENAME_BYTES: usize = 255;
+
 struct Upload {
     filename: String,
     caption: String,
     csrf_token: String,
     bytes: Vec<u8>,
+}
+
+fn display_filename(value: &str) -> String {
+    let basename = value.rsplit(['/', '\\']).next().unwrap_or("photo");
+    let mut result = String::new();
+    for ch in basename.chars().filter(|ch| !ch.is_control()) {
+        if result.len() + ch.len_utf8() > MAX_ORIGINAL_FILENAME_BYTES {
+            break;
+        }
+        result.push(ch);
+    }
+    if result.is_empty() {
+        "photo".into()
+    } else {
+        result
+    }
 }
 
 fn multipart_error(error: axum::extract::multipart::MultipartError) -> AppError {
@@ -52,7 +70,7 @@ async fn multipart(mut multipart: Multipart) -> Result<Upload, AppError> {
         let name = field.name().unwrap_or_default().to_string();
         match name.as_str() {
             "photo" => {
-                upload.filename = field.file_name().unwrap_or("photo").to_string();
+                upload.filename = display_filename(field.file_name().unwrap_or("photo"));
                 upload.bytes = field.bytes().await.map_err(multipart_error)?.to_vec();
             }
             "caption" => {
@@ -162,7 +180,15 @@ async fn save(
     upload_attribution: UploadAttribution,
     upload: Upload,
 ) -> Result<i64, AppError> {
-    let processed = photos::process(&upload.bytes)?;
+    let _permit = state.photo_ingest_permit().await;
+    let max_pixels = state.photo_max_pixels();
+    let max_side = state.photo_max_side();
+    let bytes = upload.bytes;
+    let processed = tokio::task::spawn_blocking(move || {
+        photos::process_with_limits(&bytes, max_pixels, max_side)
+    })
+    .await
+    .map_err(|error| anyhow::anyhow!("photo processing task failed: {error}"))??;
     photos::persist(
         state.store(),
         state.photo_storage_dir(),
@@ -471,5 +497,19 @@ fn viewer_identity(viewer: &Viewer) -> Option<i64> {
     match viewer {
         Viewer::Owner { identity_id } | Viewer::Guest { identity_id, .. } => Some(*identity_id),
         _ => None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn original_filename_is_a_control_free_bounded_display_basename() {
+        let sanitized = display_filename(&format!("../../folder\\evil\n{}😀.jpg", "a".repeat(300)));
+        assert!(!sanitized.contains(['/', '\\', '\n']));
+        assert!(sanitized.len() <= MAX_ORIGINAL_FILENAME_BYTES);
+        assert!(std::str::from_utf8(sanitized.as_bytes()).is_ok());
+        assert_eq!(display_filename("../\0"), "photo");
     }
 }

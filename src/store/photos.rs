@@ -1,5 +1,7 @@
 //! Account-scoped persistence for event photos and their immutable variants.
 
+use sqlx::{Sqlite, Transaction};
+
 use super::Store;
 
 #[derive(Debug, Clone, sqlx::FromRow)]
@@ -27,6 +29,46 @@ pub struct PhotoVariant {
     pub width: Option<i64>,
     pub height: Option<i64>,
     pub byte_size: i64,
+}
+
+pub struct PhotoIngest<'a> {
+    tx: Transaction<'a, Sqlite>,
+    pub id: i64,
+}
+
+impl PhotoIngest<'_> {
+    pub async fn commit(self) -> sqlx::Result<()> {
+        self.tx.commit().await
+    }
+}
+
+pub struct PhotoGcGuard<'a> {
+    tx: Transaction<'a, Sqlite>,
+    account_id: i64,
+    photo_id: i64,
+    pub has_live_reference: bool,
+}
+
+impl PhotoGcGuard<'_> {
+    pub async fn purge_and_commit(mut self) -> sqlx::Result<u64> {
+        sqlx::query!(
+            "DELETE FROM photo_variants WHERE account_id = ?1 AND photo_id = ?2",
+            self.account_id,
+            self.photo_id
+        )
+        .execute(&mut *self.tx)
+        .await?;
+        let n = sqlx::query!(
+            "DELETE FROM photos WHERE account_id = ?1 AND id = ?2 AND deleted_at IS NOT NULL",
+            self.account_id,
+            self.photo_id
+        )
+        .execute(&mut *self.tx)
+        .await?
+        .rows_affected();
+        self.tx.commit().await?;
+        Ok(n)
+    }
 }
 
 pub struct NewPhoto<'a> {
@@ -118,12 +160,17 @@ impl Store {
         .await
     }
 
-    pub async fn insert_photo_with_variants(
+    /// Starts the ingest write transaction and inserts the invisible row.
+    /// Callers publish atomically-renamed files before committing, so a photo
+    /// row cannot become visible before all of its variants exist.
+    pub async fn begin_photo_ingest(
         &self,
         photo: &NewPhoto<'_>,
         variants: &[PhotoVariant],
-    ) -> sqlx::Result<i64> {
+    ) -> sqlx::Result<PhotoIngest<'_>> {
         let mut tx = self.pool.begin().await?;
+        // The INSERT itself acquires SQLite's single-writer lock before the
+        // caller publishes files; GC takes the same lock before its re-check.
         let id = sqlx::query_scalar!(
             r#"INSERT INTO photos
                (account_id, event_id, uploaded_by_identity_id, uploaded_by_person_id, storage_key,
@@ -160,8 +207,7 @@ impl Store {
             .execute(&mut *tx)
             .await?;
         }
-        tx.commit().await?;
-        Ok(id)
+        Ok(PhotoIngest { tx, id })
     }
 
     pub async fn soft_delete_photo(
@@ -209,17 +255,39 @@ impl Store {
         .await
     }
 
-    pub async fn storage_key_has_live_photo(
+    /// Holds SQLite's writer lock from the final live-reference check through
+    /// filesystem unlink and row purge. Concurrent ingest cannot publish this
+    /// storage key until the guard commits.
+    pub async fn begin_photo_gc(
         &self,
         account_id: i64,
         event_id: i64,
+        photo_id: i64,
         storage_key: &str,
-    ) -> sqlx::Result<bool> {
-        Ok(sqlx::query_scalar!(
+    ) -> sqlx::Result<PhotoGcGuard<'_>> {
+        let mut tx = self.pool.begin().await?;
+        sqlx::query!(
+            "UPDATE photos SET id = id WHERE account_id = ?1 AND id = ?2",
+            account_id,
+            photo_id
+        )
+        .execute(&mut *tx)
+        .await?;
+        let has_live_reference = sqlx::query_scalar!(
             r#"SELECT EXISTS(SELECT 1 FROM photos
                WHERE account_id = ?1 AND event_id = ?2 AND storage_key = ?3 AND deleted_at IS NULL) as "exists!: bool""#,
-            account_id, event_id, storage_key
-        ).fetch_one(&self.pool).await?)
+            account_id,
+            event_id,
+            storage_key
+        )
+        .fetch_one(&mut *tx)
+        .await?;
+        Ok(PhotoGcGuard {
+            tx,
+            account_id,
+            photo_id,
+            has_live_reference,
+        })
     }
 
     #[cfg(test)]
@@ -237,26 +305,5 @@ impl Store {
         )
         .fetch_all(&self.pool)
         .await
-    }
-
-    pub async fn purge_photo_row(&self, account_id: i64, photo_id: i64) -> sqlx::Result<u64> {
-        let mut tx = self.pool.begin().await?;
-        sqlx::query!(
-            "DELETE FROM photo_variants WHERE account_id = ?1 AND photo_id = ?2",
-            account_id,
-            photo_id
-        )
-        .execute(&mut *tx)
-        .await?;
-        let n = sqlx::query!(
-            "DELETE FROM photos WHERE account_id = ?1 AND id = ?2 AND deleted_at IS NOT NULL",
-            account_id,
-            photo_id
-        )
-        .execute(&mut *tx)
-        .await?
-        .rows_affected();
-        tx.commit().await?;
-        Ok(n)
     }
 }

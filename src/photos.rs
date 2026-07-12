@@ -2,13 +2,20 @@
 
 use std::io::Cursor;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
 
-use image::{DynamicImage, GenericImageView, ImageFormat};
+use image::{DynamicImage, GenericImageView, ImageFormat, ImageReader, Limits};
 use sha2::{Digest, Sha256};
 
 use crate::error::AppError;
 use crate::store::Store;
 use crate::store::photos::{NewPhoto, PhotoVariant};
+
+/// Defense-in-depth defaults checked from the encoded header before decoding.
+pub const DEFAULT_MAX_IMAGE_SIDE: u32 = 8_192;
+pub const DEFAULT_MAX_IMAGE_PIXELS: u64 = 50_000_000;
+
+static TEMP_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 
 pub struct UploadAttribution {
     pub identity_id: Option<i64>,
@@ -57,15 +64,33 @@ fn exif_taken_at(bytes: &[u8], format: ImageFormat) -> Option<String> {
             .trim_end_matches('\0'),
         _ => return None,
     };
-    if raw.len() < 19 {
+    let raw = raw.as_bytes();
+    // EXIF uses an ASCII-only fixed form. Validate bytes before indexing so
+    // malformed UTF-8/multibyte values can never panic at string boundaries.
+    if raw.len() != 19
+        || !raw.is_ascii()
+        || !raw[..4].iter().all(u8::is_ascii_digit)
+        || raw[4] != b':'
+        || !raw[5..7].iter().all(u8::is_ascii_digit)
+        || raw[7] != b':'
+        || !raw[8..10].iter().all(u8::is_ascii_digit)
+        || raw[10] != b' '
+        || !raw[11..13].iter().all(u8::is_ascii_digit)
+        || raw[13] != b':'
+        || !raw[14..16].iter().all(u8::is_ascii_digit)
+        || raw[16] != b':'
+        || !raw[17..19].iter().all(u8::is_ascii_digit)
+    {
         return None;
     }
     Some(format!(
-        "{}-{}-{}{}",
-        &raw[0..4],
-        &raw[5..7],
-        &raw[8..10],
-        &raw[10..19]
+        "{}-{}-{} {}:{}:{}",
+        std::str::from_utf8(&raw[..4]).ok()?,
+        std::str::from_utf8(&raw[5..7]).ok()?,
+        std::str::from_utf8(&raw[8..10]).ok()?,
+        std::str::from_utf8(&raw[11..13]).ok()?,
+        std::str::from_utf8(&raw[14..16]).ok()?,
+        std::str::from_utf8(&raw[17..19]).ok()?,
     ))
 }
 
@@ -85,13 +110,46 @@ fn bounded(image: &DynamicImage, max: u32) -> DynamicImage {
     }
 }
 
-pub fn process(bytes: &[u8]) -> Result<ProcessedPhoto, AppError> {
+fn decode_limits(max_pixels: u64, max_side: u32) -> Limits {
+    // Allocation limit counts output pixels plus decoder scratch. 16 bytes per
+    // configured pixel gives enough headroom for RGBA output while still
+    // preventing decompression bombs from allocating past the configured cap.
+    let mut limits = Limits::default();
+    limits.max_image_width = Some(max_side);
+    limits.max_image_height = Some(max_side);
+    limits.max_alloc = Some(max_pixels.saturating_mul(16));
+    limits
+}
+
+pub fn process_with_limits(
+    bytes: &[u8],
+    max_pixels: u64,
+    max_side: u32,
+) -> Result<ProcessedPhoto, AppError> {
     let format =
         sniff(bytes).ok_or_else(|| AppError::Invalid("photo must be JPEG, PNG, or WebP".into()))?;
+    // Read only the encoded header first. Explicitly classify an oversized
+    // declaration as 413 before constructing any decoder pixel buffer.
+    let header_reader = ImageReader::with_format(Cursor::new(bytes), format);
+    let (header_width, header_height) = header_reader
+        .into_dimensions()
+        .map_err(|_| AppError::Invalid("photo dimensions could not be read".into()))?;
+    let pixels = u64::from(header_width)
+        .checked_mul(u64::from(header_height))
+        .ok_or_else(|| AppError::Invalid("photo dimensions are too large".into()))?;
+    if header_width > max_side || header_height > max_side || pixels > max_pixels {
+        return Err(AppError::PayloadTooLarge);
+    }
     let taken_at = exif_taken_at(bytes, format);
-    let image = image::load_from_memory_with_format(bytes, format)
+    let mut reader = ImageReader::with_format(Cursor::new(bytes), format);
+    reader.limits(decode_limits(max_pixels, max_side));
+    let image = reader
+        .decode()
         .map_err(|_| AppError::Invalid("photo could not be decoded".into()))?;
     let (width, height) = image.dimensions();
+    if width > max_side || height > max_side || u64::from(width) * u64::from(height) > max_pixels {
+        return Err(AppError::PayloadTooLarge);
+    }
 
     // The stored "original" is normalized to lossless WebP. Re-encoding all
     // three outputs from decoded pixels guarantees no EXIF/GPS survives.
@@ -131,6 +189,10 @@ pub fn process(bytes: &[u8]) -> Result<ProcessedPhoto, AppError> {
     })
 }
 
+pub fn process(bytes: &[u8]) -> Result<ProcessedPhoto, AppError> {
+    process_with_limits(bytes, DEFAULT_MAX_IMAGE_PIXELS, DEFAULT_MAX_IMAGE_SIDE)
+}
+
 pub fn event_dir(root: &Path, account_id: i64, event_id: i64) -> PathBuf {
     root.join(account_id.to_string()).join(event_id.to_string())
 }
@@ -150,13 +212,19 @@ pub async fn persist(
         .await
         .map_err(anyhow::Error::from)?;
     let mut rows = Vec::with_capacity(3);
+    let mut staged = Vec::with_capacity(3);
     for variant in &processed.variants {
         let path = dir.join(&variant.filename);
-        if tokio::fs::metadata(&path).await.is_err() {
-            tokio::fs::write(&path, &variant.bytes)
-                .await
-                .map_err(anyhow::Error::from)?;
-        }
+        let temp = dir.join(format!(
+            ".{}.{}.{}.tmp",
+            variant.filename,
+            std::process::id(),
+            TEMP_SEQUENCE.fetch_add(1, Ordering::Relaxed)
+        ));
+        tokio::fs::write(&temp, &variant.bytes)
+            .await
+            .map_err(anyhow::Error::from)?;
+        staged.push((temp, path));
         rows.push(PhotoVariant {
             kind: variant.kind.into(),
             storage_key: variant.filename.clone(),
@@ -166,8 +234,10 @@ pub async fn persist(
         });
     }
     let original_size = processed.variants[0].bytes.len() as i64;
-    Ok(store
-        .insert_photo_with_variants(
+    // Cross-process protocol: SQLite's writer lock spans the invisible row
+    // insert, atomic file publication, and commit. GC takes that same lock.
+    let ingest = store
+        .begin_photo_ingest(
             &NewPhoto {
                 account_id,
                 event_id,
@@ -184,7 +254,21 @@ pub async fn persist(
             },
             &rows,
         )
-        .await?)
+        .await?;
+    for (temp, path) in &staged {
+        if tokio::fs::metadata(path).await.is_ok() {
+            tokio::fs::remove_file(temp)
+                .await
+                .map_err(anyhow::Error::from)?;
+        } else {
+            tokio::fs::rename(temp, path)
+                .await
+                .map_err(anyhow::Error::from)?;
+        }
+    }
+    let id = ingest.id;
+    ingest.commit().await?;
+    Ok(id)
 }
 
 pub async fn gc(
@@ -198,10 +282,13 @@ pub async fn gc(
         .await?;
     let mut purged = 0;
     for photo in candidates {
-        if !store
-            .storage_key_has_live_photo(account_id, photo.event_id, &photo.storage_key)
-            .await?
-        {
+        // Hold SQLite's writer lock across the final reference check, unlink,
+        // and purge. Ingest holds the same lock from row insert through atomic
+        // file publication, so neither operation can invalidate the other.
+        let guard = store
+            .begin_photo_gc(account_id, photo.event_id, photo.id, &photo.storage_key)
+            .await?;
+        if !guard.has_live_reference {
             let dir = event_dir(root, account_id, photo.event_id);
             for suffix in [".webp", ".thumb.webp", ".medium.webp"] {
                 let _ =
@@ -209,7 +296,7 @@ pub async fn gc(
                         .await;
             }
         }
-        purged += store.purge_photo_row(account_id, photo.id).await? as usize;
+        purged += guard.purge_and_commit().await? as usize;
     }
     Ok(purged)
 }
@@ -261,6 +348,44 @@ mod tests {
         result
     }
 
+    fn crc32(bytes: &[u8]) -> u32 {
+        let mut crc = !0u32;
+        for &byte in bytes {
+            crc ^= u32::from(byte);
+            for _ in 0..8 {
+                crc = (crc >> 1) ^ (0xedb8_8320 & (0u32.wrapping_sub(crc & 1)));
+            }
+        }
+        !crc
+    }
+
+    fn huge_header_png(width: u32, height: u32) -> Vec<u8> {
+        let mut png = b"\x89PNG\r\n\x1a\n".to_vec();
+        let mut ihdr = Vec::with_capacity(13);
+        ihdr.extend_from_slice(&width.to_be_bytes());
+        ihdr.extend_from_slice(&height.to_be_bytes());
+        ihdr.extend_from_slice(&[8, 2, 0, 0, 0]);
+        png.extend_from_slice(&13u32.to_be_bytes());
+        png.extend_from_slice(b"IHDR");
+        png.extend_from_slice(&ihdr);
+        let mut crc_input = b"IHDR".to_vec();
+        crc_input.extend_from_slice(&ihdr);
+        png.extend_from_slice(&crc32(&crc_input).to_be_bytes());
+        for kind in [b"IDAT".as_slice(), b"IEND".as_slice()] {
+            png.extend_from_slice(&0u32.to_be_bytes());
+            png.extend_from_slice(kind);
+            png.extend_from_slice(&crc32(kind).to_be_bytes());
+        }
+        png
+    }
+
+    #[test]
+    fn huge_dimension_high_compression_image_is_rejected_before_decode() {
+        let bytes = huge_header_png(50_000, 50_000);
+        assert!(bytes.len() < 64);
+        assert!(matches!(process(&bytes), Err(AppError::PayloadTooLarge)));
+    }
+
     #[test]
     fn captures_datetime_and_strips_gps_from_every_variant() {
         let processed = process(&jpeg_with_exif()).unwrap();
@@ -282,7 +407,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn duplicate_storage_is_reused_and_gc_waits_for_last_live_reference() {
+    async fn concurrent_upload_gc_invariant_keeps_files_for_every_live_row() {
         let store = Store::connect_in_memory().await;
         let (_, account_id) = store
             .signup_with_password("Host", "host@example.com", "hash")
