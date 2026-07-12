@@ -378,6 +378,7 @@ Content-hash over UUID: free de-dup when two guests upload the same shot (second
 - **Phase 5 dedup timing (2026-07-12):** the content-dedup timing side channel is accepted as low severity for this personal-site threat model.
 - **Phase 6 migration mappings (2026-07-12):** semantic `0029_calendar_entries` is repository migration `0032_calendar_entries`; semantic `0030_calendar_feed_tokens` is repository migration `0033_calendar_feed_tokens`, preserving sequential sqlx versions after phase 5.
 - **Phase 6 feed viewer (2026-07-12):** a calendar feed resolves to `Viewer::FeedHolder { person_id }`, a standing person-bound capability with no event id and no direct-hit floor. Calendar pages and feeds both use plain `level_for`; only `/e/{token}` may use `level_for_direct_hit`.
+- **Phase 7 import verification (2026-07-12):** the v21→v33 imported-table column gap is exactly `accounts.purpose='primary'` and `people.recovery_email=NULL`; all other imported columns map verbatim. The atomic import writes one `legacy.import` audit row containing the canonical read-only source-copy path and captured table counts, allowing no-argument `verify-import` to reopen that source read-only and compare both current and captured counts. Resolver verification uses the production hash/live-link predicate without incrementing link usage.
 
 ### Critical Files for Implementation
 

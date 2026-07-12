@@ -39,6 +39,8 @@ async fn dispatch() -> anyhow::Result<()> {
         Some("set-audience") => set_audience(&args).await,
         Some("mint-calendar-feed") => mint_calendar_feed(&args).await,
         Some("photos-gc") => photos_gc(&args).await,
+        Some("import-legacy-db") => import_legacy_db(&args).await,
+        Some("verify-import") => verify_import(&args).await,
         Some(flag) if flag == "-h" || flag == "--help" => {
             print_usage(&args[0]);
             Ok(())
@@ -80,6 +82,8 @@ fn print_usage(bin: &str) {
     );
     eprintln!("  {bin} mint-calendar-feed \"<person>\"");
     eprintln!("  {bin} photos-gc --older-than <days>");
+    eprintln!("  {bin} import-legacy-db <path>");
+    eprintln!("  {bin} verify-import");
 }
 
 async fn open_cli_store() -> anyhow::Result<(Config, Store, i64)> {
@@ -439,6 +443,43 @@ async fn mint_calendar_feed(args: &[String]) -> anyhow::Result<()> {
         )
         .await?;
     println!("{}/calendar/{raw}.ics", config.public_url);
+    Ok(())
+}
+
+async fn import_legacy_db(args: &[String]) -> anyhow::Result<()> {
+    let source = args
+        .get(2)
+        .context("usage: admin import-legacy-db <path>")?;
+    if args.len() != 3 {
+        bail!("usage: admin import-legacy-db <path>");
+    }
+    let config = Config::from_env();
+    let store = Store::connect_existing(&config.database_url).await?;
+    store.import_legacy_db(std::path::Path::new(source)).await?;
+    println!("legacy import committed");
+    Ok(())
+}
+
+async fn verify_import(args: &[String]) -> anyhow::Result<()> {
+    if args.len() != 2 {
+        bail!("usage: admin verify-import");
+    }
+    let config = Config::from_env();
+    let store = Store::connect_existing(&config.database_url).await?;
+    let checks = store.verify_import().await?;
+    println!("STATUS\tCHECK\tDETAIL");
+    for check in &checks {
+        println!(
+            "{}\t{}\t{}",
+            if check.passed { "PASS" } else { "FAIL" },
+            check.name,
+            check.detail
+        );
+    }
+    let failures = checks.iter().filter(|check| !check.passed).count();
+    if failures != 0 {
+        bail!("import verification failed: {failures} check(s)");
+    }
     Ok(())
 }
 

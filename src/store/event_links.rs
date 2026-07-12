@@ -110,11 +110,13 @@ impl Store {
         .await
     }
 
-    /// Resolves a guest's token to a live link, bumping the use counter.
-    /// Returns `None` for unknown or revoked tokens — the two cases are
-    /// indistinguishable on purpose.
-    pub async fn resolve_event_link(&self, token_hash: &str) -> sqlx::Result<Option<ResolvedLink>> {
-        let link = sqlx::query_as!(
+    /// The resolver lookup without use-counter mutation. Import verification
+    /// uses this exact production predicate while remaining read-only.
+    pub async fn resolve_event_link_read_only(
+        &self,
+        token_hash: &str,
+    ) -> sqlx::Result<Option<ResolvedLink>> {
+        sqlx::query_as!(
             ResolvedLink,
             r#"SELECT id as "id!: i64", account_id as "account_id!: i64",
                       event_id as "event_id!: i64", person_id, tier
@@ -123,7 +125,14 @@ impl Store {
             token_hash,
         )
         .fetch_optional(&self.pool)
-        .await?;
+        .await
+    }
+
+    /// Resolves a guest's token to a live link, bumping the use counter.
+    /// Returns `None` for unknown or revoked tokens — the two cases are
+    /// indistinguishable on purpose.
+    pub async fn resolve_event_link(&self, token_hash: &str) -> sqlx::Result<Option<ResolvedLink>> {
+        let link = self.resolve_event_link_read_only(token_hash).await?;
 
         if let Some(link) = &link {
             sqlx::query!(

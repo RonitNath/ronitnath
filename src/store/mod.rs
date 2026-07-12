@@ -18,6 +18,7 @@ pub mod events;
 pub mod factors;
 pub mod guestbook;
 pub mod identities;
+pub mod import;
 pub mod memberships;
 pub mod people;
 pub mod person_identity_links;
