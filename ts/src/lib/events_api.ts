@@ -2,9 +2,11 @@ import { z } from "zod";
 import type { GuestView } from "../generated/GuestView";
 import type { RsvpSubmit } from "../generated/RsvpSubmit";
 import type { RsvpResult } from "../generated/RsvpResult";
+import { csrfToken } from "./api";
 
-// Link endpoints are capability-authenticated; /api/my endpoints use the
-// ambient guest session and therefore carry the synchronizer header.
+// Capability-anonymous requests need no synchronizer token. When the page
+// exposes an ambient session token, every RSVP endpoint carries it — including
+// a capability URL that belongs to a different person.
 
 const scheduleItemSchema = z.object({
   id: z.number(),
@@ -76,13 +78,12 @@ export async function fetchGuestView(endpoint: string): Promise<GuestView> {
 }
 
 export async function postRsvp(endpoint: string, submit: RsvpSubmit): Promise<RsvpResult> {
-  const sessionScoped = endpoint.startsWith("/api/my/");
-  const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute("content") ?? "";
+  const csrf = csrfToken();
   const res = await fetch(`${endpoint}/rsvp`, {
     method: "POST",
     headers: {
       "content-type": "application/json",
-      ...(sessionScoped ? { "x-csrf-token": csrf } : {}),
+      ...(csrf ? { "x-csrf-token": csrf } : {}),
     },
     body: JSON.stringify(submit),
   });

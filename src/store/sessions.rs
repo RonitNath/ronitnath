@@ -5,7 +5,24 @@
 //! lives in [`crate::auth::session`]; this module only ever sees the
 //! already-hashed value.
 
+use sqlx::{Sqlite, Transaction};
+
 use super::Store;
+
+/// Revokes every live session for an identity inside a caller-owned transaction.
+/// Force-unlink uses this so the binding and all credentials become unusable atomically.
+pub(crate) async fn revoke_all_for_identity(
+    tx: &mut Transaction<'_, Sqlite>,
+    identity_id: i64,
+) -> sqlx::Result<()> {
+    sqlx::query!(
+        "UPDATE sessions SET revoked_at = datetime('now') WHERE identity_id = ?1 AND revoked_at IS NULL",
+        identity_id,
+    )
+    .execute(&mut **tx)
+    .await?;
+    Ok(())
+}
 
 /// The result of resolving a session cookie: everything a request needs to
 /// know who's asking and what they're allowed to touch. Re-derived fresh on

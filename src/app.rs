@@ -349,7 +349,8 @@ mod tests {
 
     use crate::test_util::{
         Authed, extract_cookie, get, get_with_cookie, post_bytes, post_form, post_form_with_cookie,
-        post_json_authed, post_json_from, seed_session, signup, test_app, test_site_app,
+        post_form_with_request_id, post_json_authed, post_json_from, seed_session, signup,
+        test_app, test_site_app,
     };
 
     #[tokio::test]
@@ -2466,6 +2467,246 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn concurrent_guest_claim_has_one_winner_and_one_clean_client_error() {
+        let (app, store, _, person_id, raw, _) = phase4_fixture().await;
+        let form_a = "password=password123&password_confirm=password123&recovery_email=a%40example.com&csrf_token=";
+        let form_b = "password=password123&password_confirm=password123&recovery_email=b%40example.com&csrf_token=";
+        let path = format!("/e/{raw}/claim");
+        let (a, b) = tokio::join!(
+            post_form(&app, &path, form_a),
+            post_form(&app, &path, form_b)
+        );
+        let statuses = [a.0, b.0];
+        assert_eq!(
+            statuses
+                .iter()
+                .filter(|&&s| s == StatusCode::SEE_OTHER)
+                .count(),
+            1
+        );
+        assert_eq!(statuses.iter().filter(|&&s| s.is_client_error()).count(), 1);
+        assert!(!statuses.contains(&StatusCode::INTERNAL_SERVER_ERROR));
+        assert_eq!(
+            store
+                .count_active_bindings_for_person(1, person_id)
+                .await
+                .unwrap(),
+            1
+        );
+    }
+
+    #[tokio::test]
+    async fn mismatched_token_rsvp_uses_session_person_and_requires_csrf() {
+        use crate::auth::session::hash_token;
+
+        let (app, store, event_id, session_person_id, raw, _) = phase4_fixture().await;
+        let guest = claim_guest(&app, &raw, "maya@example.com").await;
+        let token_person = store.create_person(1, "Token Person", "").await.unwrap();
+        let token = "token-person-rsvp";
+        store
+            .create_event_link(
+                1,
+                event_id,
+                Some(token_person.id),
+                &hash_token(token),
+                token,
+                "other",
+                "private",
+            )
+            .await
+            .unwrap();
+        let submit = serde_json::json!({
+            "name": null, "status": "going", "party_size": 3,
+            "note": "authenticated guest", "segments": []
+        });
+
+        assert_eq!(
+            post_json_authed(
+                &app,
+                &format!("/api/e/{token}/rsvp"),
+                &submit,
+                &guest.cookie,
+                None,
+            )
+            .await
+            .0,
+            StatusCode::FORBIDDEN
+        );
+        assert_eq!(
+            post_json_authed(
+                &app,
+                &format!("/api/e/{token}/rsvp"),
+                &submit,
+                &guest.cookie,
+                Some(&guest.csrf_token),
+            )
+            .await
+            .0,
+            StatusCode::OK
+        );
+        assert_eq!(
+            store
+                .find_attendance(1, event_id, session_person_id)
+                .await
+                .unwrap()
+                .unwrap()
+                .party_size,
+            3
+        );
+        assert!(
+            store
+                .find_attendance(1, event_id, token_person.id)
+                .await
+                .unwrap()
+                .is_none()
+        );
+    }
+
+    #[tokio::test]
+    async fn guest_login_oracle_responses_match_for_unknown_wrong_and_ambiguous_email() {
+        use crate::auth::session::{generate_token, hash_token};
+
+        let (app, store, event_id, _, raw, _) = phase4_fixture().await;
+        let _first = claim_guest(&app, &raw, "shared@example.com").await;
+
+        // A collision in another account must not make the owner-account
+        // locator ambiguous.
+        let (_, other_account) = store
+            .signup_with_password("Other", "owner-other@example.com", "hash")
+            .await
+            .unwrap();
+        let cross = store
+            .create_person(other_account, "Cross Account", "")
+            .await
+            .unwrap();
+        let cross_password = crate::auth::password::hash("password123").unwrap();
+        let cross_session = generate_token();
+        store
+            .claim_guest(
+                other_account,
+                cross.id,
+                "Cross Account",
+                Some("shared@example.com"),
+                &cross_password,
+                &hash_token(&cross_session),
+                "cross-csrf",
+                "9999-01-01 00:00:00",
+                None,
+                None,
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            post_form(
+                &app,
+                "/login",
+                "email=shared%40example.com&password=password123"
+            )
+            .await
+            .0,
+            StatusCode::SEE_OTHER,
+            "cross-account email collisions must not affect guest login"
+        );
+
+        let dummy_before_unknown = crate::auth::password::dummy_verify_count();
+        let unknown = post_form_with_request_id(
+            &app,
+            "/login",
+            "email=unknown%40example.com&password=password123",
+            "oracle-request",
+        )
+        .await;
+        assert!(crate::auth::password::dummy_verify_count() > dummy_before_unknown);
+        let wrong = post_form_with_request_id(
+            &app,
+            "/login",
+            "email=shared%40example.com&password=wrong-password",
+            "oracle-request",
+        )
+        .await;
+
+        let second_person = store.create_person(1, "Second Guest", "").await.unwrap();
+        let second_raw = "second-ambiguous-login";
+        store
+            .create_event_link(
+                1,
+                event_id,
+                Some(second_person.id),
+                &hash_token(second_raw),
+                second_raw,
+                "second",
+                "private",
+            )
+            .await
+            .unwrap();
+        let _second = claim_guest(&app, second_raw, "shared@example.com").await;
+        let dummy_before_ambiguous = crate::auth::password::dummy_verify_count();
+        let ambiguous = post_form_with_request_id(
+            &app,
+            "/login",
+            "email=shared%40example.com&password=password123",
+            "oracle-request",
+        )
+        .await;
+        assert!(crate::auth::password::dummy_verify_count() > dummy_before_ambiguous);
+        assert_eq!(unknown.0, StatusCode::UNAUTHORIZED);
+        assert_eq!(wrong.0, unknown.0);
+        assert_eq!(ambiguous.0, unknown.0);
+        assert_eq!(wrong.2, unknown.2);
+        assert_eq!(ambiguous.2, unknown.2);
+    }
+
+    #[tokio::test]
+    async fn my_dashboard_and_detail_follow_exclude_link_floor_and_busy_matrix() {
+        let (app, store, event_id, person_id, raw, link_id) = phase4_fixture().await;
+        let guest = claim_guest(&app, &raw, "maya@example.com").await;
+        let policy = store
+            .find_audience_policy(1, "event", event_id)
+            .await
+            .unwrap()
+            .unwrap();
+
+        store
+            .set_person_override(1, policy.id, person_id, Some("exclude"), None)
+            .await
+            .unwrap();
+        let (_, _, excluded_my) = get_with_cookie(&app, "/my", &guest.cookie).await;
+        assert!(!String::from_utf8_lossy(&excluded_my).contains("Test Party"));
+        assert_eq!(
+            get_with_cookie(&app, &format!("/my/events/{event_id}"), &guest.cookie)
+                .await
+                .0,
+            StatusCode::NOT_FOUND
+        );
+
+        store
+            .set_person_override(1, policy.id, person_id, None, None)
+            .await
+            .unwrap();
+        store
+            .set_public_level(1, policy.id, "hidden")
+            .await
+            .unwrap();
+        let (_, _, hidden_my) = get_with_cookie(&app, "/my", &guest.cookie).await;
+        assert!(!String::from_utf8_lossy(&hidden_my).contains("Test Party"));
+        let (status, _, full_detail) =
+            get_with_cookie(&app, &format!("/my/events/{event_id}"), &guest.cookie).await;
+        assert_eq!(status, StatusCode::OK);
+        assert!(String::from_utf8_lossy(&full_detail).contains("1 Secret St"));
+
+        store.revoke_event_link(1, link_id).await.unwrap();
+        store.set_public_level(1, policy.id, "busy").await.unwrap();
+        let (_, _, busy_my) = get_with_cookie(&app, "/my", &guest.cookie).await;
+        assert!(!String::from_utf8_lossy(&busy_my).contains("Test Party"));
+        assert_eq!(
+            get_with_cookie(&app, &format!("/my/events/{event_id}"), &guest.cookie)
+                .await
+                .0,
+            StatusCode::NOT_FOUND
+        );
+    }
+
+    #[tokio::test]
     async fn guest_claim_logout_login_session_rsvp_and_link_revocation_roundtrip() {
         use crate::auth::session::hash_token;
         let (app, store, event_id, person_id, raw, link_id) = phase4_fixture().await;
@@ -2632,7 +2873,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn force_unlink_allows_reclaim_and_orphans_old_guest_session() {
+    async fn force_unlink_revokes_sessions_clears_stale_cookie_and_allows_reclaim() {
         let (site, store, _, person_id, raw, _) = phase4_fixture().await;
         let old = claim_guest(&site, &raw, "maya@example.com").await;
         let owner = seed_session(&store, 1, 1).await;
@@ -2656,6 +2897,31 @@ mod tests {
         assert_eq!(
             get_with_cookie(&site, "/my", &old.cookie).await.0,
             StatusCode::SEE_OTHER
+        );
+        let raw_session = old.cookie.strip_prefix("session=").unwrap();
+        assert!(
+            store
+                .find_session_context(&crate::auth::session::hash_token(raw_session))
+                .await
+                .unwrap()
+                .is_none(),
+            "force-unlink must revoke every old identity session"
+        );
+        let (login_status, _, login_body) = get_with_cookie(&site, "/login", &old.cookie).await;
+        assert_eq!(login_status, StatusCode::OK);
+        assert!(String::from_utf8_lossy(&login_body).contains("Sign in"));
+        let (_, _, public_body) = get_with_cookie(&site, "/", &old.cookie).await;
+        assert!(!String::from_utf8_lossy(&public_body).contains("csrf-token"));
+        let stale_logout = format!("csrf_token={}", old.csrf_token);
+        let (logout_status, logout_headers, _) =
+            post_form_with_cookie(&site, "/logout", &stale_logout, Some(&old.cookie)).await;
+        assert_eq!(logout_status, StatusCode::SEE_OTHER);
+        assert!(
+            logout_headers
+                .get_all(header::SET_COOKIE)
+                .iter()
+                .filter_map(|value| value.to_str().ok())
+                .any(|value| value.starts_with("session=") && value.contains("Max-Age=0"))
         );
         assert_eq!(
             get(&site, &format!("/e/{raw}/claim")).await.0,
@@ -2695,8 +2961,10 @@ mod tests {
             .0,
             StatusCode::UNAUTHORIZED
         );
-        assert!(crate::auth::password::dummy_verify_count() > dummy_before,
-            "unknown guest identifiers must execute the dummy Argon2 verify");
+        assert!(
+            crate::auth::password::dummy_verify_count() > dummy_before,
+            "unknown guest identifiers must execute the dummy Argon2 verify"
+        );
         assert_eq!(
             store
                 .count_audit_events("guest.login.failed")

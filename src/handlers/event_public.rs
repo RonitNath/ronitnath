@@ -11,15 +11,16 @@
 //! schedule redaction remain their respective chokepoints.
 
 use askama::Template;
-use axum::Json;
 use axum::extract::{Path, State};
-use axum::http::header;
+use axum::http::{HeaderMap, header};
 use axum::response::{IntoResponse, Response};
+use axum::{Extension, Json};
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 use utoipa::ToSchema;
 
 use crate::access::level::Level;
+use crate::auth::csrf;
 use crate::auth::extract::{NavContext, NavUser};
 use crate::auth::session::hash_token;
 use crate::auth::viewer::Viewer;
@@ -33,6 +34,7 @@ use crate::store::event_links::personal_token;
 use crate::store::events::{Event, EventView};
 use crate::store::schedule_items::ScheduleItem;
 use crate::store::segment_rsvps::{SegmentCount, SegmentRsvp};
+use crate::store::sessions::SessionContext;
 use crate::view::render;
 
 const MAX_NAME_LEN: usize = 100;
@@ -307,11 +309,31 @@ pub async fn api_view(
 pub async fn api_rsvp(
     State(state): State<AppState>,
     session_viewer: Viewer,
+    Extension(session_ctx): Extension<Option<SessionContext>>,
     Path(token): Path<String>,
+    headers: HeaderMap,
     Json(submit): Json<RsvpSubmit>,
 ) -> Result<Json<RsvpResult>, AppError> {
     let store = state.store();
     let (link, event) = resolve(store, &token).await?;
+    let session_guest = match &session_viewer {
+        Viewer::Guest {
+            identity_id,
+            person_id,
+        } => Some((*identity_id, *person_id)),
+        _ => None,
+    };
+    if session_guest.is_some() {
+        let submitted_csrf = headers
+            .get("x-csrf-token")
+            .and_then(|value| value.to_str().ok())
+            .unwrap_or_default();
+        let expected_csrf = session_ctx
+            .as_ref()
+            .map(|ctx| ctx.csrf_token.as_str())
+            .ok_or_else(|| AppError::Forbidden("missing or invalid CSRF token".into()))?;
+        csrf::verify_optional(Some(expected_csrf), submitted_csrf)?;
+    }
     let (viewer, _) = session_viewer.combine_with_link(Some(&link));
     let level = direct_level(store, &link, &viewer).await?;
     if event.view_for(level).is_none() {
@@ -353,18 +375,19 @@ pub async fn api_rsvp(
         }
     }
 
-    // Resolve who is RSVPing: the link's person, or a new person named in
-    // the submission (shared link). A new person also gets their own
-    // personalized link so they can come back and edit.
-    let (person_id, person_name, personal_url) = match link.person_id {
-        Some(person_id) => {
+    // A live guest session authenticates the write even when content is
+    // being rendered through somebody else's token. Anonymous requests keep
+    // capability attribution: bound links write their person; shared links
+    // create a person and personal return link.
+    let (person_id, person_name, personal_url) = match (session_guest, link.person_id) {
+        (Some((_, person_id)), _) | (None, Some(person_id)) => {
             let person = store
                 .find_person(link.account_id, person_id)
                 .await?
                 .ok_or(AppError::NotFound)?;
             (person_id, person.name, None)
         }
-        None => {
+        (None, None) => {
             let name = submit.name.as_deref().map(str::trim).unwrap_or_default();
             if name.is_empty() {
                 return Err(AppError::Invalid("please tell us your name".into()));
@@ -415,7 +438,7 @@ pub async fn api_rsvp(
 
     store
         .audit(
-            None,
+            session_guest.map(|(identity_id, _)| identity_id),
             Some(link.account_id),
             None,
             "event.rsvp",
@@ -426,6 +449,7 @@ pub async fn api_rsvp(
                 "status": submit.status,
                 "party_size": submit.party_size,
                 "via_link": link.id,
+                "via_session": session_guest.is_some(),
             }),
         )
         .await?;

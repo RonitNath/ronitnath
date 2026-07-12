@@ -64,7 +64,10 @@ impl Store {
         user_agent: Option<&str>,
         ip: Option<&str>,
     ) -> sqlx::Result<(i64, i64)> {
-        let mut tx = self.pool.begin().await?;
+        // Reserve SQLite's single writer up front. A deferred read followed by a
+        // write can otherwise lose a concurrent claim with SQLITE_BUSY during
+        // the lock upgrade instead of reaching the deterministic re-check.
+        let mut tx = self.pool.begin_with("BEGIN IMMEDIATE").await?;
         // Re-check inside the write transaction: the partial unique index is the final race guard.
         let person_exists = sqlx::query_scalar!(
             r#"SELECT COUNT(*) as "count!: i64" FROM people p
@@ -149,7 +152,11 @@ impl Store {
     }
 
     /// Recovery email is a locator, never the password factor external id. Ambiguity fails closed.
-    pub async fn find_guest_password_by_email(&self, email: &str) -> sqlx::Result<Option<Factor>> {
+    pub async fn find_guest_password_by_email(
+        &self,
+        owner_account_id: i64,
+        email: &str,
+    ) -> sqlx::Result<Option<Factor>> {
         let rows = sqlx::query_as!(
             Factor,
             r#"SELECT f.id as "id: i64", f.identity_id as "identity_id: i64", f.kind,
@@ -159,8 +166,9 @@ impl Store {
                     AND pil.person_id = p.id AND pil.unlinked_at IS NULL
                JOIN factors f ON f.identity_id = pil.identity_id AND f.kind = 'password'
                     AND f.external_id = 'guest:' || p.id
-               WHERE lower(p.recovery_email) = ?1
+               WHERE p.account_id = ?1 AND lower(p.recovery_email) = ?2
                ORDER BY f.id LIMIT 2"#,
+            owner_account_id,
             email
         )
         .fetch_all(&self.pool)
@@ -189,6 +197,22 @@ impl Store {
             person_id
         )
         .fetch_optional(&self.pool)
+        .await
+    }
+
+    #[cfg(test)]
+    pub async fn count_active_bindings_for_person(
+        &self,
+        account_id: i64,
+        person_id: i64,
+    ) -> sqlx::Result<i64> {
+        sqlx::query_scalar!(
+            r#"SELECT COUNT(*) as "count!: i64" FROM person_identity_links
+            WHERE account_id = ?1 AND person_id = ?2 AND unlinked_at IS NULL"#,
+            account_id,
+            person_id
+        )
+        .fetch_one(&self.pool)
         .await
     }
 
@@ -221,6 +245,7 @@ impl Store {
             )
             .execute(&mut *tx)
             .await?;
+            crate::store::sessions::revoke_all_for_identity(&mut tx, identity_id).await?;
         }
         tx.commit().await?;
         Ok(identity_id)

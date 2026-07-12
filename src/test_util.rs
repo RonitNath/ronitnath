@@ -135,6 +135,20 @@ pub async fn post_form(app: &Router, path: &str, form: &str) -> (StatusCode, Hea
     post_form_with_cookie(app, path, form, None).await
 }
 
+pub async fn post_form_with_request_id(
+    app: &Router,
+    path: &str,
+    form: &str,
+    request_id: &str,
+) -> (StatusCode, HeaderMap, Bytes) {
+    let request = Request::post(path)
+        .header(header::CONTENT_TYPE, "application/x-www-form-urlencoded")
+        .header("x-request-id", request_id)
+        .body(Body::from(form.to_string()))
+        .unwrap();
+    send(app, request, DEFAULT_IP).await
+}
+
 pub async fn post_form_with_cookie(
     app: &Router,
     path: &str,

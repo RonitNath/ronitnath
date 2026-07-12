@@ -145,7 +145,13 @@ pub async fn guest_login(
     ctx: RequestContext<'_>,
 ) -> Result<LoginOutcome, AppError> {
     let email = email.trim().to_lowercase();
-    let factor = state.store().find_guest_password_by_email(&email).await?;
+    let owner_account_id = state
+        .owner_account_id()
+        .ok_or_else(|| anyhow::anyhow!("guest login requires an owner account"))?;
+    let factor = state
+        .store()
+        .find_guest_password_by_email(owner_account_id, &email)
+        .await?;
     let verified = password::verify(
         password_plain,
         factor.as_ref().and_then(|f| f.secret_hash.as_deref()),

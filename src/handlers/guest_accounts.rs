@@ -26,6 +26,20 @@ use crate::store::events::{Event, EventView};
 use crate::store::sessions::SessionContext;
 use crate::view::render;
 
+fn claim_conflict(error: &sqlx::Error) -> bool {
+    match error {
+        sqlx::Error::RowNotFound => true,
+        sqlx::Error::Database(db) => {
+            db.is_unique_violation()
+                || db
+                    .code()
+                    .and_then(|code| code.parse::<i32>().ok())
+                    .is_some_and(|code| matches!(code & 0xff, 5 | 6))
+        }
+        _ => false,
+    }
+}
+
 fn request_context<'a>(headers: &'a HeaderMap, ip: &'a str) -> RequestContext<'a> {
     RequestContext {
         request_id: headers.get("x-request-id").and_then(|v| v.to_str().ok()),
@@ -157,10 +171,12 @@ pub async fn claim_submit(
             Some(&ip),
         )
         .await
-        .map_err(|e| match e {
-            sqlx::Error::RowNotFound => AppError::NotFound,
-            sqlx::Error::Database(ref db) if db.is_unique_violation() => AppError::NotFound,
-            other => AppError::from(other),
+        .map_err(|error| {
+            if claim_conflict(&error) {
+                AppError::NotFound
+            } else {
+                AppError::from(error)
+            }
         })?;
     state
         .store()
@@ -230,11 +246,13 @@ pub struct LogoutForm {
 
 pub async fn logout_submit(
     State(state): State<AppState>,
-    scope: GuestScope,
+    Extension(session_ctx): Extension<Option<SessionContext>>,
     Form(form): Form<LogoutForm>,
 ) -> Result<Response, AppError> {
-    csrf::verify_optional(Some(&scope.csrf_token), &form.csrf_token)?;
-    login::logout(&state, scope.session_id, scope.identity_id).await?;
+    if let Some(session_ctx) = session_ctx {
+        csrf::verify_optional(Some(&session_ctx.csrf_token), &form.csrf_token)?;
+        login::logout(&state, session_ctx.session_id, session_ctx.identity_id).await?;
+    }
     Ok((
         CookieJar::new().add(session::clear_cookie(state.auth_config().cookie_secure)),
         Redirect::to("/"),
@@ -336,7 +354,9 @@ async fn my_event_parts(
         Some(link) => inputs.level_for_direct_hit(&viewer, &link.tier)?,
         None => inputs.level_for(&viewer)?,
     };
-    if level == Level::Hidden {
+    // Session browsing has no capability floor when the guest no longer
+    // holds a live link. Busy is intentionally list/detail-invisible.
+    if level < Level::Summary {
         return Err(AppError::NotFound);
     }
     let link = ResolvedLink {
