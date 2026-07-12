@@ -13,8 +13,8 @@ Events keeps :3117/:3118 until cutover; both run side by side on nexus.
 
 | # | Phase | File | Status |
 |---|-------|------|--------|
-| 0 | Bootstrap (repo, two-bin split) | phase-0-bootstrap.md | in progress |
-| 1 | Design brief + token port | phase-1-design.md | pending |
+| 0 | Bootstrap (repo, two-bin split) | phase-0-bootstrap.md | done |
+| 1 | Design brief + token port | phase-1-design.md | in progress |
 | 2 | Domain port from events | phase-2-domain-port.md | pending |
 | 3 | Visibility (circles + levels) | phase-3-visibility.md | pending |
 | 4 | Guest accounts (claim + password) | phase-4-guest-accounts.md | pending |
@@ -30,4 +30,4 @@ evidence, worktree clean) before the next is dispatched.
 
 | Phase | Leg | Worker | Model/effort | Job/commit | Evidence |
 |-------|-----|--------|--------------|------------|----------|
-| 0 | two-bin split | pi_codex | gpt-5.6-sol / medium | job 7663a885-a899-443d-aed9-083ecb7f8012 | pending |
+| 0 | two-bin split | pi_codex | gpt-5.6-sol / medium | job 7663a885 → 36f98c1, 635beb9 | 26/26 tests (orchestrator re-ran); both bins booted, healthz ok; admin /login 200, site /login 404; sqlx cache committed; docker unavailable on mu — compose validated at deploy. Deviation (accepted): site owns migrations, admin fails fast on stale schema (connect_existing). |
