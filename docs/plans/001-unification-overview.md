@@ -20,8 +20,8 @@ Events keeps :3117/:3118 until cutover; both run side by side on nexus.
 | 4 | Guest accounts (claim + password) | phase-4-guest-accounts.md | done |
 | 5 | Photos | phase-5-photos.md | done |
 | 6 | Calendar | phase-6-calendar.md | done |
-| 7 | Prod data migration (dry run) | phase-7-import.md | in progress |
-| 8 | Cutover (operator, by hand) | phase-8-cutover.md | pending |
+| 7 | Prod data migration (dry run) | phase-7-import.md | done |
+| 8 | Cutover (operator, by hand) | phase-8-cutover.md | ready — awaiting operator go |
 
 Phases are sequential; each ends with a gate review (tests, acceptance
 evidence, worktree clean) before the next is dispatched.
@@ -47,3 +47,4 @@ evidence, worktree clean) before the next is dispatched.
 | 6 | calendar build | pi_codex → codex exec | gpt-5.6-sol/high (WebSocket drop ~38min) → codex exec gpt-5.5/high finished | 84dcac7, a6a1d52, a479758 | 94/94 tests (orchestrator re-ran offline, no DATABASE_URL); read-time union via level_for (Viewer::FeedHolder, no floor); CalendarEntry::view_for 4th chokepoint; live: anon /calendar shows July4 summary-only chip, ICS feed redacts (busy→SUMMARY:Busy, summary→title-only, full→both), revoke→404. Visual gate passed (orchestrator screenshot). |
 | 6 | independent security review | pi_codex (read-only, detached @a479758) | gpt-5.6-sol / high | job 0838540c | Verdict FAIL: 2 BLOCKER (capability tokens logged plaintext in telemetry span — affects /e/{token} + photo paths from phases 2-5, not just calendar; extreme-month panic) + 3 SHOULD-FIX (feed revoke race + no cache headers, partial-commit audience save, missing ICS line-folding). Token routing/visibility/tenant-isolation/ICS-injection/admin-lifecycle clean. |
 | 6 | security fix round | pi_codex | gpt-5.6-sol / high | job 13d4f9ef → 2d449a5 | 98/98 tests offline (orchestrator re-ran); telemetry path sanitizer (orchestrator live-verified: sentinel token 0 hits in logs, paths log as /e/{token} + /calendar/{feed}.ics — retroactively fixes phases 2-5 token leak); month range 1970-2100 checked-arith; feed touch conditional-on-unrevoked → 404 + private,no-store; audience save validates-all-then-txn+audit (event editor shared bug, fixed once); ICS 75-octet folding on char boundaries. |
+| 7 | prod import CLIs + dry run | pi_codex | gpt-5.6-sol / high | job 6bd891f2 → 60f419e | 99/99 tests; import-legacy-db (empty-guard, PK-verbatim, single-txn) + verify-import (16-check PASS table). ORCHESTRATOR INDEPENDENT DRY RUN on real prod snapshot (90 people/3 events/38 links, .backup from live nexus): re-migrated fresh v33 DB + re-imported + re-verified (all PASS); resolved ALL 38 real tokens (36 live→200, 2 revoked→404, bogus→404); person-bound link shows 1 Pine St (Full backfill); PK spot-check people+event_links src==imported 0 mismatches. v21→v33 gap = accounts.purpose='primary' + people.recovery_email NULL only. Note: pre-existing malformed people.name junk in live data (not import artifact). |
