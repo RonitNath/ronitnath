@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT id as \"id!: i64\" FROM accounts ORDER BY id LIMIT 2",
+  "query": "SELECT id as \"id!: i64\" FROM accounts WHERE purpose = 'primary' ORDER BY id LIMIT 2",
   "describe": {
     "columns": [
       {
@@ -22,5 +22,5 @@
       false
     ]
   },
-  "hash": "540f71626e3d11e2307ea72be6eedbba8ece218ba765e002f6dd890dbdcc5621"
+  "hash": "4593b625d82eeb3f0480d540240be18eeb522e1b4e89547bb0961a0fb723429d"
 }

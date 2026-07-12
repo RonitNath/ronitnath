@@ -1,15 +1,14 @@
 //! Queries and types for the `events` table.
 //!
-//! `Event` is the full row (admin + private-tier pages). Public-tier
-//! rendering must go through [`Event::public_view`] so the private fields
-//! (address, entry instructions, private details) can't leak by accident —
-//! the tier split is the platform's whole security model.
+//! `Event` is the full row. Guest rendering must go through
+//! [`Event::view_for`], the subject's sole redaction chokepoint.
 
 use serde::Serialize;
 use ts_rs::TS;
 use utoipa::ToSchema;
 
 use super::Store;
+use crate::access::level::Level;
 
 #[derive(Debug, Clone, Serialize, sqlx::FromRow)]
 pub struct Event {
@@ -39,11 +38,27 @@ pub struct Event {
     pub updated_at: String,
 }
 
-/// What a guest sees. `address`/`entry_instructions`/`private_details` are
-/// `None` on public-tier links — absent from the JSON, not just empty.
+/// A Busy view is deliberately opaque: even the event title is withheld.
 #[derive(Debug, Serialize, TS, ToSchema)]
 #[ts(export)]
-pub struct EventView {
+#[serde(untagged)]
+pub enum EventView {
+    Busy(BusyView),
+    Event(Box<EventDetailView>),
+}
+
+#[derive(Debug, Serialize, TS, ToSchema)]
+#[ts(export)]
+pub struct BusyView {
+    pub starts_at: String,
+    pub ends_at: Option<String>,
+    pub timezone: String,
+}
+
+/// Summary/Full event fields. Private fields are absent at Summary.
+#[derive(Debug, Serialize, TS, ToSchema)]
+#[ts(export)]
+pub struct EventDetailView {
     pub title: String,
     pub tagline: String,
     pub starts_at: String,
@@ -60,21 +75,32 @@ pub struct EventView {
 }
 
 impl Event {
-    pub fn public_view(&self, private_tier: bool) -> EventView {
-        EventView {
-            title: self.title.clone(),
-            tagline: self.tagline.clone(),
-            starts_at: self.starts_at.clone(),
-            ends_at: self.ends_at.clone(),
-            timezone: self.timezone.clone(),
-            status: self.status.clone(),
-            summary: self.summary.clone(),
-            area_name: self.area_name.clone(),
-            address: private_tier.then(|| self.address.clone()),
-            entry_instructions: private_tier.then(|| self.entry_instructions.clone()),
-            private_details: private_tier.then(|| self.private_details.clone()),
-            notice_html: private_tier.then(|| self.notice_html.clone()),
-            quick_plan_html: private_tier.then(|| self.quick_plan_html.clone()),
+    pub fn view_for(&self, level: Level) -> Option<EventView> {
+        match level {
+            Level::Hidden => None,
+            Level::Busy => Some(EventView::Busy(BusyView {
+                starts_at: self.starts_at.clone(),
+                ends_at: self.ends_at.clone(),
+                timezone: self.timezone.clone(),
+            })),
+            Level::Summary | Level::Full => {
+                let full = level == Level::Full;
+                Some(EventView::Event(Box::new(EventDetailView {
+                    title: self.title.clone(),
+                    tagline: self.tagline.clone(),
+                    starts_at: self.starts_at.clone(),
+                    ends_at: self.ends_at.clone(),
+                    timezone: self.timezone.clone(),
+                    status: self.status.clone(),
+                    summary: self.summary.clone(),
+                    area_name: self.area_name.clone(),
+                    address: full.then(|| self.address.clone()),
+                    entry_instructions: full.then(|| self.entry_instructions.clone()),
+                    private_details: full.then(|| self.private_details.clone()),
+                    notice_html: full.then(|| self.notice_html.clone()),
+                    quick_plan_html: full.then(|| self.quick_plan_html.clone()),
+                })))
+            }
         }
     }
 }
@@ -132,7 +158,11 @@ impl Store {
         .await
     }
 
-    pub async fn find_event_by_slug(&self, account_id: i64, slug: &str) -> sqlx::Result<Option<Event>> {
+    pub async fn find_event_by_slug(
+        &self,
+        account_id: i64,
+        slug: &str,
+    ) -> sqlx::Result<Option<Event>> {
         sqlx::query_as!(
             Event,
             r#"SELECT id as "id!: i64", slug, title, tagline, starts_at, ends_at, timezone,
@@ -153,7 +183,8 @@ impl Store {
         title: &str,
         starts_at: &str,
     ) -> sqlx::Result<Event> {
-        sqlx::query_as!(
+        let mut tx = self.pool.begin().await?;
+        let event = sqlx::query_as!(
             Event,
             r#"INSERT INTO events (account_id, slug, title, starts_at)
                VALUES (?1, ?2, ?3, ?4)
@@ -165,8 +196,19 @@ impl Store {
             title,
             starts_at,
         )
-        .fetch_one(&self.pool)
-        .await
+        .fetch_one(&mut *tx)
+        .await?;
+        sqlx::query!(
+            r#"INSERT INTO audience_policies
+            (account_id, subject_type, subject_id, public_level)
+            VALUES (?1, 'event', ?2, 'hidden')"#,
+            account_id,
+            event.id
+        )
+        .execute(&mut *tx)
+        .await?;
+        tx.commit().await?;
+        Ok(event)
     }
 
     pub async fn update_event(
@@ -277,5 +319,70 @@ impl Store {
         )
         .fetch_all(&self.pool)
         .await
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn create_event_atomically_creates_hidden_audience_policy() {
+        let store = Store::connect_in_memory().await;
+        let (_, account_id) = store
+            .signup_with_password("Owner", "owner@example.com", "hash")
+            .await
+            .unwrap();
+        let event = store
+            .create_event(account_id, "invariant", "Invariant", "2026-07-04 12:00")
+            .await
+            .unwrap();
+        let policy = store
+            .find_audience_policy(account_id, "event", event.id)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(policy.public_level, "hidden");
+    }
+
+    #[test]
+    fn view_for_is_the_complete_event_redaction_chokepoint() {
+        let event = Event {
+            id: 1,
+            slug: "private-party".into(),
+            title: "Private Party".into(),
+            tagline: "Secret tagline".into(),
+            starts_at: "2026-07-04 13:00".into(),
+            ends_at: Some("2026-07-04 15:00".into()),
+            timezone: "America/Los_Angeles".into(),
+            status: "published".into(),
+            summary: "Summary".into(),
+            area_name: "San Francisco".into(),
+            address: "1 Secret St".into(),
+            entry_instructions: "Secret entry".into(),
+            private_details: "Private details".into(),
+            notice_html: "Private notice".into(),
+            quick_plan_html: "Private plan".into(),
+            headcount: None,
+            created_at: "2026-01-01 00:00:00".into(),
+            updated_at: "2026-01-01 00:00:00".into(),
+        };
+
+        assert!(event.view_for(Level::Hidden).is_none());
+
+        let busy = serde_json::to_value(event.view_for(Level::Busy).unwrap()).unwrap();
+        assert_eq!(busy["starts_at"], "2026-07-04 13:00");
+        assert!(busy.get("title").is_none());
+        assert!(busy.get("address").is_none());
+        assert!(busy.get("entry_instructions").is_none());
+
+        let summary = serde_json::to_value(event.view_for(Level::Summary).unwrap()).unwrap();
+        assert_eq!(summary["title"], "Private Party");
+        assert!(summary["address"].is_null());
+        assert!(summary["entry_instructions"].is_null());
+
+        let full = serde_json::to_value(event.view_for(Level::Full).unwrap()).unwrap();
+        assert_eq!(full["address"], "1 Secret St");
+        assert_eq!(full["entry_instructions"], "Secret entry");
     }
 }

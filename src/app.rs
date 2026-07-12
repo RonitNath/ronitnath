@@ -50,7 +50,9 @@ pub fn build_site_router(state: AppState, config: &Config) -> Router {
         .fallback(handlers::errors::not_found)
         .with_state(state.clone())
         .split_for_parts();
-    apply_layers(with_openapi_json(router, api), state, config, false)
+    // Public capability pages may recognize the owner session, but the site
+    // router still exposes none of the admin auth/account routes.
+    apply_layers(with_openapi_json(router, api), state, config, true)
 }
 
 /// Builds the full authenticated/admin surface, preserving the stage_2 routes.
@@ -74,7 +76,28 @@ pub fn build_admin_router(state: AppState, config: &Config) -> Router {
             "/events/{event_id}",
             get(handlers::events_admin::detail_page).post(handlers::errors::not_found),
         )
-        .route("/events/{event_id}/schedule", post(handlers::errors::not_found))
+        .route(
+            "/events/{event_id}/audience",
+            get(handlers::audience::page).post(handlers::audience::save),
+        )
+        .route(
+            "/circles",
+            get(handlers::circles::list).post(handlers::circles::create),
+        )
+        .route(
+            "/circles/{id}",
+            get(handlers::circles::detail).post(handlers::circles::rename),
+        )
+        .route("/circles/{id}/delete", post(handlers::circles::delete))
+        .route("/circles/{id}/members", post(handlers::circles::add_member))
+        .route(
+            "/circles/{id}/members/{person_id}/delete",
+            post(handlers::circles::remove_member),
+        )
+        .route(
+            "/events/{event_id}/schedule",
+            post(handlers::errors::not_found),
+        )
         .route(
             "/events/{event_id}/schedule/{item_id}",
             post(handlers::errors::not_found),
@@ -87,7 +110,10 @@ pub fn build_admin_router(state: AppState, config: &Config) -> Router {
             "/events/{event_id}/attendance/{person_id}",
             post(handlers::events_admin::update_attendance),
         )
-        .route("/events/{event_id}/links", post(handlers::events_admin::create_link))
+        .route(
+            "/events/{event_id}/links",
+            post(handlers::events_admin::create_link),
+        )
         .route(
             "/events/{event_id}/links/{link_id}/revoke",
             post(handlers::events_admin::revoke_link),
@@ -233,9 +259,16 @@ async fn state(config: &Config, migrate: bool) -> AppState {
                 config.oidc_providers_path
             )
         });
+    // A brand-new database has no owner until the bootstrap signup. Once
+    // present, primary-account ambiguity fails startup closed.
+    let owner_account_id = store
+        .find_primary_account()
+        .await
+        .unwrap_or_else(|e| panic!("failed to resolve primary account: {e}"));
     AppState::new(store, auth_config(config))
         .with_oidc(oidc)
         .with_public_url(config.public_url.clone())
+        .with_owner_account_id(owner_account_id)
 }
 
 pub async fn run_site() {
@@ -848,6 +881,212 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn direct_link_visibility_matrix_redacts_only_at_chokepoints() {
+        use crate::access::level::Level;
+        use crate::auth::session::hash_token;
+
+        let (app, store) = test_site_app().await;
+        let (event_id, public_token, private_token, _, _) = seed_event(&store).await;
+        let person = store.create_person(1, "Matrix Guest", "").await.unwrap();
+        let person_token = "matrix-person-link";
+        store
+            .create_event_link(
+                1,
+                event_id,
+                Some(person.id),
+                &hash_token(person_token),
+                person_token,
+                "person",
+                "public",
+            )
+            .await
+            .unwrap();
+        let policy = store
+            .find_audience_policy(1, "event", event_id)
+            .await
+            .unwrap()
+            .unwrap();
+
+        for public in Level::ALL {
+            store
+                .set_public_level(1, policy.id, public.as_str())
+                .await
+                .unwrap();
+
+            let (status, _, body) = get(&app, &format!("/e/{public_token}")).await;
+            assert_eq!(status, StatusCode::OK);
+            let html = String::from_utf8(body.to_vec()).unwrap();
+            // Binding amendment: a direct public capability floors Summary.
+            assert!(html.contains("Test Party"));
+            assert_eq!(html.contains("1 Secret St"), public == Level::Full);
+            assert_eq!(html.contains("SECRET ENTRY CODE"), public == Level::Full);
+            assert_eq!(
+                html.contains("PRIVATE ROOFTOP BLOCK"),
+                public == Level::Full
+            );
+
+            let (status, _, body) = get(&app, &format!("/e/{person_token}")).await;
+            assert_eq!(status, StatusCode::OK);
+            let html = String::from_utf8(body.to_vec()).unwrap();
+            assert!(html.contains("Matrix Guest") && html.contains("Test Party"));
+            assert_eq!(html.contains("1 Secret St"), public == Level::Full);
+            assert_eq!(html.contains("SECRET ENTRY CODE"), public == Level::Full);
+
+            let (status, _, body) = get(&app, &format!("/e/{private_token}")).await;
+            assert_eq!(status, StatusCode::OK);
+            let html = String::from_utf8(body.to_vec()).unwrap();
+            assert!(html.contains("Test Party") && html.contains("1 Secret St"));
+        }
+    }
+
+    #[tokio::test]
+    async fn person_exclude_beats_public_and_circles_while_multi_circle_uses_max() {
+        use crate::auth::session::hash_token;
+
+        let (app, store) = test_site_app().await;
+        let (event_id, _, _, _, _) = seed_event(&store).await;
+        let person = store.create_person(1, "Circle Guest", "").await.unwrap();
+        let low = store.create_circle(1, "Acquaintances").await.unwrap();
+        let high = store.create_circle(1, "Friends").await.unwrap();
+        store.add_circle_member(1, low, person.id).await.unwrap();
+        store.add_circle_member(1, high, person.id).await.unwrap();
+        let policy = store
+            .find_audience_policy(1, "event", event_id)
+            .await
+            .unwrap()
+            .unwrap();
+        store
+            .set_public_level(1, policy.id, "hidden")
+            .await
+            .unwrap();
+        store
+            .set_circle_grant(1, policy.id, low, Some("busy"))
+            .await
+            .unwrap();
+        store
+            .set_circle_grant(1, policy.id, high, Some("full"))
+            .await
+            .unwrap();
+        let raw = "circle-guest-link";
+        store
+            .create_event_link(
+                1,
+                event_id,
+                Some(person.id),
+                &hash_token(raw),
+                raw,
+                "circle",
+                "public",
+            )
+            .await
+            .unwrap();
+
+        let (status, _, body) = get(&app, &format!("/e/{raw}")).await;
+        assert_eq!(status, StatusCode::OK);
+        assert!(
+            String::from_utf8(body.to_vec())
+                .unwrap()
+                .contains("1 Secret St"),
+            "max circle must be Full"
+        );
+
+        store.set_public_level(1, policy.id, "full").await.unwrap();
+        store
+            .set_person_override(1, policy.id, person.id, Some("exclude"), None)
+            .await
+            .unwrap();
+        let (status, _, _) = get(&app, &format!("/e/{raw}")).await;
+        assert_eq!(
+            status,
+            StatusCode::NOT_FOUND,
+            "exclude must beat circle, public, and direct-link floor"
+        );
+    }
+
+    #[tokio::test]
+    async fn owner_session_beats_person_exclude_on_public_router() {
+        use crate::auth::session::hash_token;
+
+        let store = crate::store::Store::connect_in_memory().await;
+        let (identity_id, account_id) = store
+            .signup_with_password("Owner", "owner@example.com", "hash")
+            .await
+            .unwrap();
+        let event = store
+            .create_event(account_id, "owner-view", "Owner View", "2026-07-04 13:00")
+            .await
+            .unwrap();
+        let fields = crate::store::events::EventFields {
+            slug: "owner-view".into(),
+            title: "Owner View".into(),
+            tagline: String::new(),
+            starts_at: "2026-07-04 13:00".into(),
+            ends_at: None,
+            timezone: "America/Los_Angeles".into(),
+            status: "published".into(),
+            summary: String::new(),
+            area_name: "San Francisco".into(),
+            address: "OWNER SECRET ADDRESS".into(),
+            entry_instructions: String::new(),
+            private_details: String::new(),
+            notice_html: String::new(),
+            quick_plan_html: String::new(),
+        };
+        store
+            .update_event(account_id, event.id, &fields)
+            .await
+            .unwrap();
+        let person = store
+            .create_person(account_id, "Excluded", "")
+            .await
+            .unwrap();
+        let policy = store
+            .find_audience_policy(account_id, "event", event.id)
+            .await
+            .unwrap()
+            .unwrap();
+        store
+            .set_person_override(account_id, policy.id, person.id, Some("exclude"), None)
+            .await
+            .unwrap();
+        let raw = "owner-person-link";
+        store
+            .create_event_link(
+                account_id,
+                event.id,
+                Some(person.id),
+                &hash_token(raw),
+                raw,
+                "private",
+                "public",
+            )
+            .await
+            .unwrap();
+        let authed = seed_session(&store, identity_id, account_id).await;
+        let config = crate::config::Config::for_tests();
+        let state = crate::state::AppState::new(store.clone(), super::test_auth_config(&config))
+            .with_owner_account_id(Some(account_id));
+        let app = super::build_site_router(state, &config);
+
+        for public in crate::access::level::Level::ALL {
+            store
+                .set_public_level(account_id, policy.id, public.as_str())
+                .await
+                .unwrap();
+            let (status, _, body) =
+                get_with_cookie(&app, &format!("/e/{raw}"), &authed.cookie).await;
+            assert_eq!(status, StatusCode::OK);
+            assert!(
+                String::from_utf8(body.to_vec())
+                    .unwrap()
+                    .contains("OWNER SECRET ADDRESS"),
+                "owner must remain Full when public_level={}",
+                public.as_str()
+            );
+        }
+    }
+
+    #[tokio::test]
     async fn shared_link_rsvp_creates_person_with_editable_personal_link() {
         let (app, store) = test_site_app().await;
         let (_, public_token, _, public_item, private_item) = seed_event(&store).await;
@@ -919,7 +1158,15 @@ mod tests {
         let person = store.create_person(1, "Maya Chen", "").await.unwrap();
         let raw = personal_token("Maya Chen");
         store
-            .create_event_link(1, 1, Some(person.id), &hash_token(&raw), &raw, "invite", "private")
+            .create_event_link(
+                1,
+                1,
+                Some(person.id),
+                &hash_token(&raw),
+                &raw,
+                "invite",
+                "private",
+            )
             .await
             .unwrap();
 
@@ -944,13 +1191,24 @@ mod tests {
             .unwrap();
 
         store
-            .set_segment_flags(1, event_id, "board_games", person.id, None, Some(true), Some(true))
+            .set_segment_flags(
+                1,
+                event_id,
+                "board_games",
+                person.id,
+                None,
+                Some(true),
+                Some(true),
+            )
             .await
             .unwrap();
 
         // A later guest-side segment update must not clobber the admin's
         // paid/attended bookkeeping (the upsert only touches status).
-        store.upsert_segment_rsvp(1, public_item, person.id, "maybe").await.unwrap();
+        store
+            .upsert_segment_rsvp(1, public_item, person.id, "maybe")
+            .await
+            .unwrap();
 
         let rows = store.list_attendance(1, event_id).await.unwrap();
         let payer = rows.iter().find(|r| r.person_name == "Payer").unwrap();
@@ -1000,7 +1258,12 @@ mod tests {
         let (_, public_token, _, _, _) = seed_event(&store).await;
         let (status, headers, body) = get(&app, &format!("/events/{public_token}/ics")).await;
         assert_eq!(status, StatusCode::OK);
-        assert!(headers[header::CONTENT_TYPE].to_str().unwrap().starts_with("text/calendar"));
+        assert!(
+            headers[header::CONTENT_TYPE]
+                .to_str()
+                .unwrap()
+                .starts_with("text/calendar")
+        );
         let body = String::from_utf8(body.to_vec()).unwrap();
         assert!(body.contains("SUMMARY:Test Party"));
         assert!(body.contains("LOCATION:Somewhere\\, SF"));
@@ -1024,6 +1287,71 @@ mod tests {
         store.revoke_event_link(1, public_link.id).await.unwrap();
         let (status, _, _) = get(&app, &format!("/e/{public_token}")).await;
         assert_eq!(status, StatusCode::NOT_FOUND);
+    }
+
+    #[tokio::test]
+    async fn circle_and_audience_admin_routes_require_csrf_and_persist() {
+        let (app, store) = test_app().await;
+        let Authed { cookie, csrf_token } =
+            signup(&app, "Admin", "admin@example.com", "password123").await;
+        let account_id = authed_account(&store, "admin@example.com").await;
+        let person = store.create_person(account_id, "Guest", "").await.unwrap();
+        let event = store
+            .create_event(account_id, "audience-ui", "Audience UI", "2026-07-04 18:00")
+            .await
+            .unwrap();
+
+        let (status, _, _) =
+            post_form_with_cookie(&app, "/circles", "name=Friends", Some(&cookie)).await;
+        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+        let form = format!("name=Friends&csrf_token={csrf_token}");
+        let (status, _, _) = post_form_with_cookie(&app, "/circles", &form, Some(&cookie)).await;
+        assert_eq!(status, StatusCode::SEE_OTHER);
+        let circle = store
+            .find_circle_by_name(account_id, "Friends")
+            .await
+            .unwrap()
+            .unwrap();
+
+        let form = format!("person_id={}&csrf_token={csrf_token}", person.id);
+        let (status, _, _) = post_form_with_cookie(
+            &app,
+            &format!("/circles/{}/members", circle.id),
+            &form,
+            Some(&cookie),
+        )
+        .await;
+        assert_eq!(status, StatusCode::SEE_OTHER);
+
+        let form = format!(
+            "public_level=busy&circle_{}=full&person_{}=exclude&csrf_token={csrf_token}",
+            circle.id, person.id
+        );
+        let (status, _, _) = post_form_with_cookie(
+            &app,
+            &format!("/events/{}/audience", event.id),
+            &form,
+            Some(&cookie),
+        )
+        .await;
+        assert_eq!(status, StatusCode::SEE_OTHER);
+        let inputs = store
+            .audience_inputs_for_event(account_id, event.id, Some(person.id))
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(inputs.policy.public_level, "busy");
+        assert_eq!(inputs.circle_grants[0].level, "full");
+        assert_eq!(inputs.overrides[0].override_kind, "exclude");
+
+        let (status, _, body) =
+            get_with_cookie(&app, &format!("/events/{}/audience", event.id), &cookie).await;
+        assert_eq!(status, StatusCode::OK);
+        assert!(
+            String::from_utf8(body.to_vec())
+                .unwrap()
+                .contains("Audience visibility")
+        );
     }
 
     #[tokio::test]

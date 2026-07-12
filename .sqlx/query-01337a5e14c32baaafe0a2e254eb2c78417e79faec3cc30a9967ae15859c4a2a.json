@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT id as \"id!: i64\", sort_order as \"sort_order!: i64\", time_label, title,\n                      detail, tier, segment_key\n               FROM schedule_items\n               WHERE account_id = ?1 AND event_id = ?2 AND (tier = 'public' OR ?3 = 1)\n               ORDER BY sort_order, id",
+  "query": "SELECT id as \"id!: i64\", sort_order as \"sort_order!: i64\", time_label, title,\n                      detail, tier, segment_key\n               FROM schedule_items\n               WHERE account_id = ?1 AND event_id = ?2\n                 AND ?3 >= 2 AND (tier = 'public' OR ?3 = 3)\n               ORDER BY sort_order, id",
   "describe": {
     "columns": [
       {
@@ -94,5 +94,5 @@
       true
     ]
   },
-  "hash": "49b3072b17c97b97b17887615c8566a5c4658bf6606303bb529f68f795c10d53"
+  "hash": "01337a5e14c32baaafe0a2e254eb2c78417e79faec3cc30a9967ae15859c4a2a"
 }

@@ -1,50 +1,39 @@
 {% extends "_layout.html" %}
 
-{% block title %}{% if let Some(person) = view.person %}{{ person.name }}'s invite{% else %}{{ view.event.title }}{% endif %}{% endblock %}
+{% block title %}{% match view.event %}{% when EventView::Busy with (_) %}Busy{% when EventView::Event with (event) %}{% if let Some(person) = view.person %}{{ person.name }}'s invite{% else %}{{ event.title }}{% endif %}{% endmatch %}{% endblock %}
 
 {% block content %}
 <article class="event-page{% if poster_theme %} event-poster-july4{% endif %}">
-    {% if let Some(person) = view.person %}
-    <header class="invite-hello">
-        <p>Hi {{ person.name }},</p>
-        <h1>you're invited!</h1>
+{% match view.event %}
+{% when EventView::Busy with (busy) %}
+    <header class="event-hero busy-view" data-visibility="busy">
+        <p class="event-eyebrow">{{ busy.starts_at|human_dt }}{% if let Some(ends) = busy.ends_at %} → {{ ends|human_dt }}{% endif %}</p>
+        <h1>Busy</h1>
+        <p class="muted">This time is unavailable. Event details are private.</p>
     </header>
-    {% endif %}
-
+{% when EventView::Event with (event) %}
+    {% if let Some(person) = view.person %}<header class="invite-hello"><p>Hi {{ person.name }},</p><h1>you're invited!</h1></header>{% endif %}
     <header class="event-hero">
-        <p class="event-eyebrow">{{ view.event.starts_at|human_dt }}{% if let Some(ends) = view.event.ends_at %} → {{ ends|human_dt }}{% endif %}</p>
-        <h1>{{ view.event.title }}</h1>
-        {% if !view.event.tagline.is_empty() %}<p class="subtitle">{{ view.event.tagline }}</p>{% endif %}
-        {% if let Some(address) = view.event.address %}<p><strong>{{ address }}</strong></p>{% else %}<p>{{ view.event.area_name }}</p>{% endif %}
-        {% if view.event.status == "archived" %}<p class="muted">This gathering already happened — kept here for the record.</p>{% endif %}
+        <p class="event-eyebrow">{{ event.starts_at|human_dt }}{% if let Some(ends) = event.ends_at %} → {{ ends|human_dt }}{% endif %}</p>
+        <h1>{{ event.title }}</h1>
+        {% if !event.tagline.is_empty() %}<p class="subtitle">{{ event.tagline }}</p>{% endif %}
+        {% if let Some(address) = event.address %}<p><strong>{{ address }}</strong></p>{% else %}<p>{{ event.area_name }}</p>{% endif %}
+        {% if event.status == "archived" %}<p class="muted">This gathering already happened — kept here for the record.</p>{% endif %}
     </header>
-
-    {% if let Some(notice) = view.event.notice_html %}{% if !notice.is_empty() %}<section class="event-notice">{{ notice|safe }}</section>{% endif %}{% endif %}
-    {% if let Some(plan) = view.event.quick_plan_html %}{% if !plan.is_empty() %}<section class="event-section"><h2>The day at a glance</h2>{{ plan|safe }}</section>{% endif %}{% endif %}
-
-    {% if !view.event.summary.is_empty() %}<section class="event-section"><h2>About</h2><p class="prewrap">{{ view.event.summary }}</p></section>{% endif %}
-
-    <section class="event-section" id="entry">
-        <h2>Where</h2>
-        {% if let Some(address) = view.event.address %}
-        <p><strong>{{ address }}</strong></p>
-        {% if let Some(entry) = view.event.entry_instructions %}{% if !entry.is_empty() %}<h3>Getting in</h3><div class="prewrap event-rich">{{ entry|safe }}</div>{% endif %}{% endif %}
-        {% if let Some(details) = view.event.private_details %}{% if !details.is_empty() %}<h3>Good to know</h3><div class="prewrap event-rich">{{ details|safe }}</div>{% endif %}{% endif %}
-        {% else %}
-        <p>{{ view.event.area_name }}</p><p class="muted">Exact address and entry instructions come with a private invite.</p>
-        {% endif %}
+    {% if let Some(notice) = event.notice_html %}{% if !notice.is_empty() %}<section class="event-notice">{{ notice|safe }}</section>{% endif %}{% endif %}
+    {% if let Some(plan) = event.quick_plan_html %}{% if !plan.is_empty() %}<section class="event-section"><h2>The day at a glance</h2>{{ plan|safe }}</section>{% endif %}{% endif %}
+    {% if !event.summary.is_empty() %}<section class="event-section"><h2>About</h2><p class="prewrap">{{ event.summary }}</p></section>{% endif %}
+    <section class="event-section" id="entry"><h2>Where</h2>
+        {% if let Some(address) = event.address %}<p><strong>{{ address }}</strong></p>
+        {% if let Some(entry) = event.entry_instructions %}{% if !entry.is_empty() %}<h3>Getting in</h3><div class="prewrap event-rich">{{ entry|safe }}</div>{% endif %}{% endif %}
+        {% if let Some(details) = event.private_details %}{% if !details.is_empty() %}<h3>Good to know</h3><div class="prewrap event-rich">{{ details|safe }}</div>{% endif %}{% endif %}
+        {% else %}<p>{{ event.area_name }}</p><p class="muted">Exact address and entry instructions come with a private invite.</p>{% endif %}
     </section>
-
-    {% if !view.schedule.is_empty() %}
-    <section class="event-section" id="schedule"><h2>Schedule</h2><ol class="event-schedule">
+    {% if !view.schedule.is_empty() %}<section class="event-section" id="schedule"><h2>Schedule</h2><ol class="event-schedule">
         {% for item in view.schedule %}<li><span class="schedule-time">{{ item.time_label }}</span><div><strong>{{ item.title }}</strong>{% if !item.detail.is_empty() %}<p class="prewrap muted">{{ item.detail|safe }}</p>{% endif %}</div></li>{% endfor %}
-    </ol></section>
-    {% endif %}
-
-    <section class="event-section" id="manage">
-        <h2>Your reservation</h2><p class="muted">No RSVP needed — this just helps with planning. Update it whenever plans change.</p>
-        <div id="event-rsvp-island" data-token="{{ token }}"><p class="muted">Loading reservation form…</p></div>
-    </section>
+    </ol></section>{% endif %}
+    <section class="event-section" id="manage"><h2>Your reservation</h2><p class="muted">No RSVP needed — this just helps with planning. Update it whenever plans change.</p><div id="event-rsvp-island" data-token="{{ token }}"><p class="muted">Loading reservation form…</p></div></section>
+{% endmatch %}
 </article>
 {% endblock %}
 

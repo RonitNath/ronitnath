@@ -6,17 +6,25 @@
 use super::Store;
 
 impl Store {
-    /// CLI convenience for this single-owner deployment. Fails closed when
-    /// account selection would be ambiguous.
-    pub async fn require_single_account(&self) -> anyhow::Result<i64> {
-        let rows = sqlx::query!(r#"SELECT id as "id!: i64" FROM accounts ORDER BY id LIMIT 2"#)
-            .fetch_all(&self.pool)
-            .await?;
+    /// Resolves the platform owner's account explicitly by purpose. Fails
+    /// closed if corrupt/legacy data has more than one primary account.
+    pub async fn find_primary_account(&self) -> anyhow::Result<Option<i64>> {
+        let rows = sqlx::query!(
+            r#"SELECT id as "id!: i64" FROM accounts WHERE purpose = 'primary' ORDER BY id LIMIT 2"#
+        )
+        .fetch_all(&self.pool)
+        .await?;
         match rows.as_slice() {
-            [row] => Ok(row.id),
-            [] => anyhow::bail!("no accounts exist; sign up in the admin server first"),
-            _ => anyhow::bail!("multiple accounts exist; CLI requires an explicit account selector"),
+            [row] => Ok(Some(row.id)),
+            [] => Ok(None),
+            _ => anyhow::bail!("multiple primary accounts exist; account purpose is ambiguous"),
         }
+    }
+
+    pub async fn require_primary_account(&self) -> anyhow::Result<i64> {
+        self.find_primary_account().await?.ok_or_else(|| {
+            anyhow::anyhow!("no primary account exists; sign up in the admin server first")
+        })
     }
 
     pub async fn rename_account(&self, id: i64, name: &str) -> sqlx::Result<()> {

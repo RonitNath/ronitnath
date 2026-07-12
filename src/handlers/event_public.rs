@@ -1,19 +1,14 @@
 //! The guest surface: everything reachable through a capability link.
 //!
-//! Guests have no account and never log in — `GET /e/{token}` is the whole
-//! entry surface. The link's tier decides what renders:
-//!
-//! - `public`  → title/summary/area + public-tier schedule. No address, no
-//!   entry instructions, ever.
-//! - `private` → the above plus address, entry instructions, private
-//!   details, and private-tier schedule items.
+//! `GET /e/{token}` is the capability entry surface. Audience policy decides
+//! the computed level; only the direct-hit policy may apply the link-tier
+//! floors (public → Summary, private → Full).
 //! - a link with a `person_id` additionally greets that person and lets
 //!   them edit their own RSVP; a shared link asks for a name and mints the
 //!   submitter a personal link on first RSVP.
 //!
-//! Tier enforcement lives in exactly two places — [`Event::public_view`]
-//! and the tier filter in `Store::list_schedule` — so a new field or route
-//! can't accidentally bypass it.
+//! Visibility computation is centralized in `access::level`; event and
+//! schedule redaction remain their respective chokepoints.
 
 use askama::Template;
 use axum::Json;
@@ -24,15 +19,17 @@ use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 use utoipa::ToSchema;
 
+use crate::access::level::Level;
 use crate::auth::extract::NavUser;
 use crate::auth::session::hash_token;
+use crate::auth::viewer::Viewer;
 use crate::dates as filters;
-use crate::store::event_links::personal_token;
 use crate::error::AppError;
 use crate::state::AppState;
 use crate::store::Store;
 use crate::store::attendance::Attendance;
 use crate::store::event_links::ResolvedLink;
+use crate::store::event_links::personal_token;
 use crate::store::events::{Event, EventView};
 use crate::store::schedule_items::ScheduleItem;
 use crate::store::segment_rsvps::{SegmentCount, SegmentRsvp};
@@ -51,7 +48,7 @@ pub struct GuestPerson {
     pub segments: Vec<SegmentRsvp>,
 }
 
-/// Everything the RSVP island needs, tier-filtered server-side.
+/// Everything the RSVP island needs, level-filtered server-side.
 #[derive(Debug, Serialize, TS, ToSchema)]
 #[ts(export)]
 pub struct GuestView {
@@ -111,16 +108,36 @@ async fn resolve(store: &Store, token: &str) -> Result<(ResolvedLink, Event), Ap
     Ok((link, event))
 }
 
-async fn build_view(store: &Store, link: &ResolvedLink, event: &Event) -> Result<GuestView, AppError> {
-    let private = link.tier == "private";
-    let schedule = store.list_schedule(link.account_id, event.id, private).await?;
+async fn direct_level(
+    store: &Store,
+    link: &ResolvedLink,
+    viewer: &Viewer,
+) -> Result<Level, AppError> {
+    let inputs = store
+        .audience_inputs_for_event(link.account_id, link.event_id, viewer.person_id())
+        .await?
+        .ok_or(AppError::NotFound)?;
+    Ok(inputs.level_for_direct_hit(viewer, &link.tier)?)
+}
+
+async fn build_view(
+    store: &Store,
+    link: &ResolvedLink,
+    event: &Event,
+    level: Level,
+) -> Result<GuestView, AppError> {
+    let schedule = store
+        .list_schedule(link.account_id, event.id, level)
+        .await?;
     let segment_counts = store.segment_counts(link.account_id, event.id).await?;
 
     let person = match link.person_id {
         Some(person_id) => match store.find_person(link.account_id, person_id).await? {
             Some(p) => Some(GuestPerson {
                 name: p.name,
-                attendance: store.find_attendance(link.account_id, event.id, person_id).await?,
+                attendance: store
+                    .find_attendance(link.account_id, event.id, person_id)
+                    .await?,
                 segments: store
                     .list_segment_rsvps_for_person(link.account_id, event.id, person_id)
                     .await?,
@@ -131,7 +148,7 @@ async fn build_view(store: &Store, link: &ResolvedLink, event: &Event) -> Result
     };
 
     Ok(GuestView {
-        event: event.public_view(private),
+        event: event.view_for(level).ok_or(AppError::NotFound)?,
         schedule,
         segment_counts,
         person,
@@ -152,14 +169,17 @@ struct EventPublicTemplate {
     view: GuestView,
 }
 
-/// The guest event page. Server-renders the tier-appropriate info so the
+/// The guest event page. Server-renders the level-appropriate info so the
 /// page is fully readable without JS; the RSVP island hydrates on top.
 pub async fn page(
     State(state): State<AppState>,
+    session_viewer: Viewer,
     Path(token): Path<String>,
 ) -> Result<Response, AppError> {
     let (link, event) = resolve(state.store(), &token).await?;
-    let view = build_view(state.store(), &link, &event).await?;
+    let (viewer, _mismatch) = session_viewer.combine_with_link(Some(&link));
+    let level = direct_level(state.store(), &link, &viewer).await?;
+    let view = build_view(state.store(), &link, &event, level).await?;
     render(EventPublicTemplate {
         nav_active: "events",
         current_user: None,
@@ -170,19 +190,23 @@ pub async fn page(
 }
 
 /// Calendar export through the same live capability-link policy as the page.
-/// The link tier controls location redaction via `Event::public_view`.
+/// The computed level controls location redaction via `Event::view_for`.
 pub async fn ics(
     State(state): State<AppState>,
+    session_viewer: Viewer,
     Path(event_ref): Path<String>,
 ) -> Result<Response, AppError> {
     let (link, event) = resolve(state.store(), &event_ref).await?;
-    // Resolve the tier-filtered schedule too: this deliberately exercises the
-    // second visibility chokepoint even though VEVENT only needs event fields.
+    let (viewer, _) = session_viewer.combine_with_link(Some(&link));
+    let level = direct_level(state.store(), &link, &viewer).await?;
     let _schedule = state
         .store()
-        .list_schedule(link.account_id, event.id, link.tier == "private")
+        .list_schedule(link.account_id, event.id, level)
         .await?;
-    let view = event.public_view(link.tier == "private");
+    let view = event.view_for(level).ok_or(AppError::NotFound)?;
+    let crate::store::events::EventView::Event(view) = view else {
+        return Err(AppError::NotFound);
+    };
     let location = view.address.as_deref().unwrap_or(&view.area_name);
     let end = view.ends_at.as_deref().unwrap_or(&view.starts_at);
     let body = format!(
@@ -193,7 +217,11 @@ pub async fn ics(
         ics_datetime(end),
         escape_ics(location),
     );
-    Ok(([(header::CONTENT_TYPE, "text/calendar; charset=utf-8")], body).into_response())
+    Ok((
+        [(header::CONTENT_TYPE, "text/calendar; charset=utf-8")],
+        body,
+    )
+        .into_response())
 }
 
 fn ics_datetime(value: &str) -> String {
@@ -229,10 +257,13 @@ fn escape_ics(value: &str) -> String {
 )]
 pub async fn api_view(
     State(state): State<AppState>,
+    session_viewer: Viewer,
     Path(token): Path<String>,
 ) -> Result<Json<GuestView>, AppError> {
     let (link, event) = resolve(state.store(), &token).await?;
-    Ok(Json(build_view(state.store(), &link, &event).await?))
+    let (viewer, _) = session_viewer.combine_with_link(Some(&link));
+    let level = direct_level(state.store(), &link, &viewer).await?;
+    Ok(Json(build_view(state.store(), &link, &event, level).await?))
 }
 
 #[utoipa::path(
@@ -248,14 +279,22 @@ pub async fn api_view(
 )]
 pub async fn api_rsvp(
     State(state): State<AppState>,
+    session_viewer: Viewer,
     Path(token): Path<String>,
     Json(submit): Json<RsvpSubmit>,
 ) -> Result<Json<RsvpResult>, AppError> {
     let store = state.store();
     let (link, event) = resolve(store, &token).await?;
+    let (viewer, _) = session_viewer.combine_with_link(Some(&link));
+    let level = direct_level(store, &link, &viewer).await?;
+    if event.view_for(level).is_none() {
+        return Err(AppError::NotFound);
+    }
 
     if !matches!(submit.status.as_str(), "going" | "maybe" | "no") {
-        return Err(AppError::Invalid("status must be going, maybe, or no".into()));
+        return Err(AppError::Invalid(
+            "status must be going, maybe, or no".into(),
+        ));
     }
     if !(1..=MAX_PARTY_SIZE).contains(&submit.party_size) {
         return Err(AppError::Invalid(format!(
@@ -263,18 +302,21 @@ pub async fn api_rsvp(
         )));
     }
     if submit.note.len() > MAX_NOTE_LEN {
-        return Err(AppError::Invalid(format!("note must be under {MAX_NOTE_LEN} characters")));
+        return Err(AppError::Invalid(format!(
+            "note must be under {MAX_NOTE_LEN} characters"
+        )));
     }
 
-    // Segment choices may only target RSVP-able items this link can see —
-    // the tier filter in list_schedule is what makes a private segment
-    // unreachable from a public link.
+    // Segment choices may only target RSVP-able items this viewer can see;
+    // list_schedule is the schedule redaction chokepoint.
     let visible = store
-        .list_schedule(link.account_id, event.id, link.tier == "private")
+        .list_schedule(link.account_id, event.id, level)
         .await?;
     for choice in &submit.segments {
         if !matches!(choice.status.as_str(), "in" | "maybe" | "out") {
-            return Err(AppError::Invalid("segment status must be in, maybe, or out".into()));
+            return Err(AppError::Invalid(
+                "segment status must be in, maybe, or out".into(),
+            ));
         }
         if !visible
             .iter()
@@ -335,7 +377,12 @@ pub async fn api_rsvp(
         .await?;
     for choice in &submit.segments {
         store
-            .upsert_segment_rsvp(link.account_id, choice.schedule_item_id, person_id, &choice.status)
+            .upsert_segment_rsvp(
+                link.account_id,
+                choice.schedule_item_id,
+                person_id,
+                &choice.status,
+            )
             .await?;
     }
 

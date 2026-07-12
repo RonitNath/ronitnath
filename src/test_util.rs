@@ -31,7 +31,7 @@ pub async fn test_app() -> (Router, Store) {
     (build_admin_router(state, &config), store)
 }
 
-/// A fresh public router with no session/auth middleware or auth routes.
+/// A fresh public router with session resolution but no auth/account routes.
 pub async fn test_site_app() -> (Router, Store) {
     let store = Store::connect_in_memory().await;
     let config = Config::for_tests();

@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO audience_policies\n            (account_id, subject_type, subject_id, public_level)\n            VALUES (?1, 'event', ?2, 'hidden')",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "aafc1a72ea93284399d65bad8829bdac6a8eb246934237ca2d4ef109f0084d8c"
+}

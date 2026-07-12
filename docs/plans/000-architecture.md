@@ -365,6 +365,11 @@ Content-hash over UUID: free de-dup when two guests upload the same shot (second
 
 ---
 
+## Amendments
+
+- **Phase 3 direct-link capability floor (2026-07-12):** person-less private links were not covered by §f/§g. `event_links.tier` remains a rendering input only inside `level_for_direct_hit(viewer, link_tier, policy_level)`: Owner remains Full; an explicit person exclude remains Hidden and wins over every other non-owner grant; otherwise `tier='private'` floors the computed level at Full and `tier='public'` floors it at Summary. Browsing surfaces never consult link tier and use only `level_for`. This preserves capability-link semantics while circles/levels govern browsing.
+- **Migration sequencing:** the semantic `0033_accounts_purpose` migration is implemented in this repository as `0027_accounts_purpose`; contract migrations 0027–0032 belong to later phases, while sqlx migration versions must remain sequential. The semantic contract name remains `accounts_purpose`.
+
 ### Critical Files for Implementation
 
 - `C:/Users/ronit/dev/stage_2/src/auth/extract.rs` — where `Viewer`/`GuestScope` extractors get added alongside `AccountScope`/`NavContext`

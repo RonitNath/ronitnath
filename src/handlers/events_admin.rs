@@ -13,6 +13,7 @@ use qrcode::QrCode;
 use qrcode::render::svg;
 use serde::Deserialize;
 
+use crate::access::level::Level;
 use crate::auth::extract::NavUser;
 use crate::auth::session::{generate_token, hash_token};
 use crate::auth::{AccountScope, Role, csrf};
@@ -171,7 +172,7 @@ pub async fn detail_page(
         .await?
         .ok_or(AppError::NotFound)?;
     let schedule = store
-        .list_schedule(scope.account_id, event_id, true)
+        .list_schedule(scope.account_id, event_id, Level::Full)
         .await?;
     let segment_counts = store.segment_counts(scope.account_id, event_id).await?;
     let raw_links = store.list_event_links(scope.account_id, event_id).await?;

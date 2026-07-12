@@ -1,0 +1,42 @@
+{% extends "_layout.html" %}
+{% block title %}{{ event.title }} · audience{% endblock %}
+{% block content %}
+<section class="hero event-overview-hero"><h1>{{ event.title }}</h1><p class="subtitle">Audience visibility</p></section>
+<form method="post" action="/events/{{ event.id }}/audience" class="admin-form">
+<input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+<section class="admin-card">
+    <h2>Public</h2>
+    <label>Visibility <select name="public_level">
+        <option value="hidden" {% if policy.public_level == "hidden" %}selected{% endif %}>hidden</option>
+        <option value="busy" {% if policy.public_level == "busy" %}selected{% endif %}>busy</option>
+        <option value="summary" {% if policy.public_level == "summary" %}selected{% endif %}>summary</option>
+        <option value="full" {% if policy.public_level == "full" %}selected{% endif %}>full</option>
+    </select></label>
+    <p class="muted">Busy shows only the occupied time. Summary adds the title and general area. Full includes private details.</p>
+</section>
+<section class="admin-card">
+    <h2>Circles</h2>
+    {% for circle in circles %}<label>{{ circle.name }} <select name="circle_{{ circle.id }}">
+        <option value="none" {% if self.circle_level(circle.id) == "none" %}selected{% endif %}>none</option>
+        <option value="hidden" {% if self.circle_level(circle.id) == "hidden" %}selected{% endif %}>hidden</option>
+        <option value="busy" {% if self.circle_level(circle.id) == "busy" %}selected{% endif %}>busy</option>
+        <option value="summary" {% if self.circle_level(circle.id) == "summary" %}selected{% endif %}>summary</option>
+        <option value="full" {% if self.circle_level(circle.id) == "full" %}selected{% endif %}>full</option>
+    </select></label>{% endfor %}
+    {% if circles.is_empty() %}<p class="muted">Create a circle first to grant a group access.</p>{% endif %}
+</section>
+<section class="admin-card">
+    <h2>People</h2>
+    {% for person in people %}<label>{{ person.name }} <select name="person_{{ person.id }}">
+        <option value="none" {% if self.person_override(person.id) == "none" %}selected{% endif %}>none</option>
+        <option value="exclude" {% if self.person_override(person.id) == "exclude" %}selected{% endif %}>exclude</option>
+        <option value="include:hidden" {% if self.person_override(person.id) == "include:hidden" %}selected{% endif %}>include:hidden</option>
+        <option value="include:busy" {% if self.person_override(person.id) == "include:busy" %}selected{% endif %}>include:busy</option>
+        <option value="include:summary" {% if self.person_override(person.id) == "include:summary" %}selected{% endif %}>include:summary</option>
+        <option value="include:full" {% if self.person_override(person.id) == "include:full" %}selected{% endif %}>include:full</option>
+    </select></label>{% endfor %}
+    {% if people.is_empty() %}<p class="muted">No people yet.</p>{% endif %}
+</section>
+<button type="submit">Save audience</button>
+</form>
+{% endblock %}

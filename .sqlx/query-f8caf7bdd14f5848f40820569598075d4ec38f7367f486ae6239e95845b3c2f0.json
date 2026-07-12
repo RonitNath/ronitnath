@@ -1,0 +1,38 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT cm.person_id as \"person_id!: i64\", p.name as person_name\n            FROM circle_members cm JOIN people p ON p.account_id = cm.account_id AND p.id = cm.person_id\n            WHERE cm.account_id = ?1 AND cm.circle_id = ?2 ORDER BY p.name COLLATE NOCASE",
+  "describe": {
+    "columns": [
+      {
+        "name": "person_id!: i64",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "circle_members",
+            "name": "person_id"
+          }
+        }
+      },
+      {
+        "name": "person_name",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "people",
+            "name": "name"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "f8caf7bdd14f5848f40820569598075d4ec38f7367f486ae6239e95845b3c2f0"
+}

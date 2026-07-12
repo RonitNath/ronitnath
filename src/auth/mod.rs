@@ -23,6 +23,7 @@ pub mod middleware;
 pub mod oidc;
 pub mod password;
 pub mod session;
+pub mod viewer;
 
 pub use extract::AccountScope;
 

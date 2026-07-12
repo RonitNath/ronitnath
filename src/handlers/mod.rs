@@ -6,13 +6,15 @@
 
 pub mod about;
 pub mod account;
+pub mod audience;
 pub mod auth;
+pub mod circles;
 pub mod client_errors;
 pub mod errors;
+pub mod event_public;
+pub mod events_admin;
 pub mod guestbook;
 pub mod health;
 pub mod home;
-pub mod settings;
-pub mod event_public;
-pub mod events_admin;
 pub mod people_admin;
+pub mod settings;

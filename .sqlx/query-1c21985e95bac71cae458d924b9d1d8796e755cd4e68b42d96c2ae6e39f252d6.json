@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM audience_person_overrides WHERE account_id = ?1 AND policy_id = ?2 AND person_id = ?3",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "1c21985e95bac71cae458d924b9d1d8796e755cd4e68b42d96c2ae6e39f252d6"
+}

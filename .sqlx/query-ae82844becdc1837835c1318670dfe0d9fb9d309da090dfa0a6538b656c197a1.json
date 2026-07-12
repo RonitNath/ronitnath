@@ -1,0 +1,50 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT g.circle_id as \"circle_id!: i64\",\n                c.name as circle_name, g.level\n            FROM audience_circle_grants g\n            JOIN circles c ON c.account_id = g.account_id AND c.id = g.circle_id\n            WHERE g.account_id = ?1 AND g.policy_id = ?2",
+  "describe": {
+    "columns": [
+      {
+        "name": "circle_id!: i64",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "audience_circle_grants",
+            "name": "circle_id"
+          }
+        }
+      },
+      {
+        "name": "circle_name",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "circles",
+            "name": "name"
+          }
+        }
+      },
+      {
+        "name": "level",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "audience_circle_grants",
+            "name": "level"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "ae82844becdc1837835c1318670dfe0d9fb9d309da090dfa0a6538b656c197a1"
+}

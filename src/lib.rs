@@ -1,5 +1,6 @@
 //! Shared library for the public `site` server and authenticated `admin` server.
 
+pub mod access;
 pub mod app;
 pub mod auth;
 pub mod config;

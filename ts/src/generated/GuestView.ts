@@ -5,6 +5,6 @@ import type { ScheduleItem } from "./ScheduleItem";
 import type { SegmentCount } from "./SegmentCount";
 
 /**
- * Everything the RSVP island needs, tier-filtered server-side.
+ * Everything the RSVP island needs, level-filtered server-side.
  */
 export type GuestView = { event: EventView, schedule: Array<ScheduleItem>, segment_counts: Array<SegmentCount>, person: GuestPerson | null, };

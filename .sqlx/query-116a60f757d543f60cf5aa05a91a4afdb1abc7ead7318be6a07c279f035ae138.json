@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM audience_circle_grants WHERE account_id = ?1 AND policy_id = ?2 AND circle_id = ?3",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "116a60f757d543f60cf5aa05a91a4afdb1abc7ead7318be6a07c279f035ae138"
+}

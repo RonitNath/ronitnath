@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO circle_members (account_id, circle_id, person_id)\n            SELECT ?1, c.id, p.id FROM circles c JOIN people p ON p.account_id = c.account_id\n            WHERE c.account_id = ?1 AND c.id = ?2 AND p.id = ?3",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "3409938466d01f273b9b3434853bb0439a5bed171373a4115329b1fce67f3b82"
+}

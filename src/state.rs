@@ -36,6 +36,7 @@ struct Inner {
     auth: AuthConfig,
     oidc: OidcRegistry,
     public_url: String,
+    owner_account_id: Option<i64>,
 }
 
 impl AppState {
@@ -48,6 +49,7 @@ impl AppState {
                 auth,
                 oidc: OidcRegistry::empty(),
                 public_url: "http://127.0.0.1:3130".into(),
+                owner_account_id: None,
             }),
         }
     }
@@ -60,6 +62,7 @@ impl AppState {
                 auth: self.inner.auth.clone(),
                 oidc,
                 public_url: self.inner.public_url.clone(),
+                owner_account_id: self.inner.owner_account_id,
             }),
         }
     }
@@ -72,8 +75,26 @@ impl AppState {
                 auth: self.inner.auth.clone(),
                 oidc: self.inner.oidc.clone(),
                 public_url,
+                owner_account_id: self.inner.owner_account_id,
             }),
         }
+    }
+
+    pub fn with_owner_account_id(self, owner_account_id: Option<i64>) -> Self {
+        Self {
+            inner: Arc::new(Inner {
+                store: self.inner.store.clone(),
+                started_at: self.inner.started_at,
+                auth: self.inner.auth.clone(),
+                oidc: self.inner.oidc.clone(),
+                public_url: self.inner.public_url.clone(),
+                owner_account_id,
+            }),
+        }
+    }
+
+    pub fn owner_account_id(&self) -> Option<i64> {
+        self.inner.owner_account_id
     }
 
     pub fn store(&self) -> &Store {

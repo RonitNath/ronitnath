@@ -528,6 +528,18 @@ async fn seed_july4(store: &Store, account_id: i64, public_url: &str) -> anyhow:
         println!("{label} ({tier}): {public_url}/e/{raw}");
     }
 
+    // Keep fresh seed data equivalent to the 0024 legacy backfill: the
+    // presence of a public share link makes the event Summary-browsable.
+    // Existing events return above, so re-running seed never overwrites an
+    // operator's later audience choice.
+    let policy = store
+        .find_audience_policy(account_id, "event", event.id)
+        .await?
+        .ok_or_else(|| anyhow::anyhow!("seeded event has no audience policy"))?;
+    store
+        .set_public_level(account_id, policy.id, "summary")
+        .await?;
+
     println!(
         "seeded: July 4th Party (published) — manage at {public_url}/events/{}",
         event.id

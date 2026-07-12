@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE circles SET name = ?3 WHERE account_id = ?1 AND id = ?2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "1605e232b8f04a064dd1745bf50d19ec18b9872f6afe774c3e0c5ffae7a15099"
+}

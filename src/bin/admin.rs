@@ -1,6 +1,7 @@
 use std::io::{self, BufRead};
 
 use anyhow::{Context, bail};
+use ronitnath::access::level::Level;
 use ronitnath::auth::session::hash_token;
 use ronitnath::config::Config;
 use ronitnath::store::Store;
@@ -35,6 +36,7 @@ async fn dispatch() -> anyhow::Result<()> {
         Some("set-segment") => set_segment(&args).await,
         Some("set-invite") => set_invite(&args).await,
         Some("set-headcount") => set_headcount(&args).await,
+        Some("set-audience") => set_audience(&args).await,
         Some(flag) if flag == "-h" || flag == "--help" => {
             print_usage(&args[0]);
             Ok(())
@@ -54,7 +56,9 @@ fn print_usage(bin: &str) {
     eprintln!(
         "  {bin} mint-link <event-slug> --person \"<name>\" --tier <public|private> --label <label>"
     );
-    eprintln!("      # personalized token \"name-xxxx\"; revokes + replaces the person's live link");
+    eprintln!(
+        "      # personalized token \"name-xxxx\"; revokes + replaces the person's live link"
+    );
     eprintln!("  {bin} list-links <event-slug>               # every live link with its URL");
     eprintln!("  {bin} revoke-link <event-slug> --person \"<name>\"");
     eprintln!(
@@ -66,12 +70,15 @@ fn print_usage(bin: &str) {
     );
     eprintln!("  {bin} set-invite <event-slug> <notice|quick-plan>   # reads HTML from stdin");
     eprintln!("  {bin} set-headcount <event-slug> <n|none>   # landing-page attendee number");
+    eprintln!("  {bin} set-audience <event-slug> --public <level>");
+    eprintln!("  {bin} set-audience <event-slug> --circle \"<name>=<level>\"");
+    eprintln!("  {bin} set-audience <event-slug> --person \"<name>=<include:level|exclude>\"");
 }
 
 async fn open_cli_store() -> anyhow::Result<(Config, Store, i64)> {
     let config = Config::from_env();
     let store = Store::connect_existing(&config.database_url).await?;
-    let account_id = store.require_single_account().await?;
+    let account_id = store.require_primary_account().await?;
     Ok((config, store, account_id))
 }
 
@@ -117,7 +124,10 @@ async fn mint_link(args: &[String]) -> anyhow::Result<()> {
 
     // One live personalized link per person per event: re-minting is the
     // invalidation story (same name, fresh suffix), so retire the old one.
-    if let Some(existing) = store.find_personal_link(account_id, event_id, person_id).await? {
+    if let Some(existing) = store
+        .find_personal_link(account_id, event_id, person_id)
+        .await?
+    {
         store.revoke_event_link(account_id, existing.id).await?;
         eprintln!("revoked previous link /e/{}", existing.token_plain);
     }
@@ -139,7 +149,9 @@ async fn mint_link(args: &[String]) -> anyhow::Result<()> {
 }
 
 async fn list_links(args: &[String]) -> anyhow::Result<()> {
-    let slug = args.get(2).context("usage: admin list-links <event-slug>")?;
+    let slug = args
+        .get(2)
+        .context("usage: admin list-links <event-slug>")?;
     let (config, store, account_id) = open_cli_store().await?;
     let event_id = event_id_for_slug(&store, account_id, slug).await?;
     for link in store.list_event_links(account_id, event_id).await? {
@@ -185,8 +197,12 @@ async fn set_segment(args: &[String]) -> anyhow::Result<()> {
             bail!("--status must be in, maybe, or out");
         }
     }
-    let paid = optional_flag(args, "--paid").map(parse_yes_no).transpose()?;
-    let attended = optional_flag(args, "--attended").map(parse_yes_no).transpose()?;
+    let paid = optional_flag(args, "--paid")
+        .map(parse_yes_no)
+        .transpose()?;
+    let attended = optional_flag(args, "--attended")
+        .map(parse_yes_no)
+        .transpose()?;
     if status.is_none() && paid.is_none() && attended.is_none() {
         bail!("nothing to set — pass at least one of --status/--paid/--attended");
     }
@@ -195,7 +211,15 @@ async fn set_segment(args: &[String]) -> anyhow::Result<()> {
     let event_id = event_id_for_slug(&store, account_id, slug).await?;
     let person_id = person_id_for_name(&store, account_id, name, "").await?;
     let updated = store
-        .set_segment_flags(account_id, event_id, segment_key, person_id, status, paid, attended)
+        .set_segment_flags(
+            account_id,
+            event_id,
+            segment_key,
+            person_id,
+            status,
+            paid,
+            attended,
+        )
         .await?;
     if updated == 0 {
         bail!("no segment {segment_key:?} on event {slug:?}");
@@ -204,7 +228,8 @@ async fn set_segment(args: &[String]) -> anyhow::Result<()> {
 }
 
 async fn set_invite(args: &[String]) -> anyhow::Result<()> {
-    let usage = "usage: admin set-invite <event-slug> <notice|quick-plan>   # reads HTML from stdin";
+    let usage =
+        "usage: admin set-invite <event-slug> <notice|quick-plan>   # reads HTML from stdin";
     let slug = args.get(2).context(usage)?;
     let field = match args.get(3).map(String::as_str) {
         Some("notice") => InviteField::Notice,
@@ -293,7 +318,79 @@ async fn set_headcount(args: &[String]) -> anyhow::Result<()> {
 
     let (_config, store, account_id) = open_cli_store().await?;
     let event_id = event_id_for_slug(&store, account_id, slug).await?;
-    store.set_event_headcount(account_id, event_id, headcount).await?;
+    store
+        .set_event_headcount(account_id, event_id, headcount)
+        .await?;
+    Ok(())
+}
+
+async fn set_audience(args: &[String]) -> anyhow::Result<()> {
+    let usage = "usage: admin set-audience <event-slug> (--public <level> | --circle <name>=<level> | --person <name>=<include:level|exclude>)";
+    let slug = args.get(2).context(usage)?;
+    let public = optional_flag(args, "--public");
+    let circle = optional_flag(args, "--circle");
+    let person = optional_flag(args, "--person");
+    if [public.is_some(), circle.is_some(), person.is_some()]
+        .into_iter()
+        .filter(|set| *set)
+        .count()
+        != 1
+    {
+        bail!("{usage}");
+    }
+
+    let (_config, store, account_id) = open_cli_store().await?;
+    let event_id = event_id_for_slug(&store, account_id, slug).await?;
+    let policy = store
+        .find_audience_policy(account_id, "event", event_id)
+        .await?
+        .context("event has no audience policy")?;
+
+    if let Some(level) = public {
+        level.parse::<Level>().map_err(anyhow::Error::msg)?;
+        store.set_public_level(account_id, policy.id, level).await?;
+        println!("{slug}: public={level}");
+    } else if let Some(spec) = circle {
+        let (name, level) = spec.split_once('=').context(usage)?;
+        level.parse::<Level>().map_err(anyhow::Error::msg)?;
+        let circle = store
+            .find_circle_by_name(account_id, name.trim())
+            .await?
+            .with_context(|| format!("no circle named {:?}", name.trim()))?;
+        store
+            .set_circle_grant(account_id, policy.id, circle.id, Some(level))
+            .await?;
+        println!("{slug}: circle {:?}={level}", circle.name);
+    } else if let Some(spec) = person {
+        let (name, value) = spec.split_once('=').context(usage)?;
+        let person = store
+            .find_person_by_name(account_id, name.trim())
+            .await?
+            .with_context(|| format!("no person named {:?}", name.trim()))?;
+        let (kind, level) = if value == "exclude" {
+            ("exclude", None)
+        } else if let Some(level) = value.strip_prefix("include:") {
+            level.parse::<Level>().map_err(anyhow::Error::msg)?;
+            ("include", Some(level))
+        } else {
+            bail!("person value must be include:<level> or exclude");
+        };
+        store
+            .set_person_override(account_id, policy.id, person.id, Some(kind), level)
+            .await?;
+        println!("{slug}: person {:?}={value}", person.name);
+    }
+    store
+        .audit(
+            None,
+            Some(account_id),
+            None,
+            "audience.updated",
+            "event",
+            Some(&event_id.to_string()),
+            &serde_json::json!({"source": "cli"}),
+        )
+        .await?;
     Ok(())
 }
 

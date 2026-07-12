@@ -8,7 +8,9 @@
 
 pub mod accounts;
 pub mod attendance;
+pub mod audience;
 pub mod audit;
+pub mod circles;
 pub mod event_links;
 pub mod events;
 pub mod factors;
@@ -61,12 +63,11 @@ impl Store {
             .map(|migration| migration.version)
             .max()
             .ok_or_else(|| anyhow::anyhow!("no embedded migrations"))?;
-        let applied = sqlx::query_scalar!(
-            r#"SELECT MAX(version) as "version?: i64" FROM _sqlx_migrations"#
-        )
-        .fetch_optional(&pool)
-        .await?
-        .flatten();
+        let applied =
+            sqlx::query_scalar!(r#"SELECT MAX(version) as "version?: i64" FROM _sqlx_migrations"#)
+                .fetch_optional(&pool)
+                .await?
+                .flatten();
         match applied {
             Some(version) if version == expected => Ok(Self { pool }),
             Some(version) => anyhow::bail!(

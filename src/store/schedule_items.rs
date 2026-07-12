@@ -5,6 +5,7 @@ use ts_rs::TS;
 use utoipa::ToSchema;
 
 use super::Store;
+use crate::access::level::Level;
 
 #[derive(Debug, Serialize, sqlx::FromRow, TS, ToSchema)]
 #[ts(export)]
@@ -30,25 +31,26 @@ pub struct ScheduleItemFields {
 }
 
 impl Store {
-    /// Schedule for a guest page. `private_tier` false filters to public
-    /// items only — the query does the tier enforcement, not the caller.
+    /// Schedule redaction chokepoint: Busy/Hidden reveal no item titles;
+    /// Summary reveals public items; private items require Full.
     pub async fn list_schedule(
         &self,
         account_id: i64,
         event_id: i64,
-        private_tier: bool,
+        level: Level,
     ) -> sqlx::Result<Vec<ScheduleItem>> {
-        let private = private_tier as i64;
+        let level = level as i64;
         sqlx::query_as!(
             ScheduleItem,
             r#"SELECT id as "id!: i64", sort_order as "sort_order!: i64", time_label, title,
                       detail, tier, segment_key
                FROM schedule_items
-               WHERE account_id = ?1 AND event_id = ?2 AND (tier = 'public' OR ?3 = 1)
+               WHERE account_id = ?1 AND event_id = ?2
+                 AND ?3 >= 2 AND (tier = 'public' OR ?3 = 3)
                ORDER BY sort_order, id"#,
             account_id,
             event_id,
-            private,
+            level,
         )
         .fetch_all(&self.pool)
         .await
