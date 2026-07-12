@@ -70,7 +70,19 @@ pub fn build_admin_router(state: AppState, config: &Config) -> Router {
             "/events",
             get(handlers::events_admin::list_page).post(handlers::events_admin::create_event),
         )
-        .route("/events/{event_id}", get(handlers::events_admin::detail_page))
+        .route(
+            "/events/{event_id}",
+            get(handlers::events_admin::detail_page).post(handlers::errors::not_found),
+        )
+        .route("/events/{event_id}/schedule", post(handlers::errors::not_found))
+        .route(
+            "/events/{event_id}/schedule/{item_id}",
+            post(handlers::errors::not_found),
+        )
+        .route(
+            "/events/{event_id}/schedule/{item_id}/delete",
+            post(handlers::errors::not_found),
+        )
         .route(
             "/events/{event_id}/attendance/{person_id}",
             post(handlers::events_admin::update_attendance),
@@ -678,6 +690,553 @@ mod tests {
             StatusCode::UNPROCESSABLE_ENTITY,
             "removing the last login method must be rejected"
         );
+    }
+
+    // --- events platform exemplars: the tier-security model ---
+
+    /// Seeds a published event with one public and one private schedule
+    /// item, plus a public-tier and a private-tier shareable link.
+    /// Returns (event_id, public_token, private_token, public_item_id,
+    /// private_item_id).
+    async fn seed_event(store: &crate::store::Store) -> (i64, String, String, i64, i64) {
+        use crate::auth::session::{generate_token, hash_token};
+        use crate::store::events::EventFields;
+        use crate::store::schedule_items::ScheduleItemFields;
+
+        let (_, account_id) = store
+            .signup_with_password("Host", "host@example.com", "hash")
+            .await
+            .unwrap();
+        let event = store
+            .create_event(account_id, "test-party", "Test Party", "2026-07-04 13:00")
+            .await
+            .unwrap();
+        store
+            .update_event(
+                account_id,
+                event.id,
+                &EventFields {
+                    slug: "test-party".into(),
+                    title: "Test Party".into(),
+                    tagline: String::new(),
+                    starts_at: "2026-07-04 13:00".into(),
+                    ends_at: None,
+                    timezone: "America/Los_Angeles".into(),
+                    status: "published".into(),
+                    summary: "A party.".into(),
+                    area_name: "Somewhere, SF".into(),
+                    address: "1 Secret St".into(),
+                    entry_instructions: "SECRET ENTRY CODE".into(),
+                    private_details: String::new(),
+                    notice_html: "SECRET NOTICE BANNER".into(),
+                    quick_plan_html: "SECRET QUICK PLAN".into(),
+                },
+            )
+            .await
+            .unwrap();
+        let public_item = store
+            .create_schedule_item(
+                account_id,
+                event.id,
+                &ScheduleItemFields {
+                    sort_order: 0,
+                    time_label: "1:00 PM".into(),
+                    title: "Board games".into(),
+                    detail: String::new(),
+                    tier: "public".into(),
+                    segment_key: Some("board_games".into()),
+                },
+            )
+            .await
+            .unwrap();
+        let private_item = store
+            .create_schedule_item(
+                account_id,
+                event.id,
+                &ScheduleItemFields {
+                    sort_order: 1,
+                    time_label: "11:00 PM".into(),
+                    title: "PRIVATE ROOFTOP BLOCK".into(),
+                    detail: String::new(),
+                    tier: "private".into(),
+                    segment_key: Some("rooftop".into()),
+                },
+            )
+            .await
+            .unwrap();
+
+        let public_token = generate_token();
+        store
+            .create_event_link(
+                account_id,
+                event.id,
+                None,
+                &hash_token(&public_token),
+                &public_token,
+                "share",
+                "public",
+            )
+            .await
+            .unwrap();
+        let private_token = generate_token();
+        store
+            .create_event_link(
+                account_id,
+                event.id,
+                None,
+                &hash_token(&private_token),
+                &private_token,
+                "trusted",
+                "private",
+            )
+            .await
+            .unwrap();
+
+        (
+            event.id,
+            public_token,
+            private_token,
+            public_item,
+            private_item,
+        )
+    }
+
+    #[tokio::test]
+    async fn public_link_hides_private_tier_and_private_link_shows_it() {
+        let (app, store) = test_site_app().await;
+        let (_, public_token, private_token, _, _) = seed_event(&store).await;
+
+        // Public link: page renders, private-tier info absent.
+        let (status, _, body) = get(&app, &format!("/e/{public_token}")).await;
+        assert_eq!(status, StatusCode::OK);
+        let body = String::from_utf8(body.to_vec()).unwrap();
+        assert!(body.contains("Test Party"));
+        assert!(body.contains("Board games"));
+        assert!(
+            !body.contains("1 Secret St"),
+            "public link must not leak the address"
+        );
+        assert!(
+            !body.contains("SECRET ENTRY CODE"),
+            "public link must not leak entry instructions"
+        );
+        assert!(
+            !body.contains("PRIVATE ROOFTOP BLOCK"),
+            "public link must not leak private schedule items"
+        );
+        assert!(
+            !body.contains("SECRET NOTICE BANNER") && !body.contains("SECRET QUICK PLAN"),
+            "public link must not leak invite content (it carries contact info)"
+        );
+
+        // Same property over the JSON view.
+        let (status, _, body) = get(&app, &format!("/api/e/{public_token}")).await;
+        assert_eq!(status, StatusCode::OK);
+        let view: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert!(view["event"]["address"].is_null());
+        assert!(view["event"]["entry_instructions"].is_null());
+
+        // Private link: everything renders.
+        let (status, _, body) = get(&app, &format!("/e/{private_token}")).await;
+        assert_eq!(status, StatusCode::OK);
+        let body = String::from_utf8(body.to_vec()).unwrap();
+        assert!(body.contains("1 Secret St"));
+        assert!(body.contains("SECRET ENTRY CODE"));
+        assert!(body.contains("PRIVATE ROOFTOP BLOCK"));
+        assert!(body.contains("SECRET NOTICE BANNER"));
+        assert!(body.contains("SECRET QUICK PLAN"));
+    }
+
+    #[tokio::test]
+    async fn shared_link_rsvp_creates_person_with_editable_personal_link() {
+        let (app, store) = test_site_app().await;
+        let (_, public_token, _, public_item, private_item) = seed_event(&store).await;
+
+        // RSVP through the shared public link → person created, personal
+        // link minted and returned.
+        let submit = serde_json::json!({
+            "name": "Guest A",
+            "status": "going",
+            "party_size": 2,
+            "note": "no nuts",
+            "segments": [{"schedule_item_id": public_item, "status": "in"}],
+        });
+        let addr = std::net::IpAddr::V4(std::net::Ipv4Addr::new(198, 51, 100, 8));
+        let (status, _, body) =
+            post_json_from(&app, &format!("/api/e/{public_token}/rsvp"), &submit, addr).await;
+        assert_eq!(status, StatusCode::OK);
+        let result: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(result["person_name"], "Guest A");
+        let personal_url = result["personal_url"]
+            .as_str()
+            .expect("personal link minted");
+        let personal_token = personal_url.rsplit("/e/").next().unwrap().to_string();
+
+        // The personal link greets them and carries their saved answers.
+        let (status, _, body) = get(&app, &format!("/api/e/{personal_token}")).await;
+        assert_eq!(status, StatusCode::OK);
+        let view: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(view["person"]["name"], "Guest A");
+        assert_eq!(view["person"]["attendance"]["status"], "going");
+        assert_eq!(view["person"]["attendance"]["party_size"], 2);
+
+        // Editing through the personal link updates, not duplicates (no
+        // name needed), and a second submit doesn't mint another link.
+        let update = serde_json::json!({
+            "name": null, "status": "maybe", "party_size": 1, "note": "", "segments": [],
+        });
+        let (status, _, body) = post_json_from(
+            &app,
+            &format!("/api/e/{personal_token}/rsvp"),
+            &update,
+            addr,
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK);
+        let result: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert!(result["personal_url"].is_null());
+        let (_, _, body) = get(&app, &format!("/api/e/{personal_token}")).await;
+        let view: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(view["person"]["attendance"]["status"], "maybe");
+
+        // A public link cannot RSVP to a private-tier segment it can't see.
+        let sneaky = serde_json::json!({
+            "name": "Guest B", "status": "going", "party_size": 1, "note": "",
+            "segments": [{"schedule_item_id": private_item, "status": "in"}],
+        });
+        let (status, _, _) =
+            post_json_from(&app, &format!("/api/e/{public_token}/rsvp"), &sneaky, addr).await;
+        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+    }
+
+    #[tokio::test]
+    async fn personalized_link_greets_by_name_and_titles_the_invite() {
+        use crate::auth::session::hash_token;
+        use crate::store::event_links::personal_token;
+
+        let (app, store) = test_site_app().await;
+        let _ = seed_event(&store).await;
+        let person = store.create_person(1, "Maya Chen", "").await.unwrap();
+        let raw = personal_token("Maya Chen");
+        store
+            .create_event_link(1, 1, Some(person.id), &hash_token(&raw), &raw, "invite", "private")
+            .await
+            .unwrap();
+
+        let (status, _, body) = get(&app, &format!("/e/{raw}")).await;
+        assert_eq!(status, StatusCode::OK);
+        let body = String::from_utf8(body.to_vec()).unwrap();
+        assert!(body.contains("<title>Maya Chen's invite</title>"));
+        assert!(body.contains("Hi Maya Chen,"));
+        assert!(body.contains("you're invited!"));
+        // Private tier ⇒ invite content renders.
+        assert!(body.contains("SECRET NOTICE BANNER"));
+    }
+
+    #[tokio::test]
+    async fn segment_flags_survive_a_guest_status_update() {
+        let (_app, store) = test_site_app().await;
+        let (event_id, _, _, public_item, _) = seed_event(&store).await;
+        let person = store.create_person(1, "Payer", "").await.unwrap();
+        store
+            .upsert_attendance(1, event_id, person.id, "going", 1, "")
+            .await
+            .unwrap();
+
+        store
+            .set_segment_flags(1, event_id, "board_games", person.id, None, Some(true), Some(true))
+            .await
+            .unwrap();
+
+        // A later guest-side segment update must not clobber the admin's
+        // paid/attended bookkeeping (the upsert only touches status).
+        store.upsert_segment_rsvp(1, public_item, person.id, "maybe").await.unwrap();
+
+        let rows = store.list_attendance(1, event_id).await.unwrap();
+        let payer = rows.iter().find(|r| r.person_name == "Payer").unwrap();
+        assert!(
+            payer.segments.contains("board_games:maybe paid ✓went"),
+            "unexpected segments string: {:?}",
+            payer.segments
+        );
+    }
+
+    #[tokio::test]
+    async fn draft_event_is_invisible_through_a_live_link() {
+        let (app, store) = test_site_app().await;
+        let (event_id, public_token, _, _, _) = seed_event(&store).await;
+        let mut event = store.find_event(1, event_id).await.unwrap().unwrap();
+        event.status = "draft".into();
+        store
+            .update_event(
+                1,
+                event_id,
+                &crate::store::events::EventFields {
+                    slug: event.slug,
+                    title: event.title,
+                    tagline: event.tagline,
+                    starts_at: event.starts_at,
+                    ends_at: event.ends_at,
+                    timezone: event.timezone,
+                    status: event.status,
+                    summary: event.summary,
+                    area_name: event.area_name,
+                    address: event.address,
+                    entry_instructions: event.entry_instructions,
+                    private_details: event.private_details,
+                    notice_html: event.notice_html,
+                    quick_plan_html: event.quick_plan_html,
+                },
+            )
+            .await
+            .unwrap();
+        let (status, _, _) = get(&app, &format!("/e/{public_token}")).await;
+        assert_eq!(status, StatusCode::NOT_FOUND);
+    }
+
+    #[tokio::test]
+    async fn live_link_exports_tier_redacted_ics() {
+        let (app, store) = test_site_app().await;
+        let (_, public_token, _, _, _) = seed_event(&store).await;
+        let (status, headers, body) = get(&app, &format!("/events/{public_token}/ics")).await;
+        assert_eq!(status, StatusCode::OK);
+        assert!(headers[header::CONTENT_TYPE].to_str().unwrap().starts_with("text/calendar"));
+        let body = String::from_utf8(body.to_vec()).unwrap();
+        assert!(body.contains("SUMMARY:Test Party"));
+        assert!(body.contains("LOCATION:Somewhere\\, SF"));
+        assert!(!body.contains("1 Secret St"));
+    }
+
+    #[tokio::test]
+    async fn revoked_and_unknown_guest_links_are_indistinguishable_404s() {
+        let (app, store) = test_site_app().await;
+        let (_, public_token, _, _, _) = seed_event(&store).await;
+
+        let (status, _, _) = get(&app, "/e/not-a-real-token").await;
+        assert_eq!(status, StatusCode::NOT_FOUND);
+
+        // Revoke the shared link (link id 1 is the public one from seed).
+        let links = {
+            // account 1 is the seeded host account
+            store.list_event_links(1, 1).await.unwrap()
+        };
+        let public_link = links.iter().find(|l| l.tier == "public").unwrap();
+        store.revoke_event_link(1, public_link.id).await.unwrap();
+        let (status, _, _) = get(&app, &format!("/e/{public_token}")).await;
+        assert_eq!(status, StatusCode::NOT_FOUND);
+    }
+
+    #[tokio::test]
+    async fn admin_event_pages_require_login() {
+        let (app, _store) = test_app().await;
+        for path in ["/events", "/events/1", "/people"] {
+            let (status, headers, _) = get(&app, path).await;
+            assert_eq!(
+                status,
+                StatusCode::SEE_OTHER,
+                "{path} should redirect anonymous visitors"
+            );
+            assert!(
+                headers
+                    .get(header::LOCATION)
+                    .unwrap()
+                    .to_str()
+                    .unwrap()
+                    .starts_with("/login"),
+                "{path} should redirect to /login"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn connect_existing_errors_on_unmigrated_db() {
+        let path = std::env::temp_dir().join(format!(
+            "events-unmigrated-{}.db",
+            crate::auth::session::generate_token()
+        ));
+        std::fs::File::create(&path).unwrap();
+        let url = format!("sqlite:{}", path.display());
+        let err = match crate::store::Store::connect_existing(&url).await {
+            Ok(_) => panic!("connect_existing should reject an unmigrated db"),
+            Err(err) => err,
+        };
+        let _ = std::fs::remove_file(&path);
+        assert!(
+            err.to_string().contains("_sqlx_migrations")
+                || err.to_string().contains("no applied migrations"),
+            "unexpected error: {err:#}"
+        );
+    }
+
+    async fn authed_account(store: &crate::store::Store, email: &str) -> i64 {
+        let factor = store
+            .find_factor_by_external("password", email)
+            .await
+            .unwrap()
+            .unwrap();
+        store
+            .find_primary_membership(factor.identity_id)
+            .await
+            .unwrap()
+            .unwrap()
+            .account_id
+    }
+
+    async fn seed_admin_overview(store: &crate::store::Store, account_id: i64) -> (i64, i64, i64) {
+        use crate::auth::session::{generate_token, hash_token};
+        use crate::store::schedule_items::ScheduleItemFields;
+
+        let event = store
+            .create_event(account_id, "overview", "Overview Party", "2026-07-04 18:00")
+            .await
+            .unwrap();
+        let dinner = store
+            .create_schedule_item(
+                account_id,
+                event.id,
+                &ScheduleItemFields {
+                    sort_order: 1,
+                    time_label: "7:00 PM".into(),
+                    title: "Dinner".into(),
+                    detail: String::new(),
+                    tier: "private".into(),
+                    segment_key: Some("dinner".into()),
+                },
+            )
+            .await
+            .unwrap();
+        let person = store
+            .create_person(account_id, "Guest A", "crew")
+            .await
+            .unwrap();
+        store
+            .upsert_attendance(account_id, event.id, person.id, "going", 2, "no nuts")
+            .await
+            .unwrap();
+        store
+            .upsert_segment_rsvp(account_id, dinner, person.id, "in")
+            .await
+            .unwrap();
+        let token = generate_token();
+        store
+            .create_event_link(
+                account_id,
+                event.id,
+                Some(person.id),
+                &hash_token(&token),
+                &token,
+                "VIP",
+                "private",
+            )
+            .await
+            .unwrap();
+        store
+            .resolve_event_link(&hash_token(&token))
+            .await
+            .unwrap()
+            .unwrap();
+        (event.id, person.id, dinner)
+    }
+
+    #[tokio::test]
+    async fn admin_overview_renders_segments_link_activity_and_qr() {
+        let (app, store) = test_app().await;
+        let Authed { cookie, .. } = signup(&app, "Admin", "admin@example.com", "password123").await;
+        let account_id = authed_account(&store, "admin@example.com").await;
+        let (event_id, _, _) = seed_admin_overview(&store, account_id).await;
+
+        let (status, _, body) =
+            get_with_cookie(&app, &format!("/events/{event_id}"), &cookie).await;
+        assert_eq!(status, StatusCode::OK);
+        let body = String::from_utf8(body.to_vec()).unwrap();
+        assert!(body.contains("Dinner"));
+        assert!(body.contains("segment-in-count\">1"));
+        assert!(body.contains("VIP"));
+        assert!(body.contains("link-uses\">1"));
+        assert!(body.contains("link-last-used"));
+        assert!(body.contains("<svg"), "overview should inline a QR SVG");
+    }
+
+    #[tokio::test]
+    async fn person_nickname_update_persists() {
+        let (app, store) = test_app().await;
+        let Authed { cookie, csrf_token } =
+            signup(&app, "Admin", "admin@example.com", "password123").await;
+        let account_id = authed_account(&store, "admin@example.com").await;
+        let person = store.create_person(account_id, "GuestA", "").await.unwrap();
+
+        let form = format!("name=GuestA&nickname=Ace&return_to=/people&csrf_token={csrf_token}");
+        let (status, _, _) = post_form_with_cookie(
+            &app,
+            &format!("/people/{}", person.id),
+            &form,
+            Some(&cookie),
+        )
+        .await;
+        assert_eq!(status, StatusCode::SEE_OTHER);
+        let updated = store
+            .find_person(account_id, person.id)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(updated.nickname, "Ace");
+    }
+
+    #[tokio::test]
+    async fn admin_attendance_override_persists() {
+        let (app, store) = test_app().await;
+        let Authed { cookie, csrf_token } =
+            signup(&app, "Admin", "admin@example.com", "password123").await;
+        let account_id = authed_account(&store, "admin@example.com").await;
+        let event = store
+            .create_event(account_id, "override", "Override Party", "2026-07-04 18:00")
+            .await
+            .unwrap();
+        let person = store.create_person(account_id, "GuestA", "").await.unwrap();
+
+        let form = format!("status=maybe&party_size=3&csrf_token={csrf_token}");
+        let (status, _, _) = post_form_with_cookie(
+            &app,
+            &format!("/events/{}/attendance/{}", event.id, person.id),
+            &form,
+            Some(&cookie),
+        )
+        .await;
+        assert_eq!(status, StatusCode::SEE_OTHER);
+        let attendance = store
+            .find_attendance(account_id, event.id, person.id)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(attendance.status, "maybe");
+        assert_eq!(attendance.party_size, 3);
+    }
+
+    #[tokio::test]
+    async fn deleted_event_edit_and_schedule_routes_404() {
+        let (app, store) = test_app().await;
+        let Authed { cookie, csrf_token } =
+            signup(&app, "Admin", "admin@example.com", "password123").await;
+        let account_id = authed_account(&store, "admin@example.com").await;
+        let event = store
+            .create_event(
+                account_id,
+                "deleted-routes",
+                "Deleted Routes",
+                "2026-07-04 18:00",
+            )
+            .await
+            .unwrap();
+        let form = format!("csrf_token={csrf_token}");
+        for path in [
+            format!("/events/{}", event.id),
+            format!("/events/{}/schedule", event.id),
+            format!("/events/{}/schedule/999", event.id),
+            format!("/events/{}/schedule/999/delete", event.id),
+        ] {
+            let (status, _, _) = post_form_with_cookie(&app, &path, &form, Some(&cookie)).await;
+            assert_eq!(status, StatusCode::NOT_FOUND, "{path} should be deleted");
+        }
     }
 
     #[derive(Clone, Copy)]
