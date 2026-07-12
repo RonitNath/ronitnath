@@ -159,7 +159,7 @@ async fn save(
     state: &AppState,
     account_id: i64,
     event_id: i64,
-    actor: &Viewer,
+    upload_attribution: UploadAttribution,
     upload: Upload,
 ) -> Result<i64, AppError> {
     let processed = photos::process(&upload.bytes)?;
@@ -170,7 +170,7 @@ async fn save(
         event_id,
         &upload.filename,
         upload.caption.trim(),
-        attribution(actor),
+        upload_attribution,
         processed,
     )
     .await
@@ -186,7 +186,21 @@ pub async fn upload_token(
     let (link, actor) = token_context(&state, &token, viewer).await?;
     let upload = multipart(multipart_body).await?;
     verify_session_csrf(&session, &upload.csrf_token)?;
-    save(&state, link.account_id, link.event_id, &actor, upload).await?;
+    let upload_attribution = session.as_ref().map_or_else(
+        || attribution(&actor),
+        |session| UploadAttribution {
+            identity_id: Some(session.identity_id),
+            person_id: None,
+        },
+    );
+    save(
+        &state,
+        link.account_id,
+        link.event_id,
+        upload_attribution,
+        upload,
+    )
+    .await?;
     Ok(Redirect::to(&format!("/e/{token}#photos")).into_response())
 }
 
@@ -203,7 +217,14 @@ pub async fn upload_my(
     ensure_attendee(&state, scope.owner_account_id, event_id, &actor).await?;
     let upload = multipart(multipart_body).await?;
     csrf::verify_optional(Some(&scope.csrf_token), &upload.csrf_token)?;
-    save(&state, scope.owner_account_id, event_id, &actor, upload).await?;
+    save(
+        &state,
+        scope.owner_account_id,
+        event_id,
+        attribution(&actor),
+        upload,
+    )
+    .await?;
     Ok(Redirect::to(&format!("/my/events/{event_id}#photos")).into_response())
 }
 
@@ -224,7 +245,14 @@ pub async fn upload_admin(
     let actor = Viewer::Owner {
         identity_id: scope.identity_id,
     };
-    save(&state, scope.account_id, event_id, &actor, upload).await?;
+    save(
+        &state,
+        scope.account_id,
+        event_id,
+        attribution(&actor),
+        upload,
+    )
+    .await?;
     Ok(Redirect::to(&format!("/events/{event_id}#photos")).into_response())
 }
 
