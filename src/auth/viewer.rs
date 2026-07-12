@@ -14,6 +14,11 @@ pub enum Viewer {
         person_id: Option<i64>,
         event_id: i64,
     },
+    /// A standing, person-bound calendar capability; unlike an event link it
+    /// carries no event-specific direct-hit floor.
+    FeedHolder {
+        person_id: i64,
+    },
     Guest {
         identity_id: i64,
         person_id: i64,
@@ -33,6 +38,7 @@ impl Viewer {
     pub fn person_id(&self) -> Option<i64> {
         match self {
             Self::Guest { person_id, .. }
+            | Self::FeedHolder { person_id }
             | Self::LinkHolder {
                 person_id: Some(person_id),
                 ..

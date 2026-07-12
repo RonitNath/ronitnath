@@ -115,9 +115,14 @@ pub async fn post_multipart(
     cookie: Option<&str>,
 ) -> (StatusCode, HeaderMap, Bytes) {
     let mut builder = Request::post(path)
-        .header(header::CONTENT_TYPE, format!("multipart/form-data; boundary={boundary}"))
+        .header(
+            header::CONTENT_TYPE,
+            format!("multipart/form-data; boundary={boundary}"),
+        )
         .header(header::CONTENT_LENGTH, body.len());
-    if let Some(cookie) = cookie { builder = builder.header(header::COOKIE, cookie); }
+    if let Some(cookie) = cookie {
+        builder = builder.header(header::COOKIE, cookie);
+    }
     send(app, builder.body(Body::from(body)).unwrap(), DEFAULT_IP).await
 }
 

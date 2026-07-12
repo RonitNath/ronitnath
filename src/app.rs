@@ -36,6 +36,13 @@ pub fn build_site_router(state: AppState, config: &Config) -> Router {
         .routes(routes!(handlers::health::healthz))
         .merge(client_error_api(&rate_limiter))
         .route("/e/{token}", get(handlers::event_public::page))
+        .route("/calendar", get(handlers::calendar_public::page))
+        // axum path parameters cannot carry a literal suffix in the route
+        // pattern, so the handler validates and strips the required `.ics`.
+        .route(
+            "/calendar/{feed_path}",
+            get(handlers::calendar_public::feed),
+        )
         .merge(
             OpenApiRouter::new()
                 .route(
@@ -111,6 +118,17 @@ pub fn build_admin_router(state: AppState, config: &Config) -> Router {
             "/events",
             get(handlers::events_admin::list_page).post(handlers::events_admin::create_event),
         )
+        .route("/calendar", get(handlers::calendar_admin::list))
+        .route("/calendar/entries", post(handlers::calendar_admin::create))
+        .route(
+            "/calendar/entries/{id}",
+            post(handlers::calendar_admin::update),
+        )
+        .route(
+            "/calendar/entries/{id}/audience",
+            get(handlers::calendar_admin::audience_page)
+                .post(handlers::calendar_admin::audience_save),
+        )
         .route(
             "/events/{event_id}",
             get(handlers::events_admin::detail_page).post(handlers::errors::not_found),
@@ -166,6 +184,10 @@ pub fn build_admin_router(state: AppState, config: &Config) -> Router {
         .route(
             "/people/{person_id}/claim-status",
             get(handlers::people_admin::claim_status),
+        )
+        .route(
+            "/people/{person_id}/calendar-feed",
+            get(handlers::calendar_admin::feed_page).post(handlers::calendar_admin::feed_action),
         )
         .route(
             "/people/{person_id}/claim-status/unlink",

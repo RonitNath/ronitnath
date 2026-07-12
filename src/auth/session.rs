@@ -5,9 +5,9 @@
 //! cookie value, never storing it anywhere but the client.
 
 use axum_extra::extract::cookie::{Cookie, SameSite};
-use rand_core::{OsRng, RngCore};
 use base64::Engine;
 use base64::engine::general_purpose::{STANDARD, URL_SAFE_NO_PAD};
+use rand_core::{OsRng, RngCore};
 use sha2::{Digest, Sha256};
 
 /// `__Host-` cookies require `Secure` and no `Domain` attribute — only

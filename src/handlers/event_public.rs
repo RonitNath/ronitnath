@@ -190,12 +190,19 @@ pub async fn page(
     let (viewer, mismatch) = session_viewer.combine_with_link(Some(&link));
     let level = direct_level(state.store(), &link, &viewer).await?;
     let view = build_view(state.store(), &link, &event, level).await?;
-    let show_photos = crate::handlers::photos::attendee(&state, link.account_id, event.id, &viewer).await?;
+    let show_photos =
+        crate::handlers::photos::attendee(&state, link.account_id, event.id, &viewer).await?;
     let photo_prefix = format!("/e/{token}/photos");
     let photos = if show_photos {
-        crate::handlers::photos::gallery(&state, link.account_id, event.id, &viewer, &photo_prefix).await?
-    } else { Vec::new() };
-    let photo_csrf = current_user.as_ref().map(|u| u.csrf_token.clone()).unwrap_or_default();
+        crate::handlers::photos::gallery(&state, link.account_id, event.id, &viewer, &photo_prefix)
+            .await?
+    } else {
+        Vec::new()
+    };
+    let photo_csrf = current_user
+        .as_ref()
+        .map(|u| u.csrf_token.clone())
+        .unwrap_or_default();
     let mismatch_note = if let Some(note) = mismatch {
         let signed_in = state
             .store()
@@ -253,12 +260,15 @@ pub async fn ics(
     let location = view.address.as_deref().unwrap_or(&view.area_name);
     let end = view.ends_at.as_deref().unwrap_or(&view.starts_at);
     let body = format!(
-        "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//ronitnath//events//EN\r\nBEGIN:VEVENT\r\nUID:{}@ronitnath.com\r\nSUMMARY:{}\r\nDTSTART:{}\r\nDTEND:{}\r\nLOCATION:{}\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n",
-        event.id,
-        escape_ics(&view.title),
-        ics_datetime(&view.starts_at),
-        ics_datetime(end),
-        escape_ics(location),
+        "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//ronitnath//events//EN\r\n{}END:VCALENDAR\r\n",
+        format_vevent(
+            &format!("event-{}", event.id),
+            &view.title,
+            &view.starts_at,
+            end,
+            Some(location),
+            None
+        ),
     );
     Ok((
         [(header::CONTENT_TYPE, "text/calendar; charset=utf-8")],
@@ -267,7 +277,32 @@ pub async fn ics(
         .into_response())
 }
 
-fn ics_datetime(value: &str) -> String {
+pub(crate) fn format_vevent(
+    uid: &str,
+    summary: &str,
+    starts_at: &str,
+    ends_at: &str,
+    location: Option<&str>,
+    description: Option<&str>,
+) -> String {
+    let mut body = format!(
+        "BEGIN:VEVENT\r\nUID:{}@ronitnath.com\r\nSUMMARY:{}\r\nDTSTART:{}\r\nDTEND:{}\r\n",
+        escape_ics(uid),
+        escape_ics(summary),
+        ics_datetime(starts_at),
+        ics_datetime(ends_at)
+    );
+    if let Some(location) = location.filter(|value| !value.is_empty()) {
+        body.push_str(&format!("LOCATION:{}\r\n", escape_ics(location)));
+    }
+    if let Some(description) = description.filter(|value| !value.is_empty()) {
+        body.push_str(&format!("DESCRIPTION:{}\r\n", escape_ics(description)));
+    }
+    body.push_str("END:VEVENT\r\n");
+    body
+}
+
+pub(crate) fn ics_datetime(value: &str) -> String {
     let compact: String = value
         .chars()
         .filter(|c| !matches!(c, '-' | ':'))
@@ -280,7 +315,7 @@ fn ics_datetime(value: &str) -> String {
     }
 }
 
-fn escape_ics(value: &str) -> String {
+pub(crate) fn escape_ics(value: &str) -> String {
     value
         .replace('\\', "\\\\")
         .replace(',', "\\,")

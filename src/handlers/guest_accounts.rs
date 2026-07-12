@@ -392,12 +392,26 @@ pub async fn my_event_page(
     let (link, event, level) = my_event_parts(&state, &scope, event_id).await?;
     let view =
         crate::handlers::event_public::build_view(state.store(), &link, &event, level).await?;
-    let viewer = Viewer::Guest { identity_id: scope.identity_id, person_id: scope.person_id };
-    let show_photos = crate::handlers::photos::attendee(&state, scope.owner_account_id, event_id, &viewer).await?;
+    let viewer = Viewer::Guest {
+        identity_id: scope.identity_id,
+        person_id: scope.person_id,
+    };
+    let show_photos =
+        crate::handlers::photos::attendee(&state, scope.owner_account_id, event_id, &viewer)
+            .await?;
     let photo_upload_url = format!("/my/events/{event_id}/photos");
     let photos = if show_photos {
-        crate::handlers::photos::gallery(&state, scope.owner_account_id, event_id, &viewer, &photo_upload_url).await?
-    } else { Vec::new() };
+        crate::handlers::photos::gallery(
+            &state,
+            scope.owner_account_id,
+            event_id,
+            &viewer,
+            &photo_upload_url,
+        )
+        .await?
+    } else {
+        Vec::new()
+    };
     render(MyEventTemplate {
         nav_active: "my",
         current_user: Some(nav(&scope)),

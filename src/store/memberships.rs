@@ -22,7 +22,10 @@ impl Store {
     /// which has no session to say which account is "active". Once
     /// multi-account identities exist (phase 2), api tokens will need to
     /// be minted per-account instead of per-identity.
-    pub async fn find_primary_membership(&self, identity_id: i64) -> sqlx::Result<Option<PrimaryMembership>> {
+    pub async fn find_primary_membership(
+        &self,
+        identity_id: i64,
+    ) -> sqlx::Result<Option<PrimaryMembership>> {
         sqlx::query_as!(
             PrimaryMembership,
             r#"SELECT m.account_id as "account_id: i64", a.name as account_name, m.role
@@ -43,7 +46,12 @@ impl Store {
     /// existing account with an arbitrary role (see the role-gating
     /// exemplar test in `app.rs`).
     #[cfg(test)]
-    pub async fn create_membership(&self, identity_id: i64, account_id: i64, role: &str) -> sqlx::Result<()> {
+    pub async fn create_membership(
+        &self,
+        identity_id: i64,
+        account_id: i64,
+        role: &str,
+    ) -> sqlx::Result<()> {
         sqlx::query!(
             "INSERT INTO memberships (identity_id, account_id, role) VALUES (?1, ?2, ?3)",
             identity_id,

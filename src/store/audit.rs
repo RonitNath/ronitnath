@@ -49,7 +49,11 @@ impl Store {
         Ok(())
     }
 
-    pub async fn list_audit_log(&self, account_id: i64, limit: i64) -> sqlx::Result<Vec<AuditEntry>> {
+    pub async fn list_audit_log(
+        &self,
+        account_id: i64,
+        limit: i64,
+    ) -> sqlx::Result<Vec<AuditEntry>> {
         sqlx::query_as!(
             AuditEntry,
             r#"SELECT al.id as "id: i64", al.at,
@@ -71,9 +75,12 @@ impl Store {
     /// only used to assert one got logged in tests.
     #[cfg(test)]
     pub async fn count_audit_events(&self, action: &str) -> sqlx::Result<i64> {
-        let row = sqlx::query!("SELECT COUNT(*) as count FROM audit_log WHERE action = ?1", action)
-            .fetch_one(&self.pool)
-            .await?;
+        let row = sqlx::query!(
+            "SELECT COUNT(*) as count FROM audit_log WHERE action = ?1",
+            action
+        )
+        .fetch_one(&self.pool)
+        .await?;
         Ok(row.count)
     }
 }

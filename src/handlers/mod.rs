@@ -8,6 +8,8 @@ pub mod about;
 pub mod account;
 pub mod audience;
 pub mod auth;
+pub mod calendar_admin;
+pub mod calendar_public;
 pub mod circles;
 pub mod client_errors;
 pub mod errors;

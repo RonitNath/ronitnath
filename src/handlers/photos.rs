@@ -159,6 +159,10 @@ fn attribution(viewer: &Viewer) -> UploadAttribution {
             identity_id: None,
             person_id: *person_id,
         },
+        Viewer::FeedHolder { person_id } => UploadAttribution {
+            identity_id: None,
+            person_id: Some(*person_id),
+        },
         Viewer::Anonymous => UploadAttribution {
             identity_id: None,
             person_id: None,
@@ -387,6 +391,7 @@ async fn delete(
         Viewer::Owner { identity_id } => (Some(*identity_id), None, true),
         Viewer::Guest { identity_id, .. } => (Some(*identity_id), None, false),
         Viewer::LinkHolder { person_id, .. } => (None, *person_id, false),
+        Viewer::FeedHolder { person_id } => (None, Some(*person_id), false),
         Viewer::Anonymous => (None, None, false),
     };
     if state

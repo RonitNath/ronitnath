@@ -37,6 +37,7 @@ async fn dispatch() -> anyhow::Result<()> {
         Some("set-invite") => set_invite(&args).await,
         Some("set-headcount") => set_headcount(&args).await,
         Some("set-audience") => set_audience(&args).await,
+        Some("mint-calendar-feed") => mint_calendar_feed(&args).await,
         Some("photos-gc") => photos_gc(&args).await,
         Some(flag) if flag == "-h" || flag == "--help" => {
             print_usage(&args[0]);
@@ -74,6 +75,10 @@ fn print_usage(bin: &str) {
     eprintln!("  {bin} set-audience <event-slug> --public <level>");
     eprintln!("  {bin} set-audience <event-slug> --circle \"<name>=<level>\"");
     eprintln!("  {bin} set-audience <event-slug> --person \"<name>=<include:level|exclude>\"");
+    eprintln!(
+        "  {bin} set-audience --calendar-entry <id> (--public <level> | --circle <name>=<level> | --person <name>=<include:level|exclude>)"
+    );
+    eprintln!("  {bin} mint-calendar-feed \"<person>\"");
     eprintln!("  {bin} photos-gc --older-than <days>");
 }
 
@@ -327,8 +332,8 @@ async fn set_headcount(args: &[String]) -> anyhow::Result<()> {
 }
 
 async fn set_audience(args: &[String]) -> anyhow::Result<()> {
-    let usage = "usage: admin set-audience <event-slug> (--public <level> | --circle <name>=<level> | --person <name>=<include:level|exclude>)";
-    let slug = args.get(2).context(usage)?;
+    let usage = "usage: admin set-audience (<event-slug> | --calendar-entry <id>) (--public <level> | --circle <name>=<level> | --person <name>=<include:level|exclude>)";
+    let subject = args.get(2).context(usage)?;
     let public = optional_flag(args, "--public");
     let circle = optional_flag(args, "--circle");
     let person = optional_flag(args, "--person");
@@ -342,16 +347,30 @@ async fn set_audience(args: &[String]) -> anyhow::Result<()> {
     }
 
     let (_config, store, account_id) = open_cli_store().await?;
-    let event_id = event_id_for_slug(&store, account_id, slug).await?;
+    let (subject_type, subject_id, label) = if subject == "--calendar-entry" {
+        let id = args
+            .get(3)
+            .context(usage)?
+            .parse::<i64>()
+            .context("calendar entry id must be an integer")?;
+        store
+            .find_calendar_entry(account_id, id)
+            .await?
+            .context("no such calendar entry")?;
+        ("calendar_entry", id, format!("calendar-entry:{id}"))
+    } else {
+        let id = event_id_for_slug(&store, account_id, subject).await?;
+        ("event", id, subject.clone())
+    };
     let policy = store
-        .find_audience_policy(account_id, "event", event_id)
+        .find_audience_policy(account_id, subject_type, subject_id)
         .await?
-        .context("event has no audience policy")?;
+        .context("subject has no audience policy")?;
 
     if let Some(level) = public {
         level.parse::<Level>().map_err(anyhow::Error::msg)?;
         store.set_public_level(account_id, policy.id, level).await?;
-        println!("{slug}: public={level}");
+        println!("{label}: public={level}");
     } else if let Some(spec) = circle {
         let (name, level) = spec.split_once('=').context(usage)?;
         level.parse::<Level>().map_err(anyhow::Error::msg)?;
@@ -362,7 +381,7 @@ async fn set_audience(args: &[String]) -> anyhow::Result<()> {
         store
             .set_circle_grant(account_id, policy.id, circle.id, Some(level))
             .await?;
-        println!("{slug}: circle {:?}={level}", circle.name);
+        println!("{label}: circle {:?}={level}", circle.name);
     } else if let Some(spec) = person {
         let (name, value) = spec.split_once('=').context(usage)?;
         let person = store
@@ -380,7 +399,7 @@ async fn set_audience(args: &[String]) -> anyhow::Result<()> {
         store
             .set_person_override(account_id, policy.id, person.id, Some(kind), level)
             .await?;
-        println!("{slug}: person {:?}={value}", person.name);
+        println!("{label}: person {:?}={value}", person.name);
     }
     store
         .audit(
@@ -388,19 +407,56 @@ async fn set_audience(args: &[String]) -> anyhow::Result<()> {
             Some(account_id),
             None,
             "audience.updated",
-            "event",
-            Some(&event_id.to_string()),
+            subject_type,
+            Some(&subject_id.to_string()),
             &serde_json::json!({"source": "cli"}),
         )
         .await?;
     Ok(())
 }
 
-async fn photos_gc(args: &[String]) -> anyhow::Result<()> {
-    let days: i64 = required_flag(args, "--older-than")?.parse().context("--older-than must be a non-negative integer")?;
-    if days < 0 { bail!("--older-than must be non-negative"); }
+async fn mint_calendar_feed(args: &[String]) -> anyhow::Result<()> {
+    let usage = "usage: admin mint-calendar-feed \"<person>\"";
+    let name = args.get(2).context(usage)?;
     let (config, store, account_id) = open_cli_store().await?;
-    let count = ronitnath::photos::gc(&store, std::path::Path::new(&config.photo_storage_dir), account_id, days).await?;
+    let person = store
+        .find_person_by_name(account_id, name)
+        .await?
+        .with_context(|| format!("no person named {name:?}"))?;
+    let raw = ronitnath::auth::session::generate_token();
+    store
+        .mint_calendar_feed(account_id, person.id, &hash_token(&raw), &raw)
+        .await?;
+    store
+        .audit(
+            None,
+            Some(account_id),
+            None,
+            "calendar_feed.mint",
+            "person",
+            Some(&person.id.to_string()),
+            &serde_json::json!({"source":"cli"}),
+        )
+        .await?;
+    println!("{}/calendar/{raw}.ics", config.public_url);
+    Ok(())
+}
+
+async fn photos_gc(args: &[String]) -> anyhow::Result<()> {
+    let days: i64 = required_flag(args, "--older-than")?
+        .parse()
+        .context("--older-than must be a non-negative integer")?;
+    if days < 0 {
+        bail!("--older-than must be non-negative");
+    }
+    let (config, store, account_id) = open_cli_store().await?;
+    let count = ronitnath::photos::gc(
+        &store,
+        std::path::Path::new(&config.photo_storage_dir),
+        account_id,
+        days,
+    )
+    .await?;
     println!("purged {count} deleted photo(s)");
     Ok(())
 }

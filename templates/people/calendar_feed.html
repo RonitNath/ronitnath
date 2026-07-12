@@ -1,0 +1,6 @@
+{% extends "_layout.html" %}{% block title %}{{ person.name }} · calendar feed{% endblock %}{% block content %}
+<section class="hero event-overview-hero"><h1>{{ person.name }}</h1><p class="subtitle">Calendar feed</p></section>
+<section class="admin-card"><p class="muted">This standing link shows only what this person may see. Revoke it at any time.</p>
+{% if let Some(url) = url %}<label>Feed URL<input type="url" readonly value="{{ url }}"></label>{% if let Some(last) = last_used_at %}<p class="muted">Last used {{ last }}</p>{% endif %}<form method="post"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="danger" name="action" value="revoke">Revoke feed</button></form>
+{% else %}<p>No active feed.</p><form method="post"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button name="action" value="mint">Mint calendar feed</button></form>{% endif %}</section>
+{% endblock %}

@@ -12,8 +12,9 @@ use rand_core::OsRng;
 /// attempt, so verifying against a real hash and verifying against this
 /// one take the same amount of time — an attacker measuring response
 /// latency can't use it to enumerate which emails have accounts.
-static DUMMY_HASH: LazyLock<String> =
-    LazyLock::new(|| hash("not-a-real-password-just-for-timing").expect("hashing a fixed string cannot fail"));
+static DUMMY_HASH: LazyLock<String> = LazyLock::new(|| {
+    hash("not-a-real-password-just-for-timing").expect("hashing a fixed string cannot fail")
+});
 
 #[cfg(test)]
 static DUMMY_VERIFY_COUNT: AtomicUsize = AtomicUsize::new(0);

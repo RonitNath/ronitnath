@@ -11,7 +11,11 @@ use crate::auth::session;
 use crate::state::AppState;
 use crate::store::sessions::SessionContext;
 
-pub async fn attach_session(State(state): State<AppState>, mut request: Request, next: Next) -> Response {
+pub async fn attach_session(
+    State(state): State<AppState>,
+    mut request: Request,
+    next: Next,
+) -> Response {
     let cookie_name = session::cookie_name(state.auth_config().cookie_secure);
     let jar = CookieJar::from_headers(request.headers());
 

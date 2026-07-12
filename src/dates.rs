@@ -87,13 +87,19 @@ mod tests {
 
     #[test]
     fn formats_event_wall_times() {
-        assert_eq!(human_datetime("2026-07-04 13:00"), "Saturday, July 4, 2026 · 1:00 PM");
+        assert_eq!(
+            human_datetime("2026-07-04 13:00"),
+            "Saturday, July 4, 2026 · 1:00 PM"
+        );
         assert_eq!(human_date("2025-12-06 17:00"), "Saturday, December 6, 2025");
     }
 
     #[test]
     fn tags_system_timestamps_as_utc() {
-        assert_eq!(human_datetime("2026-07-03 05:12:33"), "Jul 3, 2026 · 5:12 AM UTC");
+        assert_eq!(
+            human_datetime("2026-07-03 05:12:33"),
+            "Jul 3, 2026 · 5:12 AM UTC"
+        );
     }
 
     #[test]
