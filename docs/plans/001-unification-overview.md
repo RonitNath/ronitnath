@@ -19,8 +19,8 @@ Events keeps :3117/:3118 until cutover; both run side by side on nexus.
 | 3 | Visibility (circles + levels) | phase-3-visibility.md | done |
 | 4 | Guest accounts (claim + password) | phase-4-guest-accounts.md | done |
 | 5 | Photos | phase-5-photos.md | done |
-| 6 | Calendar | phase-6-calendar.md | in progress |
-| 7 | Prod data migration (dry run) | phase-7-import.md | pending |
+| 6 | Calendar | phase-6-calendar.md | done |
+| 7 | Prod data migration (dry run) | phase-7-import.md | in progress |
 | 8 | Cutover (operator, by hand) | phase-8-cutover.md | pending |
 
 Phases are sequential; each ends with a gate review (tests, acceptance
@@ -44,3 +44,6 @@ evidence, worktree clean) before the next is dispatched.
 | 5 | independent security review | pi_codex (read-only, detached @5e677c6) | gpt-5.6-sol / high | job cc87256a | Verdict FAIL: BLOCKER (unbounded decode = decompression-bomb DoS on public upload) + 4 SHOULD-FIX (GC/upload race, substring body-limit bypass, EXIF UTF-8 panic, raw filename). Path safety/authz/EXIF-strip/CSRF/serve-type clean. |
 | 5 | security fix round | pi_codex | gpt-5.6-sol / high | job 4ae155af → 6a2606f | 89/89 tests (orchestrator re-ran + read caps/spawn_blocking); decode capped 8192²/50MP + spawn_blocking + 2-permit semaphore; atomic temp+rename with writer-lock-serialized GC; structural photo/non-photo router split; ASCII-validated EXIF; filename sanitized 255B. |
 | 5 | gallery visual gate + polish | orchestrator (agent-browser) + self | — | 48cdba4 | Live gallery/lightbox/upload/dedup verified by orchestrator (2 real JPEGs, variants served, non-attendee 404, dedup 3 rows/2 keys). One completeness gap fixed: ::file-selector-button tokenized (native date/checkbox chrome stays per documented base.css decision). |
+| 6 | calendar build | pi_codex → codex exec | gpt-5.6-sol/high (WebSocket drop ~38min) → codex exec gpt-5.5/high finished | 84dcac7, a6a1d52, a479758 | 94/94 tests (orchestrator re-ran offline, no DATABASE_URL); read-time union via level_for (Viewer::FeedHolder, no floor); CalendarEntry::view_for 4th chokepoint; live: anon /calendar shows July4 summary-only chip, ICS feed redacts (busy→SUMMARY:Busy, summary→title-only, full→both), revoke→404. Visual gate passed (orchestrator screenshot). |
+| 6 | independent security review | pi_codex (read-only, detached @a479758) | gpt-5.6-sol / high | job 0838540c | Verdict FAIL: 2 BLOCKER (capability tokens logged plaintext in telemetry span — affects /e/{token} + photo paths from phases 2-5, not just calendar; extreme-month panic) + 3 SHOULD-FIX (feed revoke race + no cache headers, partial-commit audience save, missing ICS line-folding). Token routing/visibility/tenant-isolation/ICS-injection/admin-lifecycle clean. |
+| 6 | security fix round | pi_codex | gpt-5.6-sol / high | job 13d4f9ef → 2d449a5 | 98/98 tests offline (orchestrator re-ran); telemetry path sanitizer (orchestrator live-verified: sentinel token 0 hits in logs, paths log as /e/{token} + /calendar/{feed}.ics — retroactively fixes phases 2-5 token leak); month range 1970-2100 checked-arith; feed touch conditional-on-unrevoked → 404 + private,no-store; audience save validates-all-then-txn+audit (event editor shared bug, fixed once); ICS 75-octet folding on char boundaries. |
