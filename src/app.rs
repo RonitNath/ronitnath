@@ -336,6 +336,16 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn site_home_does_not_advertise_auth() {
+        let (app, _store) = test_site_app().await;
+        let (status, _, body) = get(&app, "/").await;
+        assert_eq!(status, StatusCode::OK);
+        let body = String::from_utf8(body.to_vec()).unwrap();
+        assert!(!body.contains("/login"));
+        assert!(!body.contains("/signup"));
+    }
+
+    #[tokio::test]
     async fn oversized_body_is_rejected_with_413() {
         let (app, _store) = test_app().await;
         // Config::for_tests() caps bodies at 1024 bytes. /signup is a good

@@ -140,6 +140,8 @@ by construction (accent lightness sits at opposite ends: 0.65/0.45 fill vs
   chosen because it's also a mandated verification breakpoint (this brief's
   own responsive floor), so "mobile nav" and "tablet screenshot" are the
   same state by construction, not two states that might drift apart.
+- Public (site-bin) chrome never advertises auth: no Sign in/Sign up/admin
+  links for signed-out viewers.
 
 ## Motion
 
@@ -231,6 +233,8 @@ values, they already match.
 - Social links use platform names as link text (GitHub, Instagram,
   LinkedIn, Email), not icons-only — matches the legacy site exactly, and
   keeps them screen-reader-clear without needing `aria-label`.
+- Auth-page CTAs are admin-facing; guest-facing login (phase 4) gets its own
+  copy and must not inherit "No account? Sign up."
 
 ## Status/level vocabulary (placeholder — phase 3)
 
@@ -299,10 +303,8 @@ poster PR that touches those tokens fails review on this brief alone.
   (except the topbar, which already has one).
 - Do not add gradients anywhere except the nebula layer (which is the
   brief's one sanctioned gradient use, and only in dark mode).
-- Emoji: the theme toggle uses a sun/moon glyph (already in the skeleton,
-  `\2600\FE0F` / `\1F319`) — that's the one sanctioned "icon" in the
-  system, kept because the legacy site uses the same sun/moon convention.
-  No other emoji as icons anywhere.
+- Do not use emoji as icons. The theme toggle uses monochrome inline SVG
+  sun/moon icons colored through `currentColor`.
 - Do not center workflow pages (settings, account, audit log, guestbook) —
   those stay left-aligned inside `--col-content`; centering (`.hero`
   pattern) is reserved for the marketing-flavored home/about/error pages
