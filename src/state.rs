@@ -35,6 +35,7 @@ struct Inner {
     started_at: Instant,
     auth: AuthConfig,
     oidc: OidcRegistry,
+    public_url: String,
 }
 
 impl AppState {
@@ -46,6 +47,7 @@ impl AppState {
                 started_at: Instant::now(),
                 auth,
                 oidc: OidcRegistry::empty(),
+                public_url: "http://127.0.0.1:3130".into(),
             }),
         }
     }
@@ -57,6 +59,19 @@ impl AppState {
                 started_at: self.inner.started_at,
                 auth: self.inner.auth.clone(),
                 oidc,
+                public_url: self.inner.public_url.clone(),
+            }),
+        }
+    }
+
+    pub fn with_public_url(self, public_url: String) -> Self {
+        Self {
+            inner: Arc::new(Inner {
+                store: self.inner.store.clone(),
+                started_at: self.inner.started_at,
+                auth: self.inner.auth.clone(),
+                oidc: self.inner.oidc.clone(),
+                public_url,
             }),
         }
     }
@@ -67,6 +82,10 @@ impl AppState {
 
     pub fn auth_config(&self) -> AuthConfig {
         self.inner.auth.clone()
+    }
+
+    pub fn public_url(&self) -> &str {
+        &self.inner.public_url
     }
 
     pub fn oidc(&self) -> &OidcRegistry {

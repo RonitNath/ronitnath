@@ -13,3 +13,6 @@ pub mod guestbook;
 pub mod health;
 pub mod home;
 pub mod settings;
+pub mod event_public;
+pub mod events_admin;
+pub mod people_admin;

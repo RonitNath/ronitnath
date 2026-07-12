@@ -35,6 +35,17 @@ pub fn build_site_router(state: AppState, config: &Config) -> Router {
         .route("/", get(handlers::home::index))
         .routes(routes!(handlers::health::healthz))
         .merge(client_error_api(&rate_limiter))
+        .route("/e/{token}", get(handlers::event_public::page))
+        .route("/events/{event_ref}/ics", get(handlers::event_public::ics))
+        .routes(routes!(handlers::event_public::api_view))
+        .merge(
+            OpenApiRouter::new()
+                .routes(routes!(handlers::event_public::api_rsvp))
+                .route_layer(middleware::from_fn_with_state(
+                    rate_limiter.clone(),
+                    rate_limit::enforce,
+                )),
+        )
         .nest_service("/static", ServeDir::new("static"))
         .fallback(handlers::errors::not_found)
         .with_state(state.clone())
@@ -55,6 +66,26 @@ pub fn build_admin_router(state: AppState, config: &Config) -> Router {
         ))
         .routes(routes!(handlers::health::healthz))
         .merge(client_error_api(&rate_limiter))
+        .route(
+            "/events",
+            get(handlers::events_admin::list_page).post(handlers::events_admin::create_event),
+        )
+        .route("/events/{event_id}", get(handlers::events_admin::detail_page))
+        .route(
+            "/events/{event_id}/attendance/{person_id}",
+            post(handlers::events_admin::update_attendance),
+        )
+        .route("/events/{event_id}/links", post(handlers::events_admin::create_link))
+        .route(
+            "/events/{event_id}/links/{link_id}/revoke",
+            post(handlers::events_admin::revoke_link),
+        )
+        .route(
+            "/events/{event_id}/people/bulk",
+            post(handlers::events_admin::bulk_add_people),
+        )
+        .route("/people", get(handlers::people_admin::page))
+        .route("/people/{person_id}", post(handlers::people_admin::update))
         .route(
             "/login",
             get(handlers::auth::login_page).post(handlers::auth::login_submit),
@@ -190,7 +221,9 @@ async fn state(config: &Config, migrate: bool) -> AppState {
                 config.oidc_providers_path
             )
         });
-    AppState::new(store, auth_config(config)).with_oidc(oidc)
+    AppState::new(store, auth_config(config))
+        .with_oidc(oidc)
+        .with_public_url(config.public_url.clone())
 }
 
 pub async fn run_site() {
