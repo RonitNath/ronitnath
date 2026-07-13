@@ -9,6 +9,7 @@ services:
     environment:
       RUST_LOG: info
       TRUSTED_PROXY: "true"
+      PUBLIC_URL: https://ronitnath.com
     volumes:
       - ./data:/app/data
     ports:
@@ -24,6 +25,7 @@ services:
     environment:
       AUTH_SIGNUP: closed
       RUST_LOG: info
+      PUBLIC_URL: https://ronitnath.com
     volumes:
       - ./data:/app/data
     ports:
