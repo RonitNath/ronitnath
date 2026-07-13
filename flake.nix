@@ -19,12 +19,21 @@
     in {
       packages = forAllSystems (system:
         let
-          # This repository has no rust-toolchain.toml, so use nixpkgs'
-          # matched rustPlatform directly. The pinned rust-overlay input is
-          # ready for fromRustupToolchainFile if the repository adds one.
-          pkgs = import nixpkgs { inherit system; };
+          # nixpkgs 25.11 ships rustc 1.91.1, older than parts of this crate
+          # graph require (first nix build failed on it). The Dockerfile built
+          # with floating rust:1-bookworm; mirror that with the overlay's
+          # current stable, pinned by flake.lock.
+          pkgs = import nixpkgs {
+            inherit system;
+            overlays = [ rust-overlay.overlays.default ];
+          };
+          rustToolchain = pkgs.rust-bin.stable.latest.minimal;
+          rustPlatform = pkgs.makeRustPlatform {
+            cargo = rustToolchain;
+            rustc = rustToolchain;
+          };
         in {
-          default = pkgs.rustPlatform.buildRustPackage {
+          default = rustPlatform.buildRustPackage {
             pname = "ronitnath";
             version = "0.1.0";
             src = ./.;
