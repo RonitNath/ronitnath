@@ -7,12 +7,40 @@ import { assertShape, csrfToken, errorMessage, isRecord, jsonBody } from "./api"
 // exposes an ambient session token, every RSVP endpoint carries it — including
 // a capability URL that belongs to a different person.
 
+// Field checks mirror the zod schema this file replaced, one predicate per
+// generated type; every required field is checked so a malformed response
+// fails closed instead of rendering an actionable form.
+
+function isNullableString(value: unknown): boolean {
+  return value === null || typeof value === "string";
+}
+
+function isEventDetail(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    typeof value.title === "string" &&
+    typeof value.tagline === "string" &&
+    typeof value.starts_at === "string" &&
+    isNullableString(value.ends_at) &&
+    typeof value.timezone === "string" &&
+    typeof value.status === "string" &&
+    typeof value.summary === "string" &&
+    typeof value.area_name === "string" &&
+    isNullableString(value.address) &&
+    isNullableString(value.entry_instructions) &&
+    isNullableString(value.private_details)
+  );
+}
+
 function isScheduleItem(value: unknown): boolean {
   return (
     isRecord(value) &&
     typeof value.id === "number" &&
+    typeof value.sort_order === "number" &&
     typeof value.time_label === "string" &&
     typeof value.title === "string" &&
+    typeof value.detail === "string" &&
+    typeof value.tier === "string" &&
     (value.segment_key === null || typeof value.segment_key === "string")
   );
 }
@@ -21,16 +49,19 @@ function isSegmentCount(value: unknown): boolean {
   return (
     isRecord(value) &&
     typeof value.schedule_item_id === "number" &&
-    typeof value.in_count === "number"
+    typeof value.in_count === "number" &&
+    typeof value.maybe_count === "number"
   );
 }
 
 function isAttendance(value: unknown): boolean {
   return (
     isRecord(value) &&
+    typeof value.person_id === "number" &&
     typeof value.status === "string" &&
     typeof value.party_size === "number" &&
-    typeof value.note === "string"
+    typeof value.note === "string" &&
+    typeof value.updated_at === "string"
   );
 }
 
@@ -55,7 +86,7 @@ function isGuestPerson(value: unknown): boolean {
 function isGuestView(value: unknown): value is GuestView {
   return (
     isRecord(value) &&
-    isRecord(value.event) &&
+    isEventDetail(value.event) &&
     Array.isArray(value.schedule) &&
     value.schedule.every(isScheduleItem) &&
     Array.isArray(value.segment_counts) &&
