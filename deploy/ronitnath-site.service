@@ -1,0 +1,37 @@
+[Unit]
+Description=ronitnath public origin behind nanode
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=exec
+User=ronitnath-app
+WorkingDirectory=/nix/var/nix/profiles/ronitnath/share/ronitnath
+ExecStart=/nix/var/nix/profiles/ronitnath/bin/site
+Restart=always
+RestartSec=2
+
+Environment=DATABASE_URL=sqlite:/data/apps/ronitnath/app.db
+Environment=PHOTO_STORAGE_DIR=/data/apps/ronitnath/photos
+Environment=OIDC_PROVIDERS_PATH=/data/apps/ronitnath/oidc_providers.json
+Environment=PUBLIC_URL=https://ronitnath.com
+Environment=RUST_LOG=info
+Environment=TRUSTED_PROXY=true
+# One specific wg0 bind replaces Docker's loopback + wg0 port publishes.
+# nanode is the public TLS origin and reaches this address over WireGuard.
+Environment=BIND_ADDR=10.0.0.1:3130
+
+CPUAccounting=yes
+MemoryAccounting=yes
+IOAccounting=yes
+TasksAccounting=yes
+CPUWeight=100
+MemoryHigh=30%
+MemoryMax=60%
+TasksMax=1024
+
+NoNewPrivileges=yes
+PrivateTmp=yes
+
+[Install]
+WantedBy=multi-user.target

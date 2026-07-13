@@ -1,0 +1,37 @@
+[Unit]
+Description=ronitnath mesh-only administration service
+After=network-online.target ronitnath-site.service
+Wants=network-online.target ronitnath-site.service
+
+[Service]
+Type=exec
+User=ronitnath-app
+WorkingDirectory=/nix/var/nix/profiles/ronitnath/share/ronitnath
+ExecStart=/nix/var/nix/profiles/ronitnath/bin/admin
+Restart=always
+RestartSec=2
+
+Environment=DATABASE_URL=sqlite:/data/apps/ronitnath/app.db
+Environment=PHOTO_STORAGE_DIR=/data/apps/ronitnath/photos
+Environment=OIDC_PROVIDERS_PATH=/data/apps/ronitnath/oidc_providers.json
+Environment=PUBLIC_URL=https://ronitnath.com
+Environment=RUST_LOG=info
+Environment=AUTH_SIGNUP=closed
+# One specific NetBird bind replaces Docker's loopback + mesh publishes.
+# The admin process deliberately has no public or wildcard listener.
+Environment=ADMIN_BIND_ADDR=100.88.31.199:3131
+
+CPUAccounting=yes
+MemoryAccounting=yes
+IOAccounting=yes
+TasksAccounting=yes
+CPUWeight=100
+MemoryHigh=30%
+MemoryMax=60%
+TasksMax=1024
+
+NoNewPrivileges=yes
+PrivateTmp=yes
+
+[Install]
+WantedBy=multi-user.target

@@ -213,6 +213,12 @@ threshold and stage_2 now has it. Until then, verify visually
 (agent-browser or equivalent): check the relevant breakpoints and both
 themes for anything layout- or theme-related.
 
+## Deployment
+
+Production packaging and service lifecycle live in `flake.nix` and `deploy/`;
+follow `docs/deploy.md` for build, cutover, rollback, data paths, and bind
+boundaries. The Nix/systemd path supersedes Docker Compose after cutover.
+
 ## Merge discipline (fork hygiene)
 
 `git remote -v` should show `upstream` pointing at stage_2 — `git fetch
