@@ -4,8 +4,6 @@
     "target": "ESNext",
     "module": "ESNext",
     "moduleDetection": "force",
-    "jsx": "preserve",
-    "jsxImportSource": "solid-js",
 
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,

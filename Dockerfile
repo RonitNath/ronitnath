@@ -1,10 +1,11 @@
-# Multi-stage build: Vite frontend, Rust release, then a slim runtime with both bins.
-FROM oven/bun:1 AS frontend
+# Multi-stage build: standalone esbuild frontend, Rust release, then a slim runtime with both bins.
+FROM debian:trixie-slim AS frontend
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends esbuild \
+    && rm -rf /var/lib/apt/lists/*
 WORKDIR /app/ts
-COPY ts/package.json ts/bun.lock ./
-RUN bun install --frozen-lockfile
 COPY ts/ ./
-RUN mkdir -p /app/static && bun run build
+RUN mkdir -p /app/static && ./build.sh
 
 FROM rust:1-bookworm AS build
 WORKDIR /app
