@@ -169,8 +169,13 @@ function renderForm(mount: HTMLElement, endpoint: string, view: GuestView): void
       partyInput.max = "10";
       partyInput.value = String(partySize);
       partyInput.addEventListener("input", () => {
-        partySize = Number(partyInput.value) || 1;
-        partyInput.value = String(partySize);
+        const nextPartySize = Number(partyInput.value) || 1;
+        // Match signal semantics: writing the same value does not repaint the
+        // input (so clearing an initial "1" stays clear while state remains 1).
+        if (nextPartySize !== partySize) {
+          partySize = nextPartySize;
+          partyInput.value = String(partySize);
+        }
       });
       partyLabel.append(partyInput);
       form.insertBefore(partyLabel, notesLabel);
