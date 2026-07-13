@@ -15,7 +15,6 @@ Environment=DATABASE_URL=sqlite:/data/apps/ronitnath/app.db
 Environment=PHOTO_STORAGE_DIR=/data/apps/ronitnath/photos
 Environment=OIDC_PROVIDERS_PATH=/data/apps/ronitnath/oidc_providers.json
 Environment=PUBLIC_URL=https://ronitnath.com
-Environment=COOKIE_SECURE=true
 Environment=RUST_LOG=info
 Environment=TRUSTED_PROXY=true
 # One specific wg0 bind replaces Docker's loopback + wg0 port publishes.

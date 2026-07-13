@@ -15,7 +15,6 @@ Environment=DATABASE_URL=sqlite:/data/apps/ronitnath/app.db
 Environment=PHOTO_STORAGE_DIR=/data/apps/ronitnath/photos
 Environment=OIDC_PROVIDERS_PATH=/data/apps/ronitnath/oidc_providers.json
 Environment=PUBLIC_URL=https://ronitnath.com
-Environment=COOKIE_SECURE=true
 Environment=RUST_LOG=info
 Environment=AUTH_SIGNUP=closed
 # One specific NetBird bind replaces Docker's loopback + mesh publishes.
