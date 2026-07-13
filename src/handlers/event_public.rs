@@ -15,6 +15,8 @@ use axum::extract::{Path, State};
 use axum::http::{HeaderMap, header};
 use axum::response::{IntoResponse, Response};
 use axum::{Extension, Json};
+use chrono::{NaiveDateTime, TimeZone, Utc};
+use chrono_tz::Tz;
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 use utoipa::ToSchema;
@@ -266,6 +268,7 @@ pub async fn ics(
             &view.title,
             &view.starts_at,
             end,
+            &event.timezone,
             Some(location),
             None
         ),
@@ -285,6 +288,7 @@ pub(crate) fn format_vevent(
     summary: &str,
     starts_at: &str,
     ends_at: &str,
+    timezone: &str,
     location: Option<&str>,
     description: Option<&str>,
 ) -> String {
@@ -293,8 +297,8 @@ pub(crate) fn format_vevent(
         "BEGIN:VEVENT".to_owned(),
         format!("UID:{}@ronitnath.com", escape_ics(uid)),
         format!("SUMMARY:{}", escape_ics(summary)),
-        format!("DTSTART:{}", ics_datetime(starts_at)),
-        format!("DTEND:{}", ics_datetime(ends_at)),
+        format!("DTSTART:{}", ics_datetime(starts_at, timezone)),
+        format!("DTEND:{}", ics_datetime(ends_at, timezone)),
     ] {
         push_ics_line(&mut body, &line);
     }
@@ -331,7 +335,25 @@ fn push_ics_line(output: &mut String, line: &str) {
     output.push_str("\r\n");
 }
 
-pub(crate) fn ics_datetime(value: &str) -> String {
+pub(crate) fn ics_datetime(value: &str, timezone: &str) -> String {
+    if let (Ok(naive), Ok(zone)) = (
+        NaiveDateTime::parse_from_str(value, "%Y-%m-%d %H:%M"),
+        timezone.parse::<Tz>(),
+    ) {
+        // For DST transitions, choose the earliest instant; nonexistent times fall back below.
+        let local = match zone.from_local_datetime(&naive) {
+            chrono::LocalResult::Single(instant) => Some(instant),
+            chrono::LocalResult::Ambiguous(earliest, _) => Some(earliest),
+            chrono::LocalResult::None => None,
+        };
+        if let Some(instant) = local {
+            return instant
+                .with_timezone(&Utc)
+                .format("%Y%m%dT%H%M%SZ")
+                .to_string();
+        }
+    }
+
     let compact: String = value
         .chars()
         .filter(|c| !matches!(c, '-' | ':'))
@@ -366,6 +388,7 @@ mod ics_tests {
             &long_utf8,
             "2099-07-12 10:00",
             "2099-07-12 11:00",
+            "America/Los_Angeles",
             Some(&long_utf8),
             Some(hostile),
         );
@@ -378,6 +401,26 @@ mod ics_tests {
         assert!(unfolded.contains("DESCRIPTION:hello\\nBEGIN:VEVENT\\,semi\\;"));
         assert!(!output.contains("hello\nBEGIN:VEVENT"));
         assert!(output.contains("\r\n "), "long field was not folded");
+    }
+
+    #[test]
+    fn event_times_convert_to_utc_for_summer_and_winter() {
+        assert_eq!(
+            super::ics_datetime("2099-07-12 10:00", "America/Los_Angeles"),
+            "20990712T170000Z"
+        );
+        assert_eq!(
+            super::ics_datetime("2099-01-12 10:00", "America/Los_Angeles"),
+            "20990112T180000Z"
+        );
+    }
+
+    #[test]
+    fn unknown_timezone_falls_back_to_floating_datetime() {
+        assert_eq!(
+            super::ics_datetime("2099-07-12 10:00", "Not/A_Timezone"),
+            "20990712T100000"
+        );
     }
 }
 

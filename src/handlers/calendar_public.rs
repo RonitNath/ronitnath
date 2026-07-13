@@ -340,6 +340,7 @@ pub async fn feed(
             &item.title,
             &item.starts_at,
             end,
+            &item.timezone,
             location,
             description,
         ));
