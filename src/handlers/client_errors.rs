@@ -37,8 +37,8 @@ fn truncate(s: &str) -> &str {
     responses((status = 204, description = "Error recorded"))
 )]
 pub async fn report(Json(report): Json<ClientErrorReport>) -> StatusCode {
-    // No `target:` override here — it must stay under the `stage_2` module
-    // path so the default `RUST_LOG` filter (`stage_2=debug,...`) doesn't
+    // No `target:` override here — it must stay under the crate module
+    // path so the default `RUST_LOG` filter (`ronitnath=debug,...`) doesn't
     // silently drop it. Grep the log for "client error" to find these.
     tracing::warn!(
         message = truncate(&report.message),

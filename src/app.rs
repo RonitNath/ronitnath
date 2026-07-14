@@ -101,7 +101,7 @@ pub fn build_site_router(state: AppState, config: &Config) -> Router {
     apply_layers(router.merge(photo_router), state, config, true)
 }
 
-/// Builds the full authenticated/admin surface, preserving the stage_2 routes.
+/// Builds the full authenticated/admin surface, preserving the web_template routes.
 pub fn build_admin_router(state: AppState, config: &Config) -> Router {
     let rate_limiter = RateLimiter::new(config.rate_limit_per_minute, config.trust_proxy);
     let (router, api) = OpenApiRouter::with_openapi(ApiDoc::openapi())
@@ -527,7 +527,7 @@ mod tests {
 
         // Config::for_tests() allows 10/min; the 11th from the same client
         // should be refused. client-errors is the only unauthenticated
-        // write route left in stage_2 (guestbook now requires login).
+        // write route left in web_template (guestbook now requires login).
         for _ in 0..10 {
             let (status, _, _) = post_json_from(&app, "/api/client-errors", &body, addr).await;
             assert_eq!(status, StatusCode::NO_CONTENT);
@@ -578,7 +578,7 @@ mod tests {
         assert_eq!(status, StatusCode::PAYLOAD_TOO_LARGE);
     }
 
-    // --- stage_2 auth exemplars (see docs/plans/2026-07-stage2-hardened-fork-template.md) ---
+    // --- web_template auth exemplars (see docs/plans/2026-07-stage2-hardened-fork-template.md) ---
 
     #[tokio::test]
     async fn signup_creates_identity_and_authenticated_session_roundtrips() {

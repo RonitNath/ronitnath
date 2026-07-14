@@ -1,6 +1,6 @@
 # OIDC factor
 
-`stage_2` can act as an OpenID Connect relying party. With no provider file, no SSO UI is rendered and the auth routes stay inert.
+`web_template` can act as an OpenID Connect relying party. With no provider file, no SSO UI is rendered and the auth routes stay inert.
 
 ## Config
 

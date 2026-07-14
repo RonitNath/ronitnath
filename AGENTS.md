@@ -1,6 +1,6 @@
 # ronitnath.com — agent instructions
 
-ronitnath.com is a product fork of stage_2 and retains its full auth model
+ronitnath.com is a product fork of web_template and retains its full auth model
 (identity/account/membership/factor — see README.md). Extend it — never
 replace a piece wholesale. One module per feature area (see organization.md
 in your cross-machine context, if you have one).
@@ -201,7 +201,7 @@ there for seeding data HTTP can't reach yet, like a role-gating test) and
 drives it with `tower::ServiceExt::oneshot`. `test_util::signup(...)` runs
 the real signup form and returns a ready-to-use `Authed { cookie,
 csrf_token }`. See the exemplars in `#[cfg(test)] mod tests` at the bottom
-of `src/app.rs` — one per stage_2 auth property (signup→session roundtrip,
+of `src/app.rs` — one per web_template auth property (signup→session roundtrip,
 wrong-password + audit row, CSRF required on mutation, cross-account
 isolation, role gating, session revocation, bearer-token auth + its own
 revocation, factor add/remove + last-factor guard) plus the carried-over
@@ -209,7 +209,7 @@ stage_1 hardening exemplars. Copy the pattern rather than inventing a new one.
 
 No playwright yet; add it when the app grows a real multi-step user flow —
 login → mutate → logout is stage_1's stated "real multi-step user flow"
-threshold and stage_2 now has it. Until then, verify visually
+threshold and web_template now has it. Until then, verify visually
 (agent-browser or equivalent): check the relevant breakpoints and both
 themes for anything layout- or theme-related.
 
@@ -221,10 +221,10 @@ boundaries. The Nix/systemd path supersedes Docker Compose after cutover.
 
 ## Merge discipline (fork hygiene)
 
-`git remote -v` should show `upstream` pointing at stage_2 — `git fetch
+`git remote -v` should show `upstream` pointing at web_template — `git fetch
 upstream && git merge upstream/main` periodically. Keep product features in
 new feature-area modules. The intentional fork seams are `src/bin/{site,admin}.rs`,
 router composition in `src/app.rs`, the two bind addresses in `src/config.rs`,
 and deployment/identity files. Preserve the public/admin trust-boundary split
 when resolving upstream changes: site has no session middleware or auth routes;
-admin retains the full stage_2 auth surface.
+admin retains the full web_template auth surface.

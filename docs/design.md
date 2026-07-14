@@ -6,7 +6,7 @@ Helps visitors (recruiters, collaborators, event guests) find Ronit Nath and
 his events under a single identity while feeling like a quiet, confident
 night sky — not a SaaS dashboard wearing a portfolio's clothes.
 
-This is phase 1 of a unification: stage_2's skeleton (auth, admin, guestbook)
+This is phase 1 of a unification: web_template's skeleton (auth, admin, guestbook)
 is being restyled to wear the **existing live site's** look
 (https://ronitnath.com), not a new invented one. Every value below is
 codified from that site, not derived from scratch. Phase 3 adds an
@@ -87,7 +87,7 @@ light)` when no explicit choice is stored):**
 | `--accent-fg` | `oklch(0.97 0.003 240)` |
 
 Semantic status hues (new — not in the legacy single-page site, needed
-because stage_2 has forms/errors the legacy site never did): keep the same
+because web_template has forms/errors the legacy site never did): keep the same
 hue family discipline (low chroma neutrals, one saturated accent) —
 
 - `--danger`: `oklch(0.60 0.18 25)` dark / `oklch(0.50 0.18 25)` light (form
@@ -193,18 +193,18 @@ gets this).
 
 The legacy site used a `__rn_theme` **cookie** + a pre-paint inline
 `<script>` that reads the cookie and sets `data-theme` before first paint.
-stage_2's skeleton already has an equivalent no-FOUC mechanism, but keyed on
+web_template's skeleton already has an equivalent no-FOUC mechanism, but keyed on
 **`localStorage["theme"]`** instead of a cookie, wired through
 `templates/_theme.html` (pre-paint inline `<style>`+`<script>`, hashed into
 the CSP by `src/security_headers.rs`) and `ts/src/lib/theme.ts` (the toggle
 button handler).
 
-**Decision: keep stage_2's localStorage mechanism, do not port the cookie.**
-Reasons: (1) stage_2's inline script is CSP-hash-pinned and covered by a
+**Decision: keep web_template's localStorage mechanism, do not port the cookie.**
+Reasons: (1) web_template's inline script is CSP-hash-pinned and covered by a
 `cargo test` — swapping the storage backend is a net-new surface with no
 functional gain; (2) a cookie only earns its keep once the *server* reads it
 to set `data-theme` on the initial HTML response (avoiding even the
-pre-paint-script gap) — stage_2's handlers don't read cookies for rendering
+pre-paint-script gap) — web_template's handlers don't read cookies for rendering
 today, and wiring that up is a `src/handlers` + `view.rs` change, out of
 scope for a styling leg; (3) the two mechanisms are behaviorally identical
 to a visitor (explicit choice persists, defaults to system preference, no
@@ -227,7 +227,7 @@ values, they already match.
   the actual `ref:` id, not a stack trace.
 - Forbidden words: "Get Started", "Manage" (bare, no object), "Submit"
   (bare — always "Submit <thing>" or better, a specific verb), "Welcome to
-  stage_2" (or any leftover skeleton branding — grep for "stage_2" in
+  web_template" (or any leftover skeleton branding — grep for "web_template" in
   templates before shipping and replace with "Ronit Nath" / the actual
   product name).
 - Social links use platform names as link text (GitHub, Instagram,

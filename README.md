@@ -1,11 +1,11 @@
 # ronitnath.com
 
 The unified ronitnath.com application, forked from
-[stage_2](https://github.com/RonitNath/stage_2). It keeps stage_2's hardened
+[web_template](https://github.com/RonitNath/web_template). It keeps web_template's hardened
 identity/account/factor auth foundation while separating the public site from
 the authenticated admin surface. Agents: read [AGENTS.md](AGENTS.md) first.
 
-This repository tracks stage_2 upstream via `git merge` (see AGENTS.md's
+This repository tracks web_template upstream via `git merge` (see AGENTS.md's
 "Merge discipline") — it is a product fork, not a copy.
 
 ## The auth model
