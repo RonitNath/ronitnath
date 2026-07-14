@@ -113,9 +113,14 @@ point_link() {
     sudo mv -T "$staged" "$2"
 }
 
+# The data root is only traversable by the service account and root, so every
+# read of the release pointers goes through sudo like the writes do.
+link_target() {
+    sudo readlink "$1" 2>/dev/null || true
+}
+
 switch_current() {
-    old_target=''
-    [ ! -L "$CURRENT_LINK" ] || old_target=$(readlink "$CURRENT_LINK")
+    old_target=$(link_target "$CURRENT_LINK")
     point_link "$RELEASE_DIR" "$CURRENT_LINK"
     if [ -n "$old_target" ] && [ "$old_target" != "$RELEASE_DIR" ]; then
         point_link "$old_target" "$PREVIOUS_LINK"
@@ -123,12 +128,10 @@ switch_current() {
 }
 
 prune_releases() {
-    keep_current=''
-    keep_previous=''
-    [ ! -L "$CURRENT_LINK" ] || keep_current=$(readlink "$CURRENT_LINK")
-    [ ! -L "$PREVIOUS_LINK" ] || keep_previous=$(readlink "$PREVIOUS_LINK")
+    keep_current=$(link_target "$CURRENT_LINK")
+    keep_previous=$(link_target "$PREVIOUS_LINK")
     kept=0
-    for release in $(ls -1 "$RELEASES_DIR" | sort -r); do
+    for release in $(sudo ls -1 "$RELEASES_DIR" | sort -r); do
         path="$RELEASES_DIR/$release"
         if [ "$path" = "$keep_current" ] || [ "$path" = "$keep_previous" ] \
             || [ "$kept" -lt "$KEEP_RELEASES" ]; then
@@ -153,10 +156,10 @@ deploy() {
 rollback() {
     require_command sudo
     require_command systemctl
-    [ -L "$CURRENT_LINK" ] || fail "current release pointer missing; deploy once before rollback"
-    [ -L "$PREVIOUS_LINK" ] || fail "no previous release recorded; nothing to roll back to"
-    current_target=$(readlink "$CURRENT_LINK")
-    previous_target=$(readlink "$PREVIOUS_LINK")
+    current_target=$(link_target "$CURRENT_LINK")
+    previous_target=$(link_target "$PREVIOUS_LINK")
+    [ -n "$current_target" ] || fail "current release pointer missing; deploy once before rollback"
+    [ -n "$previous_target" ] || fail "no previous release recorded; nothing to roll back to"
     point_link "$previous_target" "$CURRENT_LINK"
     point_link "$current_target" "$PREVIOUS_LINK"
     restart_services
@@ -166,11 +169,13 @@ status() {
     require_command sudo
     require_command systemctl
     sudo systemctl status "$SITE_UNIT" "$ADMIN_UNIT" --no-pager || true
-    [ -L "$CURRENT_LINK" ] || fail "current release pointer missing; deploy once before status"
-    printf '\nCurrent release: %s\n' "$(readlink "$CURRENT_LINK")"
-    cat "$CURRENT_LINK/release.json" 2>/dev/null || true
-    [ ! -L "$PREVIOUS_LINK" ] \
-        || printf 'Previous release: %s\n' "$(readlink "$PREVIOUS_LINK")"
+    current_target=$(link_target "$CURRENT_LINK")
+    [ -n "$current_target" ] || fail "current release pointer missing; deploy once before status"
+    printf '\nCurrent release: %s\n' "$current_target"
+    sudo cat "$current_target/release.json" 2>/dev/null || true
+    previous_target=$(link_target "$PREVIOUS_LINK")
+    [ -z "$previous_target" ] \
+        || printf 'Previous release: %s\n' "$previous_target"
 }
 
 init() {
