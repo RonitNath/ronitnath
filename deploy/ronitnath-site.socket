@@ -1,0 +1,13 @@
+[Unit]
+Description=ronitnath public listen socket
+
+[Socket]
+# systemd holds this socket across service restarts, so connections arriving
+# during a deploy's restart gap queue in the kernel instead of being refused.
+# Keep the address in sync with BIND_ADDR in ronitnath-site.service.
+ListenStream=10.0.0.1:3130
+# The wg0 address may not exist yet when sockets come up at boot.
+FreeBind=true
+
+[Install]
+WantedBy=sockets.target

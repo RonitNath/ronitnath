@@ -413,9 +413,32 @@ pub async fn run_admin() {
 }
 
 async fn serve(app: Router, bind_addr: &str) {
-    let listener = tokio::net::TcpListener::bind(bind_addr)
-        .await
-        .unwrap_or_else(|e| panic!("failed to bind {bind_addr}: {e}"));
+    // A socket-activated listener wins: each systemd socket unit keeps its
+    // port bound while deploys restart the service, so connections arriving
+    // in the restart gap queue instead of being refused. Runs without
+    // activation (local dev, foreign service managers) bind the configured
+    // address themselves.
+    let mut inherited = listenfd::ListenFd::from_env();
+    assert!(
+        inherited.len() <= 1,
+        "expected at most one inherited listen socket, found {}",
+        inherited.len()
+    );
+    let inherited = inherited
+        .take_tcp_listener(0)
+        .unwrap_or_else(|e| panic!("failed to adopt inherited listen socket: {e}"));
+    let listener = match inherited {
+        Some(listener) => {
+            listener
+                .set_nonblocking(true)
+                .expect("failed to make inherited listener non-blocking");
+            tokio::net::TcpListener::from_std(listener)
+                .expect("failed to register inherited listener")
+        }
+        None => tokio::net::TcpListener::bind(bind_addr)
+            .await
+            .unwrap_or_else(|e| panic!("failed to bind {bind_addr}: {e}")),
+    };
     info!("listening on http://{}", listener.local_addr().unwrap());
     axum::serve(
         listener,

@@ -5,6 +5,8 @@ APP_NAME='ronitnath'
 SERVICE_USER='ronitnath-app'
 SITE_UNIT="$APP_NAME-site.service"
 ADMIN_UNIT="$APP_NAME-admin.service"
+SITE_SOCKET="$APP_NAME-site.socket"
+ADMIN_SOCKET="$APP_NAME-admin.socket"
 DATA_DIR="/data/apps/$APP_NAME"
 PHOTO_DIR="$DATA_DIR/photos"
 RELEASES_DIR="$DATA_DIR/releases"
@@ -15,6 +17,8 @@ SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 PROJECT_ROOT=$(dirname -- "$SCRIPT_DIR")
 SITE_UNIT_SOURCE="$SCRIPT_DIR/$SITE_UNIT"
 ADMIN_UNIT_SOURCE="$SCRIPT_DIR/$ADMIN_UNIT"
+SITE_SOCKET_SOURCE="$SCRIPT_DIR/$SITE_SOCKET"
+ADMIN_SOCKET_SOURCE="$SCRIPT_DIR/$ADMIN_SOCKET"
 
 fail() {
     printf '%s\n' "deploy: $*" >&2
@@ -38,6 +42,9 @@ resolve_command() {
 }
 
 restart_services() {
+    # The socket units keep both listen sockets bound while the services
+    # restart, so connections queue in the kernel instead of being refused;
+    # the binaries drain in-flight requests on SIGTERM.
     # Site owns migrations. Start it first; admin's Restart=always handles the
     # narrow interval before a newly added migration has completed.
     sudo systemctl restart "$SITE_UNIT"
@@ -186,6 +193,8 @@ init() {
     USERADD=$(resolve_command useradd)
     [ -f "$SITE_UNIT_SOURCE" ] || fail "unit file not found: $SITE_UNIT_SOURCE"
     [ -f "$ADMIN_UNIT_SOURCE" ] || fail "unit file not found: $ADMIN_UNIT_SOURCE"
+    [ -f "$SITE_SOCKET_SOURCE" ] || fail "socket unit file not found: $SITE_SOCKET_SOURCE"
+    [ -f "$ADMIN_SOCKET_SOURCE" ] || fail "socket unit file not found: $ADMIN_SOCKET_SOURCE"
 
     if ! id "$SERVICE_USER" >/dev/null 2>&1; then
         sudo "$USERADD" --system --user-group --home-dir "$DATA_DIR" \
@@ -197,8 +206,10 @@ init() {
     sudo install -d -m 0755 "$RELEASES_DIR"
     sudo install -m 0644 "$SITE_UNIT_SOURCE" "/etc/systemd/system/$SITE_UNIT"
     sudo install -m 0644 "$ADMIN_UNIT_SOURCE" "/etc/systemd/system/$ADMIN_UNIT"
+    sudo install -m 0644 "$SITE_SOCKET_SOURCE" "/etc/systemd/system/$SITE_SOCKET"
+    sudo install -m 0644 "$ADMIN_SOCKET_SOURCE" "/etc/systemd/system/$ADMIN_SOCKET"
     sudo systemctl daemon-reload
-    sudo systemctl enable "$SITE_UNIT" "$ADMIN_UNIT"
+    sudo systemctl enable "$SITE_UNIT" "$ADMIN_UNIT" "$SITE_SOCKET" "$ADMIN_SOCKET"
 }
 
 [ "$#" -le 1 ] || fail "usage: $0 [deploy|rollback|status|init]"

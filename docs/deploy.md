@@ -9,6 +9,14 @@ repoints the `current` symlink that both units resolve at start. systemd runs
 the binaries as the dedicated `ronitnath-app` account; the human `ronitnath`
 account remains the operator.
 
+Each service has a paired socket unit (`ronitnath-{site,admin}.socket`) that
+owns its listen socket. systemd keeps those sockets bound while the services
+restart, so connections arriving during a deploy queue in the kernel instead
+of being refused, and the binaries drain in-flight requests on SIGTERM — a
+routine deploy refuses no connections. The processes adopt the activated
+socket at start and fall back to binding `BIND_ADDR`/`ADMIN_BIND_ADDR` when
+run without socket activation (local development).
+
 The checked-in `docker-compose.yml` is the pre-2026-07-13 deployment path. It
 is not used for normal releases, but is retained as the last-resort container
 rollback path until that fallback is intentionally retired.
@@ -26,6 +34,9 @@ rollback path until that fallback is intentionally retired.
 - Optional OIDC provider registry: `/data/apps/ronitnath/oidc_providers.json`
 - Public site: `10.0.0.1:3130` on `wg0`, reached only by the nanode origin
 - Admin: `100.88.31.199:3131` on the NetBird mesh
+- Each address appears twice by design: `ListenStream` in the socket unit
+  (the live listener) and `BIND_ADDR`/`ADMIN_BIND_ADDR` in the service (the
+  non-activated fallback). Change them together.
 
 The single explicit bind in each unit deliberately replaces Docker's two port
 publishes. The site does not need a host-loopback listener: nanode terminates
@@ -57,7 +68,7 @@ resolves privileged helpers such as `useradd` itself before invoking `sudo`.
 ## One-time initialization
 
 Creates the service account, data and release directories, installs both
-units, and enables them without starting them:
+service units and both socket units, and enables them without starting them:
 
 ```sh
 ./deploy/deploy.sh init
@@ -79,8 +90,9 @@ curl --fail --show-error http://100.88.31.199:3131/healthz
 ```
 
 `deploy` builds incrementally, stamps the release, flips `current`, restarts
-site first and admin second, holds a 5-second readiness gate on both units,
-then prunes old releases. All runtime writes remain under
+site first and admin second (the socket units keep both ports accepting
+throughout), holds a 5-second readiness gate on both units, then prunes old
+releases. All runtime writes remain under
 `/data/apps/ronitnath`.
 
 Before a release containing migrations, take and verify a database backup.

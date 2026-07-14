@@ -1,7 +1,8 @@
 [Unit]
 Description=ronitnath mesh-only administration service
-After=network-online.target ronitnath-site.service
+After=network-online.target ronitnath-site.service ronitnath-admin.socket
 Wants=network-online.target ronitnath-site.service
+Requires=ronitnath-admin.socket
 
 [Service]
 Type=exec
@@ -22,6 +23,8 @@ Environment=RUST_LOG=info
 Environment=AUTH_SIGNUP=closed
 # One specific NetBird bind replaces Docker's loopback + mesh publishes.
 # The admin process deliberately has no public or wildcard listener.
+# The socket unit's ListenStream is the live listener; ADMIN_BIND_ADDR is only
+# the fallback for runs without socket activation. Keep the two in sync.
 Environment=ADMIN_BIND_ADDR=100.88.31.199:3131
 
 CPUAccounting=yes

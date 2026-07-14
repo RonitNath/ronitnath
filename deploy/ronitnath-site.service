@@ -1,7 +1,8 @@
 [Unit]
 Description=ronitnath public origin behind nanode
-After=network-online.target
+After=network-online.target ronitnath-site.socket
 Wants=network-online.target
+Requires=ronitnath-site.socket
 
 [Service]
 Type=exec
@@ -22,6 +23,8 @@ Environment=RUST_LOG=info
 Environment=TRUSTED_PROXY=true
 # One specific wg0 bind replaces Docker's loopback + wg0 port publishes.
 # nanode is the public TLS origin and reaches this address over WireGuard.
+# The socket unit's ListenStream is the live listener; BIND_ADDR is only the
+# fallback for runs without socket activation. Keep the two in sync.
 Environment=BIND_ADDR=10.0.0.1:3130
 
 CPUAccounting=yes
