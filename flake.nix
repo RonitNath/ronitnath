@@ -1,10 +1,9 @@
 {
-  description = "Nix package for ronitnath";
+  description = "Pinned build environment for ronitnath";
 
   inputs = {
-    # flake.lock pins these inputs once `nix flake lock` is run on the Linux
-    # build host. Keep the lock committed so profile generations are
-    # reconstructable.
+    # flake.lock pins these inputs. Keep the lock committed so every build
+    # host resolves the exact same toolchain.
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.11";
     rust-overlay = {
       url = "github:oxalica/rust-overlay";
@@ -12,61 +11,32 @@
     };
   };
 
+  # This flake deliberately packages nothing. Release builds run incrementally
+  # on the build host through deploy/deploy.sh inside this shell, so a source
+  # change recompiles only the crates it touches; the flake's sole job is
+  # pinning the toolchain that performs those builds (owner ruling 2026-07-14:
+  # maximum incrementality, no sandboxed rebuilds).
   outputs = { nixpkgs, rust-overlay, ... }:
     let
       supportedSystems = [ "x86_64-linux" ];
       forAllSystems = nixpkgs.lib.genAttrs supportedSystems;
     in {
-      packages = forAllSystems (system:
+      devShells = forAllSystems (system:
         let
-          # nixpkgs 25.11 ships rustc 1.91.1, older than parts of this crate
-          # graph require (first nix build failed on it). The Dockerfile built
-          # with floating rust:1-bookworm; mirror that with the overlay's
-          # current stable, pinned by flake.lock.
           pkgs = import nixpkgs {
             inherit system;
             overlays = [ rust-overlay.overlays.default ];
           };
-          rustToolchain = pkgs.rust-bin.stable.latest.minimal;
-          rustPlatform = pkgs.makeRustPlatform {
-            cargo = rustToolchain;
-            rustc = rustToolchain;
-          };
         in {
-          default = rustPlatform.buildRustPackage {
-            pname = "ronitnath";
-            version = "0.1.0";
-            src = ./.;
-
-            cargoLock.lockFile = ./Cargo.lock;
-            cargoBuildFlags = [ "--bin" "site" "--bin" "admin" ];
-
-            # sqlx query macros compile against the committed offline cache;
-            # no production database is needed or available in the sandbox.
-            SQLX_OFFLINE = "true";
-
-            # build.sh accepts an explicit esbuild executable. esbuild is a
-            # build-only Go binary, so Node and a package manager are absent
-            # from the runtime closure.
-            preBuild = ''
-              ESBUILD=${pkgs.esbuild}/bin/esbuild sh ts/build.sh
-            '';
-
-            postInstall = ''
-              # Fail during packaging rather than after activation if Cargo's
-              # install hook ever stops installing one of the selected bins.
-              test -x "$out/bin/site"
-              test -x "$out/bin/admin"
-
-              mkdir -p "$out/share/ronitnath"
-              cp -R static "$out/share/ronitnath/static"
-              test -f "$out/share/ronitnath/static/dist/site.js"
-              test -f "$out/share/ronitnath/static/dist/guestbook.js"
-              test -f "$out/share/ronitnath/static/dist/event_rsvp.js"
-              test -f "$out/share/ronitnath/static/dist/events_admin.js"
-            '';
-
-            meta.mainProgram = "site";
+          default = pkgs.mkShell {
+            packages = [
+              # rust-overlay's current stable, pinned by flake.lock (nixpkgs
+              # 25.11 ships rustc 1.91.1, older than this crate graph needs).
+              pkgs.rust-bin.stable.latest.minimal
+              # esbuild is the entire JS toolchain here: ts/build.sh bundles
+              # the no-package-manager frontend with it.
+              pkgs.esbuild
+            ];
           };
         });
     };

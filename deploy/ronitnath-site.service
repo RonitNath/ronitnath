@@ -6,8 +6,11 @@ Wants=network-online.target
 [Service]
 Type=exec
 User=ronitnath-app
-WorkingDirectory=/nix/var/nix/profiles/ronitnath/share/ronitnath
-ExecStart=/nix/var/nix/profiles/ronitnath/bin/site
+# The current symlink re-resolves at each service start, so restarting after
+# deploy.sh's pointer flip (deploy or rollback) is what moves traffic. The
+# release root also carries static/, served relative to this directory.
+WorkingDirectory=/data/apps/ronitnath/current
+ExecStart=/data/apps/ronitnath/current/bin/site
 Restart=always
 RestartSec=2
 
