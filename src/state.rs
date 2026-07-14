@@ -10,7 +10,7 @@ use crate::store::Store;
 
 /// Auth knobs every request needs — split out from [`crate::config::Config`]
 /// because that struct also carries things (bind address, body limits)
-/// nothing in `src/auth` should have to know about.
+/// nothing in `src/auth` should have to know about it.
 #[derive(Clone)]
 pub struct AuthConfig {
     /// Whether to set the `Secure` cookie flag (and use the `__Host-`
