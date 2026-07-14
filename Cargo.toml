@@ -42,3 +42,10 @@ image = { version = "0.25", default-features = false, features = ["jpeg", "png",
 kamadak-exif = "0.6"
 
 qrcode = { version = "0.14", default-features = false, features = ["svg"] }
+
+# Owner ruling 2026-07-14: maximum incrementality. Shallow changes must
+# redeploy in seconds, so release builds keep incremental codegen; this
+# service is nowhere near CPU-bound enough for the optimization loss to
+# matter.
+[profile.release]
+incremental = true
