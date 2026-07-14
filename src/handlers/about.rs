@@ -1,4 +1,7 @@
 //! About page.
+//!
+//! Currently registered only on the admin router; the public nav links here
+//! but the site router does not serve it.
 
 use askama::Template;
 use axum::response::Response;
