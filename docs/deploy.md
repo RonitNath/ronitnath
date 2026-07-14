@@ -1,23 +1,29 @@
-# Production deployment (Nix + systemd)
+# Production deployment (incremental releases + systemd)
 
 Production is a **release** deployment with **durable** SQLite and photo data.
-`flake.nix` builds one package containing both Rust binaries and the four
-esbuild entry bundles. systemd runs the binaries as the dedicated
-`ronitnath-app` account; the human `ronitnath` account remains the operator.
+`flake.nix` is a toolchain-only dev shell (pinned Rust via rust-overlay,
+`pkgs.esbuild`); it packages nothing. `deploy/deploy.sh deploy` compiles both
+Rust binaries incrementally on the build host inside that shell, rebundles the
+four esbuild entries, stamps a read-only release directory, and atomically
+repoints the `current` symlink that both units resolve at start. systemd runs
+the binaries as the dedicated `ronitnath-app` account; the human `ronitnath`
+account remains the operator.
 
-The checked-in `docker-compose.yml` is the previous deployment path. It is not
-used for normal releases after cutover, but is retained as the immediate
-container rollback path until that fallback is intentionally retired.
+The checked-in `docker-compose.yml` is the pre-2026-07-13 deployment path. It
+is not used for normal releases, but is retained as the last-resort container
+rollback path until that fallback is intentionally retired.
 
 ## Layout and network boundary
 
-- Nix profile: `/nix/var/nix/profiles/ronitnath`
+- Releases: `/data/apps/ronitnath/releases/<utc-stamp>-<rev>/`
+  (root-owned, read-only to the service; `bin/site`, `bin/admin`, `static/`,
+  and a `release.json` provenance manifest with binary/lockfile digests)
+- Active release: `/data/apps/ronitnath/current` (atomic symlink; `previous`
+  retains the prior release for rollback; the newest five plus both pointers
+  survive pruning)
 - SQLite: `/data/apps/ronitnath/app.db`
 - Uploaded photos: `/data/apps/ronitnath/photos/`
-- Optional OIDC provider registry:
-  `/data/apps/ronitnath/oidc_providers.json`
-- Packaged, read-only static tree:
-  `/nix/var/nix/profiles/ronitnath/share/ronitnath/static/`
+- Optional OIDC provider registry: `/data/apps/ronitnath/oidc_providers.json`
 - Public site: `10.0.0.1:3130` on `wg0`, reached only by the nanode origin
 - Admin: `100.88.31.199:3131` on the NetBird mesh
 
@@ -32,109 +38,70 @@ SQLite file and applies migrations. `admin` only opens a migrated database, so
 its unit wants and starts after `ronitnath-site.service`; its restart policy
 also covers the short interval while a new site migration finishes.
 
-## First build and initialization
+## Build mechanics
 
-Run from a clean checkout of the exact release revision on the x86_64 Linux
-host. This repository currently has no `rust-toolchain.toml`, so the flake uses
-nixpkgs' matched Rust platform directly. It uses the committed `.sqlx` cache
-with `SQLX_OFFLINE=true` and invokes `ts/build.sh` with nixpkgs esbuild; Node,
+The dev shell pins the toolchain; the checkout's `target/` directory carries
+the compilation cache, and `[profile.release] incremental = true` keeps
+release codegen incremental, so a shallow change recompiles in ~2s (whole
+deploy ≈ 8s, of which 5s is the post-restart readiness gate). A fresh checkout
+builds cold in ~2 minutes. The build uses the committed `.sqlx` cache with
+`SQLX_OFFLINE=true` and invokes `ts/build.sh` with the shell's esbuild; Node,
 `npm`, and other JavaScript package managers are not build or runtime inputs.
-The crate has no private Git dependencies, so `buildRustPackage` needs only
-`Cargo.lock` and does not consume the operator's GitHub credentials.
 
-Generate and commit the input lock before the first deployment (the Windows
-authoring machine does not have Nix):
+`deploy.sh` warns when the working tree is dirty and marks the release
+`-dirty` in its directory name and manifest; deploy releases only from clean,
+pushed revisions. `nix` is not on non-login/`sudo` PATHs on the target —
+export `/nix/var/nix/profiles/default/bin` onto `PATH` first; the script
+resolves privileged helpers such as `useradd` itself before invoking `sudo`.
 
-```sh
-nix flake lock
-git add flake.lock
-git commit -m 'build: lock Nix inputs'
-nix build .#default
-test -x ./result/bin/site
-test -x ./result/bin/admin
-ls ./result/share/ronitnath/static/dist/{site,guestbook,event_rsvp,events_admin}.js
-```
+## One-time initialization
 
-The one-time initialization creates the service account and data directories,
-installs both units, and enables them without starting them:
+Creates the service account, data and release directories, installs both
+units, and enables them without starting them:
 
 ```sh
 ./deploy/deploy.sh init
 ```
 
-`deploy/deploy.sh` resolves privileged helpers such as `useradd` and
-`nix-env` before invoking `sudo`. This is required because sudo's clean PATH on
-the target does not include the multi-user Nix profile.
-
-## Cut over from Docker Compose
-
-Build and initialize first so the downtime window contains only shutdown,
-data copy, activation, and verification. Run these commands from the checkout
-whose `./data/` is mounted by the old Compose deployment:
-
-```sh
-nix build .#default
-./deploy/deploy.sh init
-
-docker compose down
-stamp=$(date -u +%Y%m%dT%H%M%SZ)
-sudo install -d -m 0750 -o ronitnath-app -g ronitnath-app \
-  /data/apps/ronitnath/backups
-sudo cp -a ./data "/data/apps/ronitnath/backups/compose-$stamp"
-sudo rsync -a ./data/ /data/apps/ronitnath/
-sudo chown -R ronitnath-app:ronitnath-app /data/apps/ronitnath
-
-./deploy/deploy.sh deploy
-./deploy/deploy.sh status
-curl --fail --show-error http://10.0.0.1:3130/healthz
-curl --fail --show-error http://100.88.31.199:3131/healthz
-```
-
-Then verify the public `https://ronitnath.com` path through nanode and verify an
-authenticated admin flow over the mesh. The existing ingress destination does
-not change: only the process owning the two host sockets changes.
-
-Do not run Compose and the systemd services together: they contend for the
-same addresses and may write the same logical database. `docker compose down`
-is therefore the explicit cutover gate.
+Re-run `init` whenever the unit files change; it is idempotent and ends with
+`daemon-reload`.
 
 ## Routine deploys
 
 From a clean, updated checkout with the committed `flake.lock`:
 
 ```sh
-nix build .#default
+git pull --ff-only
 ./deploy/deploy.sh deploy
 ./deploy/deploy.sh status
 curl --fail --show-error http://10.0.0.1:3130/healthz
 curl --fail --show-error http://100.88.31.199:3131/healthz
 ```
 
-`deploy` builds `.#default`, points the dedicated Nix profile at `./result`,
-then restarts site first and admin second. The profile and packaged static tree
-are read-only. All runtime writes remain under `/data/apps/ronitnath`.
+`deploy` builds incrementally, stamps the release, flips `current`, restarts
+site first and admin second, holds a 5-second readiness gate on both units,
+then prunes old releases. All runtime writes remain under
+`/data/apps/ronitnath`.
 
 Before a release containing migrations, take and verify a database backup.
-Changing profile generations does not reverse a durable SQLite migration.
+Release rollback does not reverse a durable SQLite migration.
 
 ## Rollback
 
-For a package-only rollback, switch to the preceding retained Nix profile
-generation and restart both services:
+For a binary/asset rollback, swap `current` with `previous` and restart:
 
 ```sh
 ./deploy/deploy.sh rollback
 ./deploy/deploy.sh status
 ```
 
-Inspect all retained generations with:
+Inspect retained releases with `sudo ls -l /data/apps/ronitnath/releases/`.
+The pre-2026-07-14 nix profile `/nix/var/nix/profiles/ronitnath` still holds
+the last sandbox-built generation as a stale emergency fallback (its old unit
+files would also need restoring); delete it once the release path has earned
+full confidence.
 
-```sh
-sudo /nix/var/nix/profiles/default/bin/nix-env \
-  --profile /nix/var/nix/profiles/ronitnath --list-generations
-```
-
-If the systemd cutover itself must be reverted, stop both units, copy the
+If the systemd deployment itself must be reverted, stop both units, copy the
 current durable state back to Compose's bind-mounted directory, and bring the
 old deployment up. This is the explicit **Compose rollback = `compose up`**
 path:
@@ -149,8 +116,8 @@ docker compose ps
 
 If the new release applied an incompatible migration, restore the verified
 pre-cutover backup instead of copying the migrated database back. Decide that
-migration recovery path before cutover; neither Nix generation rollback nor
-Compose rollback transforms the schema.
+migration recovery path before cutover; neither release rollback nor Compose
+rollback transforms the schema.
 
 ## Operations
 
