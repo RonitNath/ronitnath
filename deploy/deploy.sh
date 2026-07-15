@@ -12,7 +12,11 @@ PHOTO_DIR="$DATA_DIR/photos"
 RELEASES_DIR="$DATA_DIR/releases"
 CURRENT_LINK="$DATA_DIR/current"
 PREVIOUS_LINK="$DATA_DIR/previous"
+BACKUPS_DIR="$DATA_DIR/backups"
+LIVE_DB="$DATA_DIR/app.db"
 KEEP_RELEASES=5
+KEEP_BACKUPS=10
+PRE_MIGRATION_SNAPSHOT=''
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 PROJECT_ROOT=$(dirname -- "$SCRIPT_DIR")
 SITE_UNIT_SOURCE="$SCRIPT_DIR/$SITE_UNIT"
@@ -79,6 +83,7 @@ build() {
 
 stamp_release() {
     revision=$(git -C "$PROJECT_ROOT" rev-parse --short=12 HEAD)
+    release_stamp=$(date -u +%Y%m%dT%H%M%SZ)
     dirty_json=false
     dirty_suffix=''
     if [ -n "$(git -C "$PROJECT_ROOT" status --porcelain)" ]; then
@@ -87,7 +92,7 @@ stamp_release() {
         printf '%s\n' \
             "deploy: WARNING: working tree is dirty; this release is not tied to a clean revision" >&2
     fi
-    RELEASE_DIR="$RELEASES_DIR/$(date -u +%Y%m%dT%H%M%SZ)-$revision$dirty_suffix"
+    RELEASE_DIR="$RELEASES_DIR/$release_stamp-$revision$dirty_suffix"
 
     site_binary="$PROJECT_ROOT/target/release/site"
     admin_binary="$PROJECT_ROOT/target/release/admin"
@@ -101,15 +106,143 @@ stamp_release() {
     sudo install -m 0755 "$admin_binary" "$RELEASE_DIR/bin/admin"
     sudo cp -R "$PROJECT_ROOT/static" "$RELEASE_DIR/static"
     sudo chmod -R a+rX "$RELEASE_DIR/static"
+}
 
+write_manifest() {
+    site_binary="$PROJECT_ROOT/target/release/site"
+    admin_binary="$PROJECT_ROOT/target/release/admin"
     manifest=$(mktemp)
-    printf '{\n  "app": "%s",\n  "revision": "%s",\n  "dirty": %s,\n  "site_sha256": "%s",\n  "admin_sha256": "%s",\n  "cargo_lock_sha256": "%s"\n}\n' \
+    printf '{\n  "app": "%s",\n  "revision": "%s",\n  "dirty": %s,\n  "site_sha256": "%s",\n  "admin_sha256": "%s",\n  "cargo_lock_sha256": "%s",\n  "pre_migration_snapshot": "%s"\n}\n' \
         "$APP_NAME" "$revision" "$dirty_json" \
         "$(sha256sum "$site_binary" | cut -d' ' -f1)" \
         "$(sha256sum "$admin_binary" | cut -d' ' -f1)" \
-        "$(sha256sum "$PROJECT_ROOT/Cargo.lock" | cut -d' ' -f1)" >"$manifest"
+        "$(sha256sum "$PROJECT_ROOT/Cargo.lock" | cut -d' ' -f1)" \
+        "$PRE_MIGRATION_SNAPSHOT" >"$manifest"
     sudo install -m 0644 "$manifest" "$RELEASE_DIR/release.json"
     rm -f "$manifest"
+}
+
+normalize_migration_version() {
+    migration_version=$1
+    while [ "${migration_version#0}" != "$migration_version" ]; do
+        migration_version=${migration_version#0}
+    done
+    [ -n "$migration_version" ] || migration_version=0
+    printf '%s\n' "$migration_version"
+}
+
+version_in_list() {
+    version_list=$1
+    version_wanted=$2
+    for listed_version in $version_list; do
+        [ "$listed_version" = "$version_wanted" ] && return 0
+    done
+    return 1
+}
+
+prune_backups() {
+    backup_paths=$(sudo find "$BACKUPS_DIR" -maxdepth 1 -type f -name '*-pre-*.db' -printf '%p\n') \
+        || fail "could not enumerate pre-migration snapshots in $BACKUPS_DIR"
+    sorted_backup_paths=$(printf '%s\n' "$backup_paths" | sort -r) \
+        || fail "could not sort pre-migration snapshots in $BACKUPS_DIR"
+    old_ifs=$IFS
+    IFS='
+'
+    kept=0
+    for backup_path in $sorted_backup_paths; do
+        kept=$((kept + 1))
+        [ "$kept" -le "$KEEP_BACKUPS" ] && continue
+        sudo rm -f "$backup_path" \
+            || fail "could not prune old pre-migration snapshot $backup_path"
+    done
+    IFS=$old_ifs
+}
+
+state_preflight() {
+    if ! sudo test -e "$LIVE_DB"; then
+        printf '%s\n' "deploy: live database does not exist; skipping pre-migration snapshot"
+        return
+    fi
+
+    SQLITE3=$(PATH="$PATH:/usr/sbin:/sbin:/nix/var/nix/profiles/default/bin" command -v sqlite3) \
+        || fail "sqlite3 CLI is required to inspect the existing database; install sqlite3 and retry"
+
+    release_versions=''
+    for migration in "$PROJECT_ROOT"/migrations/*.sql; do
+        [ -f "$migration" ] || continue
+        migration_name=${migration##*/}
+        version_prefix=${migration_name%%_*}
+        case "$version_prefix" in
+            ''|*[!0-9]*)
+                fail "migration filename does not start with an integer version: $migration_name"
+                ;;
+        esac
+        normalized_version=$(normalize_migration_version "$version_prefix")
+        if ! version_in_list "$release_versions" "$normalized_version"; then
+            release_versions="$release_versions $normalized_version"
+        fi
+    done
+
+    table_exists=$(sudo -u "$SERVICE_USER" "$SQLITE3" -batch -bail -noheader "$LIVE_DB" \
+        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = '_sqlx_migrations';") \
+        || fail "could not inspect _sqlx_migrations in $LIVE_DB"
+
+    needs_snapshot=0
+    divergent_versions=''
+    if [ "$table_exists" != 1 ]; then
+        printf '%s\n' \
+            "deploy: _sqlx_migrations is missing; treating all release migrations as pending"
+        needs_snapshot=1
+    else
+        database_versions=$(sudo -u "$SERVICE_USER" "$SQLITE3" -batch -bail -noheader "$LIVE_DB" \
+            "SELECT version FROM _sqlx_migrations ORDER BY version;") \
+            || fail "could not read migration versions from _sqlx_migrations in $LIVE_DB"
+        for database_version in $database_versions; do
+            normalized_version=$(normalize_migration_version "$database_version")
+            if ! version_in_list "$release_versions" "$normalized_version"; then
+                divergent_versions="$divergent_versions $normalized_version"
+            fi
+        done
+        for release_version in $release_versions; do
+            if ! version_in_list "$database_versions" "$release_version"; then
+                needs_snapshot=1
+            fi
+        done
+    fi
+
+    if [ -n "$divergent_versions" ]; then
+        if [ "${DEPLOY_ALLOW_DIVERGENT:-0}" != 1 ]; then
+            fail "database has migration versions absent from this release:$divergent_versions; refusing a potentially older schema (set DEPLOY_ALLOW_DIVERGENT=1 to override with a mandatory snapshot)"
+        fi
+        printf '%s\n' \
+            "deploy: WARNING: DEPLOY_ALLOW_DIVERGENT=1 permits divergent migration versions:$divergent_versions"
+        needs_snapshot=1
+    fi
+
+    if [ "$needs_snapshot" -eq 0 ]; then
+        printf '%s\n' "deploy: no pending migrations; skipping snapshot"
+        return
+    fi
+
+    app_group=$(id -gn "$SERVICE_USER") \
+        || fail "could not resolve the service group for $SERVICE_USER"
+    sudo install -d -m 0750 -o "$SERVICE_USER" -g "$app_group" "$BACKUPS_DIR" \
+        || fail "could not create pre-migration snapshot directory $BACKUPS_DIR"
+    PRE_MIGRATION_SNAPSHOT="$BACKUPS_DIR/$release_stamp-pre-$revision.db"
+    sudo test ! -e "$PRE_MIGRATION_SNAPSHOT" \
+        || fail "pre-migration snapshot already exists: $PRE_MIGRATION_SNAPSHOT"
+    sudo -u "$SERVICE_USER" "$SQLITE3" -batch -bail "$LIVE_DB" \
+        "VACUUM INTO '$PRE_MIGRATION_SNAPSHOT';" \
+        || fail "pre-migration VACUUM INTO snapshot failed; current release remains active"
+    integrity_output=$(sudo -u "$SERVICE_USER" "$SQLITE3" -batch -bail -noheader \
+        "$PRE_MIGRATION_SNAPSHOT" "PRAGMA integrity_check;") \
+        || fail "pre-migration snapshot integrity_check failed; current release remains active"
+    [ "$integrity_output" = ok ] \
+        || fail "pre-migration snapshot integrity_check did not return exactly 'ok'; current release remains active"
+    sudo chmod 0640 "$PRE_MIGRATION_SNAPSHOT" \
+        || fail "could not secure pre-migration snapshot permissions"
+    prune_backups
+    printf '%s\n' "deploy: pre-migration snapshot verified: $PRE_MIGRATION_SNAPSHOT"
 }
 
 # Replacing a symlink by rename is the atomic step: the units resolve either
@@ -153,8 +286,11 @@ deploy() {
     require_command sudo
     require_command systemctl
     require_command sha256sum
+    require_command id
     build
     stamp_release
+    state_preflight
+    write_manifest
     switch_current
     restart_services
     prune_releases
@@ -167,6 +303,8 @@ rollback() {
     previous_target=$(link_target "$PREVIOUS_LINK")
     [ -n "$current_target" ] || fail "current release pointer missing; deploy once before rollback"
     [ -n "$previous_target" ] || fail "no previous release recorded; nothing to roll back to"
+    # Binary rollback leaves the schema at its newer N-1-compatible shape;
+    # restoring a pre-migration snapshot is a deliberate manual operation.
     point_link "$previous_target" "$CURRENT_LINK"
     point_link "$current_target" "$PREVIOUS_LINK"
     restart_services

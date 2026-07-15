@@ -25,7 +25,8 @@ rollback path until that fallback is intentionally retired.
 
 - Releases: `/data/apps/ronitnath/releases/<utc-stamp>-<rev>/`
   (root-owned, read-only to the service; `bin/site`, `bin/admin`, `static/`,
-  and a `release.json` provenance manifest with binary/lockfile digests)
+  and a `release.json` provenance manifest with binary/lockfile digests and
+  the pre-migration snapshot path when one was created)
 - Active release: `/data/apps/ronitnath/current` (atomic symlink; `previous`
   retains the prior release for rollback; the newest five plus both pointers
   survive pruning)
@@ -95,8 +96,17 @@ throughout), holds a 5-second readiness gate on both units, then prunes old
 releases. All runtime writes remain under
 `/data/apps/ronitnath`.
 
-Before a release containing migrations, take and verify a database backup.
-Release rollback does not reverse a durable SQLite migration.
+### Pre-migration snapshots
+
+Pre-migration snapshots run only when a deploy carries pending migrations (or
+an explicitly overridden schema divergence). Before the release pointer moves,
+the deploy script uses SQLite's `VACUUM INTO` to capture one consistent snapshot
+of the shared database while concurrent WAL writes continue, verifies it, and
+aborts the deploy on any snapshot failure. The host must provide the `sqlite3`
+CLI; the script retains the newest 10 pre-migration snapshots. Restoring one is
+a deliberate manual decision, and nightly off-host backups remain a separate
+recovery mechanism. Release rollback remains binary-only and does not reverse a
+durable SQLite migration.
 
 ## Rollback
 
