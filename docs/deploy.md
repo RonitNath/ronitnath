@@ -110,6 +110,9 @@ durable SQLite migration.
 
 ## Rollback
 
+Release rollback is binary-only; binaries tolerate a database schema newer than
+their embedded migrations by design, so the N-1 binary boots against the N schema.
+
 For a binary/asset rollback, swap `current` with `previous` and restart:
 
 ```sh

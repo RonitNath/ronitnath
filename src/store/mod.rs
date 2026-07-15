@@ -31,7 +31,13 @@ use std::str::FromStr;
 
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePool, SqlitePoolOptions};
 
-static MIGRATOR: sqlx::migrate::Migrator = sqlx::migrate!("./migrations");
+// Deploy preflight owns divergence refusal; boot tolerates DB-ahead so rollback
+// always boots (the N-1 rule).
+static MIGRATOR: sqlx::migrate::Migrator = {
+    let mut migrator = sqlx::migrate!("./migrations");
+    migrator.ignore_missing = true;
+    migrator
+};
 
 #[derive(Clone)]
 pub struct Store {
@@ -74,10 +80,12 @@ impl Store {
                 .await?
                 .flatten();
         match applied {
-            Some(version) if version == expected => Ok(Self { pool }),
-            Some(version) => anyhow::bail!(
-                "database migration version {version} is not current; expected {expected}"
+            Some(applied) if applied < expected => anyhow::bail!(
+                "database migration version {applied} is older than this binary expects ({expected}); start site first"
             ),
+            // Newer-than-embedded is the N-1 rollback state; migrations must be
+            // tolerable by the previous binary.
+            Some(_) => Ok(Self { pool }),
             None => anyhow::bail!("database has no applied migrations; start site first"),
         }
     }
@@ -146,5 +154,100 @@ impl Store {
 
         tx.commit().await?;
         Ok((identity_id, account_id))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{MIGRATOR, Store};
+
+    fn scratch_database(label: &str) -> (std::path::PathBuf, String) {
+        let path = std::env::temp_dir().join(format!(
+            "ronitnath-{label}-{}.db",
+            crate::auth::session::generate_token()
+        ));
+        let url = format!("sqlite:{}", path.display());
+        (path, url)
+    }
+
+    fn expected_version() -> i64 {
+        MIGRATOR
+            .iter()
+            .map(|migration| migration.version)
+            .max()
+            .expect("embedded migrations")
+    }
+
+    async fn insert_future_migration(store: &Store) {
+        sqlx::query(
+            "INSERT INTO _sqlx_migrations \
+             (version, description, success, checksum, execution_time) \
+             VALUES (?1, 'future migration', TRUE, X'', 0)",
+        )
+        .bind(expected_version() + 1)
+        .execute(&store.pool)
+        .await
+        .expect("insert future migration row");
+    }
+
+    #[tokio::test]
+    async fn connect_existing_accepts_database_ahead_of_binary() {
+        let (path, url) = scratch_database("existing-ahead");
+        let store = Store::connect(&url)
+            .await
+            .expect("migrate scratch database");
+        insert_future_migration(&store).await;
+        store.pool.close().await;
+
+        let reopened = Store::connect_existing(&url)
+            .await
+            .expect("connect_existing should accept a DB-ahead schema");
+        reopened.pool.close().await;
+        std::fs::remove_file(path).expect("remove scratch database");
+    }
+
+    #[tokio::test]
+    async fn connect_ignores_unknown_applied_migration() {
+        let (path, url) = scratch_database("connect-ahead");
+        let store = Store::connect(&url)
+            .await
+            .expect("migrate scratch database");
+        insert_future_migration(&store).await;
+        store.pool.close().await;
+
+        let reopened = Store::connect(&url)
+            .await
+            .expect("connect should ignore an unknown applied migration");
+        reopened.pool.close().await;
+        std::fs::remove_file(path).expect("remove scratch database");
+    }
+
+    #[tokio::test]
+    async fn connect_still_validates_embedded_migration_checksums() {
+        let (path, url) = scratch_database("checksum");
+        let store = Store::connect(&url)
+            .await
+            .expect("migrate scratch database");
+        sqlx::query("UPDATE _sqlx_migrations SET checksum = X'00' WHERE version = ?1")
+            .bind(expected_version())
+            .execute(&store.pool)
+            .await
+            .expect("corrupt embedded migration checksum");
+        store.pool.close().await;
+
+        let error = match Store::connect(&url).await {
+            Ok(store) => {
+                store.pool.close().await;
+                panic!("connect should reject an embedded migration checksum mismatch")
+            }
+            Err(error) => error,
+        };
+        let message = error.to_string();
+        // A failed pool open can release its Windows file handle asynchronously.
+        let _ = std::fs::remove_file(path);
+        assert!(
+            message.contains("previously applied but has been modified"),
+            "unexpected error: {error:#}"
+        );
     }
 }
