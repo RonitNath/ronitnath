@@ -1,0 +1,12 @@
+[Unit]
+Description=ronitnath off-host backup
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=root
+ExecStart=/usr/local/libexec/ronitnath-backup.sh backup
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7

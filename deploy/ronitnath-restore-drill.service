@@ -1,0 +1,12 @@
+[Unit]
+Description=ronitnath off-host backup restore drill
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=root
+ExecStart=/usr/local/libexec/ronitnath-backup.sh drill
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7

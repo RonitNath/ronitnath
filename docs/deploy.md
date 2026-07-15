@@ -69,7 +69,8 @@ resolves privileged helpers such as `useradd` itself before invoking `sudo`.
 ## One-time initialization
 
 Creates the service account, data and release directories, installs both
-service units and both socket units, and enables them without starting them:
+service units, both socket units, and the backup/restore-drill script and
+units, then enables the services, sockets, and timers without starting them:
 
 ```sh
 ./deploy/deploy.sh init
@@ -107,6 +108,43 @@ CLI; the script retains the newest 10 pre-migration snapshots. Restoring one is
 a deliberate manual decision, and nightly off-host backups remain a separate
 recovery mechanism. Release rollback remains binary-only and does not reverse a
 durable SQLite migration.
+
+## Off-host backups
+
+The host supplies exactly one backup configuration file that the application
+never carries: `/etc/restic/env`, owned by root with mode `0600`. It defines
+`RESTIC_REPOSITORY`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, and
+`RESTIC_PASSWORD`. `deploy/deploy.sh init` warns but succeeds when that file is
+absent, so application installation does not depend on host backup provisioning;
+the enabled backup timer then fails visibly until the host contract is present.
+
+Each night at 03:30, with up to 30 minutes of randomized delay, the ronitnath
+backup unit uses SQLite `VACUUM INTO` to create a consistent copy of the live
+WAL database and requires `PRAGMA integrity_check` to return `ok`. Restic backs
+up that copy and the application data root while excluding the live database,
+its WAL/SHM companions, and the local pre-migration backup directory. The
+retention pass keeps 7 daily, 4 weekly, and 6 monthly snapshots; it uses
+`restic forget` without pruning.
+
+Each Sunday at 04:30, also randomized, the restore-drill unit restores the
+latest snapshot carrying the `ronitnath` tag into fresh scratch space. It
+requires an intact restored database and at least one user table, then removes
+the scratch data. A missing configuration, failed backup, or failed drill leaves
+its oneshot unit failed so the host's failed-unit alert can surface it.
+
+When a node-exporter textfile collector directory exists, the script writes
+these gauges atomically: `ronitnath_backup_last_success_timestamp_seconds`,
+`ronitnath_backup_exit_code`,
+`ronitnath_restore_drill_last_success_timestamp_seconds`, and
+`ronitnath_restore_drill_exit_code`. The last-success value remains the prior
+successful epoch after a failure; exit code is zero only for a successful run.
+
+Repository initialization, a weekly repository-wide `restic check`, pruning,
+and alert rules for failed units, nonzero exit-code gauges, and stale
+last-success gauges are host-level responsibilities. They live outside this
+application repository.
+
+Recovery targets: RPO: 24h nightly + deploy-time pre-migration snapshots; RTO: minutes via restic restore, drill-tested weekly.
 
 ## Rollback
 

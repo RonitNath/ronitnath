@@ -7,6 +7,11 @@ SITE_UNIT="$APP_NAME-site.service"
 ADMIN_UNIT="$APP_NAME-admin.service"
 SITE_SOCKET="$APP_NAME-site.socket"
 ADMIN_SOCKET="$APP_NAME-admin.socket"
+BACKUP_SCRIPT_NAME="$APP_NAME-backup.sh"
+BACKUP_UNIT_NAME="$APP_NAME-backup.service"
+BACKUP_TIMER_NAME="$APP_NAME-backup.timer"
+RESTORE_DRILL_UNIT_NAME="$APP_NAME-restore-drill.service"
+RESTORE_DRILL_TIMER_NAME="$APP_NAME-restore-drill.timer"
 DATA_DIR="/data/apps/$APP_NAME"
 PHOTO_DIR="$DATA_DIR/photos"
 RELEASES_DIR="$DATA_DIR/releases"
@@ -23,6 +28,11 @@ SITE_UNIT_SOURCE="$SCRIPT_DIR/$SITE_UNIT"
 ADMIN_UNIT_SOURCE="$SCRIPT_DIR/$ADMIN_UNIT"
 SITE_SOCKET_SOURCE="$SCRIPT_DIR/$SITE_SOCKET"
 ADMIN_SOCKET_SOURCE="$SCRIPT_DIR/$ADMIN_SOCKET"
+BACKUP_SCRIPT_SOURCE="$SCRIPT_DIR/$BACKUP_SCRIPT_NAME"
+BACKUP_UNIT_SOURCE="$SCRIPT_DIR/$BACKUP_UNIT_NAME"
+BACKUP_TIMER_SOURCE="$SCRIPT_DIR/$BACKUP_TIMER_NAME"
+RESTORE_DRILL_UNIT_SOURCE="$SCRIPT_DIR/$RESTORE_DRILL_UNIT_NAME"
+RESTORE_DRILL_TIMER_SOURCE="$SCRIPT_DIR/$RESTORE_DRILL_TIMER_NAME"
 
 fail() {
     printf '%s\n' "deploy: $*" >&2
@@ -333,6 +343,13 @@ init() {
     [ -f "$ADMIN_UNIT_SOURCE" ] || fail "unit file not found: $ADMIN_UNIT_SOURCE"
     [ -f "$SITE_SOCKET_SOURCE" ] || fail "socket unit file not found: $SITE_SOCKET_SOURCE"
     [ -f "$ADMIN_SOCKET_SOURCE" ] || fail "socket unit file not found: $ADMIN_SOCKET_SOURCE"
+    [ -f "$BACKUP_SCRIPT_SOURCE" ] || fail "backup script not found: $BACKUP_SCRIPT_SOURCE"
+    [ -f "$BACKUP_UNIT_SOURCE" ] || fail "backup unit not found: $BACKUP_UNIT_SOURCE"
+    [ -f "$BACKUP_TIMER_SOURCE" ] || fail "backup timer not found: $BACKUP_TIMER_SOURCE"
+    [ -f "$RESTORE_DRILL_UNIT_SOURCE" ] \
+        || fail "restore-drill unit not found: $RESTORE_DRILL_UNIT_SOURCE"
+    [ -f "$RESTORE_DRILL_TIMER_SOURCE" ] \
+        || fail "restore-drill timer not found: $RESTORE_DRILL_TIMER_SOURCE"
 
     if ! id "$SERVICE_USER" >/dev/null 2>&1; then
         sudo "$USERADD" --system --user-group --home-dir "$DATA_DIR" \
@@ -342,12 +359,23 @@ init() {
     sudo install -d -m 0750 -o "$SERVICE_USER" -g "$APP_GROUP" \
         "$DATA_DIR" "$PHOTO_DIR"
     sudo install -d -m 0755 "$RELEASES_DIR"
+    sudo install -d -m 0755 /usr/local/libexec
+    sudo install -m 0755 "$BACKUP_SCRIPT_SOURCE" "/usr/local/libexec/$BACKUP_SCRIPT_NAME"
     sudo install -m 0644 "$SITE_UNIT_SOURCE" "/etc/systemd/system/$SITE_UNIT"
     sudo install -m 0644 "$ADMIN_UNIT_SOURCE" "/etc/systemd/system/$ADMIN_UNIT"
     sudo install -m 0644 "$SITE_SOCKET_SOURCE" "/etc/systemd/system/$SITE_SOCKET"
     sudo install -m 0644 "$ADMIN_SOCKET_SOURCE" "/etc/systemd/system/$ADMIN_SOCKET"
+    sudo install -m 0644 "$BACKUP_UNIT_SOURCE" "/etc/systemd/system/$BACKUP_UNIT_NAME"
+    sudo install -m 0644 "$BACKUP_TIMER_SOURCE" "/etc/systemd/system/$BACKUP_TIMER_NAME"
+    sudo install -m 0644 "$RESTORE_DRILL_UNIT_SOURCE" "/etc/systemd/system/$RESTORE_DRILL_UNIT_NAME"
+    sudo install -m 0644 "$RESTORE_DRILL_TIMER_SOURCE" "/etc/systemd/system/$RESTORE_DRILL_TIMER_NAME"
     sudo systemctl daemon-reload
-    sudo systemctl enable "$SITE_UNIT" "$ADMIN_UNIT" "$SITE_SOCKET" "$ADMIN_SOCKET"
+    sudo systemctl enable "$SITE_UNIT" "$ADMIN_UNIT" "$SITE_SOCKET" "$ADMIN_SOCKET" \
+        "$BACKUP_TIMER_NAME" "$RESTORE_DRILL_TIMER_NAME"
+    if ! sudo test -f /etc/restic/env; then
+        printf '%s\n' \
+            "deploy: WARNING: /etc/restic/env is missing; backup and restore-drill units will fail until the host backup contract is provisioned" >&2
+    fi
 }
 
 [ "$#" -le 1 ] || fail "usage: $0 [deploy|rollback|status|init]"
