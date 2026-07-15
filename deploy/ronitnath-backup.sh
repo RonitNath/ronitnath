@@ -39,7 +39,9 @@ load_restic_environment() {
 }
 
 metrics_directory() {
-    if [ -d /var/lib/prometheus/node-exporter ]; then
+    if [ -d /var/lib/node-exporter-textfiles ]; then
+        printf '%s\n' /var/lib/node-exporter-textfiles
+    elif [ -d /var/lib/prometheus/node-exporter ]; then
         printf '%s\n' /var/lib/prometheus/node-exporter
     elif [ -d /var/lib/node_exporter/textfile_collector ]; then
         printf '%s\n' /var/lib/node_exporter/textfile_collector
