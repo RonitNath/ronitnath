@@ -52,12 +52,12 @@ write_metrics() {
     metrics_dir=$(metrics_directory)
     [ -n "$metrics_dir" ] || return 0
 
-    metric_app=$(printf '%s' "$APP_NAME" | tr '-' '_')
-    metric_prefix="${metric_app}_${operation}"
+    metric_prefix="app_${operation}"
+    metric_label="app=\"$APP_NAME\""
     metric_file="$metrics_dir/${APP_NAME}_${operation}.prom"
     last_success=0
     if [ -f "$metric_file" ]; then
-        previous_success=$(awk -v metric="${metric_prefix}_last_success_timestamp_seconds" \
+        previous_success=$(awk -v metric="${metric_prefix}_last_success_timestamp_seconds{${metric_label}}" \
             '$1 == metric { print $2; exit }' "$metric_file")
         case "$previous_success" in
             ''|*[!0-9]*) ;;
@@ -69,9 +69,9 @@ write_metrics() {
     fi
 
     metric_tmp=$(mktemp "$metrics_dir/.${APP_NAME}_${operation}.prom.XXXXXX") || return 1
-    if ! printf '# TYPE %s_last_success_timestamp_seconds gauge\n%s_last_success_timestamp_seconds %s\n# TYPE %s_exit_code gauge\n%s_exit_code %s\n' \
-        "$metric_prefix" "$metric_prefix" "$last_success" \
-        "$metric_prefix" "$metric_prefix" "$exit_code" >"$metric_tmp"; then
+    if ! printf '# TYPE %s_last_success_timestamp_seconds gauge\n%s_last_success_timestamp_seconds{%s} %s\n# TYPE %s_exit_code gauge\n%s_exit_code{%s} %s\n' \
+        "$metric_prefix" "$metric_prefix" "$metric_label" "$last_success" \
+        "$metric_prefix" "$metric_prefix" "$metric_label" "$exit_code" >"$metric_tmp"; then
         rm -f "$metric_tmp"
         return 1
     fi
