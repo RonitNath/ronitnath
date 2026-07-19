@@ -90,6 +90,7 @@ pub async fn oidc_start(
         identity_id,
         account_id,
         query.next.map(|n| safe_next(Some(n))),
+        None,
     )
     .await?;
     Ok(Redirect::to(&auth_url).into_response())

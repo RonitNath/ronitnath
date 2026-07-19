@@ -11,5 +11,15 @@
     <label>Recovery email <span class="muted">(optional)</span><input type="email" name="recovery_email" autocomplete="email" /></label>
     <button type="submit">Claim my invitation</button>
   </form>
+  {% if !oidc_providers.is_empty() %}
+  <div class="oidc-login">
+    <p class="muted">Or use your ronitnath ID:</p>
+    {% for provider in oidc_providers %}
+    <a class="auth-link auth-link-primary oidc-button" href="/auth/oidc/{{ provider.key }}/start?claim={{ claim_token }}">
+      Sign in with {{ provider.display_name }}
+    </a>
+    {% endfor %}
+  </div>
+  {% endif %}
 </section>
 {% endblock %}

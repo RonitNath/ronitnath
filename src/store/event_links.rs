@@ -128,6 +128,24 @@ impl Store {
         .await
     }
 
+    /// Revalidates an already-bound capability without retaining its raw token.
+    /// OIDC guest state stores the row id after the initial capability check,
+    /// then uses this predicate again at callback time so revocation wins.
+    pub async fn find_live_event_link_by_id(
+        &self,
+        link_id: i64,
+    ) -> sqlx::Result<Option<ResolvedLink>> {
+        sqlx::query_as!(
+            ResolvedLink,
+            r#"SELECT id as "id!: i64", account_id as "account_id!: i64",
+                      event_id as "event_id!: i64", person_id, tier
+               FROM event_links WHERE id = ?1 AND revoked_at IS NULL"#,
+            link_id,
+        )
+        .fetch_optional(&self.pool)
+        .await
+    }
+
     /// Resolves a guest's token to a live link, bumping the use counter.
     /// Returns `None` for unknown or revoked tokens — the two cases are
     /// indistinguishable on purpose.

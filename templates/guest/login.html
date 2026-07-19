@@ -9,5 +9,15 @@
     <label>Password <input type="password" name="password" required autocomplete="current-password" /></label>
     <button type="submit">Sign in</button>
   </form>
+  {% if !oidc_providers.is_empty() %}
+  <div class="oidc-login">
+    <p class="muted">Or use your ronitnath ID:</p>
+    {% for provider in oidc_providers %}
+    <a class="auth-link auth-link-primary oidc-button" href="/auth/oidc/{{ provider.key }}/start">
+      Sign in with {{ provider.display_name }}
+    </a>
+    {% endfor %}
+  </div>
+  {% endif %}
 </section>
 {% endblock %}

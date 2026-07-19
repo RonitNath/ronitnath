@@ -37,6 +37,22 @@ A configured provider is a signup trust grant. If `auto_provision=true`, the fir
 
 No email auto-linking is performed. Email claims may seed display/account metadata, but the lookup key is always the stable OIDC subject: `external_id = "{issuer}#{sub}"`.
 
+### Public guest sign-in policy
+
+The public site uses a separate `guest_login` OIDC intent and never treats
+`auto_provision` as permission for open guest signup. A known OIDC factor may
+create a public session only when its identity has one active
+`person_identity_links` binding to this site's owner account; the session is
+issued against that identity's existing `purpose = 'guest'` account.
+
+For a first-time `{issuer}#{sub}`, provisioning is allowed only when OIDC was
+started from a live, person-specific `/e/{token}/claim` capability and that
+person remains unclaimed at callback time. The callback revalidates the link
+before atomically creating the normal guest identity, guest account, owner
+membership, OIDC factor, person link, and session. A bare public login, a
+shared/revoked invite, an already-claimed person, or an OIDC identity without
+an active person link fails closed. Email claims are never used for matching.
+
 ## Flow
 
 - Start: `GET /auth/oidc/{key}/start`

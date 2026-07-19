@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT pil.account_id as \"owner_account_id!: i64\", pil.person_id as \"person_id!: i64\",\n                      p.name as person_name, pil.identity_id as \"identity_id!: i64\"\n               FROM person_identity_links pil\n               JOIN people p ON p.account_id = pil.account_id AND p.id = pil.person_id\n               WHERE pil.identity_id = ?1 AND pil.unlinked_at IS NULL",
+  "query": "SELECT pil.account_id as \"owner_account_id!: i64\", pil.person_id as \"person_id!: i64\",\n                      p.name as person_name, pil.identity_id as \"identity_id!: i64\",\n                      m.account_id as \"guest_account_id!: i64\"\n               FROM person_identity_links pil\n               JOIN people p ON p.account_id = pil.account_id AND p.id = pil.person_id\n               JOIN memberships m ON m.identity_id = pil.identity_id\n               JOIN accounts a ON a.id = m.account_id AND a.purpose = 'guest' AND a.deleted_at IS NULL\n               WHERE pil.identity_id = ?1 AND pil.unlinked_at IS NULL",
   "describe": {
     "columns": [
       {
@@ -46,6 +46,17 @@
             "name": "identity_id"
           }
         }
+      },
+      {
+        "name": "guest_account_id!: i64",
+        "ordinal": 4,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "memberships",
+            "name": "account_id"
+          }
+        }
       }
     ],
     "parameters": {
@@ -55,8 +66,9 @@
       false,
       false,
       false,
+      false,
       false
     ]
   },
-  "hash": "4dce2dafed382fd4ff688561d09e23dc483b1a91a6a20a7beeb0e4ce6f047981"
+  "hash": "38e7a07ab659b5edc09d24464bb882974eda99b8dde5de915781d5b866a74fe9"
 }

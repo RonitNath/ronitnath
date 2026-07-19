@@ -55,6 +55,14 @@ pub fn build_site_router(state: AppState, config: &Config) -> Router {
                     get(handlers::guest_accounts::login_page)
                         .post(handlers::guest_accounts::login_submit),
                 )
+                .route(
+                    "/auth/oidc/{key}/start",
+                    get(handlers::guest_accounts::oidc_start),
+                )
+                .route(
+                    "/auth/oidc/{key}/callback",
+                    get(handlers::guest_accounts::oidc_callback),
+                )
                 .route_layer(middleware::from_fn_with_state(
                     rate_limiter.clone(),
                     rate_limit::enforce,
@@ -2274,13 +2282,121 @@ mod tests {
         (super::build_admin_router(state, &config), store, op)
     }
 
+    async fn public_oidc_app() -> (
+        axum::Router,
+        crate::store::Store,
+        MockOp,
+        i64,
+        i64,
+        String,
+        i64,
+    ) {
+        use crate::auth::session::hash_token;
+        use crate::store::events::EventFields;
+
+        let op = MockOp::new();
+        let registry = crate::auth::oidc::OidcRegistry::from_configs(
+            vec![crate::auth::oidc::OidcProviderConfig {
+                key: "mock".into(),
+                display_name: "Mock SSO".into(),
+                issuer_url: op.issuer.clone(),
+                client_id: "stage2".into(),
+                client_secret: "test-secret".into(),
+                scopes: None,
+                auto_provision: Some(false),
+            }],
+            crate::auth::oidc::DynOidcHttpClient::new(op.clone()),
+        )
+        .await
+        .unwrap();
+        let store = crate::store::Store::connect_in_memory().await;
+        let (event_id, _, _, _, _) = seed_event(&store).await;
+        let event = store.find_event(1, event_id).await.unwrap().unwrap();
+        store
+            .update_event(
+                1,
+                event_id,
+                &EventFields {
+                    slug: event.slug,
+                    title: event.title,
+                    tagline: event.tagline,
+                    starts_at: "2099-07-04 13:00".into(),
+                    ends_at: event.ends_at,
+                    timezone: event.timezone,
+                    status: event.status,
+                    summary: event.summary,
+                    area_name: event.area_name,
+                    address: event.address,
+                    entry_instructions: event.entry_instructions,
+                    private_details: event.private_details,
+                    notice_html: event.notice_html,
+                    quick_plan_html: event.quick_plan_html,
+                },
+            )
+            .await
+            .unwrap();
+        let person = store.create_person(1, "OIDC Guest", "").await.unwrap();
+        let policy = store
+            .find_audience_policy(1, "event", event_id)
+            .await
+            .unwrap()
+            .unwrap();
+        store
+            .set_person_override(1, policy.id, person.id, Some("include"), Some("full"))
+            .await
+            .unwrap();
+        let raw = "oidc-guest-invite".to_string();
+        let link_id = store
+            .create_event_link(
+                1,
+                event_id,
+                Some(person.id),
+                &hash_token(&raw),
+                &raw,
+                "OIDC guest",
+                "private",
+            )
+            .await
+            .unwrap();
+        let config = crate::config::Config::for_tests();
+        let state = crate::state::AppState::new(store.clone(), super::test_auth_config(&config))
+            .with_oidc(registry)
+            .with_public_url("https://ronitnath.com".into())
+            .with_owner_account_id(Some(1));
+        (
+            super::build_site_router(state, &config),
+            store,
+            op,
+            event_id,
+            person.id,
+            raw,
+            link_id,
+        )
+    }
+
     async fn run_oidc_login(
         app: &axum::Router,
         op: &MockOp,
     ) -> (StatusCode, axum::http::HeaderMap, axum::body::Bytes) {
-        let (status, headers, _) = get(app, "/auth/oidc/mock/start").await;
+        run_oidc_login_from(app, op, "/auth/oidc/mock/start").await
+    }
+
+    async fn run_oidc_login_from(
+        app: &axum::Router,
+        op: &MockOp,
+        start_path: &str,
+    ) -> (StatusCode, axum::http::HeaderMap, axum::body::Bytes) {
+        let (status, headers, _) = get(app, start_path).await;
         assert_eq!(status, StatusCode::SEE_OTHER);
         let authorize_url = headers.get(header::LOCATION).unwrap().to_str().unwrap();
+        finish_oidc_login(app, op, authorize_url).await
+    }
+
+    async fn finish_oidc_login(
+        app: &axum::Router,
+        op: &MockOp,
+        authorize_url: &str,
+    ) -> (StatusCode, axum::http::HeaderMap, axum::body::Bytes) {
         let authorize_path = openidconnect::url::Url::parse(authorize_url)
             .unwrap()
             .path()
@@ -2361,6 +2477,115 @@ mod tests {
             .unwrap();
         assert_eq!(same_factor.identity_id, factor.identity_id);
         assert_eq!(store.count_factors(factor.identity_id).await.unwrap(), 1);
+    }
+
+    #[tokio::test]
+    async fn public_oidc_requires_guest_binding_or_live_personal_claim_and_issues_session() {
+        let (app, store, op, _event_id, person_id, raw, _) = public_oidc_app().await;
+        let (status, _, body) = get(&app, "/login").await;
+        assert_eq!(status, StatusCode::OK);
+        assert!(String::from_utf8_lossy(&body).contains("Sign in with Mock SSO"));
+
+        let (_, _, _) = store
+            .signup_with_oidc("Unbound OIDC user", "http://mock-op.test#subject-1", None)
+            .await
+            .unwrap();
+        let (status, headers, _) = get(&app, "/auth/oidc/mock/start").await;
+        assert_eq!(status, StatusCode::SEE_OTHER);
+        let authorize_url = headers.get(header::LOCATION).unwrap().to_str().unwrap();
+        let parsed = openidconnect::url::Url::parse(authorize_url).unwrap();
+        let params = parsed
+            .query_pairs()
+            .into_owned()
+            .collect::<std::collections::HashMap<_, _>>();
+        assert_eq!(params.get("client_id").map(String::as_str), Some("stage2"));
+        assert_eq!(
+            params.get("redirect_uri").map(String::as_str),
+            Some("https://ronitnath.com/auth/oidc/mock/callback")
+        );
+        assert_eq!(
+            params.get("code_challenge_method").map(String::as_str),
+            Some("S256")
+        );
+        assert!(
+            params
+                .get("code_challenge")
+                .is_some_and(|value| !value.is_empty())
+        );
+        assert!(params.get("state").is_some_and(|value| !value.is_empty()));
+
+        assert_eq!(
+            get(
+                &app,
+                "/auth/oidc/mock/callback?code=unused&state=forged-state"
+            )
+            .await
+            .0,
+            StatusCode::UNAUTHORIZED
+        );
+        assert_eq!(
+            get(&app, "/auth/oidc/mock/callback?code=unused").await.0,
+            StatusCode::UNAUTHORIZED
+        );
+        assert_eq!(
+            finish_oidc_login(&app, &op, authorize_url).await.0,
+            StatusCode::FORBIDDEN,
+            "an OIDC factor without a person link cannot enter the guest surface"
+        );
+
+        op.set_subject("subject-2");
+        let (claim_status, _, claim_body) = get(&app, &format!("/e/{raw}/claim")).await;
+        assert_eq!(claim_status, StatusCode::OK);
+        assert!(String::from_utf8_lossy(&claim_body).contains("Sign in with Mock SSO"));
+        let (status, headers, _) =
+            run_oidc_login_from(&app, &op, &format!("/auth/oidc/mock/start?claim={raw}")).await;
+        assert_eq!(status, StatusCode::SEE_OTHER);
+        assert_eq!(headers.get(header::LOCATION).unwrap(), "/my");
+        let cookie = extract_cookie(&headers, "session");
+        let (status, _, body) = get_with_cookie(&app, "/my", &cookie).await;
+        assert_eq!(status, StatusCode::OK);
+        assert!(String::from_utf8_lossy(&body).contains("Test Party"));
+
+        let factor = store
+            .find_factor_by_external("oidc", "http://mock-op.test#subject-2")
+            .await
+            .unwrap()
+            .unwrap();
+        let binding = store
+            .active_guest_binding(factor.identity_id)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(binding.person_id, person_id);
+        assert_eq!(store.count_factors(factor.identity_id).await.unwrap(), 1);
+
+        let (status, headers, _) = run_oidc_login(&app, &op).await;
+        assert_eq!(status, StatusCode::SEE_OTHER);
+        let returning_cookie = extract_cookie(&headers, "session");
+        assert_eq!(
+            get_with_cookie(&app, "/my", &returning_cookie).await.0,
+            StatusCode::OK
+        );
+    }
+
+    #[tokio::test]
+    async fn public_oidc_revalidates_invite_revocation_at_callback() {
+        let (app, store, op, _, _, raw, link_id) = public_oidc_app().await;
+        let (status, headers, _) = get(&app, &format!("/auth/oidc/mock/start?claim={raw}")).await;
+        assert_eq!(status, StatusCode::SEE_OTHER);
+        let authorize_url = headers.get(header::LOCATION).unwrap().to_str().unwrap();
+        store.revoke_event_link(1, link_id).await.unwrap();
+        assert_eq!(
+            finish_oidc_login(&app, &op, authorize_url).await.0,
+            StatusCode::NOT_FOUND
+        );
+        assert!(
+            store
+                .find_factor_by_external("oidc", "http://mock-op.test#subject-1")
+                .await
+                .unwrap()
+                .is_none()
+        );
     }
 
     #[tokio::test]
