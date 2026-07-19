@@ -2387,7 +2387,7 @@ mod tests {
         start_path: &str,
     ) -> (StatusCode, axum::http::HeaderMap, axum::body::Bytes) {
         let (status, headers, _) = get(app, start_path).await;
-        assert_eq!(status, StatusCode::SEE_OTHER);
+        assert!(matches!(status, StatusCode::FOUND | StatusCode::SEE_OTHER));
         let authorize_url = headers.get(header::LOCATION).unwrap().to_str().unwrap();
         finish_oidc_login(app, op, authorize_url).await
     }
@@ -2491,7 +2491,7 @@ mod tests {
             .await
             .unwrap();
         let (status, headers, _) = get(&app, "/auth/oidc/mock/start").await;
-        assert_eq!(status, StatusCode::SEE_OTHER);
+        assert_eq!(status, StatusCode::FOUND);
         let authorize_url = headers.get(header::LOCATION).unwrap().to_str().unwrap();
         let parsed = openidconnect::url::Url::parse(authorize_url).unwrap();
         let params = parsed
@@ -2572,7 +2572,7 @@ mod tests {
     async fn public_oidc_revalidates_invite_revocation_at_callback() {
         let (app, store, op, _, _, raw, link_id) = public_oidc_app().await;
         let (status, headers, _) = get(&app, &format!("/auth/oidc/mock/start?claim={raw}")).await;
-        assert_eq!(status, StatusCode::SEE_OTHER);
+        assert_eq!(status, StatusCode::FOUND);
         let authorize_url = headers.get(header::LOCATION).unwrap().to_str().unwrap();
         store.revoke_event_link(1, link_id).await.unwrap();
         assert_eq!(

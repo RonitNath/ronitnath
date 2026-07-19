@@ -4,7 +4,7 @@ use std::net::SocketAddr;
 
 use askama::Template;
 use axum::extract::{ConnectInfo, Path, Query, State};
-use axum::http::HeaderMap;
+use axum::http::{HeaderMap, StatusCode, header};
 use axum::response::{IntoResponse, Redirect, Response};
 use axum::{Extension, Form, Json};
 use axum_extra::extract::CookieJar;
@@ -262,7 +262,7 @@ pub async fn oidc_start(
         guest_claim,
     )
     .await?;
-    Ok(Redirect::to(&auth_url).into_response())
+    Ok((StatusCode::FOUND, [(header::LOCATION, auth_url)]).into_response())
 }
 
 #[derive(Deserialize)]
