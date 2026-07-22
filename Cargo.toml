@@ -39,6 +39,7 @@ time = { version = "0.3.53", features = ["macros", "formatting", "parsing"] }
 rand_core = { version = "0.6", features = ["getrandom", "std"] }
 openidconnect = "4.0.1"
 chrono = "0.4"
+chrono-tz = "0.10"
 image = { version = "0.25", default-features = false, features = ["jpeg", "png", "webp"] }
 kamadak-exif = "0.6"
 
