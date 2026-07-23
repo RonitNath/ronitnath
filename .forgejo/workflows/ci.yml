@@ -1,0 +1,30 @@
+name: build-test-deploy
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: self-hosted
+    steps:
+      - name: Check out the exact revision
+        uses: https://code.forgejo.org/actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+          clean: true
+      - name: Build and test with persistent warm caches
+        run: |
+          export PATH=/nix/var/nix/profiles/default/bin:$PATH
+          nix develop --command bash -euo pipefail -c '
+            cargo build --release --locked
+            cargo test --locked
+            sh ts/build.sh
+          '
+      - name: Controlled red-build proof gate
+        run: test ! -e .ci-red-proof
+      - name: Deploy the green main revision
+        if: forgejo.event_name == 'push' && forgejo.ref == 'refs/heads/main'
+        run: sudo /usr/bin/systemctl start forgejo-webdeploy@ronitnath.service
