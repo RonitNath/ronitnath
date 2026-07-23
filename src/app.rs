@@ -114,12 +114,6 @@ pub fn build_admin_router(state: AppState, config: &Config) -> Router {
     let rate_limiter = RateLimiter::new(config.rate_limit_per_minute, config.trust_proxy);
     let (router, api) = OpenApiRouter::with_openapi(ApiDoc::openapi())
         .route("/", get(handlers::home::index))
-        .route("/about", get(handlers::about::index))
-        .route("/guestbook", get(handlers::guestbook::index))
-        .routes(routes!(
-            handlers::guestbook::api_list,
-            handlers::guestbook::api_create
-        ))
         .routes(routes!(handlers::health::healthz))
         .merge(client_error_api(&rate_limiter))
         .route(
@@ -558,7 +552,7 @@ mod tests {
 
         // Config::for_tests() allows 10/min; the 11th from the same client
         // should be refused. client-errors is the only unauthenticated
-        // write route left in web_template (guestbook now requires login).
+        // Client errors are the only unauthenticated write route.
         for _ in 0..10 {
             let (status, _, _) = post_json_from(&app, "/api/client-errors", &body, addr).await;
             assert_eq!(status, StatusCode::NO_CONTENT);
@@ -589,6 +583,15 @@ mod tests {
         let body = String::from_utf8(body.to_vec()).unwrap();
         assert!(!body.contains("/login"));
         assert!(!body.contains("/signup"));
+    }
+
+    #[tokio::test]
+    async fn retired_about_and_guestbook_routes_are_not_found() {
+        let (app, _store) = test_app().await;
+        for path in ["/about", "/guestbook", "/api/guestbook"] {
+            let (status, _, _) = get(&app, path).await;
+            assert_eq!(status, StatusCode::NOT_FOUND, "{path} must remain absent");
+        }
     }
 
     #[tokio::test]
@@ -649,58 +652,6 @@ mod tests {
             after,
             before + 1,
             "a failed login should audit login.failed"
-        );
-    }
-
-    #[tokio::test]
-    async fn mutating_post_requires_csrf_token() {
-        let (app, _store) = test_app().await;
-        let Authed { cookie, csrf_token } =
-            signup(&app, "Alice", "alice@example.com", "password123").await;
-        let entry = serde_json::json!({"author": "Alice", "message": "hi"});
-
-        let (status, _, _) = post_json_authed(&app, "/api/guestbook", &entry, &cookie, None).await;
-        assert_eq!(
-            status,
-            StatusCode::FORBIDDEN,
-            "missing CSRF token should be rejected"
-        );
-
-        let (status, _, _) =
-            post_json_authed(&app, "/api/guestbook", &entry, &cookie, Some(&csrf_token)).await;
-        assert_eq!(
-            status,
-            StatusCode::OK,
-            "a correct CSRF token should be accepted"
-        );
-    }
-
-    #[tokio::test]
-    async fn cross_account_isolation() {
-        let (app, _store) = test_app().await;
-        let alice = signup(&app, "Alice", "alice@example.com", "password123").await;
-        let entry = serde_json::json!({"author": "Alice", "message": "alice's secret"});
-        let (status, _, _) = post_json_authed(
-            &app,
-            "/api/guestbook",
-            &entry,
-            &alice.cookie,
-            Some(&alice.csrf_token),
-        )
-        .await;
-        assert_eq!(status, StatusCode::OK);
-
-        // No route ever takes an account id from the request — Bob's
-        // AccountScope always resolves to Bob's own account, so there's no
-        // URL that could even attempt to address Alice's data. Bob's own
-        // list is the observable proof: it must not contain her entry.
-        let bob = signup(&app, "Bob", "bob@example.com", "password123").await;
-        let (status, _, body) = get_with_cookie(&app, "/api/guestbook", &bob.cookie).await;
-        assert_eq!(status, StatusCode::OK);
-        let entries: Vec<serde_json::Value> = serde_json::from_slice(&body).unwrap();
-        assert!(
-            entries.is_empty(),
-            "Bob must not see Alice's guestbook entries"
         );
     }
 
@@ -797,7 +748,7 @@ mod tests {
             body[start..end].to_string()
         };
 
-        let request = axum::http::Request::get("/api/guestbook")
+        let request = axum::http::Request::get("/settings")
             .header(header::AUTHORIZATION, format!("Bearer {raw_token}"))
             .body(axum::body::Body::empty())
             .unwrap();
@@ -807,7 +758,7 @@ mod tests {
         assert_eq!(
             response.status(),
             StatusCode::OK,
-            "a valid bearer token should authenticate the JSON API"
+            "a valid bearer token should authenticate a protected route"
         );
 
         let alice_factor = store
@@ -825,7 +776,7 @@ mod tests {
             .await
             .unwrap();
 
-        let request = axum::http::Request::get("/api/guestbook")
+        let request = axum::http::Request::get("/settings")
             .header(header::AUTHORIZATION, format!("Bearer {raw_token}"))
             .body(axum::body::Body::empty())
             .unwrap();
@@ -834,7 +785,7 @@ mod tests {
             .unwrap();
         assert_eq!(
             response.status(),
-            StatusCode::UNAUTHORIZED,
+            StatusCode::SEE_OTHER,
             "a revoked token must stop authenticating"
         );
     }

@@ -1,5 +1,5 @@
 //! Queries and types for the `people` table — the longitudinal person
-//! registry. Account-scoped like every domain table (see guestbook.rs).
+//! registry. Account-scoped like every domain table.
 
 use serde::Serialize;
 use ts_rs::TS;

@@ -4,7 +4,7 @@
 //! multi-instance deployment gets one budget per instance. Swap for a
 //! shared-store limiter (e.g. Redis-backed) if that ever matters; until
 //! then this is enough to blunt a single abusive client hammering
-//! `/api/guestbook` or `/api/client-errors`.
+//! `/api/client-errors`.
 
 use std::collections::HashMap;
 use std::net::{IpAddr, SocketAddr};
@@ -27,9 +27,7 @@ struct Bucket {
 
 /// Shared limiter state. Cheap to clone (an `Arc` inside); register the same
 /// instance's [`enforce`] middleware on every write route you want sharing
-/// one budget (see `app.rs` — the guestbook and client-error POST routes
-/// share one instance deliberately, so abusing either counts against the
-/// same client).
+/// one budget (see `app.rs` for the client-error route).
 #[derive(Clone)]
 pub struct RateLimiter {
     max_per_window: u32,

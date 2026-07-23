@@ -1,5 +1,10 @@
 # Design: Circles, Guest Accounts, Viewer Resolution, Photos, Calendar
 
+> 2026-07-23 surface update: `/about` and `/guestbook` were retired. Their
+> routes, handlers, templates, browser island, navigation, and API are absent;
+> requests return 404. The durable `guestbook_entries` table and its rows stay
+> in place pending an explicitly reviewed cleanup migration.
+
 Explored: `stage_2` migrations 0001–0010 + `AGENTS.md`, `src/auth/{extract,middleware}.rs`, `src/config.rs`; events-fork migrations 0011–0021, `src/app.rs` (gather/admin bin split), `src/handlers/event_public.rs`, `src/store/{events,event_links,people,accounts}.rs`, `src/bin/admin.rs`. Key facts that shape everything below: the events fork already has the two-bin split (`gather` = public/no-auth, `admin` = mesh-only/`AccountScope`); tier enforcement today is exactly 2 chokepoints (`Event::public_view`, `Store::list_schedule`'s tier filter); `Store::require_single_account` hard-fails on >1 account row, which the guest-account decision below has to reconcile with.
 
 ---

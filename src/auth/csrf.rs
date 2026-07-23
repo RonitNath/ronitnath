@@ -1,8 +1,8 @@
 //! CSRF: a per-session synchronizer token, checked against every mutating
 //! request. Plain HTML forms carry it as a hidden field (`csrf_field()` on
 //! the Askama context, checked against a `Form<T>` field in the handler);
-//! the guestbook JSON API carries it as an `X-CSRF-Token` header (set by
-//! `ts/src/lib/api.ts` from a `<meta>` tag) since it has no HTML form to
+//! JSON APIs carry it as an `X-CSRF-Token` header (set by
+//! `ts/src/lib/api.ts` from a `<meta>` tag) when they have no HTML form to
 //! embed a field in.
 //!
 //! Deliberately not a router middleware: a mutating handler almost always

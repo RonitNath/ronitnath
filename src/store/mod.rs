@@ -1,7 +1,7 @@
 //! Persistence boundary.
 //!
 //! [`Store`] wraps a `SqlitePool` and owns every query in the app (organized
-//! one file per table, e.g. [`guestbook`]). Handlers call `Store` methods and
+//! one file per table). Handlers call `Store` methods and
 //! never see SQL or a pool directly — if this ever needs to move to Postgres,
 //! this module is the seam: swap the pool type and query bodies, keep the
 //! method signatures.
@@ -16,7 +16,6 @@ pub mod circles;
 pub mod event_links;
 pub mod events;
 pub mod factors;
-pub mod guestbook;
 pub mod identities;
 pub mod import;
 pub mod memberships;

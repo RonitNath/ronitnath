@@ -27,14 +27,13 @@ no seeded account — sign up at `/signup` first.
    column against a table with foreign keys and will otherwise ask for an
    `Into<i64>` impl on `Option<i64>` that doesn't exist.
 2. **New domain tables get an `account_id` column and every query takes
-   one** — see `src/store/guestbook.rs` for the exemplar. This is the one
+   one** — see `src/store/events.rs` for the product example. This is the one
    rule in this fork with real teeth: a query that forgets to filter by
    account is the canonical multi-tenant data leak.
 3. Add query fns to `src/store/<table>.rs` — `query_as!`/`query!` macros only.
 4. Add a handler in `src/handlers/`. Any route touching account-owned data
    takes an `AccountScope` extractor (`crate::auth::AccountScope`) instead
-   of a raw id — see `handlers::guestbook` for the pattern (page + JSON
-   list + JSON create, all scoped). It rejects with a redirect-to-login
+   of a raw id — see `handlers::events_admin` for the product pattern. It rejects with a redirect-to-login
    (HTML) or 401 JSON (`/api/*`) when there's no valid session/bearer
    token. Gate admin-only actions with `scope.require(Role::Admin)?` (see
    `handlers::account`). Register the route in `src/app.rs`; JSON API
@@ -43,7 +42,7 @@ no seeded account — sign up at `/signup` first.
    `.route()` pass-through. Mutating routes need a CSRF check: form
    handlers call `csrf::verify(&scope, &form.csrf_token)` against a hidden
    `csrf_token` field; JSON handlers check an `X-CSRF-Token` header the
-   same way (see `handlers::guestbook::api_create`) — CSRF is checked
+   same way (see `handlers::guest_accounts::api_my_rsvp`) — CSRF is checked
    per-handler, not via router middleware, since a mutating handler almost
    always consumes the body anyway and middleware can't peek at a form
    field without buffering/replaying it. `AccountScope.csrf_token` is
