@@ -3,8 +3,8 @@
 use std::net::SocketAddr;
 
 use askama::Template;
-use axum::extract::{ConnectInfo, Path, State};
-use axum::http::HeaderMap;
+use axum::extract::{ConnectInfo, Path, Query, State};
+use axum::http::{HeaderMap, StatusCode, header};
 use axum::response::{IntoResponse, Redirect, Response};
 use axum::{Extension, Form, Json};
 use axum_extra::extract::CookieJar;
@@ -16,7 +16,7 @@ use crate::auth::extract::{GuestScope, NavContext, NavUser};
 use crate::auth::login::{self, RequestContext};
 use crate::auth::session;
 use crate::auth::viewer::Viewer;
-use crate::auth::{csrf, password};
+use crate::auth::{csrf, oidc, password};
 use crate::dates as filters;
 use crate::error::AppError;
 use crate::handlers::event_public::{GuestView, RsvpResult, RsvpSubmit};
@@ -57,6 +57,8 @@ struct ClaimTemplate {
     current_user: Option<NavUser>,
     person_name: String,
     csrf_token: String,
+    claim_token: String,
+    oidc_providers: Vec<oidc::OidcProviderButton>,
 }
 
 pub async fn claim_page(
@@ -88,6 +90,8 @@ pub async fn claim_page(
         current_user,
         person_name: person.name,
         csrf_token,
+        claim_token: raw,
+        oidc_providers: state.oidc().buttons(),
     })
 }
 
@@ -199,16 +203,110 @@ pub async fn claim_submit(
 struct GuestLoginTemplate {
     nav_active: &'static str,
     current_user: Option<NavUser>,
+    oidc_providers: Vec<oidc::OidcProviderButton>,
 }
 
-pub async fn login_page(NavContext(current_user): NavContext) -> Result<Response, AppError> {
+pub async fn login_page(
+    State(state): State<AppState>,
+    NavContext(current_user): NavContext,
+) -> Result<Response, AppError> {
     if current_user.is_some() {
         return Ok(Redirect::to("/my").into_response());
     }
     render(GuestLoginTemplate {
         nav_active: "",
         current_user: None,
+        oidc_providers: state.oidc().buttons(),
     })
+}
+
+#[derive(Deserialize)]
+pub struct GuestOidcStartQuery {
+    claim: Option<String>,
+}
+
+pub async fn oidc_start(
+    State(state): State<AppState>,
+    Path(key): Path<String>,
+    Query(query): Query<GuestOidcStartQuery>,
+) -> Result<Response, AppError> {
+    let guest_claim = match query.claim {
+        Some(raw) => {
+            let (link, _) = crate::handlers::event_public::resolve(state.store(), &raw).await?;
+            let person_id = link.person_id.ok_or(AppError::NotFound)?;
+            if state
+                .store()
+                .active_identity_for_person(link.account_id, person_id)
+                .await?
+                .is_some()
+            {
+                return Err(AppError::NotFound);
+            }
+            Some(oidc::GuestOidcClaim {
+                event_link_id: link.id,
+                owner_account_id: link.account_id,
+                person_id,
+            })
+        }
+        None => None,
+    };
+    let redirect_uri = oidc::canonical_redirect_uri(state.public_url(), &key)?;
+    let auth_url = oidc::start(
+        &state,
+        &key,
+        redirect_uri,
+        oidc::OidcIntent::GuestLogin,
+        None,
+        None,
+        Some("/my".into()),
+        guest_claim,
+    )
+    .await?;
+    Ok((StatusCode::FOUND, [(header::LOCATION, auth_url)]).into_response())
+}
+
+#[derive(Deserialize)]
+pub struct GuestOidcCallbackQuery {
+    code: Option<String>,
+    state: Option<String>,
+    error: Option<String>,
+    error_description: Option<String>,
+}
+
+pub async fn oidc_callback(
+    State(state): State<AppState>,
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    headers: HeaderMap,
+    Path(key): Path<String>,
+    Query(query): Query<GuestOidcCallbackQuery>,
+) -> Result<Response, AppError> {
+    if let Some(error) = query.error {
+        let description = query.error_description.unwrap_or_default();
+        return Err(AppError::InvalidCredentials(format!(
+            "OIDC provider returned {error}: {description}"
+        )));
+    }
+    let code = query
+        .code
+        .ok_or_else(|| AppError::InvalidCredentials("OIDC callback missing code".into()))?;
+    let csrf_state = query
+        .state
+        .ok_or_else(|| AppError::InvalidCredentials("OIDC callback missing state".into()))?;
+    let ip = addr.ip().to_string();
+    let (outcome, _) = oidc::callback(
+        &state,
+        &key,
+        code,
+        csrf_state,
+        request_context(&headers, &ip),
+    )
+    .await?;
+    let cookie = session::build_cookie(
+        state.auth_config().cookie_secure,
+        outcome.raw_token,
+        outcome.ttl_secs,
+    );
+    Ok((CookieJar::new().add(cookie), Redirect::to("/my")).into_response())
 }
 
 #[derive(Deserialize)]

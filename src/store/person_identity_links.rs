@@ -9,6 +9,7 @@ pub struct GuestBinding {
     pub person_id: i64,
     pub person_name: String,
     pub identity_id: i64,
+    pub guest_account_id: i64,
 }
 
 #[derive(Debug, sqlx::FromRow)]
@@ -26,9 +27,12 @@ impl Store {
     ) -> sqlx::Result<Option<GuestBinding>> {
         sqlx::query_as!(GuestBinding,
             r#"SELECT pil.account_id as "owner_account_id!: i64", pil.person_id as "person_id!: i64",
-                      p.name as person_name, pil.identity_id as "identity_id!: i64"
+                      p.name as person_name, pil.identity_id as "identity_id!: i64",
+                      m.account_id as "guest_account_id!: i64"
                FROM person_identity_links pil
                JOIN people p ON p.account_id = pil.account_id AND p.id = pil.person_id
+               JOIN memberships m ON m.identity_id = pil.identity_id
+               JOIN accounts a ON a.id = m.account_id AND a.purpose = 'guest' AND a.deleted_at IS NULL
                WHERE pil.identity_id = ?1 AND pil.unlinked_at IS NULL"#,
             identity_id)
             .fetch_optional(&self.pool).await
@@ -64,6 +68,80 @@ impl Store {
         user_agent: Option<&str>,
         ip: Option<&str>,
     ) -> sqlx::Result<(i64, i64)> {
+        let external_id = format!("guest:{person_id}");
+        let (identity_id, guest_account_id, _) = self
+            .claim_guest_with_factor(
+                owner_account_id,
+                person_id,
+                None,
+                display_name,
+                recovery_email,
+                "password",
+                &external_id,
+                Some(password_hash),
+                "{}",
+                session_hash,
+                csrf_token,
+                expires_at,
+                user_agent,
+                ip,
+            )
+            .await?;
+        Ok((identity_id, guest_account_id))
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub async fn claim_guest_with_oidc(
+        &self,
+        owner_account_id: i64,
+        person_id: i64,
+        event_link_id: i64,
+        display_name: &str,
+        external_id: &str,
+        metadata: &serde_json::Value,
+        session_hash: &str,
+        csrf_token: &str,
+        expires_at: &str,
+        user_agent: Option<&str>,
+        ip: Option<&str>,
+    ) -> sqlx::Result<(i64, i64, i64)> {
+        self.claim_guest_with_factor(
+            owner_account_id,
+            person_id,
+            Some(event_link_id),
+            display_name,
+            None,
+            "oidc",
+            external_id,
+            None,
+            &metadata.to_string(),
+            session_hash,
+            csrf_token,
+            expires_at,
+            user_agent,
+            ip,
+        )
+        .await
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    async fn claim_guest_with_factor(
+        &self,
+        owner_account_id: i64,
+        person_id: i64,
+        required_event_link_id: Option<i64>,
+        display_name: &str,
+        recovery_email: Option<&str>,
+        factor_kind: &str,
+        factor_external_id: &str,
+        factor_secret_hash: Option<&str>,
+        factor_metadata: &str,
+        session_hash: &str,
+        csrf_token: &str,
+        expires_at: &str,
+        user_agent: Option<&str>,
+        ip: Option<&str>,
+    ) -> sqlx::Result<(i64, i64, i64)> {
         // Reserve SQLite's single writer up front. A deferred read followed by a
         // write can otherwise lose a concurrent claim with SQLITE_BUSY during
         // the lock upgrade instead of reaching the deterministic re-check.
@@ -75,10 +153,24 @@ impl Store {
               AND NOT EXISTS (SELECT 1 FROM person_identity_links pil
                               WHERE pil.person_id = p.id AND pil.unlinked_at IS NULL)"#,
             owner_account_id,
-            person_id
+            person_id,
         )
         .fetch_one(&mut *tx)
         .await?;
+        if let Some(link_id) = required_event_link_id {
+            let live_link = sqlx::query_scalar!(
+                r#"SELECT COUNT(*) as "count!: i64" FROM event_links
+                   WHERE id = ?1 AND account_id = ?2 AND person_id = ?3 AND revoked_at IS NULL"#,
+                link_id,
+                owner_account_id,
+                person_id,
+            )
+            .fetch_one(&mut *tx)
+            .await?;
+            if live_link != 1 {
+                return Err(sqlx::Error::RowNotFound);
+            }
+        }
         if person_exists != 1 {
             return Err(sqlx::Error::RowNotFound);
         }
@@ -104,15 +196,16 @@ impl Store {
         )
         .execute(&mut *tx)
         .await?;
-        let external_id = format!("guest:{person_id}");
-        sqlx::query!(
-            r#"INSERT INTO factors (identity_id, kind, external_id, secret_hash)
-            VALUES (?1, 'password', ?2, ?3)"#,
+        let factor_id = sqlx::query_scalar!(
+            r#"INSERT INTO factors (identity_id, kind, external_id, secret_hash, metadata)
+            VALUES (?1, ?2, ?3, ?4, ?5) RETURNING id as "id!: i64""#,
             identity_id,
-            external_id,
-            password_hash
+            factor_kind,
+            factor_external_id,
+            factor_secret_hash,
+            factor_metadata,
         )
-        .execute(&mut *tx)
+        .fetch_one(&mut *tx)
         .await?;
         if let Some(email) = recovery_email {
             sqlx::query!(
@@ -148,7 +241,7 @@ impl Store {
         .execute(&mut *tx)
         .await?;
         tx.commit().await?;
-        Ok((identity_id, guest_account_id))
+        Ok((identity_id, guest_account_id, factor_id))
     }
 
     /// Recovery email is a locator, never the password factor external id. Ambiguity fails closed.

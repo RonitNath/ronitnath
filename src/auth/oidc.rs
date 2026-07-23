@@ -238,6 +238,14 @@ impl Error for OidcHttpError {}
 pub enum OidcIntent {
     Login,
     Link,
+    GuestLogin,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GuestOidcClaim {
+    pub event_link_id: i64,
+    pub owner_account_id: i64,
+    pub person_id: i64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -248,6 +256,8 @@ pub struct PendingOidcState {
     pub redirect_uri: String,
     pub intent: OidcIntent,
     pub next: Option<String>,
+    #[serde(default)]
+    pub guest_claim: Option<GuestOidcClaim>,
 }
 
 pub async fn start(
@@ -258,6 +268,7 @@ pub async fn start(
     identity_id: Option<i64>,
     account_id: Option<i64>,
     next: Option<String>,
+    guest_claim: Option<GuestOidcClaim>,
 ) -> Result<String, AppError> {
     let provider = state.oidc().get(provider_key).ok_or(AppError::NotFound)?;
     let client = provider.client(&redirect_uri)?;
@@ -280,6 +291,7 @@ pub async fn start(
         redirect_uri,
         intent,
         next,
+        guest_claim,
     };
     state
         .store()
@@ -360,18 +372,37 @@ pub async fn callback(
         .or_else(|| email.clone())
         .unwrap_or_else(|| claims.subject().as_str().to_string());
 
-    let (identity_id, account_id, factor_id) = match pending.state.intent {
+    let request_id = ctx.request_id;
+    let (identity_id, account_id, factor_id, outcome) = match pending.state.intent {
         OidcIntent::Login => {
-            login_or_provision(
+            let (identity_id, account_id, factor_id) = login_or_provision(
                 state,
                 provider,
                 &external_id,
                 &display_name,
                 email.as_deref(),
             )
+            .await?;
+            let outcome = issue_session(state, identity_id, account_id, ctx).await?;
+            (identity_id, account_id, factor_id, outcome)
+        }
+        OidcIntent::Link => {
+            let (identity_id, account_id, factor_id) =
+                link_factor(state, &pending, &external_id, email.as_deref()).await?;
+            let outcome = issue_session(state, identity_id, account_id, ctx).await?;
+            (identity_id, account_id, factor_id, outcome)
+        }
+        OidcIntent::GuestLogin => {
+            guest_login_or_claim(
+                state,
+                provider,
+                &pending,
+                &external_id,
+                email.as_deref(),
+                ctx,
+            )
             .await?
         }
-        OidcIntent::Link => link_factor(state, &pending, &external_id, email.as_deref()).await?,
     };
     state.store().touch_factor_last_used(factor_id).await?;
     state
@@ -379,15 +410,114 @@ pub async fn callback(
         .audit(
             Some(identity_id),
             Some(account_id),
-            ctx.request_id,
+            request_id,
             "login.succeeded",
             "identity",
             Some(&identity_id.to_string()),
             &serde_json::json!({ "factor": "oidc", "provider": provider.key }),
         )
         .await?;
-    let outcome = issue_session(state, identity_id, account_id, ctx).await?;
     Ok((outcome, pending.state.next))
+}
+
+async fn guest_login_or_claim(
+    state: &AppState,
+    provider: &OidcProvider,
+    pending: &PendingOidcAuth,
+    external_id: &str,
+    email: Option<&str>,
+    ctx: RequestContext<'_>,
+) -> Result<(i64, i64, i64, LoginOutcome), AppError> {
+    if let Some(factor) = state
+        .store()
+        .find_factor_by_external("oidc", external_id)
+        .await?
+    {
+        let binding = state
+            .store()
+            .active_guest_binding(factor.identity_id)
+            .await?
+            .filter(|binding| Some(binding.owner_account_id) == state.owner_account_id())
+            .ok_or_else(|| {
+                AppError::Forbidden("this ronitnath ID is not linked to an invited guest".into())
+            })?;
+        let outcome =
+            issue_session(state, factor.identity_id, binding.guest_account_id, ctx).await?;
+        return Ok((
+            factor.identity_id,
+            binding.guest_account_id,
+            factor.id,
+            outcome,
+        ));
+    }
+
+    let claim = pending.state.guest_claim.as_ref().ok_or_else(|| {
+        AppError::Forbidden(
+            "use the claim link from a personal invitation before signing in for the first time"
+                .into(),
+        )
+    })?;
+    if Some(claim.owner_account_id) != state.owner_account_id() {
+        return Err(AppError::Forbidden(
+            "this invitation does not belong to this site".into(),
+        ));
+    }
+    let live_link = state
+        .store()
+        .find_live_event_link_by_id(claim.event_link_id)
+        .await?
+        .filter(|link| {
+            link.account_id == claim.owner_account_id && link.person_id == Some(claim.person_id)
+        })
+        .ok_or(AppError::NotFound)?;
+    let person = state
+        .store()
+        .find_person(claim.owner_account_id, claim.person_id)
+        .await?
+        .ok_or(AppError::NotFound)?;
+    let material = prepare_session(state)?;
+    let metadata = serde_json::json!({ "email": email });
+    let (identity_id, guest_account_id, factor_id) = state
+        .store()
+        .claim_guest_with_oidc(
+            claim.owner_account_id,
+            claim.person_id,
+            live_link.id,
+            &person.name,
+            external_id,
+            &metadata,
+            &material.token_hash,
+            &material.csrf_token,
+            &material.expires_at,
+            ctx.user_agent,
+            ctx.ip,
+        )
+        .await
+        .map_err(|error| match &error {
+            sqlx::Error::RowNotFound => AppError::NotFound,
+            sqlx::Error::Database(db) if db.is_unique_violation() => AppError::Forbidden(
+                "this invitation or ronitnath ID has already been claimed".into(),
+            ),
+            _ => AppError::from(error),
+        })?;
+    state
+        .store()
+        .audit(
+            Some(identity_id),
+            Some(claim.owner_account_id),
+            ctx.request_id,
+            "guest.claimed",
+            "person",
+            Some(&claim.person_id.to_string()),
+            &serde_json::json!({
+                "guest_account_id": guest_account_id,
+                "event_link_id": live_link.id,
+                "factor": "oidc",
+                "provider": provider.key,
+            }),
+        )
+        .await?;
+    Ok((identity_id, guest_account_id, factor_id, material.outcome))
 }
 
 async fn login_or_provision(
@@ -494,12 +624,14 @@ async fn link_factor(
     Ok((identity_id, account_id, factor.id))
 }
 
-async fn issue_session(
-    state: &AppState,
-    identity_id: i64,
-    account_id: i64,
-    ctx: RequestContext<'_>,
-) -> Result<LoginOutcome, AppError> {
+struct SessionMaterial {
+    outcome: LoginOutcome,
+    token_hash: String,
+    csrf_token: String,
+    expires_at: String,
+}
+
+fn prepare_session(state: &AppState) -> Result<SessionMaterial, AppError> {
     let ttl_secs = state.auth_config().session_ttl_secs;
     let raw_token = session::generate_token();
     let token_hash = session::hash_token(&raw_token);
@@ -508,22 +640,37 @@ async fn issue_session(
     let expires_at = (time::OffsetDateTime::now_utc() + time::Duration::seconds(ttl_secs))
         .format(&format)
         .map_err(|e| anyhow::anyhow!("formatting session expiry: {e}"))?;
+    Ok(SessionMaterial {
+        outcome: LoginOutcome {
+            raw_token,
+            ttl_secs,
+        },
+        token_hash,
+        csrf_token,
+        expires_at,
+    })
+}
+
+async fn issue_session(
+    state: &AppState,
+    identity_id: i64,
+    account_id: i64,
+    ctx: RequestContext<'_>,
+) -> Result<LoginOutcome, AppError> {
+    let material = prepare_session(state)?;
     state
         .store()
         .create_session(
             identity_id,
             account_id,
-            &token_hash,
-            &csrf_token,
-            &expires_at,
+            &material.token_hash,
+            &material.csrf_token,
+            &material.expires_at,
             ctx.user_agent,
             ctx.ip,
         )
         .await?;
-    Ok(LoginOutcome {
-        raw_token,
-        ttl_secs,
-    })
+    Ok(material.outcome)
 }
 
 impl OidcProvider {
@@ -550,6 +697,15 @@ impl OidcProvider {
         )
         .set_redirect_uri(redirect_uri))
     }
+}
+
+pub fn canonical_redirect_uri(public_url: &str, provider_key: &str) -> Result<String, AppError> {
+    let mut base = openidconnect::url::Url::parse(public_url)
+        .map_err(|e| AppError::Other(anyhow::anyhow!("invalid public URL: {e}")))?;
+    base.set_path(&format!("/auth/oidc/{provider_key}/callback"));
+    base.set_query(None);
+    base.set_fragment(None);
+    Ok(base.to_string())
 }
 
 pub fn redirect_uri(headers: &HeaderMap, provider_key: &str) -> Result<String, AppError> {
