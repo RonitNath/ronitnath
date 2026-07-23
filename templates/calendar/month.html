@@ -4,10 +4,15 @@
 <section class="calendar-heading">
   <div><p class="eyebrow">Calendar</p><h1>{{ month_label }}</h1></div>
   <nav class="calendar-nav" aria-label="Month navigation">
+    {% if month_view %}
     <a class="button-link" href="/calendar?month={{ previous_month }}">Previous</a>
     <a class="button-link" href="/calendar?month={{ next_month }}">Next</a>
+    {% else %}
+    <a class="button-link" href="/calendar?month={{ next_month }}">Browse month</a>
+    {% endif %}
   </nav>
 </section>
+{% if month_view %}
 <section class="calendar-grid" aria-label="Month of {{ month_label }}">
   {% for name in ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] %}<div class="calendar-weekday">{{ name }}</div>{% endfor %}
   {% for _ in 0..leading_blanks %}<div class="calendar-day calendar-day--blank" aria-hidden="true"></div>{% endfor %}
@@ -20,9 +25,10 @@
   </article>
   {% endfor %}
 </section>
+{% endif %}
 <section class="calendar-agenda">
-  <h2>Agenda</h2>
-  {% if agenda.is_empty() %}<div class="empty-state"><p>No visible plans this month.</p><p class="muted">Try another month.</p></div>{% endif %}
+  <h2>{% if month_view %}Agenda{% else %}Agenda — next 12 months{% endif %}</h2>
+  {% if agenda.is_empty() %}<div class="empty-state"><p>No visible plans {% if month_view %}this month{% else %}ahead{% endif %}.</p><p class="muted">{% if month_view %}Try another month.{% else %}Browse a past month to revisit earlier plans.{% endif %}</p></div>{% endif %}
   {% for item in agenda %}<article class="agenda-item agenda-item--{{ item.level }}">
     <div><p class="agenda-time">{{ item.starts_at }}{% if let Some(end) = item.ends_at %} – {{ end }}{% endif %}</p><h3>{{ item.title }}</h3></div>
     {% if let Some(location) = item.location %}<p>{{ location }}</p>{% endif %}

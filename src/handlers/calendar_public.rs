@@ -57,6 +57,7 @@ struct CalendarTemplate {
     leading_blanks: usize,
     days: Vec<CalendarDay>,
     agenda: Vec<CalendarItem>,
+    month_view: bool,
 }
 
 #[derive(Deserialize)]
@@ -70,30 +71,37 @@ pub async fn page(
     NavContext(current_user): NavContext,
     Query(query): Query<MonthQuery>,
 ) -> Result<Response, AppError> {
+    let month_view = query.month.is_some();
     let first = parse_month(query.month.as_deref())?;
     let next = next_month(first)?;
     let account_id = match state.owner_account_id() {
         Some(id) => id,
         None => match state.store().find_primary_account().await? {
             Some(id) => id,
-            None => return calendar_response(first, current_user, Vec::new()),
+            None => return calendar_response(first, current_user, Vec::new(), month_view),
         },
     };
-    let items = union_for_range(
-        &state,
-        account_id,
-        &viewer,
-        &format!("{} 00:00:00", first.format("%Y-%m-%d")),
-        &format!("{} 00:00:00", next.format("%Y-%m-%d")),
-    )
-    .await?;
-    calendar_response(first, current_user, items)
+    let (start, end) = if month_view {
+        (
+            format!("{} 00:00:00", first.format("%Y-%m-%d")),
+            format!("{} 00:00:00", next.format("%Y-%m-%d")),
+        )
+    } else {
+        let today = chrono::Local::now().date_naive();
+        let through = today
+            .checked_add_months(chrono::Months::new(12))
+            .ok_or_else(|| AppError::Invalid("agenda range is outside supported dates".into()))?;
+        (format!("{today} 00:00:00"), format!("{through} 00:00:00"))
+    };
+    let items = union_for_range(&state, account_id, &viewer, &start, &end).await?;
+    calendar_response(first, current_user, items, month_view)
 }
 
 fn calendar_response(
     first: NaiveDate,
     current_user: Option<NavUser>,
     items: Vec<CalendarItem>,
+    month_view: bool,
 ) -> Result<Response, AppError> {
     let next = next_month(first)?;
     let (previous_year, previous_month) = if first.month() == 1 {
@@ -104,32 +112,42 @@ fn calendar_response(
     let previous = previous_year
         .and_then(|year| NaiveDate::from_ymd_opt(year, previous_month, 1))
         .ok_or_else(|| AppError::Invalid("month is outside the supported range".into()))?;
-    let mut days = Vec::new();
-    let mut cursor = first;
-    while cursor < next {
-        let prefix = cursor.format("%Y-%m-%d").to_string();
-        days.push(CalendarDay {
-            number: cursor.day(),
-            date: prefix.clone(),
-            items: items
-                .iter()
-                .filter(|item| item.starts_at.starts_with(&prefix))
-                .cloned()
-                .collect(),
-        });
-        cursor = cursor
-            .succ_opt()
-            .ok_or_else(|| AppError::Invalid("month is outside the supported range".into()))?;
-    }
+    let days = if month_view {
+        let mut days = Vec::new();
+        let mut cursor = first;
+        while cursor < next {
+            let prefix = cursor.format("%Y-%m-%d").to_string();
+            days.push(CalendarDay {
+                number: cursor.day(),
+                date: prefix.clone(),
+                items: items
+                    .iter()
+                    .filter(|item| item.starts_at.starts_with(&prefix))
+                    .cloned()
+                    .collect(),
+            });
+            cursor = cursor
+                .succ_opt()
+                .ok_or_else(|| AppError::Invalid("month is outside the supported range".into()))?;
+        }
+        days
+    } else {
+        Vec::new()
+    };
     let mut response = render(CalendarTemplate {
         nav_active: "calendar",
         current_user,
-        month_label: first.format("%B %Y").to_string(),
+        month_label: if month_view {
+            first.format("%B %Y").to_string()
+        } else {
+            "Upcoming plans".into()
+        },
         previous_month: previous.format("%Y-%m").to_string(),
         next_month: next.format("%Y-%m").to_string(),
         leading_blanks: first.weekday().num_days_from_sunday() as usize,
         days,
         agenda: items,
+        month_view,
     })?;
     response.headers_mut().insert(
         header::CACHE_CONTROL,
