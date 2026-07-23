@@ -21,6 +21,13 @@ git pull --ff-only
 ./deploy/deploy.sh rollback
 ```
 
+The authoritative origin is the private Forgejo repository
+`git.isoastra.com/ronitnath/ronitnath`. Every push and pull request to `main`
+is built and tested by the persistent nexus runner. A green push to `main`
+then starts the fleet-owned `forgejo-webdeploy@ronitnath.service`, which checks
+out that exact Forgejo revision and performs the production deployment. GitHub
+is an archival push mirror and is not read anywhere in this deploy path.
+
 One-time adoption or manifest changes use the same shim. `init` displays all
 planned diffs before a single confirmation and does not restart services:
 
