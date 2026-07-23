@@ -1,11 +1,29 @@
 {% extends "_layout.html" %}
 {% block title %}My events{% endblock %}
 {% block content %}
-<section class="hero"><h1>My events</h1><p class="subtitle">Upcoming invitations for you.</p></section>
+<section class="hero"><h1>My events</h1><p class="subtitle">Your invitations, reservations, and calendar feed.</p></section>
 <section class="admin-card">
-{% for event in events %}
+<h2>Upcoming</h2>
+{% for event in upcoming %}
   <article><h2><a href="/my/events/{{ event.id }}">{{ event.title }}</a></h2><p>{{ event.starts_at|human_dt }} · {% if let Some(rsvp) = event.rsvp_status %}RSVP: {{ rsvp }}{% else %}No RSVP yet{% endif %}</p></article>
 {% endfor %}
-{% if events.is_empty() %}<p class="muted">No upcoming invitations right now.</p>{% endif %}
+{% if upcoming.is_empty() %}<p class="muted">No upcoming invitations right now.</p>{% endif %}
+</section>
+<section class="admin-card">
+<h2>Calendar feed</h2>
+{% if let Some(url) = calendar_feed_url %}
+<p>Subscribe privately: <a href="{{ url }}">{{ url }}</a></p>
+<form method="post" action="/my/calendar-feed"><input type="hidden" name="csrf_token" value="{{ csrf_token }}" /><button name="action" value="rotate">Rotate calendar feed</button></form>
+{% else %}
+<p class="muted">Create a private ICS feed for your visible events and calendar entries.</p>
+<form method="post" action="/my/calendar-feed"><input type="hidden" name="csrf_token" value="{{ csrf_token }}" /><button name="action" value="mint">Create calendar feed</button></form>
+{% endif %}
+</section>
+<section class="admin-card">
+<h2>Past events</h2>
+{% for event in history %}
+  <article><h3><a href="/my/events/{{ event.id }}">{{ event.title }}</a></h3><p>{{ event.starts_at|human_dt }} · {% if let Some(rsvp) = event.rsvp_status %}RSVP: {{ rsvp }}{% else %}No RSVP recorded{% endif %}</p></article>
+{% endfor %}
+{% if history.is_empty() %}<p class="muted">No visible event history yet.</p>{% endif %}
 </section>
 {% endblock %}

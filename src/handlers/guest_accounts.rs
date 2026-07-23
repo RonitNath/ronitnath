@@ -15,6 +15,7 @@ use crate::access::level::Level;
 use crate::auth::extract::{GuestScope, NavContext, NavUser};
 use crate::auth::login::{self, RequestContext};
 use crate::auth::session;
+use crate::auth::session::{generate_token, hash_token};
 use crate::auth::viewer::Viewer;
 use crate::auth::{csrf, oidc, password};
 use crate::dates as filters;
@@ -369,7 +370,10 @@ struct DashboardEvent {
 struct MyTemplate {
     nav_active: &'static str,
     current_user: Option<NavUser>,
-    events: Vec<DashboardEvent>,
+    upcoming: Vec<DashboardEvent>,
+    history: Vec<DashboardEvent>,
+    calendar_feed_url: Option<String>,
+    csrf_token: String,
 }
 
 fn nav(scope: &GuestScope) -> NavUser {
@@ -391,9 +395,10 @@ pub async fn my_page(
     let now = time::OffsetDateTime::now_utc()
         .format(&format_description!("[year]-[month]-[day] [hour]:[minute]"))
         .map_err(|e| anyhow::anyhow!("formatting current time: {e}"))?;
-    let mut visible = Vec::new();
+    let mut upcoming = Vec::new();
+    let mut history = Vec::new();
     for event in state.store().list_events(scope.owner_account_id).await? {
-        if event.status == "draft" || event.starts_at < now {
+        if event.status == "draft" {
             continue;
         }
         let inputs = state
@@ -407,19 +412,76 @@ pub async fn my_page(
                 .find_attendance(scope.owner_account_id, event.id, scope.person_id)
                 .await?
                 .map(|attendance| attendance.status);
-            visible.push(DashboardEvent {
+            let item = DashboardEvent {
                 id: event.id,
                 title: event.title,
                 starts_at: event.starts_at,
                 rsvp_status,
-            });
+            };
+            if item.starts_at < now {
+                history.push(item);
+            } else {
+                upcoming.push(item);
+            }
         }
     }
+    let calendar_feed_url = state
+        .store()
+        .find_calendar_feed_for_person(scope.owner_account_id, scope.person_id)
+        .await?
+        .filter(|feed| feed.revoked_at.is_none())
+        .map(|feed| format!("{}/calendar/{}.ics", state.public_url(), feed.token_plain));
     render(MyTemplate {
         nav_active: "my",
         current_user: Some(nav(&scope)),
-        events: visible,
+        upcoming,
+        history,
+        calendar_feed_url,
+        csrf_token: scope.csrf_token.clone(),
     })
+}
+
+#[derive(Deserialize)]
+pub struct MyCalendarFeedForm {
+    csrf_token: String,
+    action: String,
+}
+
+/// Mints or rotates only the authenticated guest's own calendar capability.
+pub async fn my_calendar_feed_action(
+    State(state): State<AppState>,
+    scope: GuestScope,
+    Form(form): Form<MyCalendarFeedForm>,
+) -> Result<Response, AppError> {
+    csrf::verify_optional(Some(&scope.csrf_token), &form.csrf_token)?;
+    match form.action.as_str() {
+        "mint" | "rotate" => {
+            let raw = generate_token();
+            state
+                .store()
+                .mint_calendar_feed(
+                    scope.owner_account_id,
+                    scope.person_id,
+                    &hash_token(&raw),
+                    &raw,
+                )
+                .await?;
+        }
+        _ => return Err(AppError::Invalid("unknown calendar feed action".into())),
+    }
+    state
+        .store()
+        .audit(
+            Some(scope.identity_id),
+            Some(scope.owner_account_id),
+            None,
+            "calendar_feed.rotate",
+            "person",
+            Some(&scope.person_id.to_string()),
+            &serde_json::json!({}),
+        )
+        .await?;
+    Ok(Redirect::to("/my").into_response())
 }
 
 async fn my_event_parts(

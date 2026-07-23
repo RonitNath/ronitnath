@@ -20,6 +20,17 @@ Set `OIDC_PROVIDERS_PATH` (default: `data/oidc_providers.json`) to a JSON array:
 ]
 ```
 
+Production `ronitnath.com` uses the personal-universe Rauthy client, stored
+outside the repository at `/data/apps/ronitnath/oidc_providers.json`:
+
+```json
+[{"key":"ronitnath-id","display_name":"Ronit Nath ID","issuer_url":"https://id.ronitnath.com/auth/v1/","client_id":"ronitnath-events","client_secret":"materialized-secret","scopes":["openid","profile","email"],"auto_provision":false}]
+```
+
+The public router's guest-claim flow is the only provisioning path. Keep
+`auto_provision` false and `AUTH_SIGNUP=closed`; a bare guest login still needs
+an existing live `person_identity_links` binding.
+
 Fields:
 
 - `key`: URL-safe route key used in `/auth/oidc/{key}/start`.

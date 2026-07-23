@@ -71,6 +71,10 @@ pub fn build_site_router(state: AppState, config: &Config) -> Router {
         .route("/logout", post(handlers::guest_accounts::logout_submit))
         .route("/my", get(handlers::guest_accounts::my_page))
         .route(
+            "/my/calendar-feed",
+            post(handlers::guest_accounts::my_calendar_feed_action),
+        )
+        .route(
             "/my/events/{event_id}",
             get(handlers::guest_accounts::my_event_page),
         )
@@ -2994,6 +2998,51 @@ mod tests {
                 .0,
             StatusCode::NOT_FOUND
         );
+    }
+
+    #[tokio::test]
+    async fn guest_can_mint_and_rotate_only_their_own_calendar_feed() {
+        let (app, store, _event_id, person_id, raw, _link_id) = phase4_fixture().await;
+        let guest = claim_guest(&app, &raw, "maya@example.com").await;
+
+        let (status, _, _) = post_form_with_cookie(
+            &app,
+            "/my/calendar-feed",
+            &format!("csrf_token={}&action=mint", guest.csrf_token),
+            Some(&guest.cookie),
+        )
+        .await;
+        assert_eq!(status, StatusCode::SEE_OTHER);
+        let first = store
+            .find_calendar_feed_for_person(1, person_id)
+            .await
+            .unwrap()
+            .unwrap();
+        assert!(first.revoked_at.is_none());
+
+        let (status, _, _) = post_form_with_cookie(
+            &app,
+            "/my/calendar-feed",
+            &format!("csrf_token={}&action=rotate", guest.csrf_token),
+            Some(&guest.cookie),
+        )
+        .await;
+        assert_eq!(status, StatusCode::SEE_OTHER);
+        let rotated = store
+            .find_calendar_feed_for_person(1, person_id)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_ne!(first.token_plain, rotated.token_plain);
+
+        let (status, _, _) = post_form_with_cookie(
+            &app,
+            "/my/calendar-feed",
+            "csrf_token=wrong&action=rotate",
+            Some(&guest.cookie),
+        )
+        .await;
+        assert_eq!(status, StatusCode::FORBIDDEN);
     }
 
     #[tokio::test]
