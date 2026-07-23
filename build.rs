@@ -14,4 +14,8 @@ fn main() {
 
     println!("cargo:rustc-env=GIT_HASH={hash}");
     println!("cargo:rerun-if-changed=.git/HEAD");
+    // Pulling a new commit onto an already checked-out branch leaves HEAD's
+    // contents unchanged; the branch ref is the dependency that moves.
+    println!("cargo:rerun-if-changed=.git/refs/heads/main");
+    println!("cargo:rerun-if-changed=.git/packed-refs");
 }
