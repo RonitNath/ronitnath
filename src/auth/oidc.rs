@@ -280,7 +280,13 @@ pub async fn start(
             openidconnect::Nonce::new_random,
         )
         .set_pkce_challenge(pkce_challenge);
-    for scope in &provider.scopes {
+    // `openidconnect` adds the required OpenID scope itself; adding the
+    // normalized value again produces a duplicate request parameter value.
+    for scope in provider
+        .scopes
+        .iter()
+        .filter(|scope| scope.as_str() != "openid")
+    {
         authorize = authorize.add_scope(Scope::new(scope.clone()));
     }
     let (auth_url, csrf_state, nonce) = authorize.url();
