@@ -1,3 +1,0 @@
-deliberate CI red proof for alien runner migration
-rerun after completing the host-native runner runtime path
-rerun after adding the Nix client to the runner service path
