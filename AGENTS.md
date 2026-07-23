@@ -11,10 +11,10 @@ Find two open ports, then run both Rust bins and the frontend watcher:
 
     BIND_ADDR=127.0.0.1:<site-port> cargo watch -w src -w templates -w migrations -x 'run --bin site'
     ADMIN_BIND_ADDR=127.0.0.1:<admin-port> cargo watch -w src -w templates -w migrations -x 'run --bin admin'
-    cd ts && ./build.sh --watch
+    pnpm dev
 
 Never use a frontend dev server or proxy. Always hit the real axum server
-above — standalone `esbuild --watch` just keeps `static/dist` up to date. Hand the
+above — Vite's watcher just keeps `static/dist` up to date. Hand the
 server URL to the operator for verification and leave it running. There's
 no seeded account — sign up at `/signup` first.
 
@@ -55,7 +55,7 @@ no seeded account — sign up at `/signup` first.
    `current_user: Option<crate::auth::extract::NavUser>` field (pull it via
    the `NavContext` extractor, or from `scope.display_name`/`scope.csrf_token`
    if the route already required `AccountScope`).
-6. Frontend: add the new entry to `ts/build.sh` + one `<script type="module">`
+6. Frontend: add the new Vite entry to `vite.config.ts` + one `<script type="module">`
    tag on the page template. Mutating
    fetches need the CSRF header — see `csrfToken()` in `ts/src/lib/api.ts`.
 7. `cargo test` (regenerates `ts/src/generated/*.ts` from `#[ts(export)]` types)
@@ -91,15 +91,13 @@ or delete `.env` to fall back to the offline cache.
 
 ## Frontend
 
-All client code is TypeScript under `ts/src`, bundled by the standalone
-`esbuild` binary via `ts/build.sh` into `static/dist` (gitignored — a fresh
-fork needs one `cd ts && ./build.sh` before islands render; pages still work
-server-side without it). The frontend build has no JavaScript package manager,
-`package.json`, lockfile, or runtime dependencies. Rust API types derive `TS` +
-`ToSchema`; their bindings in `ts/src/generated/` are committed and regenerate
-via `cargo test`. Fetch helpers use those generated types plus focused runtime
-shape assertions for fields the UI reads. Stateful islands use plain DOM APIs;
-static pages stay plain HTML/CSS — that includes the auth pages
+All client code is TypeScript under `ts/src`, built into `static/dist` by the
+root pnpm/Vite/Solid workspace (gitignored). Run `pnpm install --frozen-lockfile`
+then `pnpm build`; pages stay server-rendered and usable without their islands.
+Rust API types derive `TS` + `ToSchema`; their bindings in `ts/src/generated/`
+are committed and regenerate via `cargo test`. Fetch helpers use those generated
+types plus focused runtime shape assertions for fields the UI reads. Stateful
+islands use Solid; static pages stay plain HTML/CSS — that includes the auth pages
 (login/signup/settings/account), which are plain `<form method="post">`
 submissions, not fetch-based. The FOUC-prevention block in `_theme.html` is
 deliberately duplicated with `base.css` — keep both in sync.

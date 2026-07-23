@@ -1,0 +1,22 @@
+{
+  "name": "ronitnath",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.13.0",
+  "engines": {
+    "node": "24.x"
+  },
+  "scripts": {
+    "build": "vite build",
+    "dev": "vite build --watch",
+    "check": "tsc -p ts/tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "solid-js": "1.9.14"
+  },
+  "devDependencies": {
+    "typescript": "5.9.3",
+    "vite": "7.1.7",
+    "vite-plugin-solid": "2.11.13"
+  }
+}

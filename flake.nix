@@ -33,9 +33,10 @@
               # rust-overlay's current stable, pinned by flake.lock (nixpkgs
               # 25.11 ships rustc 1.91.1, older than this crate graph needs).
               pkgs.rust-bin.stable.latest.minimal
-              # esbuild is the entire JS toolchain here: ts/build.sh bundles
-              # the no-package-manager frontend with it.
-              pkgs.esbuild
+              # The islands pipeline is Vite + Solid through the package-lock
+              # controlled pnpm workspace; no host-global Node tooling.
+              pkgs.nodejs
+              pkgs.pnpm
             ];
           };
         });

@@ -18,7 +18,7 @@ default_env = false
 env = { DATABASE_URL = "sqlite:/data/apps/ronitnath/app.db", PHOTO_STORAGE_DIR = "/data/apps/ronitnath/photos", OIDC_PROVIDERS_PATH = "/data/apps/ronitnath/oidc_providers.json", PUBLIC_URL = "https://ronitnath.com", RUST_LOG = "info", AUTH_SIGNUP = "closed" }
 
 [build]
-commands = ["cargo build --release --locked", "sh ts/build.sh"]
+commands = ["cargo build --release --locked", "pnpm install --frozen-lockfile", "pnpm build"]
 env = { SQLX_OFFLINE = "true" }
 
 [state]

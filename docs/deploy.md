@@ -12,6 +12,10 @@ service ordering, build commands, migrations, and backup/restore-drill units.
 The public listener is `10.0.0.1:3130`; the mesh-only admin listener is
 `100.88.31.199:3131`. Do not widen either bind.
 
+The release build runs `pnpm install --frozen-lockfile` then `pnpm build` after
+the locked Cargo build. Node and pnpm are supplied by `flake.nix`; do not rely
+on a globally installed JavaScript toolchain or commit `node_modules`.
+
 Run from a clean, current checkout on nexus:
 
 ```sh

@@ -53,12 +53,11 @@ Full design rationale in `docs/plans/2026-07-stage2-hardened-fork-template.md`.
       auth/           login.html, signup.html.
     static/
       css/            Stylesheets, split by concern.
-      dist/           esbuild output (gitignored).
+      dist/           Vite output (gitignored).
     migrations/       sqlx migrations, one file per table.
-    ts/               Dependency-free TypeScript frontend (standalone esbuild).
-      build.sh         Four-entry production build; ESBUILD overrides the binary.
-      src/entries/    One esbuild entry per bundle (site-wide, per-island).
-      src/islands/    Stateful UI mounted with plain browser DOM APIs.
+    ts/               Solid TypeScript islands.
+      src/entries/    One Vite entry per bundle (site-wide, per-island).
+      src/solid/      Stateful Solid components.
       src/lib/        nav/theme/beacon/api helpers (api.ts attaches the CSRF header).
       src/generated/  ts-rs bindings for Rust API types (committed).
 
@@ -76,16 +75,16 @@ and migrates the shared `data/app.db`, then start admin in another terminal:
 They bind to `127.0.0.1:3130` and `127.0.0.1:3131` by default; override with
 `BIND_ADDR` and `ADMIN_BIND_ADDR`. Sign up through admin at `/signup` — there
 is no seeded demo account. Pages render without the frontend
-built, but islands (e.g. `/guestbook`) need the standalone `esbuild` binary and
-one build (no package manager or dependency install):
+built, but interactive islands need the locked pnpm workspace:
 
-    cd ts && ./build.sh
+    pnpm install --frozen-lockfile
+    pnpm build
 
 For active development, run both watchers side by side (see AGENTS.md):
 
     cargo watch -w src -w templates -w migrations -x 'run --bin site'
     cargo watch -w src -w templates -w migrations -x 'run --bin admin'
-    cd ts && ./build.sh --watch
+    pnpm dev
 
 ## Hardening
 
@@ -101,5 +100,5 @@ env vars.
 - Axum / Tokio / Askama / tower-http / tracing
 - sqlx + sqlite (persistence), utoipa (OpenAPI docs)
 - argon2 (password hashing), axum-extra (cookies)
-- TypeScript + plain DOM APIs (frontend), ts-rs (Rust → TS type contracts)
-- standalone esbuild binary (frontend bundling; no JS package manager or runtime deps)
+- TypeScript + Solid islands (frontend), ts-rs (Rust → TS type contracts)
+- locked pnpm + Vite (frontend bundling)
