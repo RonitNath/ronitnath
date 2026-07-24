@@ -116,6 +116,12 @@ pub fn init(service_name: &'static str) {
             tracing_subscriber::EnvFilter::try_from_default_env()
                 .unwrap_or_else(|_| "ronitnath=debug,tower_http=info".into()),
         );
+    // stdout preserves the existing JSON stream, while this native journald layer exposes
+    // request fields (notably TRACE_ID) to systemd-journal-upload as first-class fields.
+    // Keeping no prefix makes LogsQL's case-insensitive `trace_id:<id>` field selector work.
+    let journald = tracing_journald::layer()
+        .ok()
+        .map(|layer| layer.with_field_prefix(None));
 
     if let Some((config, endpoint)) = configured {
         let exporter = opentelemetry_otlp::SpanExporter::builder()
@@ -141,11 +147,15 @@ pub fn init(service_name: &'static str) {
         global::set_tracer_provider(provider);
         tracing_subscriber::registry()
             .with(fmt)
+            .with(journald)
             .with(tracing_opentelemetry::layer().with_tracer(tracer))
             .init();
         tracing::info!(service_name, "OTLP trace export enabled");
     } else {
-        tracing_subscriber::registry().with(fmt).init();
+        tracing_subscriber::registry()
+            .with(fmt)
+            .with(journald)
+            .init();
     }
 }
 
