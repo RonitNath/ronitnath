@@ -107,10 +107,15 @@ pub fn init(service_name: &'static str) {
     let trace_config = configured.as_ref().map(|(config, _)| config.clone());
     let _ = TRACE_CONFIG.set(trace_config);
 
-    let fmt = tracing_subscriber::fmt::layer().with_filter(
-        tracing_subscriber::EnvFilter::try_from_default_env()
-            .unwrap_or_else(|_| "ronitnath=debug,tower_http=info".into()),
-    );
+    let fmt = tracing_subscriber::fmt::layer()
+        .json()
+        .with_current_span(true)
+        .with_span_list(true)
+        .with_ansi(false)
+        .with_filter(
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| "ronitnath=debug,tower_http=info".into()),
+        );
 
     if let Some((config, endpoint)) = configured {
         let exporter = opentelemetry_otlp::SpanExporter::builder()
@@ -204,7 +209,11 @@ pub async fn record_response(request: Request, next: Next) -> AxumResponse {
 pub fn on_response<B>(response: &Response<B>, latency: Duration, span: &Span) {
     span.record("status", response.status().as_u16());
     span.record("latency_ms", latency.as_millis() as u64);
+    let trace_id = trace_id(span);
+    let span_id = span_id(span);
     tracing::info!(
+        trace_id,
+        span_id,
         status = response.status().as_u16(),
         latency_ms = latency.as_millis() as u64,
         "response"
@@ -260,6 +269,17 @@ fn trace_id(span: &Span) -> String {
     let context = trace_span.span_context();
     if context.is_valid() {
         context.trace_id().to_string()
+    } else {
+        String::new()
+    }
+}
+
+fn span_id(span: &Span) -> String {
+    let context = span.context();
+    let trace_span = context.span();
+    let context = trace_span.span_context();
+    if context.is_valid() {
+        context.span_id().to_string()
     } else {
         String::new()
     }
