@@ -333,6 +333,7 @@ fn apply_layers(router: Router, state: AppState, config: &Config, attach_session
         router
     };
     router
+        .layer(middleware::from_fn(telemetry::record_response))
         .layer(
             TraceLayer::new_for_http()
                 .make_span_with(telemetry::make_span)
