@@ -487,7 +487,10 @@ mod tests {
         );
         let body = String::from_utf8(body.to_vec()).unwrap();
         assert!(body.contains("Ronit Nath"));
-        assert!(body.contains(&format!("site.js?v={}", env!("GIT_HASH"))));
+        assert!(body.contains(&format!(
+            "site.js?v={}",
+            crate::view::release_revision()
+        )));
     }
 
     #[tokio::test]

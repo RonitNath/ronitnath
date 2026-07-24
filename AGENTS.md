@@ -212,9 +212,10 @@ themes for anything layout- or theme-related.
 
 ## Deployment
 
-Production packaging and service lifecycle live in `flake.nix` and `deploy/`;
-follow `docs/deploy.md` for build, cutover, rollback, data paths, and bind
-boundaries. The Nix/systemd path supersedes Docker Compose after cutover.
+Production is packaged as a digest-pinned OCI image and run with the hardened
+`deploy/compose.yaml`. Follow `docs/deploy.md` exactly for manual publication,
+deployment, rollback, persistent-volume checks, and bind boundaries. Deployment
+is deliberately operator-driven; do not add a deploy or reconciliation script.
 
 ## Merge discipline (fork hygiene)
 

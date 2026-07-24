@@ -11,11 +11,9 @@
     };
   };
 
-  # This flake deliberately packages nothing. Release builds run incrementally
-  # on the build host through deploy/deploy.sh inside this shell, so a source
-  # change recompiles only the crates it touches; the flake's sole job is
-  # pinning the toolchain that performs those builds (owner ruling 2026-07-14:
-  # maximum incrementality, no sandboxed rebuilds).
+  # This flake deliberately packages nothing. It pins the host-native
+  # verification toolchain; production artifacts are built from the separately
+  # pinned OCI stages in Dockerfile.
   outputs = { nixpkgs, rust-overlay, ... }:
     let
       supportedSystems = [ "x86_64-linux" ];

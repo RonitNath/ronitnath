@@ -1,0 +1,83 @@
+name: ronitnath
+
+x-runtime: &runtime
+  image: ${RONITNATH_IMAGE:?Set RONITNATH_IMAGE to an immutable Forgejo registry digest}
+  user: "986:985"
+  restart: unless-stopped
+  init: true
+  read_only: true
+  cap_drop: [ALL]
+  security_opt:
+    - no-new-privileges:true
+  pids_limit: 256
+  mem_limit: 1g
+  cpus: 2
+  tmpfs:
+    - /tmp:size=64m,mode=1777
+  volumes:
+    - type: bind
+      source: /data/apps/ronitnath/state
+      target: /state
+      bind:
+        create_host_path: false
+    - type: bind
+      source: /data/apps/ronitnath/oidc_providers.json
+      target: /run/config/oidc_providers.json
+      read_only: true
+      bind:
+        create_host_path: false
+  environment: &environment
+    DATABASE_URL: sqlite:/state/app.db
+    PHOTO_STORAGE_DIR: /state/photos
+    OIDC_PROVIDERS_PATH: /run/config/oidc_providers.json
+    PUBLIC_URL: https://ronitnath.com
+    RUST_LOG: info
+    TRACE_BUFFER_MAX_SPANS: "32"
+    TRACE_BUFFER_MAX_TRACES: "1024"
+    TRACE_EXPORT_QUEUE: "256"
+    TRACE_EXPORT_TIMEOUT_MS: "1000"
+    TRACE_OTLP_ENDPOINT: http://100.88.39.223:10428/insert/opentelemetry/v1/traces
+    TRACE_SAMPLE_RATE: "0.0"
+    TRACE_SLOW_THRESHOLD_MS: "500"
+
+services:
+  site:
+    <<: *runtime
+    command: /app/bin/site
+    environment:
+      <<: *environment
+      BIND_ADDR: 0.0.0.0:3130
+      TRUSTED_PROXY: "true"
+    ports:
+      - target: 3130
+        published: "3130"
+        host_ip: 10.0.0.1
+        protocol: tcp
+    healthcheck:
+      test: [CMD, busybox, wget, -q, -O, /dev/null, http://127.0.0.1:3130/healthz]
+      interval: 5s
+      timeout: 2s
+      retries: 12
+      start_period: 5s
+
+  admin:
+    <<: *runtime
+    command: /app/bin/admin
+    depends_on:
+      site:
+        condition: service_healthy
+    environment:
+      <<: *environment
+      ADMIN_BIND_ADDR: 0.0.0.0:3131
+      AUTH_SIGNUP: closed
+    ports:
+      - target: 3131
+        published: "3131"
+        host_ip: 100.88.31.199
+        protocol: tcp
+    healthcheck:
+      test: [CMD, busybox, wget, -q, -O, /dev/null, http://127.0.0.1:3131/healthz]
+      interval: 5s
+      timeout: 2s
+      retries: 12
+      start_period: 5s

@@ -28,7 +28,7 @@ pub async fn healthz(State(state): State<AppState>) -> Json<Health> {
         service: "ronitnath",
         status: "ok",
         version: env!("CARGO_PKG_VERSION"),
-        git_hash: env!("GIT_HASH"),
+        git_hash: crate::view::release_revision(),
         uptime_secs: state.uptime().as_secs(),
     })
 }
