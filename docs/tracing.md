@@ -67,10 +67,10 @@ trace_id=<response-header-value>
 ssh alien "curl -fsS 'http://127.0.0.1:10428/select/jaeger/api/traces/$trace_id'"
 ```
 
-In Grafana, choose the VictoriaTraces datasource and search that trace ID. To find its journal records in VictoriaLogs, search the structured field:
+In Grafana, choose the VictoriaTraces datasource and search that trace ID. The service emits both its JSON stdout record and a native journald record. The latter carries the correlation fields through `systemd-journal-upload`; journald uppercases custom field names, so find its exact lines in VictoriaLogs with:
 
 ```text
-trace_id:<response-header-value>
+TRACE_ID:<response-header-value>
 ```
 
 The operational validation script should also exercise a controlled 5xx and a request slower than `TRACE_SLOW_THRESHOLD_MS`, then repeat ordinary requests at rates `0.0` and `0.05`. Use a dead endpoint only in a temporary local or staged configuration to demonstrate that the bounded exporter cannot affect request latency.
