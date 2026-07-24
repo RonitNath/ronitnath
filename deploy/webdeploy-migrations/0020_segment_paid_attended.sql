@@ -1,0 +1,1 @@
+../../migrations/0020_segment_paid_attended.up.sql

@@ -212,10 +212,14 @@ themes for anything layout- or theme-related.
 
 ## Deployment
 
-Production is packaged as a digest-pinned OCI image and run with the hardened
+The target production path is a digest-pinned OCI image run with the hardened
 `deploy/compose.yaml`. Follow `docs/deploy.md` exactly for manual publication,
 deployment, rollback, persistent-volume checks, and bind boundaries. Deployment
 is deliberately operator-driven; do not add a deploy or reconciliation script.
+Until the documented backup-aware cutover is performed, the live systemd stack
+still consumes `deploy/app.toml`, `deploy/deploy.sh`, and
+`deploy/webdeploy-migrations/`; remove those compatibility files only in the
+same change that retires the live units and their webdeploy backup jobs.
 
 ## Merge discipline (fork hygiene)
 
