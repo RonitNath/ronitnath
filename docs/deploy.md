@@ -82,6 +82,31 @@ parallel stage scheduling. The runtime image is 132.8 MB. Most remaining warm
 time is Podman/layer bookkeeping on the HDD, not Rust compilation, so sccache
 would add operational state without attacking the measured bottleneck.
 
+## Nexus registry credential
+
+Nexus pulls with the dedicated Forgejo token `nexus-registry-pull-20260724`,
+whose only scope is `read:package`. Its encrypted source is
+`forgejo-registry-pull.age` in the keys repository. It cannot publish packages
+or mutate repositories and is never provided to Forgejo Actions.
+
+Materialize it and create Docker's derived root-only authentication file:
+
+```sh
+sudo keys-materialize deploy/secrets.toml
+sudo install -d -o root -g root -m 0700 /etc/ronitnath/docker-auth
+sudo docker --config /etc/ronitnath/docker-auth login \
+  --username ronitnath \
+  --password-stdin \
+  git.isoastra.com < /etc/ronitnath/forgejo-registry-pull.token
+sudo stat -c '%U:%G %a %n' \
+  /etc/ronitnath/forgejo-registry-pull.token \
+  /etc/ronitnath/docker-auth/config.json
+```
+
+Both files must be `root:root` and inaccessible to other users. Rotation is:
+mint a second `read:package` token, update the encrypted blob, materialize,
+repeat `docker login`, prove an exact-digest pull, then revoke the old token.
+
 ## Persistent-volume preflight
 
 Production data is durable SQLite and uploaded photos. The only writable
@@ -120,7 +145,7 @@ sudoedit /data/apps/ronitnath/deploy/image.env
 # Exactly one line, using the recorded digest:
 # RONITNATH_IMAGE=git.isoastra.com/ronitnath/ronitnath@sha256:...
 
-compose='docker compose --env-file /data/apps/ronitnath/deploy/image.env -f deploy/compose.yaml'
+compose='sudo docker --config /etc/ronitnath/docker-auth compose --env-file /data/apps/ronitnath/deploy/image.env -f deploy/compose.yaml'
 $compose config --quiet
 $compose config | grep -F 'source: /data/apps/ronitnath/state'
 $compose pull
@@ -145,7 +170,7 @@ binary; database restore is never part of ordinary rollback.
 From a clean checkout of the matching source revision on Nexus:
 
 ```sh
-compose='docker compose --env-file /data/apps/ronitnath/deploy/image.env -f deploy/compose.yaml'
+compose='sudo docker --config /etc/ronitnath/docker-auth compose --env-file /data/apps/ronitnath/deploy/image.env -f deploy/compose.yaml'
 $compose config --quiet
 $compose pull
 $compose up -d --wait
@@ -183,7 +208,7 @@ public-health checks:
 
 ```sh
 sudoedit /data/apps/ronitnath/deploy/image.env
-compose='docker compose --env-file /data/apps/ronitnath/deploy/image.env -f deploy/compose.yaml'
+compose='sudo docker --config /etc/ronitnath/docker-auth compose --env-file /data/apps/ronitnath/deploy/image.env -f deploy/compose.yaml'
 $compose pull
 $compose up -d --wait
 ```
