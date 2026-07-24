@@ -8,6 +8,13 @@ artifact, but never deploys it. Production changes are deliberately performed
 by an operator following this document; there is no deployment or reconciler
 script.
 
+This is currently a validated replacement candidate, not the live runtime.
+Production remains on its systemd/webdeploy units until an operator performs a
+separate backup-aware cutover. The legacy `deploy/app.toml`, `deploy/deploy.sh`,
+and `deploy/webdeploy-migrations/` remain solely because the live services and
+backup jobs still consume them. Retire those files, units, and jobs together;
+an ordinary repository pull must not strand the still-live backup lifecycle.
+
 The public listener remains `10.0.0.1:3130`. The admin listener remains
 mesh-only at `100.88.31.199:3131`. Do not widen either bind.
 

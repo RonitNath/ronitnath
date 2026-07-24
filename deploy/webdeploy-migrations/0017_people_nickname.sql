@@ -1,0 +1,1 @@
+../../migrations/0017_people_nickname.up.sql
