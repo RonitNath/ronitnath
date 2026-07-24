@@ -1,1 +1,0 @@
-../../migrations/0004_accounts.up.sql

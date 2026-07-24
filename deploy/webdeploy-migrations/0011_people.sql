@@ -1,1 +1,0 @@
-../../migrations/0011_people.up.sql

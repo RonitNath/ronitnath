@@ -1,1 +1,0 @@
-../../migrations/0013_event_links.up.sql

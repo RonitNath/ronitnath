@@ -1,1 +1,0 @@
-../../migrations/0021_schedule_items_drop_capacity.up.sql

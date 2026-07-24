@@ -1,1 +1,0 @@
-../../migrations/0015_attendance.up.sql

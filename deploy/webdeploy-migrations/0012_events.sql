@@ -1,1 +1,0 @@
-../../migrations/0012_events.up.sql
