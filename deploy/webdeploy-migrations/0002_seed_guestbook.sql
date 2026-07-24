@@ -1,0 +1,1 @@
+../../migrations/0002_seed_guestbook.up.sql

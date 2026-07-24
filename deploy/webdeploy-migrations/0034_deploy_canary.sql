@@ -1,0 +1,1 @@
+../../migrations/0034_deploy_canary.up.sql

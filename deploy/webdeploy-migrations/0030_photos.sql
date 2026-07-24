@@ -1,0 +1,1 @@
+../../migrations/0030_photos.up.sql
