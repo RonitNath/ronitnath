@@ -6,7 +6,8 @@ user = "ronitnath-app"
 name = "site"
 socket = "10.0.0.1:3130"
 default_env = false
-env = { DATABASE_URL = "sqlite:/data/apps/ronitnath/app.db", PHOTO_STORAGE_DIR = "/data/apps/ronitnath/photos", OIDC_PROVIDERS_PATH = "/data/apps/ronitnath/oidc_providers.json", PUBLIC_URL = "https://ronitnath.com", RUST_LOG = "info", TRUSTED_PROXY = "true" }
+environment_files = ["/etc/ronitnath/tracing.env"]
+env = { DATABASE_URL = "sqlite:/data/apps/ronitnath/app.db", PHOTO_STORAGE_DIR = "/data/apps/ronitnath/photos", OIDC_PROVIDERS_PATH = "/data/apps/ronitnath/oidc_providers.json", PUBLIC_URL = "https://ronitnath.com", RUST_LOG = "info", TRUSTED_PROXY = "true", TRACE_OTLP_ENDPOINT = "http://100.88.39.223:10428/insert/opentelemetry/v1/traces", TRACE_SLOW_THRESHOLD_MS = "500", TRACE_SAMPLE_RATE = "0.0", TRACE_BUFFER_MAX_TRACES = "1024", TRACE_BUFFER_MAX_SPANS = "32", TRACE_EXPORT_QUEUE = "256", TRACE_EXPORT_TIMEOUT_MS = "1000" }
 
 [[binary]]
 name = "admin"
@@ -15,7 +16,8 @@ after = ["ronitnath-site.service"]
 wants = ["ronitnath-site.service"]
 bind_env = "ADMIN_BIND_ADDR"
 default_env = false
-env = { DATABASE_URL = "sqlite:/data/apps/ronitnath/app.db", PHOTO_STORAGE_DIR = "/data/apps/ronitnath/photos", OIDC_PROVIDERS_PATH = "/data/apps/ronitnath/oidc_providers.json", PUBLIC_URL = "https://ronitnath.com", RUST_LOG = "info", AUTH_SIGNUP = "closed" }
+environment_files = ["/etc/ronitnath/tracing.env"]
+env = { DATABASE_URL = "sqlite:/data/apps/ronitnath/app.db", PHOTO_STORAGE_DIR = "/data/apps/ronitnath/photos", OIDC_PROVIDERS_PATH = "/data/apps/ronitnath/oidc_providers.json", PUBLIC_URL = "https://ronitnath.com", RUST_LOG = "info", AUTH_SIGNUP = "closed", TRACE_OTLP_ENDPOINT = "http://100.88.39.223:10428/insert/opentelemetry/v1/traces", TRACE_SLOW_THRESHOLD_MS = "500", TRACE_SAMPLE_RATE = "0.0", TRACE_BUFFER_MAX_TRACES = "1024", TRACE_BUFFER_MAX_SPANS = "32", TRACE_EXPORT_QUEUE = "256", TRACE_EXPORT_TIMEOUT_MS = "1000" }
 
 [build]
 commands = ["cargo build --release --locked", "pnpm install --frozen-lockfile", "pnpm build"]

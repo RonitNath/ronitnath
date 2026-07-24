@@ -11,7 +11,7 @@ use ronitnath::store::events::InviteField;
 #[tokio::main]
 async fn main() {
     dotenvy::dotenv().ok();
-    ronitnath::telemetry::init();
+    ronitnath::telemetry::init("ronitnath-admin");
 
     if let Err(err) = dispatch().await {
         eprintln!("admin failed: {err:#}");
