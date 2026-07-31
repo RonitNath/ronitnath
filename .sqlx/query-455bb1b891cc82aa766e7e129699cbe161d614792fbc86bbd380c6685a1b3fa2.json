@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE photos SET deleted_at = datetime('now')\n               WHERE account_id = ?1 AND event_id = ?2 AND id = ?3 AND deleted_at IS NULL\n                 AND (?6 = 1 OR uploaded_by_identity_id = ?4 OR uploaded_by_person_id = ?5)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 6
+    },
+    "nullable": []
+  },
+  "hash": "455bb1b891cc82aa766e7e129699cbe161d614792fbc86bbd380c6685a1b3fa2"
+}

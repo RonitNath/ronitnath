@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE calendar_entries SET title=?3, location=?4, starts_at=?5,\n            ends_at=?6, timezone=?7, notes=?8, updated_at=datetime('now')\n            WHERE account_id=?1 AND id=?2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 8
+    },
+    "nullable": []
+  },
+  "hash": "f7afb6d54024139dea6d5bd1c8dfb58c22933b079ac583cf7fa48c556e437911"
+}

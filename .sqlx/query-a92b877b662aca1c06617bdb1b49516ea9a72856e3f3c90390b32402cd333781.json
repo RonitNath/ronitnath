@@ -1,0 +1,74 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT id as \"id!: i64\", account_id as \"account_id!: i64\",\n                      event_id as \"event_id!: i64\", person_id, tier\n               FROM event_links WHERE id = ?1 AND revoked_at IS NULL",
+  "describe": {
+    "columns": [
+      {
+        "name": "id!: i64",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "event_links",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "name": "account_id!: i64",
+        "ordinal": 1,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "event_links",
+            "name": "account_id"
+          }
+        }
+      },
+      {
+        "name": "event_id!: i64",
+        "ordinal": 2,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "event_links",
+            "name": "event_id"
+          }
+        }
+      },
+      {
+        "name": "person_id",
+        "ordinal": 3,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "event_links",
+            "name": "person_id"
+          }
+        }
+      },
+      {
+        "name": "tier",
+        "ordinal": 4,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "event_links",
+            "name": "tier"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      false
+    ]
+  },
+  "hash": "a92b877b662aca1c06617bdb1b49516ea9a72856e3f3c90390b32402cd333781"
+}

@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM schedule_items WHERE account_id = ?1 AND id = ?2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "786b8556fc53cbe49460acb90c8098a1f0ffe1c27220fd0e0b89e4beb438f16f"
+}

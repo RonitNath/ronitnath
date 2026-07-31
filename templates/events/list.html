@@ -1,0 +1,47 @@
+{% extends "_layout.html" %}
+
+{% block title %}Events{% endblock %}
+
+{% block content %}
+<section class="hero event-overview-hero">
+    <h1>Events</h1>
+    <p class="subtitle">Every gathering, past and upcoming. Open one to manage its schedule, links, and guests.</p>
+</section>
+
+<section class="admin-card">
+    <div class="table-scroll">
+    <table class="admin-table responsive-table">
+        <thead>
+            <tr><th>Event</th><th>Starts</th><th>Status</th><th>Going</th><th>Maybe</th><th>Heads</th></tr>
+        </thead>
+        <tbody>
+            {% for row in rows %}
+            <tr>
+                <td data-label="Event"><a href="/events/{{ row.event.id }}">{{ row.event.title }}</a>
+                    <span class="muted">/{{ row.event.slug }}</span></td>
+                <td data-label="Starts">{{ row.event.starts_at|human_dt }}</td>
+                <td data-label="Status"><span class="status-pill status-{{ row.event.status }}">{{ row.event.status }}</span></td>
+                <td data-label="Going">{{ row.going }}</td>
+                <td data-label="Maybe">{{ row.maybe }}</td>
+                <td data-label="Heads">{{ row.heads }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    </div>
+    {% if rows.is_empty() %}
+    <p class="muted">No events yet — create the first one below.</p>
+    {% endif %}
+</section>
+
+<section class="admin-card">
+    <h2>New event</h2>
+    <form method="post" action="/events" class="admin-form admin-form-row">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+        <label>Slug <input type="text" name="slug" placeholder="july4-2026" required /></label>
+        <label>Title <input type="text" name="title" placeholder="July 4th" required /></label>
+        <label>Starts <input type="text" name="starts_at" placeholder="2026-07-04 13:00" required /></label>
+        <button type="submit">Create</button>
+    </form>
+</section>
+{% endblock %}

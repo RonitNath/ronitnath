@@ -1,0 +1,22 @@
+{% extends "_layout.html" %}
+{% block title %}Circles{% endblock %}
+{% block content %}
+<section class="hero event-overview-hero">
+    <h1>Circles</h1>
+    <p class="subtitle">Reusable groups for event visibility.</p>
+</section>
+<section class="admin-card">
+    <ul>
+    {% for circle in circles %}<li><a href="/circles/{{ circle.id }}">{{ circle.name }}</a></li>{% endfor %}
+    </ul>
+    {% if circles.is_empty() %}<p class="muted">No circles yet.</p>{% endif %}
+</section>
+<section class="admin-card">
+    <h2>New circle</h2>
+    <form method="post" action="/circles" class="admin-form admin-form-row">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+        <label>Name <input type="text" name="name" required /></label>
+        <button type="submit">Create circle</button>
+    </form>
+</section>
+{% endblock %}

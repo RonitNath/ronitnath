@@ -1,0 +1,38 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT id as \"id!: i64\", public_level\n            FROM audience_policies WHERE account_id = ?1 AND subject_type = ?2 AND subject_id = ?3",
+  "describe": {
+    "columns": [
+      {
+        "name": "id!: i64",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "audience_policies",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "name": "public_level",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "audience_policies",
+            "name": "public_level"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "07ddc126da3734bd4efb7d3ad3ef156184374b4717c71dc4c7e512c6edfea84c"
+}

@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO attendance (account_id, event_id, person_id, status, party_size, note)\n               VALUES (?1, ?2, ?3, ?4, ?5, ?6)\n               ON CONFLICT (event_id, person_id) DO UPDATE SET\n                   status = excluded.status,\n                   party_size = excluded.party_size,\n                   note = excluded.note,\n                   updated_at = datetime('now')",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 6
+    },
+    "nullable": []
+  },
+  "hash": "a0ab2be4c71c6a0538c276a25ecae9752489ee553a76d6c2861dc87cc6cc5c05"
+}

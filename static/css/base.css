@@ -411,5 +411,3 @@ code {
     padding: 0.1rem 0.35rem;
     font-size: 0.9em;
 }
-
-[data-island-state="mounted"] [data-island-fallback] { display: none; }

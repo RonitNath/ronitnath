@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE audience_policies SET public_level = ?3 WHERE account_id = ?1 AND id = ?2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "66fb0dc15e771d6be311a29142b915dfd1ab7e1b0fbe2e0fde71fbbafdf97f7f"
+}

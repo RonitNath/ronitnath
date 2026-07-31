@@ -1,25 +1,59 @@
-[workspace]
-
 [package]
 name = "ronitnath"
 version = "0.1.0"
 edition = "2024"
-rust-version = "1.97"
-publish = false
+default-run = "site"
+
+[[bin]]
+name = "site"
+path = "src/bin/site.rs"
+
+[[bin]]
+name = "admin"
+path = "src/bin/admin.rs"
 
 [dependencies]
-axum = "=0.8.9"
-http-runtime = { git = "https://git.isoastra.com/ronitnath/web_template.git", rev = "48c1517d72b1fdcd5ad3f59a3e83ef3cf9c362cf", version = "=0.6.0" }
-islands = { git = "https://git.isoastra.com/ronitnath/web_template.git", rev = "48c1517d72b1fdcd5ad3f59a3e83ef3cf9c362cf", version = "=0.6.0" }
-serde_json = "=1.0.150"
-telemetry = { git = "https://git.isoastra.com/ronitnath/web_template.git", rev = "48c1517d72b1fdcd5ad3f59a3e83ef3cf9c362cf", version = "=0.6.0" }
-tokio = { version = "=1.52.3", features = ["macros", "net", "rt-multi-thread", "signal"] }
+anyhow = "1"
+askama = "0.16"
+axum = { version = "0.8", features = ["multipart"] }
+listenfd = "1.0.2"
+base64 = "0.22"
+thiserror = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "signal", "fs", "io-util"] }
+tokio-util = { version = "0.7", features = ["io"] }
+tower-http = { version = "0.6", features = ["fs", "trace", "request-id", "util", "limit", "set-header", "timeout"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+tracing-journald = "0.3"
+tracing-opentelemetry = { version = "0.33", default-features = false }
+opentelemetry = { version = "0.32", features = ["trace"] }
+opentelemetry_sdk = { version = "0.32", features = ["trace"] }
+opentelemetry-otlp = { version = "0.32", default-features = false, features = ["http-proto", "reqwest-blocking-client", "trace"] }
+futures-executor = "0.3"
+tower = { version = "0.5.3", features = ["util"] }
+dotenvy = "0.15.7"
+sqlx = { version = "0.9.0", default-features = false, features = ["sqlite", "runtime-tokio", "macros", "migrate", "derive"] }
+ts-rs = "12.0.1"
+utoipa = { version = "5.5.0", features = ["axum_extras"] }
+utoipa-axum = "0.2.0"
+argon2 = "0.5.3"
+axum-extra = { version = "0.12.6", features = ["cookie"] }
+time = { version = "0.3.53", features = ["macros", "formatting", "parsing"] }
+rand_core = { version = "0.6", features = ["getrandom", "std"] }
+openidconnect = "4.0.1"
+chrono = "0.4"
+chrono-tz = "0.10"
+image = { version = "0.25", default-features = false, features = ["jpeg", "png", "webp"] }
+kamadak-exif = "0.6"
 
-[dev-dependencies]
-tempfile = "=3.27.0"
-tower = { version = "=0.5.3", features = ["util"] }
+qrcode = { version = "0.14", default-features = false, features = ["svg"] }
 
-# Shallow changes must redeploy in seconds (owner ruling 2026-07-14), so
-# release builds keep incremental codegen.
+# Owner ruling 2026-07-14: maximum incrementality. Shallow changes must
+# redeploy in seconds, so release builds keep incremental codegen; this
+# service is nowhere near CPU-bound enough for the optimization loss to
+# matter.
 [profile.release]
 incremental = true

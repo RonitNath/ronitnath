@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO schedule_items\n                   (account_id, event_id, sort_order, time_label, title, detail, tier, segment_key)\n               VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)\n               RETURNING id as \"id!: i64\"",
+  "describe": {
+    "columns": [
+      {
+        "name": "id!: i64",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "schedule_items",
+            "name": "id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 8
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "badac654f809cd7caa9e6bc252a5a8a1a166934b2363b9f4461967d3f8955de0"
+}

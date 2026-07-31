@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE factors SET external_id = ?3\n                WHERE identity_id = ?1 AND kind = 'password' AND external_id = ?2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "24cd7e1ca47fdce2b98b2d73357209b3aa5635cd1c9b7e128a655ede04bc57fc"
+}

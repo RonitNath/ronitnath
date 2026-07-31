@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM pending_auth WHERE expires_at <= datetime('now') OR consumed_at IS NOT NULL",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": []
+  },
+  "hash": "d7ca353e28bf7550c772c3b80d64c6970a156cedee27246d1ff18bcfe407e129"
+}

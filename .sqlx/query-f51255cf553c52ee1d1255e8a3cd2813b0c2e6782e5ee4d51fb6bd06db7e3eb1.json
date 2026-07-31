@@ -1,0 +1,62 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT o.person_id as \"person_id!: i64\",\n                    p.name as person_name, o.override_kind, o.level\n                FROM audience_person_overrides o\n                JOIN people p ON p.account_id = o.account_id AND p.id = o.person_id\n                WHERE o.account_id = ?1 AND o.policy_id = ?2 AND o.person_id = ?3",
+  "describe": {
+    "columns": [
+      {
+        "name": "person_id!: i64",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "audience_person_overrides",
+            "name": "person_id"
+          }
+        }
+      },
+      {
+        "name": "person_name",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "people",
+            "name": "name"
+          }
+        }
+      },
+      {
+        "name": "override_kind",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "audience_person_overrides",
+            "name": "override_kind"
+          }
+        }
+      },
+      {
+        "name": "level",
+        "ordinal": 3,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "audience_person_overrides",
+            "name": "level"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "f51255cf553c52ee1d1255e8a3cd2813b0c2e6782e5ee4d51fb6bd06db7e3eb1"
+}

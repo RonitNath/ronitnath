@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE events SET headcount = ?3, updated_at = datetime('now')\n               WHERE account_id = ?1 AND id = ?2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "9ff015a3676793e403d4f7de956f33d91487234792d252cb6dbc3c9a1a1d3041"
+}

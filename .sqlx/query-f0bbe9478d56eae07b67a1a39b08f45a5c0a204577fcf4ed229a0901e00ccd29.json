@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE factors SET last_used_at = datetime('now') WHERE id = ?1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "f0bbe9478d56eae07b67a1a39b08f45a5c0a204577fcf4ed229a0901e00ccd29"
+}

@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO audience_person_overrides\n                        (account_id, policy_id, person_id, override_kind, level)\n                    SELECT ?1, p.id, person.id, ?4, ?5 FROM audience_policies p\n                    JOIN people person ON person.account_id = p.account_id\n                    WHERE p.account_id = ?1 AND p.id = ?2 AND person.id = ?3\n                    ON CONFLICT(policy_id, person_id) DO UPDATE SET\n                        override_kind = excluded.override_kind, level = excluded.level",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 5
+    },
+    "nullable": []
+  },
+  "hash": "b43c188260f4da614aa91160a882991f1f139cfa4aa73f0549c984a3e94901f4"
+}

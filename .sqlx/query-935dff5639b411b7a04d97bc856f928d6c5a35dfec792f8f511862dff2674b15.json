@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO segment_rsvps (account_id, schedule_item_id, person_id, status)\n               VALUES (?1, ?2, ?3, ?4)\n               ON CONFLICT (schedule_item_id, person_id) DO UPDATE SET\n                   status = excluded.status,\n                   updated_at = datetime('now')",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": []
+  },
+  "hash": "935dff5639b411b7a04d97bc856f928d6c5a35dfec792f8f511862dff2674b15"
+}

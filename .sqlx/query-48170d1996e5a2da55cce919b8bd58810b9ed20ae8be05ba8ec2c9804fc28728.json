@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE events SET quick_plan_html = ?3, updated_at = datetime('now')\n                       WHERE account_id = ?1 AND id = ?2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "48170d1996e5a2da55cce919b8bd58810b9ed20ae8be05ba8ec2c9804fc28728"
+}

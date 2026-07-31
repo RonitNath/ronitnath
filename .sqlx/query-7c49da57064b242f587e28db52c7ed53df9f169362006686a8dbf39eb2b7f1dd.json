@@ -1,0 +1,21 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT COALESCE(SUM(CASE WHEN sr.status = 'in' THEN 1 ELSE 0 END), 0) as \"count!: i64\"\n               FROM segment_rsvps sr\n               JOIN schedule_items si ON si.id = sr.schedule_item_id\n               WHERE si.event_id = ?1 AND si.segment_key = ?2",
+  "describe": {
+    "columns": [
+      {
+        "name": "count!: i64",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "7c49da57064b242f587e28db52c7ed53df9f169362006686a8dbf39eb2b7f1dd"
+}

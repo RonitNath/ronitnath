@@ -1,0 +1,57 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT pil.identity_id as \"identity_id!: i64\", i.display_name, pil.claimed_at,\n                      COUNT(f.id) as \"factor_count!: i64\"\n               FROM person_identity_links pil\n               JOIN identities i ON i.id = pil.identity_id\n               LEFT JOIN factors f ON f.identity_id = pil.identity_id\n               WHERE pil.account_id = ?1 AND pil.person_id = ?2 AND pil.unlinked_at IS NULL\n               GROUP BY pil.id",
+  "describe": {
+    "columns": [
+      {
+        "name": "identity_id!: i64",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "person_identity_links",
+            "name": "identity_id"
+          }
+        }
+      },
+      {
+        "name": "display_name",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "identities",
+            "name": "display_name"
+          }
+        }
+      },
+      {
+        "name": "claimed_at",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "person_identity_links",
+            "name": "claimed_at"
+          }
+        }
+      },
+      {
+        "name": "factor_count!: i64",
+        "ordinal": 3,
+        "type_info": "Integer",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "e901537d46ee4d3b3aaab61bc5d1f695b3e75c9d96c01fe7680b09a81c109834"
+}

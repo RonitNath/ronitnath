@@ -1,0 +1,50 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE pending_auth\n               SET consumed_at = datetime('now')\n               WHERE token_hash = ?1 AND kind = 'oidc' AND factor_kind = 'oidc'\n                 AND consumed_at IS NULL AND expires_at > datetime('now')\n               RETURNING identity_id as \"identity_id?: i64\", account_id as \"account_id?: i64\", state",
+  "describe": {
+    "columns": [
+      {
+        "name": "identity_id?: i64",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "pending_auth",
+            "name": "identity_id"
+          }
+        }
+      },
+      {
+        "name": "account_id?: i64",
+        "ordinal": 1,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "pending_auth",
+            "name": "account_id"
+          }
+        }
+      },
+      {
+        "name": "state",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "pending_auth",
+            "name": "state"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      true,
+      true,
+      false
+    ]
+  },
+  "hash": "c0414f69ea6e8c63cf52763dd3e105db85b00f69ef1122a84db0580b16221d8d"
+}

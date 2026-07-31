@@ -1,0 +1,182 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT id as \"id!: i64\", account_id as \"account_id!: i64\", event_id as \"event_id!: i64\",\n                      uploaded_by_identity_id, uploaded_by_person_id, storage_key, original_filename,\n                      mime_type, byte_size as \"byte_size!: i64\", width, height, caption, taken_at, created_at\n               FROM photos WHERE account_id = ?1 AND deleted_at IS NOT NULL\n                 AND deleted_at <= datetime('now', '-' || ?2 || ' days')",
+  "describe": {
+    "columns": [
+      {
+        "name": "id!: i64",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "photos",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "name": "account_id!: i64",
+        "ordinal": 1,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "photos",
+            "name": "account_id"
+          }
+        }
+      },
+      {
+        "name": "event_id!: i64",
+        "ordinal": 2,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "photos",
+            "name": "event_id"
+          }
+        }
+      },
+      {
+        "name": "uploaded_by_identity_id",
+        "ordinal": 3,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "photos",
+            "name": "uploaded_by_identity_id"
+          }
+        }
+      },
+      {
+        "name": "uploaded_by_person_id",
+        "ordinal": 4,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "photos",
+            "name": "uploaded_by_person_id"
+          }
+        }
+      },
+      {
+        "name": "storage_key",
+        "ordinal": 5,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "photos",
+            "name": "storage_key"
+          }
+        }
+      },
+      {
+        "name": "original_filename",
+        "ordinal": 6,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "photos",
+            "name": "original_filename"
+          }
+        }
+      },
+      {
+        "name": "mime_type",
+        "ordinal": 7,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "photos",
+            "name": "mime_type"
+          }
+        }
+      },
+      {
+        "name": "byte_size!: i64",
+        "ordinal": 8,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "photos",
+            "name": "byte_size"
+          }
+        }
+      },
+      {
+        "name": "width",
+        "ordinal": 9,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "photos",
+            "name": "width"
+          }
+        }
+      },
+      {
+        "name": "height",
+        "ordinal": 10,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "photos",
+            "name": "height"
+          }
+        }
+      },
+      {
+        "name": "caption",
+        "ordinal": 11,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "photos",
+            "name": "caption"
+          }
+        }
+      },
+      {
+        "name": "taken_at",
+        "ordinal": 12,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "photos",
+            "name": "taken_at"
+          }
+        }
+      },
+      {
+        "name": "created_at",
+        "ordinal": 13,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "photos",
+            "name": "created_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      true,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      false,
+      true,
+      false
+    ]
+  },
+  "hash": "cb712b27b2809cb8c7af69c9e2f0b82dde92ff876ef0320b82851207d6e554c2"
+}

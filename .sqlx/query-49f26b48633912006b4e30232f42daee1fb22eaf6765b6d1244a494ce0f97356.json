@@ -1,0 +1,21 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT EXISTS(\n                SELECT 1 FROM attendance\n                WHERE account_id = ?1 AND event_id = ?2 AND person_id = ?3\n                  AND status IN ('going', 'attended')\n            ) as \"exists!: bool\"",
+  "describe": {
+    "columns": [
+      {
+        "name": "exists!: bool",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "49f26b48633912006b4e30232f42daee1fb22eaf6765b6d1244a494ce0f97356"
+}

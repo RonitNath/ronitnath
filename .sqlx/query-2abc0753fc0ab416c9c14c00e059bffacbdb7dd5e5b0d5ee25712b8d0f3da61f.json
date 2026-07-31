@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO factors (identity_id, kind, external_id, secret_hash, metadata)\n            VALUES (?1, ?2, ?3, ?4, ?5) RETURNING id as \"id!: i64\"",
+  "describe": {
+    "columns": [
+      {
+        "name": "id!: i64",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "factors",
+            "name": "id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 5
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "2abc0753fc0ab416c9c14c00e059bffacbdb7dd5e5b0d5ee25712b8d0f3da61f"
+}

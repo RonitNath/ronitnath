@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT circle_id as \"circle_id!: i64\" FROM circle_members\n                WHERE account_id = ?1 AND person_id = ?2",
+  "describe": {
+    "columns": [
+      {
+        "name": "circle_id!: i64",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "circle_members",
+            "name": "circle_id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "36d708f5096ace7afbb7a668ae4e4e8981275fab1d55466ad0438ab08d9c4f8e"
+}

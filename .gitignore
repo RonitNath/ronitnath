@@ -1,12 +1,5 @@
-/target/
-/result
-/node_modules/
-/static/public/
-/data/
-/keys/
-/secrets/
-/config/providers.json
-*.db
-*.db-shm
-*.db-wal
+/target
+/data
 .env
+/static/dist
+node_modules

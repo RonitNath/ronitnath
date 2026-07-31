@@ -1,0 +1,13 @@
+.git
+.forgejo
+.env
+data
+deploy
+docs
+node_modules
+target
+static/dist
+Python
+*.db
+*.db-shm
+*.db-wal

@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE events\n               SET slug = ?3, title = ?4, tagline = ?5, starts_at = ?6, ends_at = ?7,\n                   timezone = ?8, status = ?9, summary = ?10, area_name = ?11,\n                   address = ?12, entry_instructions = ?13, private_details = ?14,\n                   notice_html = ?15, quick_plan_html = ?16,\n                   updated_at = datetime('now')\n               WHERE account_id = ?1 AND id = ?2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 16
+    },
+    "nullable": []
+  },
+  "hash": "cb621ae9a405b3c5a3e09f005e374ed2d4a2fd0c720f885f834245a347952931"
+}

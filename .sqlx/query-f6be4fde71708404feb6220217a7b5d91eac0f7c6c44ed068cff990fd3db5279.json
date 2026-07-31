@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM circle_members WHERE account_id = ?1 AND circle_id = ?2 AND person_id = ?3",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "f6be4fde71708404feb6220217a7b5d91eac0f7c6c44ed068cff990fd3db5279"
+}

@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT identity_id as \"identity_id!: i64\"\n            FROM person_identity_links\n            WHERE account_id = ?1 AND person_id = ?2 AND unlinked_at IS NULL",
+  "describe": {
+    "columns": [
+      {
+        "name": "identity_id!: i64",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "person_identity_links",
+            "name": "identity_id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "ace49c018a89ff7b8ac91968a09b6354f619e65eaa0adcdf208b719d77dec39f"
+}

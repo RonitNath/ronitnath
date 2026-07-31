@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE event_links SET uses = uses + 1, last_used_at = datetime('now') WHERE id = ?1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "f2814d0888b233fc508f9633a94bebb808dbe3f9e0d4b7f2ada3ca264bfb3358"
+}

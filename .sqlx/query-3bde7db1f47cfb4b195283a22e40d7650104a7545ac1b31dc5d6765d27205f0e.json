@@ -1,0 +1,35 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT\n                   COALESCE(SUM(CASE WHEN status = 'going' THEN 1 ELSE 0 END), 0) as \"going!: i64\",\n                   COALESCE(SUM(CASE WHEN status = 'maybe' THEN 1 ELSE 0 END), 0) as \"maybe!: i64\",\n                   COALESCE(SUM(CASE WHEN status = 'going' THEN party_size ELSE 0 END), 0) as \"heads!: i64\"\n               FROM attendance WHERE account_id = ?1 AND event_id = ?2",
+  "describe": {
+    "columns": [
+      {
+        "name": "going!: i64",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": "Expression"
+      },
+      {
+        "name": "maybe!: i64",
+        "ordinal": 1,
+        "type_info": "Integer",
+        "origin": "Expression"
+      },
+      {
+        "name": "heads!: i64",
+        "ordinal": 2,
+        "type_info": "Integer",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "3bde7db1f47cfb4b195283a22e40d7650104a7545ac1b31dc5d6765d27205f0e"
+}

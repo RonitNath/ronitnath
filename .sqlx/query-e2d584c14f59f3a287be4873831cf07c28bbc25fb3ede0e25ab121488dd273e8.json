@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO audience_circle_grants (account_id, policy_id, circle_id, level)\n                SELECT ?1, p.id, c.id, ?4 FROM audience_policies p\n                JOIN circles c ON c.account_id = p.account_id\n                WHERE p.account_id = ?1 AND p.id = ?2 AND c.id = ?3\n                ON CONFLICT(policy_id, circle_id) DO UPDATE SET level = excluded.level",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": []
+  },
+  "hash": "e2d584c14f59f3a287be4873831cf07c28bbc25fb3ede0e25ab121488dd273e8"
+}

@@ -2,8 +2,8 @@
   description = "Pinned build environment for ronitnath";
 
   inputs = {
-    # The generated flake.lock pins this nixpkgs input. Commit that lock so
-    # every build host resolves the exact same toolchain.
+    # flake.lock pins these inputs. Keep the lock committed so every build
+    # host resolves the exact same toolchain.
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.11";
     rust-overlay = {
       url = "github:oxalica/rust-overlay";
@@ -11,13 +11,12 @@
     };
   };
 
-  # This flake deliberately packages nothing. Release images build
-  # incrementally on the build host against persistent caches, so a source
-  # change recompiles only the crates it touches; the flake's sole job is
-  # pinning the toolchain development uses.
+  # This flake deliberately packages nothing. It pins the host-native
+  # verification toolchain; production artifacts are built from the separately
+  # pinned OCI stages in Dockerfile.
   outputs = { nixpkgs, rust-overlay, ... }:
     let
-      supportedSystems = [ "x86_64-linux" "aarch64-linux" ];
+      supportedSystems = [ "x86_64-linux" ];
       forAllSystems = nixpkgs.lib.genAttrs supportedSystems;
     in {
       devShells = forAllSystems (system:
@@ -29,12 +28,13 @@
         in {
           default = pkgs.mkShell {
             packages = [
-              (pkgs.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml)
-
-              # Islands assets build in this same shell. corepack's pnpm shim
-              # resolves the exact pnpm version pinned by package.json.
-              pkgs.nodejs_24
-              pkgs.corepack_24
+              # rust-overlay's current stable, pinned by flake.lock (nixpkgs
+              # 25.11 ships rustc 1.91.1, older than this crate graph needs).
+              pkgs.rust-bin.stable.latest.minimal
+              # The islands pipeline is Vite + Solid through the package-lock
+              # controlled pnpm workspace; no host-global Node tooling.
+              pkgs.nodejs
+              pkgs.pnpm
             ];
           };
         });
