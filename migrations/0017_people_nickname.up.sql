@@ -1,1 +1,0 @@
-ALTER TABLE people ADD COLUMN nickname TEXT NOT NULL DEFAULT '';

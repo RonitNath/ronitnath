@@ -1,23 +1,7 @@
 import { defineConfig } from "vite";
-import solid from "vite-plugin-solid";
+import { solidAppConfig } from "@isoastra/web-runtime/vite";
 
-export default defineConfig({
-  base: "/static/dist/",
-  plugins: [solid()],
-  build: {
-    emptyOutDir: true,
-    outDir: "static/dist",
-    rollupOptions: {
-      input: {
-        site: "ts/src/entries/site.tsx",
-        event_rsvp: "ts/src/entries/event_rsvp.tsx",
-        events_admin: "ts/src/entries/events_admin.tsx",
-      },
-      output: {
-        entryFileNames: "[name].js",
-        chunkFileNames: "chunks/[name]-[hash].js",
-        assetFileNames: "assets/[name]-[hash][extname]",
-      },
-    },
-  },
-});
+// The base URL, output directory, hashed entry naming, and manifest are the
+// contract `http_runtime::StaticAssets` reads; they live in the package so a
+// change to the contract cannot land in the crates and miss an application.
+export default defineConfig(solidAppConfig());
