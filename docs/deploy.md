@@ -228,3 +228,28 @@ $compose up -d --wait
 Rollback changes only the image. Never restore `app.db` during routine
 rollback. A database restore is a separate disaster-recovery operation with
 its own explicit evidence and traffic gate.
+
+## Executed OCI cutover — 2026-07-31
+
+- Artifact: `git.isoastra.com/ronitnath/ronitnath@sha256:92d1f2b331794364b33042bd4ee970b2b10159fba11e306f9ffe4ac3d4a76fbd`, revision `8f62de73323689cab100b268bca0e5ea730bd834`.
+- Runtime: Nexus Compose project `ronitnath`; state remains
+  `/data/apps/ronitnath/state`; the OIDC configuration is the runtime-owned
+  read-only bind under `oci/secrets/`.
+- Backup gate: a consistent SQLite `.backup`, compressed tar, SHA-256 manifest,
+  tar listing, extraction, and `PRAGMA quick_check` restore drill passed at
+  `/data/archives/ronitnath-pre-oci-20260731/`. A disposable OCI boot against
+  that restored state passed for both listeners.
+- Routing: the service-ingress catalog routes the public site to
+  `10.0.0.1:3130`; its deployed shadow generation was valid on Nexus and Tor.
+  No Caddy file was edited.
+- Retirement: `ronitnath-{site,admin}.{service,socket}`, webdeploy releases,
+  release pointers, migration snapshots, old runtime credential material, and
+  repository webdeploy compatibility files were removed immediately after
+  verification. `ronitnath-identity` is a separate Rauthy deployment and was
+  intentionally retained.
+- Rollback: the prior OCI candidate is
+  `git.isoastra.com/ronitnath/ronitnath@sha256:9e243cd056059407e6d59bc2f74ca6d0a067f7209b07bfb8e1ba553bc1b5d3e9`
+  (revision `0ce6e9d973698ae59453dd2d28fd38b1289d289c`). Set it in
+  `/data/apps/ronitnath/oci/image.env`, then run the ordinary digest pull and
+  Compose `up -d --wait` sequence above. Native webdeploy is not a rollback
+  path.
