@@ -1,0 +1,15 @@
+{
+  "compilerOptions": {
+    "jsx": "preserve",
+    "jsxImportSource": "solid-js",
+    "strict": true,
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "types": ["vite/client"],
+    "noEmit": true,
+    "isolatedModules": true,
+    "skipLibCheck": true
+  },
+  "include": ["web"]
+}
