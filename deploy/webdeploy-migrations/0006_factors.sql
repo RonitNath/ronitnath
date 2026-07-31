@@ -1,1 +1,0 @@
-../../migrations/0006_factors.up.sql

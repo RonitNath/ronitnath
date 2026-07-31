@@ -1,1 +1,0 @@
-../../migrations/0005_memberships.up.sql

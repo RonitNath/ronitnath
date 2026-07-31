@@ -12,7 +12,7 @@ The Grafana Jaeger datasource is already provisioned as VictoriaTraces at `http:
 
 ## Configuration
 
-Put non-secret production values in each `[[binary]].env` block in `deploy/app.toml`. Both binaries use the same exporter settings, while their resources differ as `ronitnath-site` and `ronitnath-admin`.
+Put non-secret production values in the shared environment block in `deploy/compose.yaml`. Both OCI services use the same exporter settings, while their resources differ as `ronitnath-site` and `ronitnath-admin`.
 
 | Variable | Default | Meaning |
 | --- | --- | --- |
@@ -25,7 +25,7 @@ Put non-secret production values in each `[[binary]].env` block in `deploy/app.t
 | `TRACE_EXPORT_QUEUE` | `256` | Bounded queue of decided traces waiting for the exporter thread. |
 | `TRACE_EXPORT_TIMEOUT_MS` | `1000` | Maximum OTLP export attempt duration, on the exporter thread only. |
 
-`TRACE_FORCE_SECRET` comes from root-owned `/etc/ronitnath/tracing.env`, named by each binary's `environment_files` manifest entry. The file must be mode `0600` and never enter Git or `deploy/app.toml`. The secret is intentionally not logged or added to a span. A bad or absent header is treated exactly like an ordinary request.
+`TRACE_FORCE_SECRET` is intentionally unset in the OCI runtime, disabling forced tracing. If re-enabled, materialize it through the approved OCI secret contract; never place it in Git, `image.env`, or the Compose file. The secret is never logged or added to a span. A bad or absent header is treated exactly like an ordinary request.
 
 ## Sampling decision
 
@@ -77,4 +77,4 @@ The operational validation script should also exercise a controlled 5xx and a re
 
 ## Lift into web_template
 
-The reusable pieces are the subscriber setup, root-span/matched-route middleware, log correlation fields, and bounded deferred processor. This product fork's only app-specific decisions are its two binary names and deployment manifest. web_template would need a generic service-name input and an approved protected environment-file mechanism for `TRACE_FORCE_SECRET`; its default must remain disabled with `TRACE_SAMPLE_RATE=0.0`.
+The reusable pieces are the subscriber setup, root-span/matched-route middleware, log correlation fields, and bounded deferred processor. This product fork's only app-specific decisions are its two binary names and OCI runtime contract. web_template would need a generic service-name input and an approved OCI secret mechanism for `TRACE_FORCE_SECRET`; its default must remain disabled with `TRACE_SAMPLE_RATE=0.0`.

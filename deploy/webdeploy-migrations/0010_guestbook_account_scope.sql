@@ -1,1 +1,0 @@
-../../migrations/0010_guestbook_account_scope.up.sql

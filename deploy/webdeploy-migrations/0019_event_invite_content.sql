@@ -1,1 +1,0 @@
-../../migrations/0019_event_invite_content.up.sql

@@ -1,1 +1,0 @@
-../../migrations/0001_guestbook.up.sql

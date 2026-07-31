@@ -1,1 +1,0 @@
-../../migrations/0016_segment_rsvps.up.sql

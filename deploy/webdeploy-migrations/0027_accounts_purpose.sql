@@ -1,1 +1,0 @@
-../../migrations/0027_accounts_purpose.up.sql

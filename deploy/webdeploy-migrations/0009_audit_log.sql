@@ -1,1 +1,0 @@
-../../migrations/0009_audit_log.up.sql

@@ -8,12 +8,12 @@ artifact, but never deploys it. Production changes are deliberately performed
 by an operator following this document; there is no deployment or reconciler
 script.
 
-This is currently a validated replacement candidate, not the live runtime.
-Production remains on its systemd/webdeploy units until an operator performs a
-separate backup-aware cutover. The legacy `deploy/app.toml`, `deploy/deploy.sh`,
-and `deploy/webdeploy-migrations/` remain solely because the live services and
-backup jobs still consume them. Retire those files, units, and jobs together;
-an ordinary repository pull must not strand the still-live backup lifecycle.
+Production runs the OCI runtime. The root-owned runtime definition, exact
+image reference, and runtime-owned secret copies live beneath
+`/data/apps/ronitnath/oci/`; an ordinary repository checkout is never a runtime
+input. Webdeploy manifests, shims, migration mirrors, generated units, release
+pointers, and webdeploy backup hooks are retired together and are not a
+rollback path.
 
 The public listener remains `10.0.0.1:3130`. The admin listener remains
 mesh-only at `100.88.31.199:3131`. Do not widen either bind.
@@ -99,7 +99,7 @@ or mutate repositories and is never provided to Forgejo Actions.
 Materialize it and create Docker's derived root-only authentication file:
 
 ```sh
-sudo keys-materialize deploy/secrets.toml
+# Materialize the approved host registry-pull credential through its managed key source.
 sudo install -d -o root -g root -m 0700 /etc/ronitnath/docker-auth
 sudo docker --config /etc/ronitnath/docker-auth login \
   --username ronitnath \
@@ -119,7 +119,9 @@ repeat `docker login`, prove an exact-digest pull, then revoke the old token.
 Production data is durable SQLite and uploaded photos. The only writable
 application mount is the absolute host directory
 `/data/apps/ronitnath/state`, presented as `/state`. The OIDC provider file is
-an absolute, read-only bind. Compose sets `create_host_path: false`, so a typo
+copied as a runtime-owned `0400` secret to
+`/data/apps/ronitnath/oci/secrets/oidc_providers.json` and is an absolute,
+read-only bind. Compose sets `create_host_path: false`, so a typo
 or missing secondary disk fails instead of silently creating an empty root-disk
 directory.
 
@@ -131,11 +133,12 @@ test "$(findmnt -no FSTYPE /data)" = ext4
 sudo test -d /data/apps/ronitnath/state
 sudo test -f /data/apps/ronitnath/state/app.db
 sudo test -d /data/apps/ronitnath/state/photos
-sudo test -f /data/apps/ronitnath/oidc_providers.json
+sudo test -f /data/apps/ronitnath/oci/secrets/oidc_providers.json
 sudo stat -c '%u:%g %a %n' \
   /data/apps/ronitnath/state \
   /data/apps/ronitnath/state/app.db \
-  /data/apps/ronitnath/state/photos
+  /data/apps/ronitnath/state/photos \
+  /data/apps/ronitnath/oci/secrets/oidc_providers.json
 ```
 
 The state tree must be owned by the dedicated runtime identity `986:985` and
@@ -145,14 +148,16 @@ preflight identifies drift; do not recursively chmod as a workaround.
 Resolve and inspect the exact Compose model before starting anything:
 
 ```sh
-sudo install -d -o root -g root -m 0755 /data/apps/ronitnath/deploy
+sudo install -d -o root -g root -m 0755 /data/apps/ronitnath/oci
+sudo install -d -o ronitnath-app -g ronitnath-app -m 0700 \
+  /data/apps/ronitnath/oci/secrets
 sudo install -o root -g root -m 0600 /dev/null \
-  /data/apps/ronitnath/deploy/image.env
-sudoedit /data/apps/ronitnath/deploy/image.env
+  /data/apps/ronitnath/oci/image.env
+sudoedit /data/apps/ronitnath/oci/image.env
 # Exactly one line, using the recorded digest:
 # RONITNATH_IMAGE=git.isoastra.com/ronitnath/ronitnath@sha256:...
 
-compose='sudo docker --config /etc/ronitnath/docker-auth compose --env-file /data/apps/ronitnath/deploy/image.env -f deploy/compose.yaml'
+compose='sudo docker --config /etc/ronitnath/docker-auth compose --env-file /data/apps/ronitnath/oci/image.env -f /data/apps/ronitnath/oci/compose.yaml'
 $compose config --quiet
 $compose config | grep -F 'source: /data/apps/ronitnath/state'
 $compose pull
@@ -174,10 +179,10 @@ integrity-check a consistent pre-deploy snapshot using the existing backup
 procedure. Migrations shipped in release N must remain tolerable to the N-1
 binary; database restore is never part of ordinary rollback.
 
-From a clean checkout of the matching source revision on Nexus:
+From the root-owned OCI runtime definition on Nexus:
 
 ```sh
-compose='sudo docker --config /etc/ronitnath/docker-auth compose --env-file /data/apps/ronitnath/deploy/image.env -f deploy/compose.yaml'
+compose='sudo docker --config /etc/ronitnath/docker-auth compose --env-file /data/apps/ronitnath/oci/image.env -f /data/apps/ronitnath/oci/compose.yaml'
 $compose config --quiet
 $compose pull
 $compose up -d --wait
@@ -201,7 +206,7 @@ export failures:
 
 ```sh
 $compose logs --since 10m site admin
-docker image inspect "$(grep '^RONITNATH_IMAGE=' /data/apps/ronitnath/deploy/image.env | cut -d= -f2-)" \
+docker image inspect "$(grep '^RONITNATH_IMAGE=' /data/apps/ronitnath/oci/image.env | cut -d= -f2-)" \
   --format '{{index .Config.Labels "org.opencontainers.image.revision"}}'
 ```
 
@@ -214,8 +219,8 @@ digest, then repeat the same pull, start, mount, digest, direct-health, and
 public-health checks:
 
 ```sh
-sudoedit /data/apps/ronitnath/deploy/image.env
-compose='sudo docker --config /etc/ronitnath/docker-auth compose --env-file /data/apps/ronitnath/deploy/image.env -f deploy/compose.yaml'
+sudoedit /data/apps/ronitnath/oci/image.env
+compose='sudo docker --config /etc/ronitnath/docker-auth compose --env-file /data/apps/ronitnath/oci/image.env -f /data/apps/ronitnath/oci/compose.yaml'
 $compose pull
 $compose up -d --wait
 ```

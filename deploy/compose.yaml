@@ -21,7 +21,7 @@ x-runtime: &runtime
       bind:
         create_host_path: false
     - type: bind
-      source: /data/apps/ronitnath/oidc_providers.json
+      source: /data/apps/ronitnath/oci/secrets/oidc_providers.json
       target: /run/config/oidc_providers.json
       read_only: true
       bind:

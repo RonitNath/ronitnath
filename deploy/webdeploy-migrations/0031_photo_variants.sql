@@ -1,1 +1,0 @@
-../../migrations/0031_photo_variants.up.sql
