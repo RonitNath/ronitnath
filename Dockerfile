@@ -22,8 +22,9 @@ RUN --mount=type=cache,id=ronitnath-cargo-registry,target=/usr/local/cargo/regis
 FROM ${NODE_IMAGE} AS ui-deps
 WORKDIR /app
 RUN corepack enable
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
 RUN --mount=type=cache,id=ronitnath-pnpm-store,target=/pnpm/store,sharing=locked \
+    --mount=type=secret,id=forgejo-build.npmrc,target=/root/.npmrc,required=true \
     pnpm config set store-dir /pnpm/store \
     && pnpm fetch --frozen-lockfile
 

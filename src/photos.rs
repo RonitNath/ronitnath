@@ -197,6 +197,7 @@ pub fn event_dir(root: &Path, account_id: i64, event_id: i64) -> PathBuf {
     root.join(account_id.to_string()).join(event_id.to_string())
 }
 
+#[allow(clippy::too_many_arguments)]
 pub async fn persist(
     store: &Store,
     root: &Path,

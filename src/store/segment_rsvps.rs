@@ -57,6 +57,7 @@ impl Store {
     /// (dinner) and whether they actually showed up. `None` leaves a flag
     /// untouched. Creates the row (status `in`) if the person never marked
     /// the segment themselves — recording a payment implies they're in.
+    #[allow(clippy::too_many_arguments)]
     pub async fn set_segment_flags(
         &self,
         account_id: i64,

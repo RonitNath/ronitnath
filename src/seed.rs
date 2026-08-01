@@ -430,7 +430,8 @@ async fn seed_july4(store: &Store, account_id: i64, public_url: &str) -> anyhow:
     store.update_event(account_id, event.id, &fields).await?;
 
     // (sort, time, title, detail, tier, segment_key)
-    let schedule: &[(i64, &str, &str, &str, &str, Option<&str>)] = &[
+    type ScheduleItem<'a> = (i64, &'a str, &'a str, &'a str, &'a str, Option<&'a str>);
+    let schedule: &[ScheduleItem<'_>] = &[
         (
             0,
             "2:00 PM",

@@ -157,6 +157,9 @@ fn normalize_scopes(scopes: Option<Vec<String>>) -> Vec<String> {
 #[derive(Clone)]
 pub struct DynOidcHttpClient(Arc<dyn OidcHttpClient>);
 
+type OidcHttpFuture<'c> =
+    Pin<Box<dyn Future<Output = Result<Response<Vec<u8>>, OidcHttpError>> + Send + 'c>>;
+
 impl DynOidcHttpClient {
     pub fn new(client: impl OidcHttpClient + 'static) -> Self {
         Self(Arc::new(client))
@@ -165,7 +168,7 @@ impl DynOidcHttpClient {
 
 impl<'c> openidconnect::AsyncHttpClient<'c> for DynOidcHttpClient {
     type Error = OidcHttpError;
-    type Future = Pin<Box<dyn Future<Output = Result<Response<Vec<u8>>, Self::Error>> + Send + 'c>>;
+    type Future = OidcHttpFuture<'c>;
 
     fn call(&'c self, request: Request<Vec<u8>>) -> Self::Future {
         self.0.call(request)
@@ -173,10 +176,7 @@ impl<'c> openidconnect::AsyncHttpClient<'c> for DynOidcHttpClient {
 }
 
 pub trait OidcHttpClient: Send + Sync {
-    fn call<'c>(
-        &'c self,
-        request: Request<Vec<u8>>,
-    ) -> Pin<Box<dyn Future<Output = Result<Response<Vec<u8>>, OidcHttpError>> + Send + 'c>>;
+    fn call<'c>(&'c self, request: Request<Vec<u8>>) -> OidcHttpFuture<'c>;
 }
 
 #[derive(Clone)]
@@ -260,6 +260,7 @@ pub struct PendingOidcState {
     pub guest_claim: Option<GuestOidcClaim>,
 }
 
+#[allow(clippy::too_many_arguments)]
 pub async fn start(
     state: &AppState,
     provider_key: &str,

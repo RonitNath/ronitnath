@@ -203,10 +203,10 @@ async fn set_segment(args: &[String]) -> anyhow::Result<()> {
     let segment_key = args.get(3).context(usage)?;
     let name = args.get(4).context(usage)?;
     let status = optional_flag(args, "--status");
-    if let Some(status) = status {
-        if !matches!(status, "in" | "maybe" | "out") {
-            bail!("--status must be in, maybe, or out");
-        }
+    if let Some(status) = status
+        && !matches!(status, "in" | "maybe" | "out")
+    {
+        bail!("--status must be in, maybe, or out");
     }
     let paid = optional_flag(args, "--paid")
         .map(parse_yes_no)

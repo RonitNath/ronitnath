@@ -83,6 +83,7 @@ pub struct ResolvedLink {
 }
 
 impl Store {
+    #[allow(clippy::too_many_arguments)]
     pub async fn create_event_link(
         &self,
         account_id: i64,

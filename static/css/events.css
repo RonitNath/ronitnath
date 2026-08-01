@@ -5,7 +5,7 @@
     padding: 2rem 1rem 4rem;
 }
 .event-hero { padding: 3rem 0; text-align: center; }
-.event-hero h1, .invite-hello h1 { font-size: clamp(2.25rem, 6vw, 3.25rem); }
+.event-hero h1, .invite-hello h1 { font-size: var(--text-display); font-weight: var(--weight-semibold); letter-spacing: var(--tracking-display); }
 .event-hero .subtitle { color: var(--fg-muted); max-width: 46ch; margin: .75rem auto; }
 .event-time { color: var(--accent); font-size: .85rem; letter-spacing: .08em; text-transform: uppercase; }
 .invite-hello { border-bottom: 1px solid var(--border); padding: 1.5rem 0; }
