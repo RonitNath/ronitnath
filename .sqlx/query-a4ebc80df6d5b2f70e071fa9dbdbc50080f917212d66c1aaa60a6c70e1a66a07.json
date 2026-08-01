@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE _sqlx_migrations SET checksum = X'00' WHERE version = ?1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "a4ebc80df6d5b2f70e071fa9dbdbc50080f917212d66c1aaa60a6c70e1a66a07"
+}

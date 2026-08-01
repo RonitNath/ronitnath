@@ -17,7 +17,6 @@ pub mod event_links;
 pub mod events;
 pub mod factors;
 pub mod identities;
-pub mod import;
 pub mod memberships;
 pub mod people;
 pub mod person_identity_links;
@@ -178,12 +177,12 @@ mod tests {
     }
 
     async fn insert_future_migration(store: &Store) {
-        sqlx::query(
+        sqlx::query!(
             "INSERT INTO _sqlx_migrations \
              (version, description, success, checksum, execution_time) \
              VALUES (?1, 'future migration', TRUE, X'', 0)",
+            expected_version() + 1,
         )
-        .bind(expected_version() + 1)
         .execute(&store.pool)
         .await
         .expect("insert future migration row");
@@ -227,8 +226,10 @@ mod tests {
         let store = Store::connect(&url)
             .await
             .expect("migrate scratch database");
-        sqlx::query("UPDATE _sqlx_migrations SET checksum = X'00' WHERE version = ?1")
-            .bind(expected_version())
+        sqlx::query!(
+            "UPDATE _sqlx_migrations SET checksum = X'00' WHERE version = ?1",
+            expected_version(),
+        )
             .execute(&store.pool)
             .await
             .expect("corrupt embedded migration checksum");
