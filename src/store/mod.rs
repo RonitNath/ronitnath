@@ -230,9 +230,9 @@ mod tests {
             "UPDATE _sqlx_migrations SET checksum = X'00' WHERE version = ?1",
             expected_version(),
         )
-            .execute(&store.pool)
-            .await
-            .expect("corrupt embedded migration checksum");
+        .execute(&store.pool)
+        .await
+        .expect("corrupt embedded migration checksum");
         store.pool.close().await;
 
         let error = match Store::connect(&url).await {

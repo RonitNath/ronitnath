@@ -16,7 +16,8 @@ test("the public heading treatment stays on the shared restrained scale", async 
   assert.equal(JSON.parse(manifest).dependencies["@isoastra/tokens"], "0.4.0");
   assert.match(scales, /--text-3xl:[^;]*1\.625rem/);
   assert.match(scales, /--text-display:[^;]*1\.75rem/);
-  assert.match(components, /\.home-card h1[\s\S]*font-size: var\(--text-display\)/);
+  assert.match(components, /\.home-card h1[\s\S]*font-size: var\(--text-3xl\)/);
   assert.match(components, /\.hero h1[\s\S]*font-size: var\(--text-3xl\)/);
-  assert.match(events, /\.event-hero h1[^}]*var\(--text-display\)/);
+  assert.match(events, /\.event-hero h1[^}]*var\(--text-3xl\)/);
+  assert.doesNotMatch(`${components}\n${events}`, /h1[^}]*var\(--text-display\)/);
 });

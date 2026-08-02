@@ -9,7 +9,7 @@ export default defineConfig({
     outDir: "static/dist",
     rollupOptions: {
       input: {
-        tokens: "ts/src/styles/tokens.css",
+        site_tokens: "ts/src/styles/site.css",
         site: "ts/src/entries/site.tsx",
         event_rsvp: "ts/src/entries/event_rsvp.tsx",
         events_admin: "ts/src/entries/events_admin.tsx",
@@ -18,8 +18,8 @@ export default defineConfig({
         entryFileNames: "[name].js",
         chunkFileNames: "chunks/[name]-[hash].js",
         assetFileNames: (asset) =>
-          asset.names.includes("tokens.css")
-            ? "tokens.css"
+          asset.names.includes("site_tokens.css")
+            ? "site.css"
             : "assets/[name]-[hash][extname]",
       },
     },
