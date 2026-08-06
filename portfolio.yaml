@@ -19,6 +19,33 @@ products:
       first external deploy (RCDA pilot).
     code_repo: isoastra/rinity on the forge (control plane; nexus ~/dev/isoastra/rinity); engine isoastra/audgent + isoastra/pipecat
     context: ~/dev/context/isoastra/business-direction.md, ~/dev/context/isoastra/products-history-20260724.md
+  - name: audgent
+    tier: real
+    status: discovery
+    summary: >-
+      Internal voice/audio engine for Isoastra and the owner's projects. Brownfield onboard
+      2026-08-06 on a direction change: stop being a self-hostable vapi/retell alternative
+      (EV-001), serve internal projects (EV-002), reach frontier audio capability such as
+      force-aligned phonetics (EV-003), drop multi-tenant SaaS (EV-005), and make agents —
+      not the console — the primary interfacing surface (EV-006). Capability inventory of the
+      as-built engine is rinity/EV-011. Cross-product seam with rinity (external plane) is open.
+    code_repo: isoastra/audgent on the forge (nexus ~/dev/isoastra/audgent) + isoastra/pipecat submodule
+    context: ~/dev/context/isoastra/products-history-20260724.md, ~/dev/context/isoastra/business-direction.md
+  - name: voice
+    tier: real
+    status: discovery
+    summary: >-
+      voice.ronitnath.com — greenfield Rust voice-agent orchestration service, the intended
+      replacement for audgent. Onboarded 2026-08-06: voice agents are a baseline product in
+      their own right (EV-001); audgent is disqualified on language (EV-002), on missing
+      systems critical to quality orchestration (EV-003), and on provenance — a dograh fork
+      repurposed for Isoastra rather than designed for it (EV-004). Built incrementally from
+      the basics so the owner can judge each component (EV-005), on the ronitnath domain as
+      the testing-mode signal (EV-006), graduating to Isoastra on an owner verdict about the
+      internals (EV-007). Stack is ruled: same as ronitnath-universe (EV-008).
+    code_repo: none yet — greenfield; prior art ~/dev/console (Rust voice lab, frame core +
+      replay harness + ledger), isoastra/audgent, isoastra/pipecat
+    context: ~/dev/context/ronitnath/platform-scope.md, ~/dev/context/isoastra/business-direction.md
   - name: isoastra-services
     tier: real
     status: discovery
