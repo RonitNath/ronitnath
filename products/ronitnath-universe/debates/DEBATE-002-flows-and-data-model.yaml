@@ -174,13 +174,20 @@ claims:
     provenance: [H4-guest-dignity-4, H4-guest-dignity-5, H4-guest-dignity-6, H3-operator-under-load-2, H1-minimalist-6]
     supports: []
     rebuts: [DEC-005, GATE-001]
-    resolution: escalated
+    resolution: resolved
     note: >
       Three lenses object to the owner's just-taken base-screen decision, each for a different reason:
       guest-dignity (it is a dossier), operator-under-load (it costs a navigation to reach the event
       in progress), minimalist (the invitee list is the surface that does real work). Only the owner
       can weigh these against why he chose it — the cross-event collapse is the thing three codebases
       destroyed. Escalated with the objection stated, not re-decided.
+      OWNER RULING 2026-08-05: partly answering the wrong question — "base page" meant the first
+      Penpot page, not the app root (EV-022). The app root is a new personal dashboard (DASH-001),
+      whose first card is the event happening now, which resolves the operator-under-load objection
+      directly. The design-gate base screen stays the people directory for density, with the dashboard
+      beside it on page 1. Guest-dignity's dossier objection stands unresolved and is accepted as a cost
+      (DEC-009); its schema half is adopted in full (EV-021 — owner-authored data on contact, not identity).
+
 
   - id: C-11
     statement: >
