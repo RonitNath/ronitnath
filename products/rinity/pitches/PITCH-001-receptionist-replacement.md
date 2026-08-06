@@ -2,7 +2,7 @@
 product: rinity
 pitch: PITCH-001 — replace the receptionist (tier 1)
 date: 2026-08-06
-status: DRAFT rev 2 (2026-08-06 owner batch EV-027..EV-038 applied; E-1 resolved → DEC-001) — awaiting owner review to freeze
+status: FROZEN 2026-08-06 (owner: "lgtm, go" + hallmark-brass amendment EV-039; bound = 5 review sessions proposed and unobjected, session ① spent at freeze)
 sources: BRIEF-001, FLOWS-001 (rev 2), DEBATE-001, DEC-001, DEC-002
 debate: triggered (T3: PHI/call-data retention, customer identity model, self-serve URL + config-schema commitments, the rinity↔audgent seam; + T2: bound waived, EV-014) → memo DEBATE-001
 ---
@@ -105,7 +105,8 @@ an audgent contract change).
    PHI-bearing (D2-4), vendor egress allowlist + BAAs (D2-8). Retention numbers land at the
    data gate (D1-4).
 5. **Schedule desk** — rebuilt or repaired to the EV-026 human bar; it is the correction
-   surface the sale depends on, not a side feature.
+   surface the sale depends on, not a side feature. Console identity is **hallmark brass**
+   (gold-external) — the current ember (red-internal) is a defect to correct (EV-039).
 6. **Analytics spine** — one cost/quality data path feeds three surfaces: per-call grades
    (EV-034) → practice analytics (volume + quality, F-12) and the operator cost surface
    (cost per call, drivers, per-office projections, F-10/EV-035); test traffic lives in the

@@ -3,7 +3,7 @@ id: FLOWS-001
 product: rinity
 pitch: PITCH-001 (freezes with it)
 date: 2026-08-06
-status: draft rev 2 — debated (DEBATE-001), then extended by owner requirements batch 2026-08-06 (EV-027..EV-038); freezes with PITCH-001
+status: FROZEN 2026-08-06 with PITCH-001 (tag pitch/rinity-1) — debated (DEBATE-001), extended by owner requirements batch (EV-027..EV-038)
 sources: EV-012, EV-013, EV-015, EV-016, EV-019, EV-020, EV-021..EV-026, EV-027..EV-038, DEC-001, DEC-002, EV-011 (engine capabilities), EV-010 (as-built)
 ---
 
