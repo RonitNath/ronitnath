@@ -2,7 +2,7 @@
 id: DASH-001
 product: ronitnath-universe
 date: 2026-08-05
-status: DRAFT — proposal for owner review, then lands as flow F-12 + PKT-17
+status: OWNER-CUT 2026-08-05 (four cards; present-event keyed on end time) — lands as flow F-12 + PKT-17
 sources: EV-009, EV-022, DEC-006, DEBATE-002 (C-1, C-5, H3-operator-under-load-2)
 ---
 
@@ -17,42 +17,48 @@ is where work happens.
 panels, and per-event panels are bespoke (EV-016) — so the duplication would be N-way. Routing plus
 health is the only shape that stays small as the platform grows.
 
-## Cards
+## Cards — cut to four by owner ruling (2026-08-05)
 
-The surface is a **card list**, phone-first, in priority order. Later features add cards; nothing
-about the structure changes when they do. Cards render only when they have something to say — no
-empty-state boxes for features that don't exist yet.
-
-### Now (built in this bet)
+The surface is a short card list, phone-first. Everything not listed here is **deliberately absent**,
+not deferred-with-a-placeholder.
 
 | Card | Content | Live? |
 | --- | --- | --- |
-| **Happening now** | The event in progress or imminent: name, when, going / no-reply counts, one tap to its panel. Absent when nothing is close. | SSE |
-| **Needs you** | The action queue, each row a route: unpublished events, invitees never copied as the date approaches, **events closed but attendance unrecorded** (F-11), copy fields failing validation, **an event whose release isn't live** (PKT-15). | SSE |
-| **Events** | Upcoming, then drafts, then recently closed. Names and dates only — routing, not a table. | SSE |
-| **People pulse** | Recent activity: who answered, who changed their answer, identities newly created. Entry point to the directory (F-9). | SSE |
-| **System** | One line, green/amber, tap for detail: deploy state and current SHA, stream health, last backup, probe status (PKT-10). Amber is a route to the detail, never a fix-it button. | SSE |
+| **Present event** | The event happening now, or the next one to happen, with RSVP counts as plain `x/y/z` (yes / maybe / no). One tap to its panel. | SSE |
+| **Contacts** | `X contacts` — a count, routing to the full CRM (F-9). | SSE |
+| **Accounts** | `X accounts` — a count, routing to account management. Today that list is one row: the owner. | SSE |
+| **System** | One line, green/amber: deploy state and SHA, stream health, last backup, probe status (PKT-10). Amber routes to detail, never a fix-it button. | SSE |
 
-**"Happening now" is the answer to DEBATE-002's operator-under-load objection.** Landing on a
-directory at 9pm was the complaint; landing on a dashboard whose first card is the event in progress
-resolves it without changing what the design gate locks.
+**"Present event" is defined by the event's END time, not its start** (owner ruling). The rule is
+`the event with the soonest end_time still in the future` — so an event stays present *through* its
+whole run rather than vanishing from the dashboard the moment it begins, which is precisely when it
+matters most. One query, no state, no "is it running" flag to keep correct.
 
-### Later (slots left deliberately open)
+Data-model consequence: **events carry an end time, not just a date.** The predecessors did not all
+model this. It goes to the data gate.
 
-Named so the structure is designed against them, not built for them: **photos** (the shared-album
-replacement, EV-010 — likely "recent uploads" plus a needs-review count), **calendar** (what's coming
-across events and non-event things), **circles** (who's in what group), **friend activity** (once
-accounts exist — and the SSE seam built here is what it arrives on, DEC-006), and **invitations
-received** once the owner is not the only account.
+This card is also what answers DEBATE-002's operator-under-load objection: at 9pm the root of the
+site is the event in progress and its counts.
 
-The long-term shape this anticipates: as ronitnath.com becomes a hub (EV-009), the dashboard is the
-one surface every role has, and role determines its card set. FRIEND's root is the same component
-with a different set — which is the same composition idea as per-event panels, applied to roles.
+### Deliberately absent
+
+The earlier draft proposed **Needs you**, **Events** and **People pulse**; all three are cut. An
+action queue, an event list and an activity feed are each a way for a routing surface to start
+accreting product. If a nag turns out to be needed, it earns its way back with a real instance of
+having been forgotten.
+
+### Later (slots, not stubs)
+
+**Photos** (EV-010), **calendar**, **circles**, **friend activity**, and **invitations received** once
+the owner is not the only account. Named so the structure is designed against them — the card list
+takes new cards without redesign — but nothing renders for them until they exist.
+
+The structural bet: role determines the card set. FRIEND's root is the same component with a
+different set (EV-022), which is the per-event composition idea applied to roles.
 
 ## Rules
 
-1. **Every card is a route.** If a card can mutate state, it has escaped its purpose. The one
-   permitted exception is dismissing a "needs you" row, which is itself a routing decision.
+1. **Every card is a route.** No card mutates state — with "needs you" cut, there is no exception.
 2. **Cards are independently live.** Each subscribes to its own scope over SSE and owns its own
    disconnected state; a dead stream on one card must not blank the others (PKT-13).
 3. **Absent, not empty.** A card with nothing to say does not render. A dashboard of empty boxes is
@@ -69,7 +75,7 @@ that duplicates a per-event panel.
 
 ## Open
 
-- Does **"needs you"** persist dismissals, or recompute from state every time? Recomputing is simpler
-  and self-healing; persisting allows "not now". Recommend recompute, revisit if it nags.
-- Does the dashboard show **other people's** activity once friends exist, or stay the owner's own
-  view? Decides whether the pulse card is a feed or a log. Later bet, but the card shape differs.
+- **Accounts management is a new surface** with no packet yet. Today it lists one row, the owner, and
+  it is the seam where friend accounts arrive (pitch no-go for onboarding, but the surface is where
+  that later bet lands). Needs a packet before build.
+- **Events need an end time** for the present-event rule. Data gate.
