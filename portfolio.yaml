@@ -1,0 +1,12 @@
+# Product index. One entry per product under management.
+# tier: experiment | real | client-facing   (see README — ceremony scales with tier)
+# status: discovery | betting | building | live | dormant
+products:
+  - name: ronitnath-universe
+    tier: real
+    status: discovery
+    summary: Greenfield personal-universe platform (Rust/Leptos). Current bet in discovery: events platform + identity model.
+    code_repo: RonitNath/universe-ronitnath (private GitHub); live predecessor RonitNath/ronitnath
+    context: ~/dev/context/ronitnath/platform-scope.md
+# Other products (frontdesk-dental, rcda-mail, …) onboard when they are next touched,
+# each with an explicit tier — corner-cutting is deliberate, not accidental.
