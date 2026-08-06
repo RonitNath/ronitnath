@@ -30,5 +30,6 @@ debate: triggered (T3: identity data model) → memo DEBATE-###
 ## When a debate runs
 
 - Inherits the brief's open questions. Each ends resolved, deferred-as-assumption ("assume X; cheap to reverse"), or escalated.
+- **The flow addendum is in scope** (SYS-DEC-004): the claim graph may carry claims about which journeys exist, who mediates them, and whether a step belongs in the product at all. A struck, added or reordered flow lands as a delta before freeze — not at the design gate.
 - Escalation to the human only for questions **both blocking and undecidable by agents**, batched as one consolidated round — never a drip.
 - Output is an argument graph per `claim-schema.md`; the memo is generated from it. Artifacts are decision-shaped: options considered, rejected-and-why, what would change the recommendation.

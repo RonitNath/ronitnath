@@ -21,3 +21,21 @@ Owner added two review stations between packet derivation and build, because ins
 - **Data gate** (`data-gate.md`): domain model, access patterns, transport seams (HTTP/SSE/WS/RPC), operational posture (elastic scaling, zero-downtime rolling upgrades), peripheral-service requirements. May loop back to the design gate when iteration reveals new UI surfaces.
 
 Both are owner sessions and count against the bet's bound.
+
+## SYS-DEC-004 — User flows are a pitch addendum, not a design-gate discovery (2026-08-05)
+
+Owner ruling at the PITCH-001 design gate, from the gate itself failing in a specific way: reviewing
+the flow boards turned into a conversation about *which journeys exist and who mediates them* — the
+import flow wasn't a user journey at all, and the editing journey was the wrong one. The owner's
+diagnosis: "that I needed to talk about this above with you is an indication that user flows should
+have been part of the first gate, as an addendum to the pitch, and the pitch would have summaries."
+
+So: flows are written at the pitch stage as a **separate document** (`flows/FLOWS-###-*.md`), the
+pitch carries **one-line summaries** and links, both freeze under the same tag, and the flow set is
+**in scope for debate** (`flow-addendum.md`). The design gate renders agreed flows and judges
+ordering, fidelity and feel — it no longer discovers them.
+
+Two rules fall out of what was actually wrong, and both are in the spec: a journey that happens
+outside the web UI (editing a file, talking to an agent) is still a flow and must be written; and
+one-time, machine-mediated work is a work packet, not a flow — drawing it as one invents UI nobody
+will build.

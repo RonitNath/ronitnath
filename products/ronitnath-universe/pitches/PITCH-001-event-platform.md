@@ -18,6 +18,7 @@ The site is dormant and there is no path to create an event ("pickleball on Aug 
 ## Deltas
 
 - **delta-1** (2026-08-05, owner, session ① follow-on): bound restructured 3→5 sessions — design gate and data gate inserted before build (SYS-DEC-003). No scope change.
+- **delta-3** (2026-08-05, owner at session ② design gate; EV-015/016/017, DEC-005): **authoring-model pivot.** Copy lives in a per-event `copy.toml` the owner edits directly, not in an inline console editor; structural changes go through the coding agent; the event's **admin panel is per-event** like its invite pages. §4 rewritten below. Import loses its UI (EV-017). The flow addendum `FLOWS-001` is added retroactively per SYS-DEC-004 and summarized below; it re-freezes with this pitch. Net scope: inline copy-editing UI removed, per-event admin composition + a copy-source pipeline (PKT-11) added.
 
 ## Solution shape
 
@@ -26,13 +27,29 @@ In `universe-ronitnath` (Leptos islands + Axum, EV-002), first stateful slice on
 1. **Minimum identity** — identity(kind=human) / account / credential / auth_factor / session / capability_link / audit. Guests are account-less identity rows (longitudinal people). Encrypted wire-ids from table one; links/sessions stay bearer tokens (EV-004). Single `authorize(actor, action)` seam even while the answer is always "owner" (DEBATE-001 C-2 guard).
 2. **Agent creation surface (primary)** — HTTP/MCP API authenticated by owner-minted named, coarse-scoped bearer tokens; audit rows carry the token label. No agent identities (EV-009). The flow: owner tells agent about the event → agent creates it via API (EV-012).
 3. **Modular event pages** — page = ordered doc of module instances, per-module props validated at write. Cut-one registry: hero, rich body, schedule (flat + keyed segments w/ optional per-segment RSVP), RSVP/status panel, photo-guided entry instructions, style wrapper. **Per-event visual identity is code**, written by the creating agent (starfield/fireworks precedent) — content in the doc, identity in the registry (DEBATE-001 C-6).
-4. **Admin UI (refinement surface)** — tweak wording, manage/mint/revoke invite links, see RSVPs. Not the creation path.
+4. **Admin UI (runtime-data surface)** — *rewritten by delta-3.* The console owns only what exists at runtime: RSVPs and guests, minting/labelling/revoking invite links, publish state, and the cross-event people view. It does **not** edit wording (a per-event `copy.toml`, edited directly) and does not edit structure (the coding agent). Its **per-event admin panel is composed per event** from the shared component library plus event-specific components, exactly like an invite page; the canonical surfaces are sign-in, the event index, people, and link management (DEC-005).
 5. **Data ground truth** — the **expressibility test** (owner amendment at freeze): everything Housewarming + B24 + July 4th contained — people, attendance, content — must be *representable* in the new model, which is the fourth distinct data model to hold this data. The import tooling itself may be rough and one-shot; smoothness is not the bar. Export is first-class. Live site's `app.db` snapshotted before cutover.
 6. **Cutover** — ronitnath.com points at universe (presence + events); the dormant live site retires (its data preserved per 5).
 
+## Flows (summary — full addendum in `flows/FLOWS-001-event-platform.md`, added by delta-3)
+
+| ID | Flow | Actor | Surface |
+| --- | --- | --- | --- |
+| F-1 | Sign in | OWNER | web |
+| F-2 | Create an event by talking to the agent | OWNER | mixed |
+| F-3 | Change wording — edit the event's `copy.toml` | OWNER | mixed |
+| F-4 | Change structure — talk to the agent | OWNER | outside-web |
+| F-5 | Mint and share invites, setting what each shows | OWNER | web |
+| F-6 | Watch responses on the event's own admin panel | OWNER | web (per-event) |
+| F-7 | Open an invite and respond | GUEST | web (per-invite) |
+| F-8 | Arrive without a link | VISITOR | web |
+| F-9 | Look up a person across events | OWNER | web |
+
+Not flows: expressing past events (one-time, agent-mediated — EV-017); friend signup; photos/calendar/circles. AGENT has no UI, so no flows of its own; it is a mediator inside F-2 and F-4.
+
 ## Acceptance (the pickleball test)
 
-Owner tells an agent about a pickleball event → agent creates it via API, with its own styling → owner tweaks wording + mints invites in the UI → friend opens the link and RSVPs — on the real public ronitnath.com, with all three past events' recovered data expressed in the new model and rendering (import may be hand-cranked).
+Owner tells an agent about a pickleball event → agent authors it (page, admin panel, identity-as-code, `copy.toml`) and creates it via API → owner fixes a line of wording in the copy file and it shows up live → owner mints invites in the console → friend opens the link and RSVPs — on the real public ronitnath.com, with all three past events' recovered data expressed in the new model and rendering (import may be hand-cranked, and has no UI).
 
 ## Rabbit holes (named, avoided)
 

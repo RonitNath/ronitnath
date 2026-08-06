@@ -12,11 +12,11 @@ Durable artifacts are **decisions and evidence**, not requirement docs. Specs de
 ## The loop
 
 ```
-signal → evidence log → PM interview → [debate | sanity pass] → pitch (frozen) → work packets
-      → design gate → data gate → build → working-software inspection → acceptance → retro
+signal → evidence log → PM interview → flow addendum → [debate | sanity pass] → pitch (frozen, flows tagged with it)
+      → work packets → design gate → data gate → build → working-software inspection → acceptance → retro
 ```
 
-Every station is mandatory or explicitly waived in writing; the packet station (`system/work-packets.md`) is where user stories, edge states, and UX artifacts are derived mechanically — the owner never prompts for "peripheral" work. The **design gate** (`system/design-gate.md`, layered Penpot review) and **data gate** (`system/data-gate.md`, domain truth + seams) are owner sessions before any build; the data gate may loop back to the design gate when new surfaces emerge.
+Every station is mandatory or explicitly waived in writing. The **flow addendum** (`system/flow-addendum.md`) enumerates the human journeys at pitch time, in scope for debate and frozen with the pitch — the design gate renders them, never discovers them (SYS-DEC-004). The packet station (`system/work-packets.md`) derives user stories, edge states, and UX artifacts from those flows mechanically — the owner never prompts for "peripheral" work. The **design gate** (`system/design-gate.md`, layered Penpot review) and **data gate** (`system/data-gate.md`, domain truth + seams) are owner sessions before any build; the data gate may loop back to the design gate when new surfaces emerge.
 
 - **Signal capture**: human feeds raw signal (calls, dogfooding, inspiration) into the product's `evidence/`. Every item is provenance-tagged `ground-truth` (human-originated) or `inference` (agent-produced). A pitch resting only on inference is flagged.
 - **PM interview**: interviewer agent drafts a discussion-guide agenda (`system/discussion-guide.md`), shows it for strike/add edits, runs a freeform interview with coverage-checklist semantics, outputs a structured brief to `briefs/`.
@@ -44,6 +44,7 @@ products/<name>/
   evidence/EV-###-slug.md       # provenance-tagged signal
   decisions/DEC-###-slug.md     # chose A over B because C
   briefs/BRIEF-###-slug.md      # interview output
+  flows/FLOWS-###-slug.md       # human journeys — pitch addendum, frozen with the pitch
   debates/DEBATE-###-slug.{yaml,md}  # claim graph + memo generated from it
   pitches/PITCH-###-slug.md     # frozen baselines (tagged at freeze)
 ```

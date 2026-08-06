@@ -17,7 +17,7 @@ depends:      packet IDs
 
 ## Mandatory coverage checklist (run at derivation, record the result)
 
-1. **Actors × journeys** — enumerate every actor in the pitch (including machine actors); every journey each actor can take gets a packet or a named non-goal. An actor with zero packets is an error.
+1. **Actors × journeys** — every flow in the frozen addendum (`flow-addendum.md`) maps to at least one packet; every actor in the pitch, including machine actors, has flows or is a named non-goal. Journeys are *checked* here, not invented here — a journey first noticed at this station means the flow addendum was incomplete, and it is fixed there by delta.
 2. **States** — for every human-visible surface: empty state, error state, loading/latency, and the unauthorized/expired path. For every API: invalid input, auth failure, idempotency.
 3. **Data lifecycle** — creation, mutation, export, deletion/retention, migration/rollback for every new table.
 4. **Instrumentation** — how the owner will *know* it works in production (logs/metrics/audit), per packet or explicitly waived.
