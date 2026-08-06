@@ -85,6 +85,15 @@ per-practice agent-behavior model (config schema becomes a compatibility surface
 | OQ-4 | Is the RCDA line cutover part of this bet or a separate deploy decision? | EV-005 posture; first real traffic vs stranger-practice readiness | no |
 | OQ-5 | Which competitor tier is the first target (answering service / dental voice-AI incumbents / human parity)? | EV-014 makes this the de-facto scope decision | no |
 
+## OQ resolutions (owner, same day)
+
+All five resolved 2026-08-06: OQ-1 → outbound in-surface but not tier 1 (EV-023); OQ-2 →
+gated integrations, self-serve OR sales-call onboarding both first-class (EV-022); OQ-3 →
+per-office pricing, high-end positioning (EV-024); OQ-4 → RCDA uses this product, cutover
+in-bet (EV-025); OQ-5 → scope is a ladder of sellable tiers (EV-021). The owner additionally
+overruled EV-020's quality read on the calendar: as a human it does not work as expected
+(EV-026).
+
 ## Next stations
 
 Flow addendum (enumerate the human journeys: caller, front desk, owner, Isoastra operator —
