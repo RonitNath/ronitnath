@@ -15,6 +15,8 @@ Durable artifacts are **decisions and evidence**, not requirement docs. Specs de
 signal → evidence log → PM interview → [debate | sanity pass] → pitch (frozen) → work packets → build → retro
 ```
 
+Every station is mandatory or explicitly waived in writing; the packet station (`system/work-packets.md`) is where user stories, edge states, and UX artifacts are derived mechanically — the owner never prompts for "peripheral" work.
+
 - **Signal capture**: human feeds raw signal (calls, dogfooding, inspiration) into the product's `evidence/`. Every item is provenance-tagged `ground-truth` (human-originated) or `inference` (agent-produced). A pitch resting only on inference is flagged.
 - **PM interview**: interviewer agent drafts a discussion-guide agenda (`system/discussion-guide.md`), shows it for strike/add edits, runs a freeform interview with coverage-checklist semantics, outputs a structured brief to `briefs/`.
 - **Adversarial review**: selective — trigger rules in `system/debate-triggers.md`. Skipping is a recorded decision, never an accident. Debate output is an argument graph (`system/claim-schema.md`); the memo is generated from the graph.
