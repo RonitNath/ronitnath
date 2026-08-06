@@ -143,9 +143,11 @@ directory as identities appear. Polling and manual refresh are the exception and
   selectable); a revoked link that was already sent.
 - **non-goals in this bet**: per-invite custom pages and per-invite composition (EV-020 — deferred,
   supersedes EV-014); any personalization at sharing time.
-- **open**: is the copy count persisted server-side (surviving reload and a different device) or
-  local to the browser? Server-side is the recommendation — the owner works a long list across
-  sittings and a laptop-vs-phone split would silently lose his place. Data gate.
+- **decided, not open**: the copy count is **state on the link**, persisted server-side. Browser-local
+  state would lose his place on reload and split it between laptop and phone, which defeats the whole
+  affordance — he works these lists across sittings. Recorded as PKT-14 acceptance.
+- **open**: does renaming a person re-slug their already-shared link, or does the old URL keep
+  working? Shared with F-10. Data gate.
 
 ## F-6 Watch responses come in live
 
