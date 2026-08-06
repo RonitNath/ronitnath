@@ -11,9 +11,13 @@ debate: triggered (T3: identity + page-doc schemas, agent-API surface) → DEBAT
 
 The site is dormant and there is no path to create an event ("pickleball on Aug 15") — historically every event meant building a new codebase (EV-008, EV-013). The platform must make event creation trivial *without* losing what forced those rebuilds: genuinely different requirements and a specialized visual identity per event (EV-011).
 
-## Bound
+## Bound (amended by delta-1)
 
-**3 owner review sessions** (SYS-DEC-001): ① this freeze (spent), ② working software inspection, ③ pickleball-test acceptance on the real domain. Each ends continue / cut-scope / kill. *Standing offer: pin to a real event date if the owner commits one — reality is the best deadline.* No time estimates anywhere.
+**5 owner review sessions** (SYS-DEC-001): ① freeze (spent), ② design gate (layered Penpot + stories, `system/design-gate.md`), ③ data gate (domain model + seams, `system/data-gate.md`), ④ working-software inspection, ⑤ pickleball-test acceptance on the real domain. Each ends continue / cut-scope / kill. *Standing offer: pin to a real event date if the owner commits one — reality is the best deadline.* No time estimates anywhere.
+
+## Deltas
+
+- **delta-1** (2026-08-05, owner, session ① follow-on): bound restructured 3→5 sessions — design gate and data gate inserted before build (SYS-DEC-003). No scope change.
 
 ## Solution shape
 
