@@ -1,0 +1,65 @@
+lens: c1-realm-consistent
+claims:
+  - id: C1_REALM_CONSISTENT-1
+    statement: >
+      Rinity must make every practice/customer login an account in a dedicated commercial id.rinity.com identity origin, with internal staff entering only through restricted Kanidm federation, and the current Kanidm allow-list browser door must not be the customer door.
+    provenance:
+      - /home/ronitnath/dev/context/isoastra/identity-realms.md
+      - EV-010
+      - EV-016
+      - EV-020
+    stake: true
+    note: >
+      The identity doctrine says a commercial brand gets a dedicated permanent identity origin beginning with planned id.rinity.com, and product customers never become Kanidm workforce identities. EV-010/RF-02 and EV-020 show the current door is Kanidm/OIDC with deploy-time PRODUCT_MEMBER_SUBJECT_KEYS admission and no signup, which is an internal/operator gate rather than the customer realm.
+  - id: C1_REALM_CONSISTENT-2
+    statement: >
+      Rinity must not create a product-local username, password, passkey, or account-lifecycle system for practices, because both self-serve and sales-assisted onboarding must provision identity through the sanctioned customer realm before attaching product tenant membership.
+    provenance:
+      - /home/ronitnath/dev/context/isoastra/identity-realms.md
+      - EV-016
+      - EV-022
+    stake: false
+    note: >
+      EV-016 requires self-serve and EV-022 allows sales-assisted onboarding, but the doctrine assigns authentication to the brand Rauthy realm and tenant lifecycle to product databases. A rinity-local auth table would be a forked customer identity universe to unwind later.
+  - id: C1_REALM_CONSISTENT-3
+    statement: >
+      Rinity must persist stable issuer and subject identity keys from the customer realm and keep organization, office, subscription, entitlement, operator-assignment, and business-role lifecycle in rinity's database rather than deriving product roles from IdP group or email claims.
+    provenance:
+      - /home/ronitnath/dev/context/isoastra/identity-realms.md
+      - EV-010
+      - EV-024
+    stake: false
+    note: >
+      The doctrine requires applications to key identity on issuer and subject while product databases own tenant membership, subscriptions, entitlements, and business roles. EV-010 shows rinity already has organizations, offices, principals, and memberships, and EV-024 makes office the commercial billing atom, so those lifecycle concepts belong in rinity rather than in realm-wide claims.
+  - id: C1_REALM_CONSISTENT-4
+    statement: >
+      Rinity's per-office account lifecycle must be automated through the customer realm and product tenant records, so the current JSON-only organization and office APIs plus deploy-time PRODUCT_MEMBER_SUBJECT_KEYS gate are not an acceptable customer lifecycle system.
+    provenance:
+      - EV-010
+      - EV-016
+      - EV-022
+      - EV-024
+      - /home/ronitnath/dev/context/isoastra/identity-realms.md
+    stake: false
+    note: >
+      EV-010/RF-04 says org and office creation exists only as browser JSON APIs, while EV-010/RF-02 gates members with an environment allow-list. EV-016, EV-022, and EV-024 require sellable self-serve or sales-assisted per-office accounts, which means standing create, invite, membership, billing, offboarding, and recovery paths against the sanctioned realm.
+  - id: C1_REALM_CONSISTENT-5
+    statement: >
+      Audgent must not expose its own customer identity or customer login surface for calls, transcripts, recordings, configuration, or engine APIs, and every customer-facing engine capability must be projected through rinity using distinct browser, service, and machine-client registrations.
+    provenance:
+      - EV-011
+      - EV-015
+      - /home/ronitnath/dev/context/isoastra/identity-realms.md
+    stake: false
+    note: >
+      EV-015 makes audgent pure internal and rinity external, while EV-011 shows audgent has its own org users, Kanidm operator auth, and service-principal machinery. The doctrine requires distinct registrations for browser clients, service audiences, and machine credentials, so audgent can be an internal engine but not a second customer realm.
+  - id: C1_REALM_CONSISTENT-6
+    statement: >
+      Before RCDA or any non-demo office runs real patient traffic, rinity must have deployed-dev and release id.rinity.com realms with explicit registration policy, branded login/recovery/account/email surfaces, reconciled desired state, backup/restore evidence, and federation audit evidence, rather than reusing id.ronitnath.com or the internal Kanidm realm.
+    provenance:
+      - /home/ronitnath/dev/context/isoastra/identity-realms.md
+      - EV-018
+      - EV-025
+    stake: false
+    note: >
+      EV-025 puts RCDA live use inside this bet and EV-018 says the first real non-test business triggers the compliance runway. The identity doctrine says commercial identity belongs on cloud cells with explicit availability, backups, restore drills, probing, branding, reconciler state, and federation audit gates, and it says the personal realm is not a commercial template.

@@ -1,0 +1,59 @@
+lens: d1-trust-through-records
+claims:
+  - id: D1_TRUST_THROUGH_RECORDS-1
+    statement: >
+      Tier 1 must not cut over RCDA or any other real inbound practice line until every answered call creates a durable rinity-visible review record containing the full recording, the verbatim transcript, and the actions committed by the agent.
+    provenance:
+      - EV-025
+      - /home/ronitnath/dev/portfolio/products/rinity/flows/FLOWS-001-receptionist-replacement.md
+      - EV-011
+    stake: true
+    note: >
+      FLOWS-001 makes call review the console's new center of gravity and requires recording, transcript, outcome, and booked-appointment links to land in the console feed. EV-011 says audgent can produce transcripts, recordings, run artifacts, usage, QA, and analyses, so the missing requirement is a product seam and persistence contract, not a research concession.
+  - id: D1_TRUST_THROUGH_RECORDS-2
+    statement: >
+      Rinity currently gets the auditability posture wrong because the customer console has no calls, transcripts, recordings, agent configuration, phone numbers, call interaction log, audit log, appointment history, or engine attachment seam.
+    provenance:
+      - EV-010
+      - EV-020
+    stake: false
+    note: >
+      EV-010 explicitly lists no voice engine wiring, no call event ingest, no call state projections, and no audit log or call interaction log. EV-020 verifies by dogfood that every customer-touching voice review route is absent and that the only working surface is a scheduling desk.
+  - id: D1_TRUST_THROUGH_RECORDS-3
+    statement: >
+      Audgent's run artifacts and post-call analyses must be projected into rinity as first-class customer review records, not left in audgent or replaced by rinity summaries.
+    provenance:
+      - EV-011
+      - EV-015
+    stake: false
+    note: >
+      EV-015 says audgent is pure internal and rinity is external, so practices cannot be sent to audgent for trust evidence. EV-011/AC-12 and EV-011/AC-13 show the engine can generate recordings, transcript text, artifacts, QA, webhooks, and structured analyses, but analyses are additive evidence rather than a substitute for verbatim review.
+  - id: D1_TRUST_THROUGH_RECORDS-4
+    statement: >
+      The data gate is incomplete until it specifies full-fidelity retention for recordings, transcripts, and committed-action records long enough to cover real patient and practice dispute cycles for the first non-demo business.
+    provenance:
+      - /home/ronitnath/dev/portfolio/products/rinity/flows/FLOWS-001-receptionist-replacement.md
+      - /home/ronitnath/dev/portfolio/products/rinity/briefs/BRIEF-001-receptionist-replacement.md
+      - EV-018
+    stake: false
+    note: >
+      FLOWS-001 names call, transcript, and recording retention plus PHI posture as a data-gate item, and BRIEF-001 calls patient-data handling and wrong agent speech hard-to-walk-back risks. EV-018 says compliance runway exists for the first real business, so unresolved retention is a product gap, not a reason to reduce fidelity.
+  - id: D1_TRUST_THROUGH_RECORDS-5
+    statement: >
+      Every booking, reschedule, cancellation, message, handoff, failed write, and human correction must be attributable from the appointment or task back to the exact call record that caused it.
+    provenance:
+      - /home/ronitnath/dev/portfolio/products/rinity/flows/FLOWS-001-receptionist-replacement.md
+      - EV-013
+      - /home/ronitnath/dev/portfolio/products/rinity/briefs/BRIEF-001-receptionist-replacement.md
+    stake: false
+    note: >
+      Replacing the receptionist means the front desk supervises what the agent did rather than merely using a calendar. FLOWS-001 F-1 through F-6 require call outcomes, affected appointment links, needs-attention work, and corrections to be reviewable together.
+  - id: D1_TRUST_THROUGH_RECORDS-6
+    statement: >
+      The call feed must include partial and failed calls such as hang-ups, no acceptable slot, adapter conflicts, transfer failures, outages, and human-demanded handoffs, not only successful bookings.
+    provenance:
+      - /home/ronitnath/dev/portfolio/products/rinity/flows/FLOWS-001-receptionist-replacement.md
+      - EV-020
+    stake: false
+    note: >
+      FLOWS-001 repeatedly requires honest states for no-outcome calls, conflicts, outages, and handoff paths. EV-020 shows that no call feed exists today, so the product has not yet proven complete negative-case auditability.

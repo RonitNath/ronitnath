@@ -1,0 +1,75 @@
+lens: b1-rinity-sovereign
+claims:
+  - id: B1_RINITY_SOVEREIGN-1
+    statement: >
+      Rinity must not ship inbound receptionist replacement until rinity, not audgent or any voice engine, persists and serves the customer-visible call ledger including call status, transcript, recording pointer, extracted tasks, and scheduling outcome.
+    provenance:
+      - EV-013
+      - EV-015
+      - EV-011
+      - /home/ronitnath/dev/isoastra/rinity/docs/architecture.md
+    stake: true
+    note: >
+      EV-015 makes audgent internal, while EV-011 lists audgent workflow-run readback and durable workflow-run tables. Rinity architecture explicitly says M1 has no voice-engine endpoints or call projections, so the current seam would leave customer-visible call facts outside the product-owned plane.
+  - id: B1_RINITY_SOVEREIGN-2
+    statement: >
+      The rinity-engine seam must accept scheduling intents from the engine and execute all book, update, cancel, confirm, patient, provider, and eligibility actions inside Rinity's PMS adapter boundary, never by giving the engine PMS adapter credentials or direct PMS write capability.
+    provenance:
+      - /home/ronitnath/dev/isoastra/rinity/src/features/adapter.rs
+      - /home/ronitnath/dev/isoastra/rinity/src/features/console.rs
+      - /home/ronitnath/dev/isoastra/rinity/README.md
+    stake: false
+    note: >
+      The current console path correctly centralizes scheduling through AdapterClient and resolves office credential references inside Rinity. The voice engine must become another caller of a Rinity command contract, not a second holder of PMS authority.
+  - id: B1_RINITY_SOVEREIGN-3
+    statement: >
+      Any appointment state shown in Rinity must be a Rinity-owned projection with source, freshness, and operation history, but the current console endpoints return adapter appointments directly and the product migration has no appointments table.
+    provenance:
+      - /home/ronitnath/dev/isoastra/rinity/src/features/console.rs
+      - /home/ronitnath/dev/isoastra/rinity/src/features/adapter.rs
+      - /home/ronitnath/dev/isoastra/rinity/migrations/0001_rinity_core.sql
+      - EV-010
+    stake: false
+    note: >
+      The adapter client merges freshness internally, but console handlers serialize only result.appointments or result.slots. Rinity therefore cannot prove what customer-visible appointment facts were shown or changed during a call.
+  - id: B1_RINITY_SOVEREIGN-4
+    statement: >
+      Rinity's current SQLite schema is insufficient for control-plane sovereignty because it has no durable table for call records, transcripts, recording objects, extracted messages, appointment-operation history, or engine event ingestion.
+    provenance:
+      - /home/ronitnath/dev/isoastra/rinity/migrations/0001_rinity_core.sql
+      - /home/ronitnath/dev/isoastra/rinity/docs/architecture.md
+      - EV-010
+    stake: false
+    note: >
+      The migration stores organizations, principals, offices, lines, and flat config overlays only. EV-010 separately records no audit log, appointment history, or call interaction log.
+  - id: B1_RINITY_SOVEREIGN-5
+    statement: >
+      Practice-facing agent behavior and office configuration must be authored and read through Rinity's config model before an engine deployment runs, but current ConfigRepository is unreachable from any route or CLI and is constructed then dropped in application build.
+    provenance:
+      - /home/ronitnath/dev/isoastra/rinity/src/features/config.rs
+      - /home/ronitnath/dev/isoastra/rinity/src/app.rs
+      - EV-010
+    stake: false
+    note: >
+      EV-015 requires customer-relevant engine configuration to surface through Rinity. The repository and tables are a useful nucleus, but today they are not an operator-usable source of truth.
+  - id: B1_RINITY_SOVEREIGN-6
+    statement: >
+      Rinity must own the office-line to immutable-engine-artifact binding, because Audgent's immutable deployment contract can store artifacts and destination bindings but EV-011 found no call-routing path that consumes those bindings and Rinity's line schema currently has no repository or route.
+    provenance:
+      - EV-011
+      - /home/ronitnath/dev/isoastra/rinity/migrations/0001_rinity_core.sql
+      - /home/ronitnath/dev/isoastra/rinity/docs/architecture.md
+    stake: false
+    note: >
+      The migration has a lines table, but architecture says line management and voice deployment are absent in M1. If destination ownership lives in the engine, swapping engines changes customer-visible routing behavior.
+  - id: B1_RINITY_SOVEREIGN-7
+    statement: >
+      Rinity's current validation evidence is not acceptable for sovereignty-critical PMS semantics because README and docs/validation claim cancel, confirm, coverage, two adapters, and OpenDental state verification while tests/integration_adapters.rs only drives a native adapter through slots, patients, book, update, readback, and providers.
+    provenance:
+      - /home/ronitnath/dev/isoastra/rinity/README.md
+      - /home/ronitnath/dev/isoastra/rinity/docs/validation.md
+      - /home/ronitnath/dev/isoastra/rinity/tests/integration_adapters.rs
+      - EV-010
+    stake: false
+    note: >
+      A sovereignty seam has to be proven at the exact mutation edges that can diverge from the PMS. Overstated integration claims hide the missing proof that Rinity, not a downstream adapter or engine, controls those transitions.

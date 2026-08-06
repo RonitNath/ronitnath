@@ -1,0 +1,1078 @@
+debate: DEBATE-001
+product: rinity
+date: '2026-08-06'
+judge:
+  identity: claude portfolio session (authored BRIEF-001/FLOWS-001)
+  compromised: true
+  lens_runtime: pi CLI, openai-codex/gpt-5.5, 8 detached processes on nexus
+claims:
+- id: A1-1
+  statement: 'The first sellable tier must handle inbound scheduling calls end to end by answering the
+    live line, identifying caller and intent, booking, rescheduling, or cancelling a dental visit, escalating
+    to staff when it cannot safely complete, and showing the call outcome in rinity, because a high-end
+    office will reject flat per-office pricing if staff still has to answer revenue calls or reconcile
+    what the agent did.
+
+    '
+  provenance:
+  - EV-013
+  - EV-021
+  - EV-023
+  - EV-024
+  - EV-020
+  stake: true
+  note: 'This is the smallest non-toy replacement cut because it covers inbound only and scheduling
+    only. The sale-losing objection is concrete. The buyer is not paying premium office pricing for
+    a voice agent that does not carry the revenue call and leave staff with a trustworthy result.
+
+    '
+  author: a1-first-dollar
+- id: A1-2
+  statement: 'Rinity currently gets the first-dollar bet wrong because the customer-visible product
+    is a schedule desk with no voice surface, no signup, no onboarding, no billing, no calls, and no
+    front door that lets a stranger practice buy, connect a line, or hear a patient call handled.
+
+    '
+  provenance:
+  - EV-020
+  - EV-015
+  - EV-016
+  - EV-019
+  stake: false
+  note: 'Audgent has telephony and call machinery, but EV-015 makes audgent internal and EV-020 says
+    rinity does not project any of it outward. A stranger cannot become cash flow from a product whose
+    only visible authenticated value is human-operated calendar work.
+
+    '
+  author: a1-first-dollar
+- id: A1-3
+  statement: 'Tier 1 must not include outbound confirmations, recall, campaigns, live eligibility checking,
+    or multi-vertical healthcare behavior, because those do not answer the concrete first-buyer objection
+    that inbound patient calls are still not covered.
+
+    '
+  provenance:
+  - EV-023
+  - EV-017
+  - EV-022
+  - EV-011/AC-10
+  stake: false
+  note: 'EV-023 explicitly moves outbound after tier 1 and EV-017 defers vertical breadth. Gated integrations
+    can be sold later after inbound scheduling coverage proves the office can stop losing or manually
+    handling calls.
+
+    '
+  author: a1-first-dollar
+- id: A1-4
+  statement: 'Tier 1 must expose practice-controlled agent policy and after-call review in rinity before
+    taking live calls, because a high-end buyer will object that an opaque agent could mishandle tone,
+    fees, clinical boundaries, or exceptions under the practice name.
+
+    '
+  provenance:
+  - EV-002
+  - EV-015
+  - EV-011/AC-08
+  - EV-011/AC-12
+  - EV-020
+  stake: false
+  note: 'EV-002 makes owner philosophy control part of the offer, and audgent already has workflow and
+    observability primitives. The missing product work is surfacing enough of that control and audit
+    trail through rinity that a practice can trust the agent on its phone line.
+
+    '
+  author: a1-first-dollar
+- id: A1-5
+  statement: 'Self-serve for the first dollar may be a sales-call onboarding path with gated integrations,
+    but rinity must still expose office setup, line connection status, and flat per-office purchase
+    state rather than relying on deploy-time allowlists and raw admin APIs.
+
+    '
+  provenance:
+  - EV-016
+  - EV-022
+  - EV-024
+  - EV-010/RF-02
+  - EV-010/RF-04
+  stake: false
+  note: 'EV-022 permits manual onboarding and gated integrations, so anonymous swipe-card signup is
+    not the first-dollar blocker. The blocker is that the current exact allowlist door and JSON-only
+    seeding path leave no buyer-visible way to know what is connected or what is being bought.
+
+    '
+  author: a1-first-dollar
+- id: A1-6
+  statement: 'The calendar can remain narrow, but the scheduling actions the agent performs must be
+    human-usable for staff verification, correction, and undo before RCDA or a stranger office is cut
+    over.
+
+    '
+  provenance:
+  - EV-026
+  - EV-024
+  - EV-025
+  - EV-020
+  stake: false
+  note: 'EV-026 says the one existing screen fails human expectations, which directly threatens premium
+    per-office positioning. The buyer objection is that staff cannot safely trust or repair the agent''s
+    scheduling work.
+
+    '
+  author: a1-first-dollar
+- id: A1-7
+  statement: 'The first sale must not depend on a bespoke live PMS integration for every prospect, because
+    EV-022 says integrations are gated and the minimum sellable proof is that inbound calls become actionable
+    booked or escalated outcomes in the office workflow.
+
+    '
+  provenance:
+  - EV-022
+  - EV-010/RF-06
+  - EV-010/RF-16
+  - EV-020
+  stake: false
+  note: 'Existing adapter work is useful where available, but the tier boundary should survive a sales-call
+    onboarding path without making each new office a custom integration project. The sale-losing objection
+    to avoid is a demo that handles speech but cannot leave the office with a reliable next action.
+
+    '
+  author: a1-first-dollar
+- id: A2-1
+  statement: 'Tier 1 must let the practice turn off live phone staffing during business hours only if
+    each normal Tuesday inbound call either completes through F-1, F-2, or F-3 in the call or receives
+    an explicit patient-acceptable fallback through F-5 without synchronous human review.
+
+    '
+  provenance:
+  - EV-013
+  - /home/ronitnath/dev/portfolio/products/rinity/flows/FLOWS-001-receptionist-replacement.md
+  - inference
+  stake: true
+  note: 'This is the receptionist replacement standard, not an overflow standard. A queue the office
+    checks later can be acceptable only when the caller was told a clear next step and no one had to
+    shadow the call live.
+
+    '
+  author: a2-parity-standard
+- id: A2-2
+  statement: 'FLOWS-001 is not Monday-cutover ready because its open items leave the agent without finalized
+    rules for visit-type matching, provider choice, cancellation policy, insurance answers, transfer
+    mechanics, and productized telephony paths.
+
+    '
+  provenance:
+  - /home/ronitnath/dev/portfolio/products/rinity/flows/FLOWS-001-receptionist-replacement.md
+  stake: false
+  note: 'Those are not polish questions from an office manager seat. They are the daily judgment calls
+    a receptionist makes while the caller is waiting on the phone.
+
+    '
+  author: a2-parity-standard
+- id: A2-3
+  statement: 'F-4 must be treated as a launch-blocking coverage flow because without an all-calls feed
+    containing transcripts, recordings, outcomes, and appointment links the staff cannot recover when
+    a patient says they called earlier.
+
+    '
+  provenance:
+  - EV-020
+  - /home/ronitnath/dev/portfolio/products/rinity/flows/FLOWS-001-receptionist-replacement.md
+  stake: false
+  note: 'EV-020 says the current customer surface has no calls, transcripts, recordings, agent configuration,
+    or phone numbers. FLOWS-001 correctly names the feed, but parity requires it to cover every answered,
+    abandoned, transferred, failed, and message-only call.
+
+    '
+  author: a2-parity-standard
+- id: A2-4
+  statement: 'Every message-only fallback in F-1, F-3, and F-5 must tell the caller when and how the
+    practice will respond and must create a visible same-day queue item, or the flow is only voicemail
+    with a nicer voice.
+
+    '
+  provenance:
+  - /home/ronitnath/dev/portfolio/products/rinity/flows/FLOWS-001-receptionist-replacement.md
+  - inference
+  stake: false
+  note: 'The proposed flows often land hard cases in a message path. That can be acceptable on a busy
+    Tuesday only if the patient hears a concrete promise the practice can keep.
+
+    '
+  author: a2-parity-standard
+- id: A2-5
+  statement: 'Tier 1 must handle inbound insurance and cost-adjacent questions by answering from configured
+    practice facts or capturing the exact plan and promised follow-up, not by limiting coverage to an
+    accept or do-not-accept list.
+
+    '
+  provenance:
+  - EV-013
+  - /home/ronitnath/dev/portfolio/products/rinity/flows/FLOWS-001-receptionist-replacement.md
+  - inference
+  stake: false
+  note: 'EV-013 includes insurance questions in the receptionist duty surface. FLOWS-001 flags insurance
+    as high-stakes and asks whether tier 1 is only lists, which is too narrow for normal inbound dental
+    calls.
+
+    '
+  author: a2-parity-standard
+- id: A2-6
+  statement: 'Tier 1 must recognize urgent dental calls such as severe pain, swelling, trauma, bleeding,
+    or post-procedure complications and route them to booking, a practice-approved urgent script, or
+    human handoff per office policy before it can replace an 8am to 5pm receptionist.
+
+    '
+  provenance:
+  - EV-013
+  - /home/ronitnath/dev/portfolio/products/rinity/flows/FLOWS-001-receptionist-replacement.md
+  - inference
+  stake: false
+  note: 'FLOWS-001 mentions emergency indicators and an urgent-case script, but the parity bar requires
+    concrete detection and routing. A high-end practice cannot have the phone agent treat urgent pain
+    like an ordinary FAQ miss.
+
+    '
+  author: a2-parity-standard
+- id: A2-7
+  statement: 'F-6 currently fails the parity bar because EV-026 says the calendar''s new visit, Today
+    shortcut, and drag-and-drop behavior do not work as a human expects, so the office cannot reliably
+    correct agent actions or handle walk-ins after the phones go unstaffed.
+
+    '
+  provenance:
+  - EV-026
+  - /home/ronitnath/dev/portfolio/products/rinity/flows/FLOWS-001-receptionist-replacement.md
+  stake: false
+  note: 'The only existing screen is not finished enough for the human side of replacement. If the agent
+    books wrong or a walk-in needs to be added, the practice needs the correction tool to be boringly
+    reliable.
+
+    '
+  author: a2-parity-standard
+- id: A2-8
+  statement: 'Tier 1 must select and prove one offered phone-line connection and rollback path for the
+    office rather than relying on the engine''s provider list, because missed or dead-air inbound calls
+    are unacceptable during a Monday business-hours cutover.
+
+    '
+  provenance:
+  - EV-011
+  - EV-025
+  - /home/ronitnath/dev/portfolio/products/rinity/flows/FLOWS-001-receptionist-replacement.md
+  stake: false
+  note: 'Audgent has broad telephony capability and RCDA is expected to use this product. From the office
+    manager seat, the only thing that matters on Monday is that the chosen cutover path works and can
+    be reversed immediately.
+
+    '
+  author: a2-parity-standard
+- id: B1-1
+  statement: 'Rinity must not ship inbound receptionist replacement until rinity, not audgent or any
+    voice engine, persists and serves the customer-visible call ledger including call status, transcript,
+    recording pointer, extracted tasks, and scheduling outcome.
+
+    '
+  provenance:
+  - EV-013
+  - EV-015
+  - EV-011
+  - /home/ronitnath/dev/isoastra/rinity/docs/architecture.md
+  stake: true
+  note: 'EV-015 makes audgent internal, while EV-011 lists audgent workflow-run readback and durable
+    workflow-run tables. Rinity architecture explicitly says M1 has no voice-engine endpoints or call
+    projections, so the current seam would leave customer-visible call facts outside the product-owned
+    plane.
+
+    '
+  author: b1-rinity-sovereign
+- id: B1-2
+  statement: 'The rinity-engine seam must accept scheduling intents from the engine and execute all
+    book, update, cancel, confirm, patient, provider, and eligibility actions inside Rinity''s PMS adapter
+    boundary, never by giving the engine PMS adapter credentials or direct PMS write capability.
+
+    '
+  provenance:
+  - /home/ronitnath/dev/isoastra/rinity/src/features/adapter.rs
+  - /home/ronitnath/dev/isoastra/rinity/src/features/console.rs
+  - /home/ronitnath/dev/isoastra/rinity/README.md
+  stake: false
+  note: 'The current console path correctly centralizes scheduling through AdapterClient and resolves
+    office credential references inside Rinity. The voice engine must become another caller of a Rinity
+    command contract, not a second holder of PMS authority.
+
+    '
+  author: b1-rinity-sovereign
+- id: B1-3
+  statement: 'Any appointment state shown in Rinity must be a Rinity-owned projection with source, freshness,
+    and operation history, but the current console endpoints return adapter appointments directly and
+    the product migration has no appointments table.
+
+    '
+  provenance:
+  - /home/ronitnath/dev/isoastra/rinity/src/features/console.rs
+  - /home/ronitnath/dev/isoastra/rinity/src/features/adapter.rs
+  - /home/ronitnath/dev/isoastra/rinity/migrations/0001_rinity_core.sql
+  - EV-010
+  stake: false
+  note: 'The adapter client merges freshness internally, but console handlers serialize only result.appointments
+    or result.slots. Rinity therefore cannot prove what customer-visible appointment facts were shown
+    or changed during a call.
+
+    '
+  author: b1-rinity-sovereign
+- id: B1-4
+  statement: 'Rinity''s current SQLite schema is insufficient for control-plane sovereignty because
+    it has no durable table for call records, transcripts, recording objects, extracted messages, appointment-operation
+    history, or engine event ingestion.
+
+    '
+  provenance:
+  - /home/ronitnath/dev/isoastra/rinity/migrations/0001_rinity_core.sql
+  - /home/ronitnath/dev/isoastra/rinity/docs/architecture.md
+  - EV-010
+  stake: false
+  note: 'The migration stores organizations, principals, offices, lines, and flat config overlays only.
+    EV-010 separately records no audit log, appointment history, or call interaction log.
+
+    '
+  author: b1-rinity-sovereign
+- id: B1-5
+  statement: 'Practice-facing agent behavior and office configuration must be authored and read through
+    Rinity''s config model before an engine deployment runs, but current ConfigRepository is unreachable
+    from any route or CLI and is constructed then dropped in application build.
+
+    '
+  provenance:
+  - /home/ronitnath/dev/isoastra/rinity/src/features/config.rs
+  - /home/ronitnath/dev/isoastra/rinity/src/app.rs
+  - EV-010
+  stake: false
+  note: 'EV-015 requires customer-relevant engine configuration to surface through Rinity. The repository
+    and tables are a useful nucleus, but today they are not an operator-usable source of truth.
+
+    '
+  author: b1-rinity-sovereign
+- id: B1-6
+  statement: 'Rinity must own the office-line to immutable-engine-artifact binding, because Audgent''s
+    immutable deployment contract can store artifacts and destination bindings but EV-011 found no call-routing
+    path that consumes those bindings and Rinity''s line schema currently has no repository or route.
+
+    '
+  provenance:
+  - EV-011
+  - /home/ronitnath/dev/isoastra/rinity/migrations/0001_rinity_core.sql
+  - /home/ronitnath/dev/isoastra/rinity/docs/architecture.md
+  stake: false
+  note: 'The migration has a lines table, but architecture says line management and voice deployment
+    are absent in M1. If destination ownership lives in the engine, swapping engines changes customer-visible
+    routing behavior.
+
+    '
+  author: b1-rinity-sovereign
+- id: B1-7
+  statement: 'Rinity''s current validation evidence is not acceptable for sovereignty-critical PMS semantics
+    because README and docs/validation claim cancel, confirm, coverage, two adapters, and OpenDental
+    state verification while tests/integration_adapters.rs only drives a native adapter through slots,
+    patients, book, update, readback, and providers.
+
+    '
+  provenance:
+  - /home/ronitnath/dev/isoastra/rinity/README.md
+  - /home/ronitnath/dev/isoastra/rinity/docs/validation.md
+  - /home/ronitnath/dev/isoastra/rinity/tests/integration_adapters.rs
+  - EV-010
+  stake: false
+  note: 'A sovereignty seam has to be proven at the exact mutation edges that can diverge from the PMS.
+    Overstated integration claims hide the missing proof that Rinity, not a downstream adapter or engine,
+    controls those transitions.
+
+    '
+  author: b1-rinity-sovereign
+- id: B2-1
+  statement: 'A production rinity inbound call must commit appointment booking, reschedule, cancel,
+    and confirmation writes inside the audgent engine runtime without calling the rinity control-plane
+    service or routing the action through a generic HTTP or MCP tool.
+
+    '
+  provenance:
+  - EV-013
+  - EV-010/RF-06
+  - EV-010/RF-11
+  - EV-011/AC-09
+  - /home/ronitnath/dev/isoastra/audgent/api/services/workflow/tools/custom_tool.py
+  stake: true
+  note: 'The current control plane owns the PMS adapter client and booking endpoint, while Audgent''s
+    production integration seam is generic live tool calling plus fixtures. That seam inserts another
+    service into the caller''s wait loop, which is the bet-losing failure mode for live reception.
+
+    '
+  author: b2-engine-capable
+- id: B2-2
+  statement: 'Audgent''s current rinity-specific scheduling implementation is not capable of real receptionist
+    booking because `/api/v1/test-fixtures/rinity/book` returns a deterministic confirmation from stateless
+    fixture code rather than persisting an appointment or enforcing availability.
+
+    '
+  provenance:
+  - /home/ronitnath/dev/isoastra/audgent/api/routes/rinity_test_fixtures.py
+  - /home/ronitnath/dev/isoastra/audgent/api/services/rinity_test_fixtures.py
+  - EV-011/AC-09
+  - EV-013
+  stake: false
+  note: 'The fixture always answers with status confirmed and confirmation RIN-6201. That is useful
+    for acceptance calls, not for preventing duplicate or impossible dental appointments.
+
+    '
+  author: b2-engine-capable
+- id: B2-3
+  statement: 'The existing Audgent HTTP tool path must not be used for any caller-awaited scheduling
+    action because it awaits an external `httpx` request before returning the function result, with
+    a default timeout of five seconds.
+
+    '
+  provenance:
+  - /home/ronitnath/dev/isoastra/audgent/api/services/workflow/tools/custom_tool.py
+  - /home/ronitnath/dev/isoastra/audgent/api/services/workflow/pipecat_engine_custom_tools.py
+  stake: false
+  note: 'Five seconds is an eternity during a negotiated appointment slot. Playing a custom message
+    before the request does not make the booking path local or resilient.
+
+    '
+  author: b2-engine-capable
+- id: B2-4
+  statement: 'Audgent''s immutable engine contract is currently insufficient as the rinity call seam
+    because destination bindings are publishable and resolvable in storage but no inbound call-routing
+    path consumes `ArtifactStore.resolve` to choose the live workflow and office overlay.
+
+    '
+  provenance:
+  - /home/ronitnath/dev/isoastra/audgent/api/routes/engine_contract.py
+  - /home/ronitnath/dev/isoastra/audgent/api/services/engine_contract/artifacts.py
+  - EV-011/AC-14
+  stake: false
+  note: 'The artifact store has the right offline-deployment smell, but the telephony path still routes
+    through workflow and phone-number rows rather than an artifact destination binding. The seam is
+    not done until a phone line can run from an already-admitted local artifact while the control plane
+    is unavailable.
+
+    '
+  author: b2-engine-capable
+- id: B2-5
+  statement: 'Pre-call data fetch may only be optional enrichment for rinity, not a required source
+    for patient, office, slot, or policy state, because Audgent waits under ringback for an external
+    HTTP response and proceeds with empty context on timeout or failure.
+
+    '
+  provenance:
+  - /home/ronitnath/dev/isoastra/audgent/docs/voice-agent/pre-call-data-fetch.mdx
+  - /home/ronitnath/dev/isoastra/audgent/api/services/pipecat/pre_call_fetch.py
+  - /home/ronitnath/dev/isoastra/audgent/api/services/pipecat/event_handlers.py
+  stake: false
+  note: 'Ringback is less bad than silence, but it is still a caller-visible dependency on another service.
+    Core reception state must already be inside the engine runtime before the phone rings.
+
+    '
+  author: b2-engine-capable
+- id: B2-6
+  statement: 'Because rinity is priced per higher-end office and integrations are gated, the engine
+    must provide a local office schedule ledger that can confirm appointments before PMS sync is connected
+    or healthy.
+
+    '
+  provenance:
+  - EV-022
+  - EV-024
+  - EV-010/RF-11
+  - EV-010
+  - inference
+  stake: false
+  note: 'The product cannot sell premium live reception if the first scheduling call becomes a control-plane
+    or PMS-integration demo. PMS sync can reconcile after the engine-local booking commit, but the caller
+    must leave with a real confirmation.
+
+    '
+  author: b2-engine-capable
+- id: C1-1
+  statement: 'Rinity must make every practice/customer login an account in a dedicated commercial id.rinity.com
+    identity origin, with internal staff entering only through restricted Kanidm federation, and the
+    current Kanidm allow-list browser door must not be the customer door.
+
+    '
+  provenance:
+  - /home/ronitnath/dev/context/isoastra/identity-realms.md
+  - EV-010
+  - EV-016
+  - EV-020
+  stake: true
+  note: 'The identity doctrine says a commercial brand gets a dedicated permanent identity origin beginning
+    with planned id.rinity.com, and product customers never become Kanidm workforce identities. EV-010/RF-02
+    and EV-020 show the current door is Kanidm/OIDC with deploy-time PRODUCT_MEMBER_SUBJECT_KEYS admission
+    and no signup, which is an internal/operator gate rather than the customer realm.
+
+    '
+  author: c1-realm-consistent
+- id: C1-2
+  statement: 'Rinity must not create a product-local username, password, passkey, or account-lifecycle
+    system for practices, because both self-serve and sales-assisted onboarding must provision identity
+    through the sanctioned customer realm before attaching product tenant membership.
+
+    '
+  provenance:
+  - /home/ronitnath/dev/context/isoastra/identity-realms.md
+  - EV-016
+  - EV-022
+  stake: false
+  note: 'EV-016 requires self-serve and EV-022 allows sales-assisted onboarding, but the doctrine assigns
+    authentication to the brand Rauthy realm and tenant lifecycle to product databases. A rinity-local
+    auth table would be a forked customer identity universe to unwind later.
+
+    '
+  author: c1-realm-consistent
+- id: C1-3
+  statement: 'Rinity must persist stable issuer and subject identity keys from the customer realm and
+    keep organization, office, subscription, entitlement, operator-assignment, and business-role lifecycle
+    in rinity''s database rather than deriving product roles from IdP group or email claims.
+
+    '
+  provenance:
+  - /home/ronitnath/dev/context/isoastra/identity-realms.md
+  - EV-010
+  - EV-024
+  stake: false
+  note: 'The doctrine requires applications to key identity on issuer and subject while product databases
+    own tenant membership, subscriptions, entitlements, and business roles. EV-010 shows rinity already
+    has organizations, offices, principals, and memberships, and EV-024 makes office the commercial
+    billing atom, so those lifecycle concepts belong in rinity rather than in realm-wide claims.
+
+    '
+  author: c1-realm-consistent
+- id: C1-4
+  statement: 'Rinity''s per-office account lifecycle must be automated through the customer realm and
+    product tenant records, so the current JSON-only organization and office APIs plus deploy-time PRODUCT_MEMBER_SUBJECT_KEYS
+    gate are not an acceptable customer lifecycle system.
+
+    '
+  provenance:
+  - EV-010
+  - EV-016
+  - EV-022
+  - EV-024
+  - /home/ronitnath/dev/context/isoastra/identity-realms.md
+  stake: false
+  note: 'EV-010/RF-04 says org and office creation exists only as browser JSON APIs, while EV-010/RF-02
+    gates members with an environment allow-list. EV-016, EV-022, and EV-024 require sellable self-serve
+    or sales-assisted per-office accounts, which means standing create, invite, membership, billing,
+    offboarding, and recovery paths against the sanctioned realm.
+
+    '
+  author: c1-realm-consistent
+- id: C1-5
+  statement: 'Audgent must not expose its own customer identity or customer login surface for calls,
+    transcripts, recordings, configuration, or engine APIs, and every customer-facing engine capability
+    must be projected through rinity using distinct browser, service, and machine-client registrations.
+
+    '
+  provenance:
+  - EV-011
+  - EV-015
+  - /home/ronitnath/dev/context/isoastra/identity-realms.md
+  stake: false
+  note: 'EV-015 makes audgent pure internal and rinity external, while EV-011 shows audgent has its
+    own org users, Kanidm operator auth, and service-principal machinery. The doctrine requires distinct
+    registrations for browser clients, service audiences, and machine credentials, so audgent can be
+    an internal engine but not a second customer realm.
+
+    '
+  author: c1-realm-consistent
+- id: C1-6
+  statement: 'Before RCDA or any non-demo office runs real patient traffic, rinity must have deployed-dev
+    and release id.rinity.com realms with explicit registration policy, branded login/recovery/account/email
+    surfaces, reconciled desired state, backup/restore evidence, and federation audit evidence, rather
+    than reusing id.ronitnath.com or the internal Kanidm realm.
+
+    '
+  provenance:
+  - /home/ronitnath/dev/context/isoastra/identity-realms.md
+  - EV-018
+  - EV-025
+  stake: false
+  note: 'EV-025 puts RCDA live use inside this bet and EV-018 says the first real non-test business
+    triggers the compliance runway. The identity doctrine says commercial identity belongs on cloud
+    cells with explicit availability, backups, restore drills, probing, branding, reconciler state,
+    and federation audit gates, and it says the personal realm is not a commercial template.
+
+    '
+  author: c1-realm-consistent
+- id: C2-1
+  statement: 'Tier 1 must fail the bet unless an owner can arrive from rinity.com, create their practice,
+    and land in agent configuration without learning Kanidm, OIDC, member admission, organization, or
+    Audgent vocabulary.
+
+    '
+  provenance:
+  - EV-016
+  - EV-010/RF-02
+  - EV-015
+  - /home/ronitnath/dev/portfolio/products/rinity/flows/FLOWS-001-receptionist-replacement.md
+  stake: true
+  note: 'EV-016 requires self-serve while EV-010/RF-02 says the current door is exact member admission
+    through Kanidm OIDC. FLOWS-001 F-8 names the needed outcome as the owner reaching their own console
+    configuring the agent.
+
+    '
+  author: c2-frictionless-door
+- id: C2-2
+  statement: 'The current customer door is unusable for the lunch-lead owner because /signup 404s and
+    the signed-out page only offers sign in behind allowlisted OIDC.
+
+    '
+  provenance:
+  - EV-020
+  - EV-010/RF-02
+  stake: false
+  note: 'EV-020 records that /signup 404s and that the signed-out page teaches a prospect nothing. EV-010/RF-02
+    records the allowlisted OIDC admission path.
+
+    '
+  author: c2-frictionless-door
+- id: C2-3
+  statement: 'Signup must take the owner directly into practice setup with locked integrations visible
+    but nonblocking, not into a sales-call request or PMS credential hunt.
+
+    '
+  provenance:
+  - EV-022
+  - /home/ronitnath/dev/portfolio/products/rinity/flows/FLOWS-001-receptionist-replacement.md
+  - /home/ronitnath/dev/portfolio/products/rinity/briefs/BRIEF-001-receptionist-replacement.md
+  stake: false
+  note: 'EV-022 says integrations are gated while most of the product remains self-serve or first-class
+    sales-call onboarded. FLOWS-001 F-8 requires rinity-native scheduling to be available immediately
+    with PMS integration visibly locked.
+
+    '
+  author: c2-frictionless-door
+- id: C2-4
+  statement: 'The first-run console must include a browser test call before phone-line connection or
+    billing so the owner can hear the agent act as their practice inside the eleven-minute trial.
+
+    '
+  provenance:
+  - EV-011/AC-02
+  - /home/ronitnath/dev/portfolio/products/rinity/flows/FLOWS-001-receptionist-replacement.md
+  - /home/ronitnath/dev/portfolio/products/rinity/briefs/BRIEF-001-receptionist-replacement.md
+  stake: false
+  note: 'EV-011/AC-02 says browser voice calls over raw PCM WebSockets exist. FLOWS-001 F-7 names preview
+    and test as part of owner configuration, while F-8 puts billing before or at go-live rather than
+    before proof of value.
+
+    '
+  author: c2-frictionless-door
+- id: C2-5
+  statement: 'Pricing on the front door must be a clear per-office premium offer before identity capture,
+    because a hidden price or usage-meter choice turns the first eleven minutes into sales-process anxiety.
+
+    '
+  provenance:
+  - EV-024
+  - /home/ronitnath/dev/portfolio/products/rinity/flows/FLOWS-001-receptionist-replacement.md
+  - inference
+  stake: false
+  note: 'EV-024 sets per-office flat pricing and a high-end target. FLOWS-001 F-8 requires the front
+    door to say what rinity costs per office.
+
+    '
+  author: c2-frictionless-door
+- id: C2-6
+  statement: 'No signup screen, redirect, email, or console label may expose Audgent or any different
+    product name to the customer.
+
+    '
+  provenance:
+  - EV-015
+  - /home/ronitnath/dev/portfolio/products/rinity/flows/FLOWS-001-receptionist-replacement.md
+  stake: false
+  note: 'EV-015 says Audgent is pure internal and rinity is external. FLOWS-001 states Audgent is invisible
+    in every flow.
+
+    '
+  author: c2-frictionless-door
+- id: C2-7
+  statement: 'The configured console is not sale-ready until New Visit, today navigation, and drag-and-drop
+    behave reliably under human mouse and keyboard use during onboarding.
+
+    '
+  provenance:
+  - EV-026
+  - EV-024
+  stake: false
+  note: 'EV-026 says the current calendar fails the human expectation bar on New Visit, T navigation,
+    and drag-and-drop confidence. EV-024 makes premium experience part of the high-end sale.
+
+    '
+  author: c2-frictionless-door
+- id: D1-1
+  statement: 'Tier 1 must not cut over RCDA or any other real inbound practice line until every answered
+    call creates a durable rinity-visible review record containing the full recording, the verbatim
+    transcript, and the actions committed by the agent.
+
+    '
+  provenance:
+  - EV-025
+  - /home/ronitnath/dev/portfolio/products/rinity/flows/FLOWS-001-receptionist-replacement.md
+  - EV-011
+  stake: true
+  note: 'FLOWS-001 makes call review the console''s new center of gravity and requires recording, transcript,
+    outcome, and booked-appointment links to land in the console feed. EV-011 says audgent can produce
+    transcripts, recordings, run artifacts, usage, QA, and analyses, so the missing requirement is a
+    product seam and persistence contract, not a research concession.
+
+    '
+  author: d1-trust-through-records
+- id: D1-2
+  statement: 'Rinity currently gets the auditability posture wrong because the customer console has
+    no calls, transcripts, recordings, agent configuration, phone numbers, call interaction log, audit
+    log, appointment history, or engine attachment seam.
+
+    '
+  provenance:
+  - EV-010
+  - EV-020
+  stake: false
+  note: 'EV-010 explicitly lists no voice engine wiring, no call event ingest, no call state projections,
+    and no audit log or call interaction log. EV-020 verifies by dogfood that every customer-touching
+    voice review route is absent and that the only working surface is a scheduling desk.
+
+    '
+  author: d1-trust-through-records
+- id: D1-3
+  statement: 'Audgent''s run artifacts and post-call analyses must be projected into rinity as first-class
+    customer review records, not left in audgent or replaced by rinity summaries.
+
+    '
+  provenance:
+  - EV-011
+  - EV-015
+  stake: false
+  note: 'EV-015 says audgent is pure internal and rinity is external, so practices cannot be sent to
+    audgent for trust evidence. EV-011/AC-12 and EV-011/AC-13 show the engine can generate recordings,
+    transcript text, artifacts, QA, webhooks, and structured analyses, but analyses are additive evidence
+    rather than a substitute for verbatim review.
+
+    '
+  author: d1-trust-through-records
+- id: D1-4
+  statement: 'The data gate is incomplete until it specifies full-fidelity retention for recordings,
+    transcripts, and committed-action records long enough to cover real patient and practice dispute
+    cycles for the first non-demo business.
+
+    '
+  provenance:
+  - /home/ronitnath/dev/portfolio/products/rinity/flows/FLOWS-001-receptionist-replacement.md
+  - /home/ronitnath/dev/portfolio/products/rinity/briefs/BRIEF-001-receptionist-replacement.md
+  - EV-018
+  stake: false
+  note: 'FLOWS-001 names call, transcript, and recording retention plus PHI posture as a data-gate item,
+    and BRIEF-001 calls patient-data handling and wrong agent speech hard-to-walk-back risks. EV-018
+    says compliance runway exists for the first real business, so unresolved retention is a product
+    gap, not a reason to reduce fidelity.
+
+    '
+  author: d1-trust-through-records
+- id: D1-5
+  statement: 'Every booking, reschedule, cancellation, message, handoff, failed write, and human correction
+    must be attributable from the appointment or task back to the exact call record that caused it.
+
+    '
+  provenance:
+  - /home/ronitnath/dev/portfolio/products/rinity/flows/FLOWS-001-receptionist-replacement.md
+  - EV-013
+  - /home/ronitnath/dev/portfolio/products/rinity/briefs/BRIEF-001-receptionist-replacement.md
+  stake: false
+  note: 'Replacing the receptionist means the front desk supervises what the agent did rather than merely
+    using a calendar. FLOWS-001 F-1 through F-6 require call outcomes, affected appointment links, needs-attention
+    work, and corrections to be reviewable together.
+
+    '
+  author: d1-trust-through-records
+- id: D1-6
+  statement: 'The call feed must include partial and failed calls such as hang-ups, no acceptable slot,
+    adapter conflicts, transfer failures, outages, and human-demanded handoffs, not only successful
+    bookings.
+
+    '
+  provenance:
+  - /home/ronitnath/dev/portfolio/products/rinity/flows/FLOWS-001-receptionist-replacement.md
+  - EV-020
+  stake: false
+  note: 'FLOWS-001 repeatedly requires honest states for no-outcome calls, conflicts, outages, and handoff
+    paths. EV-020 shows that no call feed exists today, so the product has not yet proven complete negative-case
+    auditability.
+
+    '
+  author: d1-trust-through-records
+- id: D2-1
+  statement: 'Rinity must not run RCDA''s or any other real office''s inbound line on the current default
+    audgent call-data posture because the first real business is the compliance trigger and the runtime
+    persists patient-side audio, transcript artifacts, realtime feedback logs, and call context for
+    completed calls.
+
+    '
+  provenance:
+  - EV-018
+  - EV-025
+  - /home/ronitnath/dev/isoastra/audgent/api/services/pipecat/event_handlers.py
+  - /home/ronitnath/dev/isoastra/audgent/api/services/workflow_run_artifacts.py
+  - /home/ronitnath/dev/isoastra/audgent/api/db/models.py
+  stake: true
+  note: 'The event handler saves realtime feedback events into workflow_runs.logs and uploads mixed,
+    user, and bot WAV buffers plus transcript text. WorkflowRunModel then keeps artifact paths, initial_context,
+    gathered_context, logs, annotations, usage, and cost in durable Postgres rows.
+
+    '
+  author: d2-phi-debt-minimizer
+- id: D2-2
+  statement: 'Pre-compliance demos and staging must admit only synthetic calls with no patient data,
+    which matches the existing T9 harness contract but must remain a hard boundary rather than a convenience
+    guideline.
+
+    '
+  provenance:
+  - EV-011
+  - /home/ronitnath/dev/isoastra/audgent/harness/README.md
+  - /home/ronitnath/dev/isoastra/audgent/harness/run_t9.py
+  stake: false
+  note: 'The harness README says it uses no PSTN or real telephony and that fixtures prohibit E.164
+    and patient data. run_t9.py stamps patient_audio false in the safe context.
+
+    '
+  author: d2-phi-debt-minimizer
+- id: D2-3
+  statement: 'Rinity must not point real dental workflows at the rinity test-fixture endpoints because
+    those endpoints accept caller_name, reason, payer, member_id, callback_number, and message fields
+    that become PHI-bearing once a patient supplies them.
+
+    '
+  provenance:
+  - EV-011
+  - /home/ronitnath/dev/isoastra/audgent/api/routes/rinity_test_fixtures.py
+  - /home/ronitnath/dev/isoastra/audgent/api/services/rinity_test_fixtures.py
+  stake: false
+  note: 'The fixture service echoes booking, reschedule, eligibility, and message fields into deterministic
+    responses. If a live workflow used them, the ordinary run logs, contexts, and webhook machinery
+    would retain those fields as compliance debt.
+
+    '
+  author: d2-phi-debt-minimizer
+- id: D2-4
+  statement: 'The compliance cutover must classify Postgres as PHI-bearing even when raw audio lives
+    in object storage because run readback exposes initial_context, gathered_context, logs, annotations,
+    and artifact URLs directly from workflow_runs.
+
+    '
+  provenance:
+  - /home/ronitnath/dev/isoastra/audgent/api/routes/workflow.py
+  - /home/ronitnath/dev/isoastra/audgent/api/db/models.py
+  - /home/ronitnath/dev/isoastra/audgent/docs/core-concepts/context-and-variables.mdx
+  stake: false
+  note: 'The context docs say initial_context can contain contact, appointment, and account details
+    and gathered_context is returned on the run record alongside recording_url and transcript_url. The
+    workflow route returns those contexts, logs, annotations, and public artifact URLs on run detail.
+
+    '
+  author: d2-phi-debt-minimizer
+- id: D2-5
+  statement: 'Public artifact tokens must not be enabled for live dental calls until they have expiry
+    and revocation or are replaced by authenticated artifact access because audgent persists a UUID
+    on workflow_runs and accepts it unauthenticated to mint one-hour storage URLs.
+
+    '
+  provenance:
+  - /home/ronitnath/dev/isoastra/audgent/api/db/workflow_run_client.py
+  - /home/ronitnath/dev/isoastra/audgent/api/routes/public_download.py
+  - /home/ronitnath/dev/isoastra/audgent/api/db/models.py
+  stake: false
+  note: 'ensure_public_access_token returns the existing token forever once stored. public_download
+    only needs that token and artifact type before redirecting to a signed object-store URL.
+
+    '
+  author: d2-phi-debt-minimizer
+- id: D2-6
+  statement: 'Post-call QA, integration export, and webhook delivery must default off for live patient
+    calls until the compliance posture exists because they copy transcript-derived content and artifact
+    URLs into LLM requests, annotations, and durable webhook_deliveries rows.
+
+    '
+  provenance:
+  - /home/ronitnath/dev/isoastra/audgent/api/services/workflow/qa/analysis.py
+  - /home/ronitnath/dev/isoastra/audgent/api/tasks/run_integrations.py
+  - /home/ronitnath/dev/isoastra/audgent/api/db/models.py
+  stake: false
+  note: 'QA analysis sends formatted transcripts to an LLM and stores raw_response-derived results in
+    annotations. Webhook delivery freezes rendered payloads for retry, so every enabled integration
+    creates another retention and deletion target.
+
+    '
+  author: d2-phi-debt-minimizer
+- id: D2-7
+  statement: 'Rinity must not retain patient utterance audio or transcripts for billing because EV-024
+    fixes per-office pricing and audgent already stores usage_info and cost_info separately from recording_url
+    and transcript_url.
+
+    '
+  provenance:
+  - EV-024
+  - /home/ronitnath/dev/isoastra/audgent/api/db/models.py
+  - /home/ronitnath/dev/isoastra/audgent/api/services/pipecat/event_handlers.py
+  stake: false
+  note: 'Usage metering can remain an operations field without preserving utterance content. The model
+    separates usage_info and cost_info from artifact paths, so pricing does not justify keeping the
+    heavier PHI objects.
+
+    '
+  author: d2-phi-debt-minimizer
+- id: D2-8
+  statement: 'The compliant cutover must gate vendor egress before patient calls because the hardening
+    contract explicitly accepts model, telephony, webhook, and private object-store endpoints sending
+    customer data while recording the outbound allowlist as unresolved release evidence.
+
+    '
+  provenance:
+  - /home/ronitnath/dev/isoastra/audgent/deploy/isoastra/HARDENING.md
+  stake: false
+  note: 'HARDENING removes product telemetry and anonymous MinIO, but it still treats core engine vendors
+    as places customer data leaves the engine. That means vendor BAA and egress allowlist choices must
+    be made before any stored patient utterance can exist under the real-business posture.
+
+    '
+  author: d2-phi-debt-minimizer
+synthesis:
+- id: J-1
+  author: synthesis
+  statement: 'The rinity-audgent seam is a rinity-authored, engine-held office ledger: rinity distributes
+    availability, config, and engine artifacts ahead of calls; the engine commits bookings locally against
+    that ledger mid-call with no cross-service round-trip; every commit reconciles through rinity''s
+    PMS-adapter boundary after (or asynchronously during) the call; rinity alone holds PMS credentials;
+    reconcile conflicts surface as explicit F-4 queue items.'
+  provenance:
+  - B1-2
+  - B2-1
+  - B2-6
+  - B2-3
+  - EV-015
+  - EV-010
+  - EV-011
+  supports: []
+  rebuts: []
+  resolution: resolved
+  note: 'Given up knowingly: strict synchronous single-writer consistency (B1''s purest form) and engine
+    self-sufficiency without rinity-defined state (B2''s purest form). Reopened if the double-booking
+    window between local commit and reconcile produces a material conflict rate.'
+- id: J-2
+  author: synthesis
+  statement: Real patient calls begin only inside the compliant posture (EV-018's trigger is RCDA itself,
+    EV-025); until then every call is synthetic under the T9 boundary; once live, call review is full-fidelity
+    (recording, verbatim transcript, committed actions) as rinity-owned records with retention set at
+    the data gate; D2's concrete engine gaps (non-expiring public artifact tokens, default-on QA/webhooks/integrations,
+    fixture endpoints reachable by live workflows) are named pre-cutover packet work.
+  provenance:
+  - D1-1
+  - D2-1
+  - D2-2
+  - D2-5
+  - D2-6
+  - D2-3
+  - EV-018
+  - EV-025
+  supports:
+  - B1-1
+  rebuts: []
+  resolution: resolved
+  note: 'Given up knowingly: any ''learn from real traffic before the posture exists'' path — priced
+    as not worth the migration/deletion debt (D2) nor the trust risk (D1).'
+- id: J-3
+  author: synthesis
+  statement: The customer door is a dedicated branded commercial identity realm (id.rinity.com per identity-realms
+    doctrine) reached from rinity.com with zero foreign vocabulary; no product-local auth; internal
+    staff enter via restricted federation; a browser test call is available before billing.
+  provenance:
+  - C1-1
+  - C1-2
+  - C2-1
+  - C2-4
+  - EV-016
+  - EV-022
+  supports: []
+  rebuts: []
+  resolution: resolved
+  note: Convergent axis — effectively a pre-made decision surfaced by the round; owner ratification
+    turns this into a DEC record.
+- id: J-4
+  author: synthesis
+  statement: 'Tier 1 is: inbound scheduling end-to-end (answer, identify, book, reschedule, cancel,
+    escalate, land the outcome in review), practice questions from configured facts with verbatim capture
+    and promised follow-up for the rest, urgent-call recognition routed per office policy, a complete
+    call feed including failed and partial calls, one productized line-connection path with instant
+    rollback, and a correction surface that meets EV-026''s human bar; explicitly out of tier 1: outbound
+    (EV-023), live eligibility, per-prospect bespoke PMS work (EV-022 gated), multi-vertical (EV-017).'
+  provenance:
+  - A1-1
+  - A2-1
+  - A2-5
+  - A2-6
+  - A2-8
+  - A1-6
+  - A2-7
+  - D1-6
+  - EV-013
+  - EV-021
+  - EV-023
+  - EV-026
+  supports: []
+  rebuts: []
+  resolution: resolved
+  note: 'Given up knowingly: A1''s leaner scheduling-only cut — rejected because the named buyer objections
+    (urgent mishandling, insurance stonewalling, untrustworthy correction tools) each lose the high-end
+    sale A1 itself requires (EV-024).'
+collisions:
+- rebuts:
+  - B2-1
+  - B1-2
+  also:
+  - B2-6
+  collision: COL-1
+  resolution: resolved
+  note: 'Resolved by J-1: rinity-authored, engine-held office ledger. B1 keeps sole PMS credential custody
+    and durable ownership; B2 keeps a zero-round-trip mid-call commit. Neither forbidden move is made.'
+- rebuts:
+  - D2-1
+  - D1-1
+  collision: COL-2
+  resolution: resolved
+  note: 'Resolved by J-2: there is no pre-compliance real-call phase at all, so ''full fidelity from
+    day one'' and ''minimum PHI before the posture exists'' are both satisfied — day one of real calls
+    is by definition inside the compliant posture.'
+- rebuts:
+  - A2-5
+  - A1-3
+  collision: COL-3
+  resolution: resolved
+  note: 'Resolved by J-4: tier 1 answers from configured practice facts and captures plan details verbatim
+    with a promised follow-up; live eligibility checking stays out (a gated integration, EV-022). A2''s
+    caller is never stonewalled; A1''s cut stays buildable.'
+- rebuts: []
+  collision: C-AXIS-CONVERGENT
+  resolution: resolved
+  note: 'C1 and C2 converged: a dedicated branded realm (id.rinity.com per the identity-realms doctrine)
+    satisfies the eleven-minute door because the brand never changes. Per debate-heuristics step 3,
+    convergence means this decision was effectively already made by doctrine + EV-016; recorded for
+    the owner as a decision candidate (J-3), honestly flagged rather than dressed as a debate outcome.'
+escalations:
+- id: E-1
+  resolution: escalated
+  statement: 'Sequencing of RCDA go-live prerequisites: C1-6 (full id.rinity.com realm evidence: branding,
+    backups, restore drills, federation audit) and J-2 (compliant posture) together gate any real call,
+    while A1-1 presses for first revenue soon. May RCDA go live behind an interim internal door and/or
+    a staged subset of realm/compliance evidence given its friendly status (EV-005), or are the branded
+    realm and full posture hard pre-cutover gates even for RCDA?'
+  note: Blocking (sequences the in-bet cutover, EV-025) and undecidable by agents (doctrine exception
+    + risk appetite are owner authority). Batched as the round's single escalation.

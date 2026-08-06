@@ -1,0 +1,70 @@
+lens: c2-frictionless-door
+claims:
+  - id: C2_FRICTIONLESS_DOOR-1
+    statement: >
+      Tier 1 must fail the bet unless an owner can arrive from rinity.com, create their practice, and land in agent configuration without learning Kanidm, OIDC, member admission, organization, or Audgent vocabulary.
+    provenance:
+      - EV-016
+      - EV-010/RF-02
+      - EV-015
+      - /home/ronitnath/dev/portfolio/products/rinity/flows/FLOWS-001-receptionist-replacement.md
+    stake: true
+    note: >
+      EV-016 requires self-serve while EV-010/RF-02 says the current door is exact member admission through Kanidm OIDC. FLOWS-001 F-8 names the needed outcome as the owner reaching their own console configuring the agent.
+  - id: C2_FRICTIONLESS_DOOR-2
+    statement: >
+      The current customer door is unusable for the lunch-lead owner because /signup 404s and the signed-out page only offers sign in behind allowlisted OIDC.
+    provenance:
+      - EV-020
+      - EV-010/RF-02
+    stake: false
+    note: >
+      EV-020 records that /signup 404s and that the signed-out page teaches a prospect nothing. EV-010/RF-02 records the allowlisted OIDC admission path.
+  - id: C2_FRICTIONLESS_DOOR-3
+    statement: >
+      Signup must take the owner directly into practice setup with locked integrations visible but nonblocking, not into a sales-call request or PMS credential hunt.
+    provenance:
+      - EV-022
+      - /home/ronitnath/dev/portfolio/products/rinity/flows/FLOWS-001-receptionist-replacement.md
+      - /home/ronitnath/dev/portfolio/products/rinity/briefs/BRIEF-001-receptionist-replacement.md
+    stake: false
+    note: >
+      EV-022 says integrations are gated while most of the product remains self-serve or first-class sales-call onboarded. FLOWS-001 F-8 requires rinity-native scheduling to be available immediately with PMS integration visibly locked.
+  - id: C2_FRICTIONLESS_DOOR-4
+    statement: >
+      The first-run console must include a browser test call before phone-line connection or billing so the owner can hear the agent act as their practice inside the eleven-minute trial.
+    provenance:
+      - EV-011/AC-02
+      - /home/ronitnath/dev/portfolio/products/rinity/flows/FLOWS-001-receptionist-replacement.md
+      - /home/ronitnath/dev/portfolio/products/rinity/briefs/BRIEF-001-receptionist-replacement.md
+    stake: false
+    note: >
+      EV-011/AC-02 says browser voice calls over raw PCM WebSockets exist. FLOWS-001 F-7 names preview and test as part of owner configuration, while F-8 puts billing before or at go-live rather than before proof of value.
+  - id: C2_FRICTIONLESS_DOOR-5
+    statement: >
+      Pricing on the front door must be a clear per-office premium offer before identity capture, because a hidden price or usage-meter choice turns the first eleven minutes into sales-process anxiety.
+    provenance:
+      - EV-024
+      - /home/ronitnath/dev/portfolio/products/rinity/flows/FLOWS-001-receptionist-replacement.md
+      - inference
+    stake: false
+    note: >
+      EV-024 sets per-office flat pricing and a high-end target. FLOWS-001 F-8 requires the front door to say what rinity costs per office.
+  - id: C2_FRICTIONLESS_DOOR-6
+    statement: >
+      No signup screen, redirect, email, or console label may expose Audgent or any different product name to the customer.
+    provenance:
+      - EV-015
+      - /home/ronitnath/dev/portfolio/products/rinity/flows/FLOWS-001-receptionist-replacement.md
+    stake: false
+    note: >
+      EV-015 says Audgent is pure internal and rinity is external. FLOWS-001 states Audgent is invisible in every flow.
+  - id: C2_FRICTIONLESS_DOOR-7
+    statement: >
+      The configured console is not sale-ready until New Visit, today navigation, and drag-and-drop behave reliably under human mouse and keyboard use during onboarding.
+    provenance:
+      - EV-026
+      - EV-024
+    stake: false
+    note: >
+      EV-026 says the current calendar fails the human expectation bar on New Visit, T navigation, and drag-and-drop confidence. EV-024 makes premium experience part of the high-end sale.

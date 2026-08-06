@@ -1,0 +1,82 @@
+lens: a1-first-dollar
+claims:
+  - id: A1_FIRST_DOLLAR-1
+    statement: >
+      The first sellable tier must handle inbound scheduling calls end to end by answering the live line, identifying caller and intent, booking, rescheduling, or cancelling a dental visit, escalating to staff when it cannot safely complete, and showing the call outcome in rinity, because a high-end office will reject flat per-office pricing if staff still has to answer revenue calls or reconcile what the agent did.
+    provenance:
+      - EV-013
+      - EV-021
+      - EV-023
+      - EV-024
+      - EV-020
+    stake: true
+    note: >
+      This is the smallest non-toy replacement cut because it covers inbound only and scheduling only. The sale-losing objection is concrete. The buyer is not paying premium office pricing for a voice agent that does not carry the revenue call and leave staff with a trustworthy result.
+  - id: A1_FIRST_DOLLAR-2
+    statement: >
+      Rinity currently gets the first-dollar bet wrong because the customer-visible product is a schedule desk with no voice surface, no signup, no onboarding, no billing, no calls, and no front door that lets a stranger practice buy, connect a line, or hear a patient call handled.
+    provenance:
+      - EV-020
+      - EV-015
+      - EV-016
+      - EV-019
+    stake: false
+    note: >
+      Audgent has telephony and call machinery, but EV-015 makes audgent internal and EV-020 says rinity does not project any of it outward. A stranger cannot become cash flow from a product whose only visible authenticated value is human-operated calendar work.
+  - id: A1_FIRST_DOLLAR-3
+    statement: >
+      Tier 1 must not include outbound confirmations, recall, campaigns, live eligibility checking, or multi-vertical healthcare behavior, because those do not answer the concrete first-buyer objection that inbound patient calls are still not covered.
+    provenance:
+      - EV-023
+      - EV-017
+      - EV-022
+      - EV-011/AC-10
+    stake: false
+    note: >
+      EV-023 explicitly moves outbound after tier 1 and EV-017 defers vertical breadth. Gated integrations can be sold later after inbound scheduling coverage proves the office can stop losing or manually handling calls.
+  - id: A1_FIRST_DOLLAR-4
+    statement: >
+      Tier 1 must expose practice-controlled agent policy and after-call review in rinity before taking live calls, because a high-end buyer will object that an opaque agent could mishandle tone, fees, clinical boundaries, or exceptions under the practice name.
+    provenance:
+      - EV-002
+      - EV-015
+      - EV-011/AC-08
+      - EV-011/AC-12
+      - EV-020
+    stake: false
+    note: >
+      EV-002 makes owner philosophy control part of the offer, and audgent already has workflow and observability primitives. The missing product work is surfacing enough of that control and audit trail through rinity that a practice can trust the agent on its phone line.
+  - id: A1_FIRST_DOLLAR-5
+    statement: >
+      Self-serve for the first dollar may be a sales-call onboarding path with gated integrations, but rinity must still expose office setup, line connection status, and flat per-office purchase state rather than relying on deploy-time allowlists and raw admin APIs.
+    provenance:
+      - EV-016
+      - EV-022
+      - EV-024
+      - EV-010/RF-02
+      - EV-010/RF-04
+    stake: false
+    note: >
+      EV-022 permits manual onboarding and gated integrations, so anonymous swipe-card signup is not the first-dollar blocker. The blocker is that the current exact allowlist door and JSON-only seeding path leave no buyer-visible way to know what is connected or what is being bought.
+  - id: A1_FIRST_DOLLAR-6
+    statement: >
+      The calendar can remain narrow, but the scheduling actions the agent performs must be human-usable for staff verification, correction, and undo before RCDA or a stranger office is cut over.
+    provenance:
+      - EV-026
+      - EV-024
+      - EV-025
+      - EV-020
+    stake: false
+    note: >
+      EV-026 says the one existing screen fails human expectations, which directly threatens premium per-office positioning. The buyer objection is that staff cannot safely trust or repair the agent's scheduling work.
+  - id: A1_FIRST_DOLLAR-7
+    statement: >
+      The first sale must not depend on a bespoke live PMS integration for every prospect, because EV-022 says integrations are gated and the minimum sellable proof is that inbound calls become actionable booked or escalated outcomes in the office workflow.
+    provenance:
+      - EV-022
+      - EV-010/RF-06
+      - EV-010/RF-16
+      - EV-020
+    stake: false
+    note: >
+      Existing adapter work is useful where available, but the tier boundary should survive a sales-call onboarding path without making each new office a custom integration project. The sale-losing objection to avoid is a demo that handles speech but cannot leave the office with a reliable next action.

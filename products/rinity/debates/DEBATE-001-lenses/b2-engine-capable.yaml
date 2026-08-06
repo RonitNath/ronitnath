@@ -1,0 +1,66 @@
+lens: b2-engine-capable
+claims:
+  - id: B2_ENGINE_CAPABLE-1
+    statement: >
+      A production rinity inbound call must commit appointment booking, reschedule, cancel, and confirmation writes inside the audgent engine runtime without calling the rinity control-plane service or routing the action through a generic HTTP or MCP tool.
+    provenance:
+      - EV-013
+      - EV-010/RF-06
+      - EV-010/RF-11
+      - EV-011/AC-09
+      - /home/ronitnath/dev/isoastra/audgent/api/services/workflow/tools/custom_tool.py
+    stake: true
+    note: >
+      The current control plane owns the PMS adapter client and booking endpoint, while Audgent's production integration seam is generic live tool calling plus fixtures. That seam inserts another service into the caller's wait loop, which is the bet-losing failure mode for live reception.
+  - id: B2_ENGINE_CAPABLE-2
+    statement: >
+      Audgent's current rinity-specific scheduling implementation is not capable of real receptionist booking because `/api/v1/test-fixtures/rinity/book` returns a deterministic confirmation from stateless fixture code rather than persisting an appointment or enforcing availability.
+    provenance:
+      - /home/ronitnath/dev/isoastra/audgent/api/routes/rinity_test_fixtures.py
+      - /home/ronitnath/dev/isoastra/audgent/api/services/rinity_test_fixtures.py
+      - EV-011/AC-09
+      - EV-013
+    stake: false
+    note: >
+      The fixture always answers with status confirmed and confirmation RIN-6201. That is useful for acceptance calls, not for preventing duplicate or impossible dental appointments.
+  - id: B2_ENGINE_CAPABLE-3
+    statement: >
+      The existing Audgent HTTP tool path must not be used for any caller-awaited scheduling action because it awaits an external `httpx` request before returning the function result, with a default timeout of five seconds.
+    provenance:
+      - /home/ronitnath/dev/isoastra/audgent/api/services/workflow/tools/custom_tool.py
+      - /home/ronitnath/dev/isoastra/audgent/api/services/workflow/pipecat_engine_custom_tools.py
+    stake: false
+    note: >
+      Five seconds is an eternity during a negotiated appointment slot. Playing a custom message before the request does not make the booking path local or resilient.
+  - id: B2_ENGINE_CAPABLE-4
+    statement: >
+      Audgent's immutable engine contract is currently insufficient as the rinity call seam because destination bindings are publishable and resolvable in storage but no inbound call-routing path consumes `ArtifactStore.resolve` to choose the live workflow and office overlay.
+    provenance:
+      - /home/ronitnath/dev/isoastra/audgent/api/routes/engine_contract.py
+      - /home/ronitnath/dev/isoastra/audgent/api/services/engine_contract/artifacts.py
+      - EV-011/AC-14
+    stake: false
+    note: >
+      The artifact store has the right offline-deployment smell, but the telephony path still routes through workflow and phone-number rows rather than an artifact destination binding. The seam is not done until a phone line can run from an already-admitted local artifact while the control plane is unavailable.
+  - id: B2_ENGINE_CAPABLE-5
+    statement: >
+      Pre-call data fetch may only be optional enrichment for rinity, not a required source for patient, office, slot, or policy state, because Audgent waits under ringback for an external HTTP response and proceeds with empty context on timeout or failure.
+    provenance:
+      - /home/ronitnath/dev/isoastra/audgent/docs/voice-agent/pre-call-data-fetch.mdx
+      - /home/ronitnath/dev/isoastra/audgent/api/services/pipecat/pre_call_fetch.py
+      - /home/ronitnath/dev/isoastra/audgent/api/services/pipecat/event_handlers.py
+    stake: false
+    note: >
+      Ringback is less bad than silence, but it is still a caller-visible dependency on another service. Core reception state must already be inside the engine runtime before the phone rings.
+  - id: B2_ENGINE_CAPABLE-6
+    statement: >
+      Because rinity is priced per higher-end office and integrations are gated, the engine must provide a local office schedule ledger that can confirm appointments before PMS sync is connected or healthy.
+    provenance:
+      - EV-022
+      - EV-024
+      - EV-010/RF-11
+      - EV-010
+      - inference
+    stake: false
+    note: >
+      The product cannot sell premium live reception if the first scheduling call becomes a control-plane or PMS-integration demo. PMS sync can reconcile after the engine-local booking commit, but the caller must leave with a real confirmation.

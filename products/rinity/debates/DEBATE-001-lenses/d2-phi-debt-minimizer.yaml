@@ -1,0 +1,82 @@
+lens: d2-phi-debt-minimizer
+claims:
+  - id: D2_PHI_DEBT_MINIMIZER-1
+    statement: >
+      Rinity must not run RCDA's or any other real office's inbound line on the current default audgent call-data posture because the first real business is the compliance trigger and the runtime persists patient-side audio, transcript artifacts, realtime feedback logs, and call context for completed calls.
+    provenance:
+      - EV-018
+      - EV-025
+      - /home/ronitnath/dev/isoastra/audgent/api/services/pipecat/event_handlers.py
+      - /home/ronitnath/dev/isoastra/audgent/api/services/workflow_run_artifacts.py
+      - /home/ronitnath/dev/isoastra/audgent/api/db/models.py
+    stake: true
+    note: >
+      The event handler saves realtime feedback events into workflow_runs.logs and uploads mixed, user, and bot WAV buffers plus transcript text. WorkflowRunModel then keeps artifact paths, initial_context, gathered_context, logs, annotations, usage, and cost in durable Postgres rows.
+  - id: D2_PHI_DEBT_MINIMIZER-2
+    statement: >
+      Pre-compliance demos and staging must admit only synthetic calls with no patient data, which matches the existing T9 harness contract but must remain a hard boundary rather than a convenience guideline.
+    provenance:
+      - EV-011
+      - /home/ronitnath/dev/isoastra/audgent/harness/README.md
+      - /home/ronitnath/dev/isoastra/audgent/harness/run_t9.py
+    stake: false
+    note: >
+      The harness README says it uses no PSTN or real telephony and that fixtures prohibit E.164 and patient data. run_t9.py stamps patient_audio false in the safe context.
+  - id: D2_PHI_DEBT_MINIMIZER-3
+    statement: >
+      Rinity must not point real dental workflows at the rinity test-fixture endpoints because those endpoints accept caller_name, reason, payer, member_id, callback_number, and message fields that become PHI-bearing once a patient supplies them.
+    provenance:
+      - EV-011
+      - /home/ronitnath/dev/isoastra/audgent/api/routes/rinity_test_fixtures.py
+      - /home/ronitnath/dev/isoastra/audgent/api/services/rinity_test_fixtures.py
+    stake: false
+    note: >
+      The fixture service echoes booking, reschedule, eligibility, and message fields into deterministic responses. If a live workflow used them, the ordinary run logs, contexts, and webhook machinery would retain those fields as compliance debt.
+  - id: D2_PHI_DEBT_MINIMIZER-4
+    statement: >
+      The compliance cutover must classify Postgres as PHI-bearing even when raw audio lives in object storage because run readback exposes initial_context, gathered_context, logs, annotations, and artifact URLs directly from workflow_runs.
+    provenance:
+      - /home/ronitnath/dev/isoastra/audgent/api/routes/workflow.py
+      - /home/ronitnath/dev/isoastra/audgent/api/db/models.py
+      - /home/ronitnath/dev/isoastra/audgent/docs/core-concepts/context-and-variables.mdx
+    stake: false
+    note: >
+      The context docs say initial_context can contain contact, appointment, and account details and gathered_context is returned on the run record alongside recording_url and transcript_url. The workflow route returns those contexts, logs, annotations, and public artifact URLs on run detail.
+  - id: D2_PHI_DEBT_MINIMIZER-5
+    statement: >
+      Public artifact tokens must not be enabled for live dental calls until they have expiry and revocation or are replaced by authenticated artifact access because audgent persists a UUID on workflow_runs and accepts it unauthenticated to mint one-hour storage URLs.
+    provenance:
+      - /home/ronitnath/dev/isoastra/audgent/api/db/workflow_run_client.py
+      - /home/ronitnath/dev/isoastra/audgent/api/routes/public_download.py
+      - /home/ronitnath/dev/isoastra/audgent/api/db/models.py
+    stake: false
+    note: >
+      ensure_public_access_token returns the existing token forever once stored. public_download only needs that token and artifact type before redirecting to a signed object-store URL.
+  - id: D2_PHI_DEBT_MINIMIZER-6
+    statement: >
+      Post-call QA, integration export, and webhook delivery must default off for live patient calls until the compliance posture exists because they copy transcript-derived content and artifact URLs into LLM requests, annotations, and durable webhook_deliveries rows.
+    provenance:
+      - /home/ronitnath/dev/isoastra/audgent/api/services/workflow/qa/analysis.py
+      - /home/ronitnath/dev/isoastra/audgent/api/tasks/run_integrations.py
+      - /home/ronitnath/dev/isoastra/audgent/api/db/models.py
+    stake: false
+    note: >
+      QA analysis sends formatted transcripts to an LLM and stores raw_response-derived results in annotations. Webhook delivery freezes rendered payloads for retry, so every enabled integration creates another retention and deletion target.
+  - id: D2_PHI_DEBT_MINIMIZER-7
+    statement: >
+      Rinity must not retain patient utterance audio or transcripts for billing because EV-024 fixes per-office pricing and audgent already stores usage_info and cost_info separately from recording_url and transcript_url.
+    provenance:
+      - EV-024
+      - /home/ronitnath/dev/isoastra/audgent/api/db/models.py
+      - /home/ronitnath/dev/isoastra/audgent/api/services/pipecat/event_handlers.py
+    stake: false
+    note: >
+      Usage metering can remain an operations field without preserving utterance content. The model separates usage_info and cost_info from artifact paths, so pricing does not justify keeping the heavier PHI objects.
+  - id: D2_PHI_DEBT_MINIMIZER-8
+    statement: >
+      The compliant cutover must gate vendor egress before patient calls because the hardening contract explicitly accepts model, telephony, webhook, and private object-store endpoints sending customer data while recording the outbound allowlist as unresolved release evidence.
+    provenance:
+      - /home/ronitnath/dev/isoastra/audgent/deploy/isoastra/HARDENING.md
+    stake: false
+    note: >
+      HARDENING removes product telemetry and anonymous MinIO, but it still treats core engine vendors as places customer data leaves the engine. That means vendor BAA and egress allowlist choices must be made before any stored patient utterance can exist under the real-business posture.

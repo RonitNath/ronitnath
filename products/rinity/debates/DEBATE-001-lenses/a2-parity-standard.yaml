@@ -1,0 +1,77 @@
+lens: a2-parity-standard
+claims:
+  - id: A2_PARITY_STANDARD-1
+    statement: >
+      Tier 1 must let the practice turn off live phone staffing during business hours only if each normal Tuesday inbound call either completes through F-1, F-2, or F-3 in the call or receives an explicit patient-acceptable fallback through F-5 without synchronous human review.
+    provenance:
+      - EV-013
+      - /home/ronitnath/dev/portfolio/products/rinity/flows/FLOWS-001-receptionist-replacement.md
+      - inference
+    stake: true
+    note: >
+      This is the receptionist replacement standard, not an overflow standard. A queue the office checks later can be acceptable only when the caller was told a clear next step and no one had to shadow the call live.
+  - id: A2_PARITY_STANDARD-2
+    statement: >
+      FLOWS-001 is not Monday-cutover ready because its open items leave the agent without finalized rules for visit-type matching, provider choice, cancellation policy, insurance answers, transfer mechanics, and productized telephony paths.
+    provenance:
+      - /home/ronitnath/dev/portfolio/products/rinity/flows/FLOWS-001-receptionist-replacement.md
+    stake: false
+    note: >
+      Those are not polish questions from an office manager seat. They are the daily judgment calls a receptionist makes while the caller is waiting on the phone.
+  - id: A2_PARITY_STANDARD-3
+    statement: >
+      F-4 must be treated as a launch-blocking coverage flow because without an all-calls feed containing transcripts, recordings, outcomes, and appointment links the staff cannot recover when a patient says they called earlier.
+    provenance:
+      - EV-020
+      - /home/ronitnath/dev/portfolio/products/rinity/flows/FLOWS-001-receptionist-replacement.md
+    stake: false
+    note: >
+      EV-020 says the current customer surface has no calls, transcripts, recordings, agent configuration, or phone numbers. FLOWS-001 correctly names the feed, but parity requires it to cover every answered, abandoned, transferred, failed, and message-only call.
+  - id: A2_PARITY_STANDARD-4
+    statement: >
+      Every message-only fallback in F-1, F-3, and F-5 must tell the caller when and how the practice will respond and must create a visible same-day queue item, or the flow is only voicemail with a nicer voice.
+    provenance:
+      - /home/ronitnath/dev/portfolio/products/rinity/flows/FLOWS-001-receptionist-replacement.md
+      - inference
+    stake: false
+    note: >
+      The proposed flows often land hard cases in a message path. That can be acceptable on a busy Tuesday only if the patient hears a concrete promise the practice can keep.
+  - id: A2_PARITY_STANDARD-5
+    statement: >
+      Tier 1 must handle inbound insurance and cost-adjacent questions by answering from configured practice facts or capturing the exact plan and promised follow-up, not by limiting coverage to an accept or do-not-accept list.
+    provenance:
+      - EV-013
+      - /home/ronitnath/dev/portfolio/products/rinity/flows/FLOWS-001-receptionist-replacement.md
+      - inference
+    stake: false
+    note: >
+      EV-013 includes insurance questions in the receptionist duty surface. FLOWS-001 flags insurance as high-stakes and asks whether tier 1 is only lists, which is too narrow for normal inbound dental calls.
+  - id: A2_PARITY_STANDARD-6
+    statement: >
+      Tier 1 must recognize urgent dental calls such as severe pain, swelling, trauma, bleeding, or post-procedure complications and route them to booking, a practice-approved urgent script, or human handoff per office policy before it can replace an 8am to 5pm receptionist.
+    provenance:
+      - EV-013
+      - /home/ronitnath/dev/portfolio/products/rinity/flows/FLOWS-001-receptionist-replacement.md
+      - inference
+    stake: false
+    note: >
+      FLOWS-001 mentions emergency indicators and an urgent-case script, but the parity bar requires concrete detection and routing. A high-end practice cannot have the phone agent treat urgent pain like an ordinary FAQ miss.
+  - id: A2_PARITY_STANDARD-7
+    statement: >
+      F-6 currently fails the parity bar because EV-026 says the calendar's new visit, Today shortcut, and drag-and-drop behavior do not work as a human expects, so the office cannot reliably correct agent actions or handle walk-ins after the phones go unstaffed.
+    provenance:
+      - EV-026
+      - /home/ronitnath/dev/portfolio/products/rinity/flows/FLOWS-001-receptionist-replacement.md
+    stake: false
+    note: >
+      The only existing screen is not finished enough for the human side of replacement. If the agent books wrong or a walk-in needs to be added, the practice needs the correction tool to be boringly reliable.
+  - id: A2_PARITY_STANDARD-8
+    statement: >
+      Tier 1 must select and prove one offered phone-line connection and rollback path for the office rather than relying on the engine's provider list, because missed or dead-air inbound calls are unacceptable during a Monday business-hours cutover.
+    provenance:
+      - EV-011
+      - EV-025
+      - /home/ronitnath/dev/portfolio/products/rinity/flows/FLOWS-001-receptionist-replacement.md
+    stake: false
+    note: >
+      Audgent has broad telephony capability and RCDA is expected to use this product. From the office manager seat, the only thing that matters on Monday is that the chosen cutover path works and can be reversed immediately.
