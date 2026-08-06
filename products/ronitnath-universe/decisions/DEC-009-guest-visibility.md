@@ -29,3 +29,18 @@ actually for. There is no forwarded *case*, because there is nothing to branch o
 
 Everything else in DEC-009 stands unchanged: no guest disclosure surface, no correction or deletion
 route, and link opens continue to be recorded.
+
+## Amendment, 2026-08-06 (EV-029, DEC-014) — an "open" is not a GET
+
+"Link opens are recorded" stands. **What counts as an open does not.** The owner shares links by
+iMessage and Instagram, both of which fetch the URL server-side to build a preview — so `uses`,
+incremented on every capability GET, counts crawlers as people and would show eleven opens for one
+share.
+
+Split into `fetch_count` (every GET, diagnostic and anti-bot only) and `open_count` (confirmed from
+the client, which a preview fetcher cannot fake because it does not run JavaScript). Every
+owner-facing surface shows the second. See DEC-014.
+
+This does not soften the ruling above — a confirmed open is a *stronger* behavioural record than the
+one the guest-dignity lens objected to, and it is still undisclosed. It is more honest, not more
+private.
