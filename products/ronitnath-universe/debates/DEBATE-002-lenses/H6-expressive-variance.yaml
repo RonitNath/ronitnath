@@ -1,0 +1,96 @@
+claims:
+  - id: H6-expressive-variance-1
+    statement: >
+      F-4 cannot deliver an event-specific behavior that needs persistence or commands beyond the fixed RSVP model, because it only permits editing composition or registering a component before shipping.
+    author: H6-expressive-variance
+    provenance: [EV-013, FLOWS-001-event-platform.md, "/tmp/h6-events/migrations/0020_segment_paid_attended.up.sql", "/tmp/h6-rn-events/src/routes/admin/images.rs"]
+    supports: []
+    rebuts: []
+    resolution: unresolved
+    note: >
+      This is the fourth-rebuild trap I would stake the bet on: July 4th required paid and attended state plus Telegram commands, while B24 required image storage and processing, none of which is a page-module prop. Add an OWNER-via-AGENT journey called "extend event behavior" covering schema/API/command authoring, migration, backfill, deploy, and live verification. The model needs event_feature_definition(event_id, feature_key, schema_version, record_schema, command_contract) and event_feature_record(event_id, feature_key, subject_kind, subject_id, record_key, revision, payload), with the latter uniquely keyed by the first five columns; definitions become immutable when activated, incompatible changes create a new schema version with an explicit migration, and archive freezes records and code while preserving export. I would change my mind only after a fourth-event fixture adds a novel persisted workflow without changing a platform-owned attendance, schedule, or link table.
+    stake: true
+
+  - id: H6-expressive-variance-2
+    statement: >
+      F-6 is wrongly reduced to watching responses even though a genuinely per-event admin panel must let the OWNER execute event-specific operations such as marking payment, recording attendance, managing media, or changing a live plan.
+    author: H6-expressive-variance
+    provenance: [EV-013, EV-016, "/tmp/h6-events/templates/events/detail.html", "/tmp/h6-events/src/store/segment_rsvps.rs", "/tmp/h6-rn-events/frontend/src/components/admin/ImageManager.tsx"]
+    supports: []
+    rebuts: []
+    resolution: unresolved
+    note: >
+      A read-only bespoke arrangement over universal counts is cosmetic variance, not behavioral variance; the July 4th code exposes admin-set paid/attended flags and B24 has an ImageManager, ScheduleEditor, and ThemeEditor. Replace F-6 with "operate this event live," including custom reads, commands, optimistic/concurrent outcomes, audit, and phone-first recovery, while "watch responses" becomes one branch. The feature definition and command contract from claim 1 must authorize and audit these writes. I would change my mind if all event-specific admin actions in the three predecessors and the next real event can be executed through F-6 without adding an unmodelled side channel or canonical screen.
+    stake: false
+
+  - id: H6-expressive-variance-3
+    statement: >
+      F-7's mandatory status, party-size, note, and optional segment answers will force schema work when an event uses different participation semantics, because the three predecessors already used registration, named plus-ones, and an ongoing segmented status manager.
+    author: H6-expressive-variance
+    provenance: [EV-013, "/tmp/h6-socials/migrations/005_create_registrations.sql", "/tmp/h6-rn-events/migrations/20260320001_initial.sql", "/tmp/h6-events/src/handlers/event_public.rs"]
+    supports: []
+    rebuts: []
+    resolution: unresolved
+    note: >
+      The guest journey must be "interact with this invitation," not a universal RSVP form whose columns become permanent platform law. Require interaction_definition(id, event_release_id, key, component_key, payload_schema, visibility) and interaction_response(interaction_id, identity_id, revision, payload, submitted_at), unique on (interaction_id, identity_id); active definitions are immutable, edits fork a version, old payloads remain readable, and migration is explicit. A status/party-size RSVP is one authored definition, not the base model. I would change my mind if fixtures for Housewarming, B24, July 4th, and a deliberately non-RSVP event all round-trip through the same unmodified fixed response schema without semantic loss.
+    stake: false
+
+  - id: H6-expressive-variance-4
+    statement: >
+      F-3 cannot reliably generate a copy editor ordered "the way the page reads" for arbitrary event code unless each release declares typed, stable copy slots independently of module props.
+    author: H6-expressive-variance
+    provenance: [EV-018, FLOWS-001-event-platform.md, PITCH-001-event-platform.md]
+    supports: []
+    rebuts: []
+    resolution: unresolved
+    note: >
+      Bespoke pages can reuse a phrase, reveal it conditionally, place wording in custom admin tiles, or remove a component, so deriving a canonical form from visual module order will create missing and orphan rows. Require copy_slot(event_release_id, slot_key, surface, value_kind, constraints, editor_group, display_order, default_value) and copy_value(event_id, slot_key, revision, value), unique on (event_id, slot_key); release activation seeds defaults atomically, removal retires rather than deletes slots, and every write increments revision for SSE. I would change my mind if a custom component can add, validate, reorder, stream, retire, and restore copy without hand-editing the canonical copy page or its schema.
+    stake: false
+
+  - id: H6-expressive-variance-5
+    statement: >
+      F-2 can expose an event record that has no renderable code, or activate new code against incompatible old data, because no durable entity binds the database event to a deployed page, admin, and data-contract release.
+    author: H6-expressive-variance
+    provenance: [FLOWS-001-event-platform.md, DEC-005, PITCH-001-event-platform.md]
+    supports: []
+    rebuts: []
+    resolution: unresolved
+    note: >
+      The flow names the deploy seam but leaves publication as a UI toggle, so bespoke code and rows have no atomic compatibility boundary. Add event_release(id, event_id, code_ref, page_manifest_hash, admin_manifest_hash, data_schema_version, status) and event.active_release_id; deployments register available code_ref values, activation validates and seeds all release data in one transaction, only an active release may publish, rollback repoints active_release_id, and archived events retain their exact release indefinitely. I would change my mind if kill-the-process tests at every F-2 ordering point can never produce an index entry, preview, published page, or archived page whose bound code and data disagree.
+    stake: false
+
+  - id: H6-expressive-variance-6
+    statement: >
+      Deferring page variants makes F-5 and F-7 unable to express an event whose invite groups need different module order, content, or behavior, despite the owner's recorded requirement that audience can change composition.
+    author: H6-expressive-variance
+    provenance: [EV-014, EV-020, FLOWS-001-event-platform.md]
+    supports: []
+    rebuts: []
+    resolution: unresolved
+    note: >
+      EV-020 cuts the very variance EV-014 says the owner uses, so the next event needing family instructions, a dinner subgroup, or a co-host control will bypass the platform or trigger another rebuild. Preserve automatic minting while adding page_variant(id, event_id, variant_key, event_release_id, composition, visibility), invite_group(id, event_id, group_key, variant_id), and capability_link.variant_id; assignment is inherited from the invite group at mint time, survives renames and remints, and issued variants remain renderable through archive. I would change my mind only if the owner explicitly accepts identical event composition for every invite as a permanent product constraint rather than a scope cut.
+    stake: false
+
+  - id: H6-expressive-variance-7
+    statement: >
+      DEC-006's copy, RSVP, and identity SSE topics will make the first bespoke live tile poll or modify the transport unless custom event code can publish authorized, replayable event-defined changes.
+    author: H6-expressive-variance
+    provenance: [DEC-006, EV-016, "/tmp/h6-events/templates/events/detail.html"]
+    supports: []
+    rebuts: []
+    resolution: unresolved
+    note: >
+      SSE is suitable, but a closed topic list silently makes "per-event admin" mean static arrangement around three privileged data types. Require event_change(event_id, seq, topic, schema_version, audience, subject_kind, subject_id, payload, committed_at), unique on (event_id, seq), written transactionally with feature mutations; releases declare topic schemas and component subscriptions, authorization filters every replay, retention has a documented resync cutoff, and archive stops mutation without erasing replay/export. I would change my mind if a novel custom feature can update guest and owner components live, reconnect without gaps, and enforce tiers without editing PKT-13's platform transport code.
+    stake: false
+
+  - id: H6-expressive-variance-8
+    statement: >
+      The design contract forbids a page that changes spacing, radius, columns, navigation, or stylesheet architecture, so an event cannot reproduce the predecessor jump from neoclassical to starlight to fireworks while remaining conformant.
+    author: H6-expressive-variance
+    provenance: [EV-011, EV-013, "/Users/ronitnath/dev/personal/universe-ronitnath/docs/design.md", "/tmp/h6-socials/islands/src/styles.css", "/tmp/h6-rn-events/frontend/src/components/public/backgrounds/Starfield.tsx", "/tmp/h6-events/templates/_sky.html"]
+    supports: []
+    rebuts: []
+    resolution: unresolved
+    note: >
+      Per-event identity-as-code needs an event-owned, root-scoped CSS/assets/font/client entrypoint and may optionally consume platform primitives; mandatory hallmark tokens for per-event admin and the poster-theming ban on parallel stylesheets make the common vocabulary a ceiling. Bind only security, capability filtering, semantic HTML, contrast, focus, reduced motion, and touch-target floors across event surfaces. Followed absolutely, my mandate would damage the product if it also bespokeified sign-in, the longitudinal people directory, or token mechanics: those cross-event surfaces need canonical continuity, while event pages and event admin behavior do not. I would change my mind if an event package with radically different geometry, navigation, motion, and rendering technology passes the contract without changing shared tokens or platform-owned CSS.
+    stake: false

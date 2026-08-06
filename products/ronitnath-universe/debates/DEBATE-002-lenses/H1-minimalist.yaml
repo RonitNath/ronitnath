@@ -1,0 +1,157 @@
+claims:
+  - id: H1-minimalist-1
+    statement: >
+      F-9 and F-10 must be removed as standalone journeys, with contact creation,
+      search, editing, and archiving embedded only in F-5's invitee list and legacy
+      deduplication left to the one-time agent import.
+    author: H1-minimalist
+    provenance: [EV-017, EV-019, /Users/ronitnath/dev/personal/ronitnath/src/seed.rs]
+    supports: [F-5]
+    rebuts: [F-9, F-10]
+    resolution: unresolved
+    note: >
+      The evidence requires durable people and attendance data, a nickname, and an
+      invite-planning lookup; it does not show an owner job performed in a standalone
+      people directory, merge screen, delete screen, or person-detail screen. The old
+      seed already did cross-event matching in machine work, including its imperfect
+      case-insensitive reconciliation. I would restore a directory only after an
+      observed owner task that starts with a person rather than an event.
+    stake: false
+
+  - id: H1-minimalist-2
+    statement: >
+      F-2 should have no event index or separate preview surface: the agent must return
+      the unpublished event's direct guest and admin URLs, after which the owner checks
+      the real guest route and publishes from the per-event panel.
+    author: H1-minimalist
+    provenance: [EV-003, EV-012, EV-015, EV-016]
+    supports: [F-2]
+    rebuts: []
+    resolution: unresolved
+    note: >
+      Agent-led creation is forced, publish state is forced, and something viewable
+      early is forced; an index is not. Direct URLs also remove the invented
+      record-before-code intermediate screen: the agent deploys code, creates the row,
+      and returns links only when both exist. I would add an index only if direct links
+      fail a demonstrated multi-event navigation task.
+    stake: false
+
+  - id: H1-minimalist-3
+    statement: >
+      F-8 must end at the existing presence page for every request lacking a capability,
+      because anonymous group access is already expressible as a non-personal public-tier
+      capability link and does not require a second event URL.
+    author: H1-minimalist
+    provenance: [EV-019, EV-020, /Users/ronitnath/dev/personal/ronitnath/migrations/0013_event_links.up.sql, /Users/ronitnath/dev/personal/universe-ronitnath/src/app.rs]
+    supports: []
+    rebuts: [F-8]
+    resolution: unresolved
+    note: >
+      The current app has one presence route, while the predecessor already represented
+      public and private sharing as tiers on capability rows. Adding a published slug
+      route creates another access rule, enumeration state, and rendering path without
+      enabling a recorded job. I would change this only for evidence that an event must
+      be discoverable without any link.
+    stake: false
+
+  - id: H1-minimalist-4
+    statement: >
+      All new event and owner-auth product data can be represented in exactly six tables:
+      identities, contacts, sessions, events, event_copy, and event_guests.
+    author: H1-minimalist
+    provenance: [EV-004, EV-018, EV-019, /Users/ronitnath/dev/personal/ronitnath/migrations/0011_people.up.sql, /Users/ronitnath/dev/personal/ronitnath/migrations/0015_attendance.up.sql, /Users/ronitnath/dev/personal/ronitnath/migrations/0013_event_links.up.sql]
+    supports: [F-1, F-3, F-5, F-6, F-7]
+    rebuts: []
+    resolution: unresolved
+    note: >
+      Use integer identity and event primary keys, encrypted only on ordinary wire APIs;
+      contacts.identity_id is both PK and FK and holds nickname plus optional contact
+      JSON; sessions.token_hash is the PK and stores expiry/revocation; events.slug is
+      unique and stores renderer_key, facts, draft/published/archived state, and a
+      revision; event_copy has PK(event_id, key) plus value and tier; event_guests has a
+      unique capability code, nullable identity_id for a group link, response JSON,
+      persisted copy_count, revocation, and UNIQUE(event_id, identity_id). Response is
+      upserted, re-mint replaces the code so the old URL fails, removal revokes rather
+      than erases, and identities/events archive rather than hard-delete. The sole
+      owner's password hash may live on the owner identity; the named agent token may be
+      a deployment secret whose label enters operational logs. Account, credential,
+      factor, audit, API-token, page, module, schedule, segment, and SSE-outbox tables
+      are not forced. The pre-existing node_release operational table is outside this
+      product-table count. I would add a seventh table only when an evidence-backed
+      invariant cannot be enforced by these keys and lifecycle rules.
+    stake: true
+
+  - id: H1-minimalist-5
+    statement: >
+      Event composition and visual identity must remain code selected by
+      events.renderer_key, with no page-document, module-instance, theme, or component
+      registry rows in the database.
+    author: H1-minimalist
+    provenance: [EV-011, EV-012, EV-016, EV-020, RonitNath/rn-events/frontend/src/components/admin/ThemeEditor.tsx]
+    supports: [F-4, F-6, F-7]
+    rebuts: []
+    resolution: unresolved
+    note: >
+      The product's author is a coding agent and both guest and admin composition vary
+      per event; turning that code into editable data recreates B24's ThemeEditor and
+      CMS concepts that the later workflow deliberately replaced. Database rows should
+      contain wording and runtime answers only. I would change this only if a non-agent
+      actor is required to reorder structure in the current bet.
+    stake: false
+
+  - id: H1-minimalist-6
+    statement: >
+      The invitee list, not People or an event index, must be the canonical console base
+      screen used to lock the shared design language.
+    author: H1-minimalist
+    provenance: [EV-016, EV-019, RonitNath/rn-events/frontend/src/components/admin/GuestTable.tsx, /Users/ronitnath/dev/personal/ronitnath/templates/events/list.html]
+    supports: [F-5]
+    rebuts: [F-9]
+    resolution: unresolved
+    note: >
+      Invitees is the densest forced canonical surface: search, add, nickname, response,
+      link, copy state, and re-mint all meet there. The archived B24 GuestTable proves
+      these jobs cohere on one screen, while a separate People home adds navigation and
+      duplicate CRUD. Per-event guest and admin compositions remain bespoke as ruled;
+      sign-in and copy editing inherit the canonical component language without becoming
+      candidate base products.
+    stake: false
+
+  - id: H1-minimalist-7
+    statement: >
+      SSE must use one authorized event-scoped invalidation packet carrying only the
+      event id and revision, with no durable message log, topic table, changed-field
+      variants, or identity-directory stream.
+    author: H1-minimalist
+    provenance: [EV-018, /Users/ronitnath/dev/portfolio/products/ronitnath-universe/flows/FLOWS-001-event-platform.md, /Users/ronitnath/dev/personal/universe-ronitnath/src/server/store.rs]
+    supports: [F-3, F-6, F-7]
+    rebuts: [F-9]
+    resolution: unresolved
+    note: >
+      Every copy or RSVP transaction bumps events.revision; each replica's SSE handler
+      observes the replicated revision, emits one invalidation shape, and the client
+      reloads its authorized current projection while retaining unsaved form state.
+      Reconnect performs the same projection load and the UI shows disconnected state.
+      This satisfies visible live updates across the existing replicated fleet without
+      inventing replay semantics or an outbox. I would add payload variants only if the
+      measured snapshot reload is too expensive at actual friend-scale traffic.
+    stake: false
+
+  - id: H1-minimalist-8
+    statement: >
+      Following this mandate absolutely by putting schedule and per-segment answers in
+      event_copy and event_guests.response_json will make generic cross-event segment
+      analytics impossible without renderer-specific code.
+    author: H1-minimalist
+    provenance: [EV-009, EV-013, /Users/ronitnath/dev/personal/ronitnath/src/seed.rs, /Users/ronitnath/dev/personal/ronitnath/migrations/0014_schedule_items.up.sql, /Users/ronitnath/dev/personal/ronitnath/migrations/0016_segment_rsvps.up.sql]
+    supports: [H1-minimalist-4]
+    rebuts: []
+    resolution: unresolved
+    note: >
+      This is where H1 damages the product: July 4th's dinner, fireworks, rooftop,
+      sleepover, paid, and attended semantics cease to be uniformly queryable, even
+      though the durable raw facts remain exportable. I still accept that damage because
+      the evidence asks to preserve data for analytics but supplies no current generic
+      segment-analysis journey or acceptance query. A required cross-event segment query
+      would justify normalized schedule and segment-response tables and change my mind.
+    stake: false

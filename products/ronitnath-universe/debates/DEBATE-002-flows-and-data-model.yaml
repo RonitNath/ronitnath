@@ -1,0 +1,252 @@
+id: DEBATE-002
+product: ronitnath-universe
+date: 2026-08-05
+subject: "FLOWS-001 (F-1..F-10), the unwritten data model, and the design decisions DEC-005/DEC-006"
+trigger: "T3 (irreversibility — schema commitments on stored guest data, capability-link semantics, release model)"
+panel: "system/debate-heuristics.md — 8 lenses, 4 opposed axes"
+model: "openai-codex/gpt-5.6-sol:high (single family; decorrelation is structural, not model-diverse — see limitations)"
+lens_claims: "debates/DEBATE-002-lenses/*.yaml (68 claims, 8 staked, 1 inference-only)"
+judge: >
+  Claude (Opus 5) — COMPROMISED, having authored FLOWS-001, DEC-005, DEC-006 and PKT-11/13/14, all
+  under debate here. The aggregation below is an input the owner reviews, not an adjudication
+  (debate-heuristics rule 6).
+
+# Convergences — independently reached by lenses with opposed mandates.
+# These are the strongest signals in the round: no shared mandate explains them.
+
+claims:
+  - id: C-1
+    statement: >
+      No durable entity binds an event row to the deployed code that renders it, so an event can be
+      created, published, or activated in a state its public route cannot render.
+    author: synthesis
+    provenance: [H5-cohesion-6, H6-expressive-variance-5, H7-agent-autonomy-3, H8-failure-realist-1, FLOWS-001 F-2 open]
+    supports: [C-2]
+    rebuts: []
+    resolution: resolved
+    note: >
+      Four lenses — cohesion, variance, agent-autonomy and failure-realism — reached this from four
+      mandates that agree on nothing else. It is the same seam FLOWS-001 F-2 already flagged as open,
+      but the lenses show it is not merely an ordering question: without a release entity there is no
+      correct ordering. Accepted for the data gate as EventRelease + a compare-and-swap activation
+      pointer, with archived events pinned to their release.
+
+  - id: C-2
+    statement: >
+      PKT-13's acceptance — gap-free reconnect via Last-Event-ID — is not implementable over an
+      in-process broadcast bus or PostgreSQL LISTEN/NOTIFY, because neither durably replays events
+      missed while disconnected.
+    author: synthesis
+    provenance: [H3-operator-under-load-7, H7-agent-autonomy-6, H8-failure-realist-6, H2-archivist-8]
+    supports: []
+    rebuts: [PKT-13]
+    resolution: resolved
+    note: >
+      A confirmed defect in a packet the judge wrote. Both transports named in DEC-006 as candidates
+      are fire-and-forget. Either the guarantee weakens to resync-on-reconnect against durable
+      revisioned state (SSE becomes a notification that something changed, not the change itself), or
+      a durable ChangeEvent log with a monotonic sequence is required. H8-6 and H5-8 argue the latter;
+      it is the smaller change to correctness and the larger change to scope. Data gate decides,
+      but PKT-13's acceptance text is wrong as written either way.
+
+  - id: C-3
+    statement: >
+      Last-write-wins on copy destroys the prior wording irrecoverably and cannot establish which
+      wording a guest answered against.
+    author: synthesis
+    provenance: [H2-archivist-2, H8-failure-realist-2, H7-agent-autonomy-5, H4-guest-dignity-8, H3-operator-under-load-5]
+    supports: []
+    rebuts: [PKT-11]
+    resolution: resolved
+    note: >
+      Five lenses. PKT-11 and F-3 specify last-write-wins with the conflict "surfaced" — H7-5 notes
+      that "surfaced" is a visual condition, so an API agent gets a success response for a write that
+      silently clobbered the owner. Requires a revision per copy value and an optimistic precondition
+      on write. Whether superseded revisions are retained is contested — see C-9.
+
+  - id: C-4
+    statement: >
+      The copy-link counter cannot evidence that anyone was invited; it records that a URL reached a
+      clipboard, and clipboard success, server acknowledgement, app switch and actual sending are four
+      independently failing steps.
+    author: synthesis
+    provenance: [H2-archivist-3, H3-operator-under-load-6, H4-guest-dignity-3, H7-agent-autonomy-2, H8-failure-realist-3]
+    supports: []
+    rebuts: [PKT-14]
+    resolution: resolved
+    note: >
+      Five lenses, including the two that most want the feature to work. The owner's need is real and
+      unchanged (EV-019); what fails is the *label*. The affordance must say "copied", never "invited"
+      or "sent", and the count needs an idempotent recovery path. The design-gate button states are
+      unaffected; the semantics and wording are.
+
+  - id: C-5
+    statement: >
+      No flow records attendance, so F-9's promise to show whether a person showed up is unachievable
+      for any newly created event.
+    author: synthesis
+    provenance: [H2-archivist-1, H2-archivist-7, H6-expressive-variance-2]
+    supports: []
+    rebuts: [FLOWS-001]
+    resolution: resolved
+    note: >
+      A gap in the flow set the judge wrote, not a disagreement. Invitation, response and observed
+      attendance are three distinct facts; deriving "attended" from RSVP status makes the people
+      directory lie. Needs an owner journey that closes an event and pins its archival revision.
+      Lands as a new flow — F-11 — and re-opens the F-9 acceptance text.
+
+# Collisions — the axes doing their job. Each is a decision, not a defect.
+
+  - id: C-6
+    statement: >
+      Presentation belongs in code selected by a renderer key, with no composition, module-instance or
+      theme rows in the database.
+    author: H1-minimalist
+    provenance: [H1-minimalist-5, H1-minimalist-4]
+    supports: []
+    rebuts: [C-7]
+    resolution: escalated
+    note: >
+      Escalated with C-7 as one decision. Minimalism's six-table model is the cheapest thing that
+      satisfies today's evidence and preserves DEBATE-001 C-6 (identity is code).
+
+  - id: C-7
+    statement: >
+      If composition, visual identity, field visibility and fixed wording live only in event-specific
+      Rust and templates, a Postgres dump cannot reconstruct what any invite page presented.
+    author: H2-archivist
+    provenance: [H2-archivist-4, H5-cohesion-5, H8-failure-realist-7]
+    supports: []
+    rebuts: [C-6]
+    resolution: escalated
+    note: >
+      The load-bearing collision of the round, and it attacks DEBATE-001 C-6 — the ruling the whole
+      product shape rests on. The owner's stated reason for this bet is that data about his friends
+      survived three codebases badly; the archivist observes that under identity-as-code the *pages*
+      do not survive at all. Escalated: this is a values question about what "preserved" means, and it
+      sets how much of presentation the data model must hold.
+
+  - id: C-8
+    statement: >
+      A per-event extension may register presentation components and theme assets but must not add
+      routes, tables, authorization rules, RSVP semantics or SSE topics.
+    author: H5-cohesion
+    provenance: [H5-cohesion-1, H5-cohesion-4, H5-cohesion-8]
+    supports: []
+    rebuts: [C-9]
+    resolution: escalated
+    note: >
+      Escalated with C-9. Without a boundary of roughly this shape, "per-event admin panel" (EV-016)
+      means N unrelated applications sharing a database.
+
+  - id: C-9
+    statement: >
+      Events need persistence and commands beyond the fixed RSVP model, and the three predecessors
+      already did — payment and attendance marking, media management, named plus-ones, an ongoing
+      segmented status manager.
+    author: H6-expressive-variance
+    provenance: [H6-expressive-variance-1, H6-expressive-variance-2, H6-expressive-variance-3, H6-expressive-variance-7, "/tmp/h6-events/migrations/0020_segment_paid_attended.up.sql", "/tmp/h6-rn-events/src/routes/admin/images.rs"]
+    supports: []
+    rebuts: [C-8]
+    resolution: escalated
+    note: >
+      H6 carries the better evidence: it cites a real migration and a real admin route from past
+      events that added exactly the persistence C-8 forbids. The bet exists because events forced
+      rebuilds (EV-011); a boundary that forbids per-event persistence reproduces the cause.
+      Escalated as one decision with C-8 — where the extension boundary sits is the single question
+      that most shapes the data model.
+
+  - id: C-10
+    statement: >
+      Making the people directory the base screen puts an owner-only cross-event dossier — including
+      people whose only record is a link they never opened — at the front of the product.
+    author: H4-guest-dignity
+    provenance: [H4-guest-dignity-4, H4-guest-dignity-5, H4-guest-dignity-6, H3-operator-under-load-2, H1-minimalist-6]
+    supports: []
+    rebuts: [DEC-005, GATE-001]
+    resolution: escalated
+    note: >
+      Three lenses object to the owner's just-taken base-screen decision, each for a different reason:
+      guest-dignity (it is a dossier), operator-under-load (it costs a navigation to reach the event
+      in progress), minimalist (the invitee list is the surface that does real work). Only the owner
+      can weigh these against why he chose it — the cross-event collapse is the thing three codebases
+      destroyed. Escalated with the objection stated, not re-decided.
+
+  - id: C-11
+    statement: >
+      Recording uses and last_used_at on every capability GET turns opening an invitation into an
+      undisclosed behavioural record, and a forwarded personalized link lets a partner read and
+      overwrite the intended invitee's answer.
+    author: H4-guest-dignity
+    provenance: [H4-guest-dignity-6, H4-guest-dignity-2, H4-guest-dignity-1, PKT-02, PKT-06]
+    supports: []
+    rebuts: []
+    resolution: escalated
+    note: >
+      Two distinct issues, both escalated. The forwarded-link overwrite is a concrete correctness
+      problem the flows do not address (F-7 binds every return through a link to one identity). The
+      open-tracking question is a values call: the data is useful to the owner and invisible to the
+      guest. Nothing in the artifacts currently argues the guest's side, which is why this lens exists.
+
+  - id: C-12
+    statement: >
+      The archivist mandate and the guest-dignity mandate are irreconcilable on retention: preserving
+      revoked URLs, notes, addresses and superseded identities is exactly what a guest believes
+      revocation and deletion removed.
+    author: synthesis
+    provenance: [H2-archivist-9, H4-guest-dignity-9, H2-archivist-6, H8-failure-realist-5]
+    supports: []
+    rebuts: []
+    resolution: escalated
+    note: >
+      Both lenses flagged this against their own mandate, which is the panel working as designed. It
+      decides F-10's merge and archive semantics, which are already flagged T3-irreversible. H8-5 adds
+      that the predecessor foreign keys cascade-delete attendance, so a naive delete destroys the data
+      the bet exists to keep.
+
+  - id: C-13
+    statement: >
+      F-2 and F-4 cannot be unattended: both assign the journey to OWNER and require browser preview,
+      publish or live-page confirmation, while AGENT is explicitly denied a flow.
+    author: H7-agent-autonomy
+    provenance: [H7-agent-autonomy-1, H7-agent-autonomy-4, H7-agent-autonomy-7]
+    supports: []
+    rebuts: []
+    resolution: deferred-as-assumption
+    note: >
+      Assume the human confirmation step stays. H3-8 argues against its own mandate that removing it
+      erases the product's differentiator, and H7-9 concedes that full machine gating would strangle
+      the visual experimentation that made past events distinct. What survives as real work: PKT-04
+      needs idempotency beyond create, an atomic manifest write, an optimistic revision precondition,
+      a stable machine error schema and converged-state readback (H7-4). Cheap to reverse — an
+      unattended path can be added later if the owner ever wants one.
+
+  - id: C-14
+    statement: >
+      A copy form ordered "the way the page reads" cannot be generated for arbitrary event code unless
+      each release declares typed, stable copy slots keyed by (event_id, instance_key, field_key),
+      independent of module props.
+    author: synthesis
+    provenance: [H5-cohesion-3, H6-expressive-variance-4, H1-minimalist-8]
+    supports: [C-1]
+    rebuts: []
+    resolution: resolved
+    note: >
+      Cohesion and variance agree on the mechanism while disagreeing on everything around it, which
+      makes this the safest structural finding in the round. Note H1-8's self-directed warning: a
+      minimal event_copy/response_json shape makes cross-event segment analytics impossible without
+      renderer-specific code. Accepted into the data gate.
+
+  - id: C-15
+    statement: >
+      A mutable person-by-event RSVP row plus separately upserted segment rows can persist a
+      combination no guest ever submitted, and will expose a mixed response if attendance commits and
+      a segment write fails.
+    author: synthesis
+    provenance: [H2-archivist-5, H8-failure-realist-4]
+    supports: []
+    rebuts: []
+    resolution: resolved
+    note: >
+      A complete response must be one idempotent revision committed in one transaction. Uncontested by
+      any lens; accepted into the data gate and into PKT-07's states.

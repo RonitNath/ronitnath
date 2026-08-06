@@ -1,0 +1,96 @@
+claims:
+  - id: H8-failure-realist-1
+    statement: >
+      F-2 and F-4 cannot safely reach publish or preserve an archived event until code deployment, copy seeding, schema migration, and activation are separate resumable stages joined by one compare-and-swap activation pointer.
+    author: H8-failure-realist
+    provenance: ["EV-012", "EV-016", "/Users/ronitnath/dev/portfolio/products/ronitnath-universe/flows/FLOWS-001-event-platform.md", "/Users/ronitnath/dev/personal/universe-ronitnath/src/server/store.rs", "/Users/ronitnath/dev/personal/universe-ronitnath/docs/contract.md"]
+    supports: []
+    rebuts: []
+    resolution: unresolved
+    note: >
+      This is the claim I would stake the bet on: F-2 itself names the split-brain seam, while the current three-node app runs migrations during node startup and records only the node's global release, not an event's compatibility state. The model needs event_release(event_id, release_id, artifact_digest, copy_schema_version, api_version, state), deployment_attempt(attempt_id, release_id, node_id, state, error), schema_migration(version, checksum, expand_contract_phase), and event.active_release_id; staged may become active only after every required copy key validates, the new artifact is healthy on the fleet, and the activation CAS commits. Failure leaves staged or failed state that can be resumed or rolled back, the prior digest and data remain retained, and expand/contract migrations keep old and new binaries compatible during rolling deploys. The index must render provisioning/failed rather than an unrenderable event, and publish must reject anything but active. I would change my mind only for an integration test that kills the agent or a node after every stage and proves one-click resume or rollback with the previously published event still rendering.
+    stake: true
+
+  - id: H8-failure-realist-2
+    statement: >
+      F-3's stated concurrent owner-plus-agent last-write-wins behavior will irretrievably discard one author's wording whenever both save the same copy field from the same base version.
+    author: H8-failure-realist
+    provenance: ["EV-018", "/Users/ronitnath/dev/portfolio/products/ronitnath-universe/flows/FLOWS-001-event-platform.md", "/Users/ronitnath/dev/personal/ronitnath/src/store/events.rs", "/Users/ronitnath/archive/previous_projects/personal/socials/src/db/events.rs"]
+    supports: []
+    rebuts: []
+    resolution: unresolved
+    note: >
+      Naming the loss: the earlier owner's or agent's value, its intent, and the ability to distinguish overwrite from correction all disappear. Require copy_field(event_id, field_key, value, version) with primary key (event_id, field_key), immutable copy_revision(revision_id, event_id, field_key, base_version, prior_value, proposed_value, actor, operation_id), and copy_batch(operation_id, state); save uses WHERE version = base_version, multi-field saves transact as one batch, and a zero-row update returns a conflict showing base/current/proposed rather than overwriting. Undo appends a compensating revision, never erases history, and SSE is emitted only from the committed revision. The predecessor event stores either rewrite a whole event row or issue independent field updates without versions, demonstrating both overwrite and half-form hazards. I would change my mind only if two stale tabs and an API writer can race in tests with every proposed value either committed once or left in an explicit resolvable conflict.
+    stake: false
+
+  - id: H8-failure-realist-3
+    statement: >
+      F-5's persisted copy count is false bookkeeping unless clipboard success and server acknowledgement are modeled as two failure-prone steps with an idempotent recovery path.
+    author: H8-failure-realist
+    provenance: ["EV-019", "/Users/ronitnath/dev/portfolio/products/ronitnath-universe/flows/FLOWS-001-event-platform.md", "/Users/ronitnath/dev/personal/ronitnath/ts/src/solid/EventsAdmin.tsx"]
+    supports: []
+    rebuts: []
+    resolution: unresolved
+    note: >
+      The existing predecessor changes a button briefly after navigator.clipboard resolves and falls back to prompt, but persists nothing; recording before the browser promise overcounts failures, while recording after it can lose a real copy when the network or tab dies. Add link_copy_receipt(invite_link_id, operation_id, client_id, clipboard_succeeded_at, acknowledged_at) with unique operation_id, keep unacknowledged successful operations in a client outbox, retry idempotently, and derive the count from receipts. The button needs distinct failed, copied-but-not-recorded, and recorded states; manual selection must require an explicit confirm rather than pretending the clipboard succeeded. Two tabs use distinct operation IDs and retries never double-count. I would change my mind only after tests cover denied clipboard permission, successful copy plus failed POST, duplicate retry, and tab closure before acknowledgement without losing or inventing a count.
+    stake: false
+
+  - id: H8-failure-realist-4
+    statement: >
+      F-7 will expose a mixed RSVP whenever attendance commits but a later segment write fails unless the complete response is one idempotent revision committed in one transaction.
+    author: H8-failure-realist
+    provenance: ["EV-013", "/Users/ronitnath/dev/portfolio/products/ronitnath-universe/flows/FLOWS-001-event-platform.md", "/Users/ronitnath/dev/personal/ronitnath/src/handlers/event_public.rs", "/Users/ronitnath/dev/personal/ronitnath/src/store/attendance.rs", "/Users/ronitnath/dev/personal/ronitnath/src/store/segment_rsvps.rs"]
+    supports: []
+    rebuts: []
+    resolution: unresolved
+    note: >
+      The archived implementation writes attendance and then loops through segment upserts, so a process crash or constraint failure can confirm a party status while retaining only some segment choices; a double-submit can also replay the sequence, and two phones silently overwrite each other. Model rsvp_response(event_id, identity_id, revision, status, party_size, note), rsvp_segment(event_id, identity_id, segment_id, response_revision, status), and rsvp_command(operation_id, base_revision, payload, result, state), with uniqueness on (event_id, identity_id) and operation_id. Validate the whole payload first, replace the complete aggregate plus its outbox change in one transaction, replay the stored result for duplicate operation IDs, and return a base-revision conflict with current and proposed answers for concurrent devices. I would change my mind only if fault injection after every statement proves the guest can never observe or announce a partial answer and every accepted command has exactly one resulting revision.
+    stake: false
+
+  - id: H8-failure-realist-5
+    statement: >
+      F-10's delete and merge journey is unreleasable while its conflict rule is open because the predecessor foreign keys cascade deletion of attendance and invite links and the recovered seed contains same-name and alias-like rows that cannot be collapsed safely by name.
+    author: H8-failure-realist
+    provenance: ["EV-009", "EV-013", "/Users/ronitnath/dev/portfolio/products/ronitnath-universe/flows/FLOWS-001-event-platform.md", "/Users/ronitnath/dev/personal/ronitnath/migrations/0013_event_links.up.sql", "/Users/ronitnath/dev/personal/ronitnath/migrations/0015_attendance.up.sql", "/Users/ronitnath/dev/personal/ronitnath/src/seed.rs"]
+    supports: []
+    rebuts: []
+    resolution: unresolved
+    note: >
+      F-10 must replace delete with archive plus capability revocation; historical edges remain. Require identity(id, archived_at, revision), contact(identity_id primary key, nickname, revision), identity_source_record(source, source_key, identity_id, raw_value), identity_alias(source_identity_id primary key, target_identity_id), merge_operation(operation_id, source_id, target_id, state), and merge_conflict(operation_id, event_id, field, source_value, target_value, resolution). A merge transaction moves nonconflicting references, parks conflicting same-event responses without choosing, and activates the alias only after every conflict is resolved; abort restores the untouched inputs. Names and nicknames are mutable labels, never identity keys, and invite_link.slug_at_mint remains immutable when a person is renamed. I would change my mind only if archive, merge, abort, and same-event conflict tests preserve every attendance fact and keep already-shared non-revoked URLs deterministic.
+    stake: false
+
+  - id: H8-failure-realist-6
+    statement: >
+      F-3, F-6, and F-9 incorrectly treat SSE delivery as the outcome even though a dropped or cross-deploy stream can only be correct when it is a replayable notification over durable revisioned state.
+    author: H8-failure-realist
+    provenance: ["EV-018", "/Users/ronitnath/dev/portfolio/products/ronitnath-universe/flows/FLOWS-001-event-platform.md", "/Users/ronitnath/dev/personal/universe-ronitnath/docs/design.md", "/Users/ronitnath/dev/personal/universe-ronitnath/docs/contract.md"]
+    supports: []
+    rebuts: []
+    resolution: unresolved
+    note: >
+      Add domain_change(sequence primary key, aggregate_type, aggregate_id, aggregate_revision, payload_version, committed_at) in the same transaction as each mutation; SSE id is sequence, clients deduplicate, persist the last applied ID, and reconnect with Last-Event-ID. If retention no longer covers the cursor or a payload version crosses a deploy boundary, the server sends a fresh authorized snapshot plus high-water mark before resuming. Every streaming surface displays connecting, live-as-of revision/time, disconnected-stale, and resyncing states, while the business outcome is a committed revision rather than a promise that every open page already rendered it. I would change my mind only if forced disconnects, duplicate frames, skipped frames, server failover, and old-client/new-server deployment tests converge to the authoritative snapshot without a manual reload.
+    stake: false
+
+  - id: H8-failure-realist-7
+    statement: >
+      Per-event page and admin composition will strand copy rows or break archived pages unless each composition is validated against and pinned to an immutable versioned component contract before activation.
+    author: H8-failure-realist
+    provenance: ["EV-006", "EV-016", "EV-020", "/Users/ronitnath/dev/portfolio/products/ronitnath-universe/flows/FLOWS-001-event-platform.md", "/Users/ronitnath/dev/personal/universe-ronitnath/docs/design.md"]
+    supports: []
+    rebuts: []
+    resolution: unresolved
+    note: >
+      Bespoke composition is not permission for dangling runtime state. Require component_contract(component_key, contract_version, input_schema, copy_key_schema), event_composition(event_id, release_id, document, contract_set_digest, state), and composition_validation(release_id, result, errors); activation verifies every component exists in the artifact, every referenced copy key has the required type and tier, and every admin mutation targets an API version that artifact supports. Removed components move their copy rows to retained inactive revisions rather than deleting them, archived events keep the artifact digest and contract set they rendered with, and shared-library promotion creates a new version rather than mutating old behavior. I would change my mind only if an event-specific component can be removed, promoted, rolled back, and viewed years later under tests without orphaned copy or behavior changes.
+    stake: false
+
+  - id: H8-failure-realist-8
+    statement: >
+      Following this mandate absolutely by persisting every transient SSE connection state, preview render, and cosmetic animation would damage the product by multiplying failure state and recovery UI without preserving any user-authored fact.
+    author: H8-failure-realist
+    provenance: ["/Users/ronitnath/dev/personal/universe-ronitnath/docs/contract.md", "/Users/ronitnath/dev/personal/universe-ronitnath/src/starscape/render.rs"]
+    supports: []
+    rebuts: []
+    resolution: unresolved
+    note: >
+      The mandate's correct boundary is durable intent and externally observed side effects: copy, RSVP, identity, invitation, publish, migration, and activation commands need revisions and recovery, while a disconnected indicator, derived preview, or starscape frame is reconstructed from authoritative state and may disappear. Persisting those ephemeral render states would create more partial-failure surfaces, clutter the phone-first console, and slow a solo developer while improving neither rollback nor data survival. This is not permission to hide staleness or lose writes; the durable cursor and snapshot rules in claim 6 remain mandatory. I would change my mind if a supposedly cosmetic or derived state can be shown to affect a later durable decision without that dependency already being captured in the command's base revision.
+    stake: false

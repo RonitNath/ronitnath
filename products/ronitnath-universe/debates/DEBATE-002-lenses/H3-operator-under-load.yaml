@@ -1,0 +1,117 @@
+claims:
+  - id: H3-operator-under-load-1
+    statement: >
+      The flow set has no OWNER journey for operating a live event because F-6 only watches data and routes a no-reply into F-5, while the predecessor event detail surface allowed status, party-size, segment, and link work in one place.
+    author: H3-operator-under-load
+    provenance:
+      - /Users/ronitnath/dev/portfolio/products/ronitnath-universe/flows/FLOWS-001-event-platform.md
+      - /Users/ronitnath/dev/personal/ronitnath/templates/events/detail.html
+    supports: []
+    rebuts: []
+    resolution: unresolved
+    note: >
+      At 9pm, correction is as important as observation: one thumb must be able to find a person, override status or party size, mark arrival, and reach that person's link without changing screens. The data gate therefore needs event_attendance keyed uniquely by (event_id, identity_id), with status, party_size, arrived_at, and a monotonic version; rows are created when invited, upserted rather than duplicated, and retained when the event archives. It also needs mutation_receipt keyed by (owner_session_id, idempotency_key) so a retry after a timeout cannot apply twice. I would change my mind only after a phone test shows every such intervention completes from F-6 without navigation or text scanning under packet loss.
+    stake: false
+
+  - id: H3-operator-under-load-2
+    statement: >
+      Making People the base screen guarantees that a fresh or expired owner session takes at least one extra navigation decision before reaching the event currently in progress.
+    author: H3-operator-under-load
+    provenance:
+      - /Users/ronitnath/dev/portfolio/products/ronitnath-universe/flows/FLOWS-001-event-platform.md
+      - DEC-005
+      - /Users/ronitnath/dev/personal/ronitnath/templates/events/list.html
+    supports: []
+    rebuts: []
+    resolution: unresolved
+    note: >
+      The event-night base screen must be the current event command center, with People remaining the planning-time home. Add operator_focus keyed by owner_identity_id, with event_id, activated_at, and expires_at, allowing only one unexpired focus per owner; set it explicitly before an event, expire it after the event window, and fall back to the nearest published live event. Without this state, overlapping, overnight, and time-zone-sensitive events make automatic routing ambiguous. I would change my mind if a cold sign-in at event time reliably opens the right command center with no owner choice in a one-handed field test.
+    stake: false
+
+  - id: H3-operator-under-load-3
+    statement: >
+      A wholly per-event F-6 composition cannot provide fixed-position muscle-memory controls, so it cannot satisfy arm's-length operation without reading even if every component individually meets the design system.
+    author: H3-operator-under-load
+    provenance:
+      - EV-016
+      - DEC-005
+      - /Users/ronitnath/dev/personal/universe-ronitnath/docs/design.md
+    supports: []
+    rebuts: []
+    resolution: unresolved
+    note: >
+      This is the bet-level failure: the owner will scan an agent-authored arrangement while people interrupt him. Every event panel needs a canonical phone operator rail in the same order and locations—connection truth, headcount, person lookup, status override, share action, and undo—with bespoke tiles only below it. The current shared-library rule standardizes parts but not placement. I would change my mind only if two materially different real events are operated one-handed without reading and their critical controls remain discoverable at first touch.
+    stake: true
+
+  - id: H3-operator-under-load-4
+    statement: >
+      F-1 cannot pass the stated operating criterion because its only unauthenticated path requires reading and typing both email and password, while passkeys are explicitly excluded from PKT-01.
+    author: H3-operator-under-load
+    provenance:
+      - /Users/ronitnath/dev/portfolio/products/ronitnath-universe/flows/FLOWS-001-event-platform.md
+      - /Users/ronitnath/dev/personal/universe-ronitnath/changes/pitch-1/packets.md
+    supports: []
+    rebuts: []
+    resolution: unresolved
+    note: >
+      Session expiry at the party turns every other owner surface into a dead end. Add webauthn_credential keyed by credential_id with owner_account_id, public_key, sign_count, transports, created_at, last_used_at, and revoked_at; retain password recovery but make biometric passkey reauthentication the primary phone path, preserving the target URL. Credentials must be individually revocable and sign counters updated atomically. I would change my mind if measured cold reauthentication with the current password flow takes one hand, no reading, and under five seconds on the owner's phone.
+    stake: false
+
+  - id: H3-operator-under-load-5
+    statement: >
+      F-3 has no specified way to distinguish a save that committed before a network timeout from one that never arrived, and it has no guaranteed one-tap rollback because copy history remains unresolved.
+    author: H3-operator-under-load
+    provenance:
+      - EV-018
+      - /Users/ronitnath/dev/portfolio/products/ronitnath-universe/flows/FLOWS-001-event-platform.md
+      - /Users/ronitnath/dev/personal/universe-ronitnath/changes/pitch-1/packets.md
+    supports: []
+    rebuts: []
+    resolution: unresolved
+    note: >
+      A one-handed typo fix on bad wifi must end in an unmistakable committed or queued state and offer immediate undo, not a last-write-wins message to read. Model copy_field with primary key (event_id, field_key) and current_revision_id, plus append-only copy_revision keyed by revision_id and unique (event_id, field_key, revision_number), carrying value, actor, mutation_id, and committed_at. Retain revisions through archive; undo creates a new revision, and mutation_id is idempotent across retries. I would change my mind after a packet-loss test proves repeated taps never duplicate or overwrite unexpectedly and the previous value is restored in one touch.
+    stake: false
+
+  - id: H3-operator-under-load-6
+    statement: >
+      F-5's persisted copy count cannot truthfully tell the owner who was sent a link because clipboard success, server-side count recording, app switching, and actual sharing are four independently failing steps.
+    author: H3-operator-under-load
+    provenance:
+      - EV-019
+      - /Users/ronitnath/dev/personal/ronitnath/templates/events/detail.html
+      - /Users/ronitnath/dev/portfolio/products/ronitnath-universe/flows/FLOWS-001-event-platform.md
+    supports: []
+    rebuts: []
+    resolution: unresolved
+    note: >
+      The event-night action must be one large per-person Share control that invokes the native share or preferred-contact deep link directly, not a clipboard round trip, and the surface must distinguish copied from share-completed. Add share_action keyed by action_id with capability_link_id, idempotency_key, method, outcome, attempted_at, and completed_at; preserve actions when a link is revoked or re-minted, and derive counters rather than mutating an ambiguous copy_count. I would change my mind if noisy, one-handed testing shows the existing copy-switch-find-paste-send loop is faster and never leaves the owner uncertain about whether he completed it.
+    stake: false
+
+  - id: H3-operator-under-load-7
+    statement: >
+      PKT-13's no-gap Last-Event-ID reconnect guarantee is impossible across a process restart with only an in-process broadcast bus or PostgreSQL LISTEN/NOTIFY because neither transport retains missed events.
+    author: H3-operator-under-load
+    provenance:
+      - DEC-006
+      - /Users/ronitnath/dev/personal/universe-ronitnath/changes/pitch-1/packets.md
+    supports: []
+    rebuts: []
+    resolution: unresolved
+    note: >
+      Flaky event wifi makes reconnect the normal path, not an edge state, and a text-only disconnected warning still requires reading. The data gate must choose either a full versioned snapshot on every reconnect or an event_change log keyed by change_id with scope_type, scope_id, aggregate_version, kind, committed_at, and payload; changes must commit in the same transaction as the domain write and remain replayable beyond the maximum offline window before compaction. The phone should keep the last snapshot but show a fixed, oversized non-text stale state and resync automatically. I would change my mind only after forced disconnects and a rolling restart leave the panel bit-for-bit current without refresh or owner intervention.
+    stake: false
+
+  - id: H3-operator-under-load-8
+    statement: >
+      Applying this lens literally to F-2 and F-4 would damage the product by eliminating its agent-authored event and structure differentiator, because terminal conversation, code review, deployment, and visual confirmation inherently require reading and sustained attention.
+    author: H3-operator-under-load
+    provenance:
+      - EV-012
+      - EV-015
+      - /Users/ronitnath/dev/portfolio/products/ronitnath-universe/flows/FLOWS-001-event-platform.md
+    supports: []
+    rebuts: []
+    resolution: unresolved
+    note: >
+      This is where my mandate causes product damage if followed absolutely: creation and structural authoring must remain rich planning workflows, but they must be classified as unavailable in a locked-down live-operator mode rather than presented as event-night owner tasks. Live mode should expose only safe runtime mutations and should have no deploy or structural-edit affordance. I would change my mind if a production deploy initiated one-handed by voice could be previewed, verified, and rolled back safely without the owner reading anything, which the opened artifacts do not support.
+    stake: false

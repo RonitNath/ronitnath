@@ -1,0 +1,108 @@
+claims:
+  - id: H2-archivist-1
+    statement: >
+      F-1..F-10 omit an OWNER journey that closes an event by recording actual whole-event and per-segment attendance and pinning its archival revision, so F-9's promise to show whether someone attended is unachievable for newly created events.
+    author: H2-archivist
+    provenance: [FLOWS-001, /Users/ronitnath/dev/personal/ronitnath/migrations/0020_segment_paid_attended.up.sql, /Users/ronitnath/dev/personal/ronitnath/src/store/attendance.rs]
+    supports: []
+    rebuts: []
+    resolution: unresolved
+    note: >
+      A response is an intention, not evidence that somebody showed up; the predecessor schema explicitly distinguished RSVP status from admin-recorded segment attendance. Add a recurring OWNER flow backed by attendance_observation(id, event_id, person_id, segment_id nullable, outcome, recorded_at, recorded_by, source) and an event_archive row that pins the final page and copy revisions. I would change my mind if an existing flow were amended to record these facts and archive them without rewriting the RSVP.
+    stake: false
+
+  - id: H2-archivist-2
+    statement: >
+      F-3's specified last-write-wins update destroys prior copy and therefore cannot establish which wording was on a guest's page when that guest answered.
+    author: H2-archivist
+    provenance: [FLOWS-001, EV-018, /Users/ronitnath/dev/personal/ronitnath/src/store/events.rs]
+    supports: []
+    rebuts: []
+    resolution: unresolved
+    note: >
+      Replace mutable value rows with copy_field_definition(id, event_id, stable_key, meaning, value_type, visibility_tier, validation_json) and append-only copy_revision/copy_value rows, then put presented_page_revision_id on each response submission and retain the revision seen by no-JS forms too. The predecessor's UPDATE overwrites title, summary, address, instructions, notice, and plan in place, demonstrating the exact loss. I would change my mind only if the dump retained every old value, its semantic field definition, effective interval, author, and the revision associated with each answer.
+    stake: false
+
+  - id: H2-archivist-3
+    statement: >
+      F-5 cannot truthfully report who was sent an invite because its only in-product evidence is a clipboard-copy count while delivery occurs in texts and DMs outside the platform.
+    author: H2-archivist
+    provenance: [FLOWS-001, EV-019, /Users/ronitnath/dev/personal/ronitnath/migrations/0013_event_links.up.sql]
+    supports: []
+    rebuts: []
+    resolution: unresolved
+    note: >
+      Model invitation(id, event_id, person_id, invited_at, withdrawn_at) independently from capability(id, invitation_id, minted_at, revoked_at, supersedes_capability_id, access_tier) and share_action(id, capability_id, occurred_at, kind, channel nullable); never delete the invitation when a token is re-minted or a person is removed. A clipboard action proves copying, not sending or delivery, so the UI must label those states honestly. I would change my mind if the platform ingested an attributable external send receipt or revised the outcome to claim only invited and copied facts.
+    stake: false
+
+  - id: H2-archivist-4
+    statement: >
+      If page and admin composition, visual identity, field visibility, and fixed wording exist only in event-specific Rust and templates, a Postgres dump cannot reconstruct what any invite page presented after that code is lost.
+    author: H2-archivist
+    provenance: [FLOWS-001, EV-013, EV-016, /Users/ronitnath/dev/personal/ronitnath/templates/event_public.html, /Users/ronitnath/dev/personal/ronitnath/src/handlers/event_public.rs]
+    supports: []
+    rebuts: []
+    resolution: unresolved
+    note: >
+      This is the bet: event_page_revision(id, event_id, revision_no, created_at, published_at, authored_by, schema_version, composition_json, theme_json, rendered_html, asset_manifest) must be immutable and self-contained, and event_publication must pin the revision used during each interval. The predecessor hard-codes headings, greeting text, section order, RSVP explanation, and July 4th poster selection outside its data rows, so its database alone is already lossy. I would change my mind if a dump-only exercise reproduced each tier's historical page byte-for-byte or from a human-readable complete snapshot without consulting a repository or binary.
+    stake: true
+
+  - id: H2-archivist-5
+    statement: >
+      A mutable person-by-event RSVP row plus separately upserted segment rows cannot preserve answer history and can persist a combination that no guest ever submitted.
+    author: H2-archivist
+    provenance: [/Users/ronitnath/dev/personal/ronitnath/src/handlers/event_public.rs, /Users/ronitnath/dev/personal/ronitnath/src/store/attendance.rs, /Users/ronitnath/dev/personal/ronitnath/src/store/segment_rsvps.rs]
+    supports: []
+    rebuts: []
+    resolution: unresolved
+    note: >
+      Store each form post atomically as response_submission(id, invitation_id, person_id, event_id, presented_page_revision_id, submitted_at, status, party_size, note, actor_kind) with response_segment(submission_id, segment_definition_id, status), and derive the current answer rather than updating history. The predecessor commits the main upsert and then each segment upsert separately, with no submission key and no transaction joining them. I would change my mind if one immutable transaction record captured every answer and correction while a projection supplied the current dashboard state.
+    stake: false
+
+  - id: H2-archivist-6
+    statement: >
+      F-10's delete and survivor-reassignment merge semantics would erase the provenance of distinct imported people and conflicting same-event answers.
+    author: H2-archivist
+    provenance: [FLOWS-001, /Users/ronitnath/dev/personal/ronitnath/src/seed.rs, /Users/ronitnath/dev/personal/ronitnath/src/store/people.rs]
+    supports: []
+    rebuts: []
+    resolution: unresolved
+    note: >
+      The recovered rows include duplicate names and obvious aliases as well as genuinely ambiguous identities, so person rows must be archived, never deleted, and merge must append identity_merge(id, source_person_id, target_person_id, decided_at, decided_by, rationale) plus explicit per-event conflict resolutions while historical submissions retain their original person_id. A canonical-person projection can collapse rows without falsifying their source. I would change my mind if delete and merge were specified as reversible additive records that preserve all source keys, values, and conflicts in the dump.
+    stake: false
+
+  - id: H2-archivist-7
+    statement: >
+      The People base screen will misstate history unless it presents invitation, response, and observed attendance as separate facts rather than deriving events attended from RSVP status.
+    author: H2-archivist
+    provenance: [FLOWS-001, /Users/ronitnath/dev/personal/ronitnath/src/store/people.rs, /Users/ronitnath/dev/personal/ronitnath/src/seed.rs]
+    supports: []
+    rebuts: []
+    resolution: unresolved
+    note: >
+      The predecessor's longitudinal query counts both going and attended as events attended, while its recovered seed distinguishes none, no, maybe, attended, party size, and notes. The canonical screen should be an archival index over invitation, latest response, response chronology, and attendance observation, not a denormalized verdict whose derivation dies with code. I would change my mind if the screen and export exposed those source facts and defined every derived count in database metadata or views.
+    stake: false
+
+  - id: H2-archivist-8
+    statement: >
+      An SSE frame without a committed database revision ID creates an update order that vanishes from the dump and cannot be evidence of what changed.
+    author: H2-archivist
+    provenance: [FLOWS-001, EV-018, /Users/ronitnath/dev/personal/universe-ronitnath/docs/contract.md]
+    supports: []
+    rebuts: []
+    resolution: unresolved
+    note: >
+      SSE is transport only: each copy, response, identity, publication, and invitation mutation must commit its immutable domain row and monotonic change_id before an outbox streams that same ID, with reconnect resuming from durable order. Streaming whole current state may repair a screen but does not preserve chronology. I would change my mind if every frame could be traced to an ordered immutable domain revision already sufficient to reconstruct history, making a separate outbox unnecessary.
+    stake: false
+
+  - id: H2-archivist-9
+    statement: >
+      Following the archivist mandate absolutely would damage this private social product by retaining revoked capability URLs, private addresses, personal notes, and superseded identities after a person reasonably believes deletion or revocation removed them.
+    author: H2-archivist
+    provenance: [FLOWS-001, /Users/ronitnath/dev/personal/ronitnath/migrations/0013_event_links.up.sql, /Users/ronitnath/dev/personal/ronitnath/src/seed.rs]
+    supports: []
+    rebuts: []
+    resolution: unresolved
+    note: >
+      The predecessor deliberately stores raw bearer tokens and the recovered event content includes an exact home address, entry procedure, phone number, and guest notes; lossless permanence therefore harms privacy and makes F-10 Delete misleading. Crypto-shredding or redacted exports would reduce that harm but violate this mandate's literal losslessness, so the conflict must be named rather than hidden. I would change my mind only if the owner explicitly defined archive as permanent retention visible to affected people, or if the success criterion allowed irreversible erasure of designated sensitive fields.
+    stake: false

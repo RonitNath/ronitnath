@@ -1,0 +1,108 @@
+claims:
+  - id: H5-cohesion-1
+    statement: >
+      F-2 fails cohesion unless its authoring step instantiates a versioned EventDefinition from the shared platform and limits all bespoke code to one named EventExtension that may register guest/admin presentation components and theme assets but may not add routes, tables, authorization rules, RSVP semantics, or SSE topics.
+    author: H5-cohesion
+    provenance: [FLOWS-001-event-platform.md, EV-016, DEC-005, /Users/ronitnath/dev/personal/universe-ronitnath/changes/pitch-1/packets.md]
+    supports: []
+    rebuts: []
+    resolution: unresolved
+    note: >
+      This is the enforceable answer to what prevents N websites: a new event inherits routing, persistence, identity, links, responses, copy editing, authorization, streaming and shared components, while its optional bespoke part has one name and a presentation-only boundary. I would change my mind only if a real event demonstrates an irreducibly event-local persistence or authorization need that cannot be promoted into the shared platform without destroying the event's purpose.
+    stake: true
+
+  - id: H5-cohesion-2
+    statement: >
+      F-4's “the change generalizes” branch is a missing recurring OWNER terminal flow that must cover a registry-version bump, impact preview for every referencing event, compatibility or migration checks, deployment, and rollback rather than hiding platform evolution inside a flow whose stated outcome is that other events are untouched.
+    author: H5-cohesion
+    provenance: [FLOWS-001-event-platform.md, DEC-005]
+    supports: []
+    rebuts: []
+    resolution: unresolved
+    note: >
+      Without this journey, promotion is discretionary code motion with no owner-visible contract, so shared components will fork as soon as changing one risks an old event. I would change my mind if module definitions are immutable by version, existing events never move versions implicitly, and promotion can be proven to have no effect on any deployed composition.
+    stake: false
+
+  - id: H5-cohesion-3
+    statement: >
+      F-3 must generate its canonical copy form from registry-declared field contracts addressed by stable (event_id, module_instance_key, field_key) keys and reject any save not declared by the active composition, rather than allowing each event's admin code to define its own fields, ordering, and validation.
+    author: H5-cohesion
+    provenance: [FLOWS-001-event-platform.md, EV-018, /Users/ronitnath/dev/personal/universe-ronitnath/changes/pitch-1/packets.md]
+    supports: []
+    rebuts: []
+    resolution: unresolved
+    note: >
+      The promised canonical Copy page otherwise becomes a bespoke form for every event, and orphan rows or renamed modules make wording silently detach from rendering. I would change my mind if one generic editor can derive equivalent grouping, validation and preview behavior from a smaller stable contract without those three keys.
+    stake: false
+
+  - id: H5-cohesion-4
+    statement: >
+      F-6 may vary only the selection, ordering, and presentation of admin tiles, while every tile must read one canonical EventAdminSnapshot and invoke canonical response, attendance, invite, and publish commands instead of issuing event-specific queries or inventing statuses.
+    author: H5-cohesion
+    provenance: [EV-013, EV-016, /Users/ronitnath/archive/previous_projects/personal/secure_socials/admin/src/main.rs, /Users/ronitnath/dev/personal/ronitnath/migrations/0015_attendance.up.sql]
+    supports: []
+    rebuts: []
+    resolution: unresolved
+    note: >
+      The predecessors encoded summaries and RSVP semantics in their own handlers and schemas; permitting that behind bespoke tiles recreates separate admin applications even if they share a component crate. I would change my mind if two new event panels need genuinely different command semantics that a shared typed snapshot and command set cannot represent.
+    stake: false
+
+  - id: H5-cohesion-5
+    statement: >
+      The data gate must define Event(id), EventRelease(id, event_id, code_revision, extension_key, extension_version, state), Composition(id, event_release_id, surface UNIQUE), ModuleInstance(id, composition_id, instance_key UNIQUE, module_key, module_version, position, props), and CopyValue(event_id, instance_key, field_key UNIQUE, value, revision) rather than a mutable per-event JSON singleton.
+    author: H5-cohesion
+    provenance: [PITCH-001-event-platform.md, EV-006, DEC-005, inference]
+    supports: []
+    rebuts: []
+    resolution: unresolved
+    note: >
+      These entities make the shared inheritance and bespoke delta inspectable, preserve copy through reorderings, distinguish guest from admin composition, and identify exactly which code can render an archived event. I would change my mind if a simpler normalized model can enforce the same uniqueness, version pinning, copy stability and two-surface composition invariants in database constraints.
+    stake: false
+
+  - id: H5-cohesion-6
+    statement: >
+      F-2 and F-4 must stage an EventRelease only after its code revision and extension manifest are registered, validate both compositions and all required copy fields, atomically switch Event.active_release_id, permit publishing only from an active complete release, and pin archived events to their release and assets.
+    author: H5-cohesion
+    provenance: [FLOWS-001-event-platform.md, PITCH-001-event-platform.md, /Users/ronitnath/dev/personal/universe-ronitnath/changes/pitch-1/packets.md]
+    supports: []
+    rebuts: []
+    resolution: unresolved
+    note: >
+      This closes the admitted code-versus-rows deploy seam without showing an unrenderable event or letting a shared-library upgrade mutate history. I would change my mind if deployment can atomically bind code and rows without an explicit release record while still supporting preview, rollback and archive pinning.
+    stake: false
+
+  - id: H5-cohesion-7
+    statement: >
+      F-5, F-7, and F-10 require EventInvitation UNIQUE(event_id, identity_id), versioned CapabilityLink rows keyed by unique token_hash, EventResponse UNIQUE(event_id, identity_id), EventSegment UNIQUE(event_id, segment_key), SegmentResponse UNIQUE(segment_id, identity_id), and Contact UNIQUE(identity_id), with re-mint revoking only the prior link, invite removal retaining responses, and identity deletion implemented as archive without cascading attendance.
+    author: H5-cohesion
+    provenance: [EV-019, FLOWS-001-event-platform.md, /Users/ronitnath/dev/personal/ronitnath/migrations/0013_event_links.up.sql, /Users/ronitnath/dev/personal/ronitnath/migrations/0015_attendance.up.sql, /Users/ronitnath/dev/personal/ronitnath/migrations/0016_segment_rsvps.up.sql]
+    supports: []
+    rebuts: []
+    resolution: unresolved
+    note: >
+      Separating the durable person-event relationship and response from replaceable bearer links is what makes returning RSVP, re-mint, cross-event history, merge and archive one platform behavior instead of event-specific cleanup code. I would change my mind if another key structure preserves those lifecycles and proves that link replacement or identity archival cannot erase response history.
+    stake: false
+
+  - id: H5-cohesion-8
+    statement: >
+      DEC-006 needs one platform ChangeEvent log keyed by monotonically increasing sequence with scope_kind, scope_id, kind, and aggregate_version for canonical copy.changed, response.changed, invitation.changed, and identity.changed events, and EventExtension code must neither define private SSE kinds nor subscribe outside its event scope.
+    author: H5-cohesion
+    provenance: [DEC-006, EV-018, FLOWS-001-event-platform.md]
+    supports: []
+    rebuts: []
+    resolution: unresolved
+    note: >
+      A single authorized event envelope plus replay makes reconnect behavior shared infrastructure; per-event channels or payloads would duplicate tier filtering and let each page become its own live application. I would change my mind if stateless snapshot-on-reconnect is demonstrably simpler and equally guarantees ordered convergence across restarts without a persisted change log.
+    stake: false
+
+  - id: H5-cohesion-9
+    statement: >
+      Applying cohesion as a ban on all bespoke event code would damage the product by erasing the documented neoclassical, starfield, and fireworks identities, so the design contract must preserve a presentation-only EventExtension inside an executable shared shell and component contract rather than impose one visual template.
+    author: H5-cohesion
+    provenance: [EV-011, EV-013, DEC-005, /Users/ronitnath/dev/personal/universe-ronitnath/docs/design.md]
+    supports: []
+    rebuts: []
+    resolution: unresolved
+    note: >
+      This names where my mandate becomes destructive if followed absolutely: visual sameness is not product cohesion, and the shared boundary should own behavior, states, accessibility and data contracts while an event owns bounded presentation. The current design source also still labels invite pages “per invite” despite EV-020 deferring that to per event, so it is not yet a coherent contract; I would change my mind if the three predecessor identities can be faithfully reproduced using only shared declarative theme parameters.
+    stake: false

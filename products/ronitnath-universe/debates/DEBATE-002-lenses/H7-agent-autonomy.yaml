@@ -1,0 +1,108 @@
+claims:
+  - id: H7-agent-autonomy-1
+    statement: >
+      F-2 and F-4 cannot satisfy unattended agent creation because both assign the journey to OWNER and require browser preview, publish, or live-page confirmation after the agent's terminal work while explicitly denying AGENT a flow of its own.
+    author: H7-agent-autonomy
+    provenance: ["/Users/ronitnath/dev/portfolio/products/ronitnath-universe/flows/FLOWS-001-event-platform.md", EV-012]
+    supports: []
+    rebuts: []
+    resolution: unresolved
+    note: >
+      The creating machine needs a first-class create/amend journey whose terminal state is returned through HTTP or MCP, including publication and post-publication verification; otherwise a transcript ends at "rows written" and cannot prove the event exists for guests. I would change my mind only if one agent can execute every required transition after the owner's initial prompt and receive structured proof of the public result without any human browser action or inspection.
+    stake: true
+
+  - id: H7-agent-autonomy-2
+    statement: >
+      F-5 cannot establish that people were invited unattended because its required completion path is an OWNER clicking copy and sending each capability through an external channel, while persisted copy count proves neither send nor delivery.
+    author: H7-agent-autonomy
+    provenance: [EV-019, "/Users/ronitnath/dev/portfolio/products/ronitnath-universe/flows/FLOWS-001-event-platform.md", "/Users/ronitnath/dev/personal/universe-ronitnath/changes/pitch-1/packets.md"]
+    supports: []
+    rebuts: []
+    resolution: unresolved
+    note: >
+      Under this mandate, either the machine-visible outcome must be named "invitation capabilities minted" rather than "invited," or the model needs delivery_endpoint(id, contact_id, channel, address) and delivery_attempt(id, invitation_id, endpoint_id, provider_message_id, state, error_code), with queued-to-sent-or-failed lifecycle and receipts exposed by API. Without that, the agent must falsely report success before any guest can receive a link; I would change my mind upon a transcript containing one terminal delivery result per intended invitee.
+    stake: false
+
+  - id: H7-agent-autonomy-3
+    statement: >
+      The open F-2 deploy seam permits an event row to become publishable before its event-specific renderer is deployed, so the proposed API can return success for an event that the public route cannot render.
+    author: H7-agent-autonomy
+    provenance: ["/Users/ronitnath/dev/portfolio/products/ronitnath-universe/flows/FLOWS-001-event-platform.md", EV-016, DEC-005]
+    supports: []
+    rebuts: []
+    resolution: unresolved
+    note: >
+      The data gate must add creation_run(id, agent_credential_id, idempotency_key, state, error_code), event_release(id, event_id, code_sha, renderer_key, manifest_revision, state), and event.active_release_id; the lifecycle must be authoring -> deployed -> probed -> publishable -> published or failed, and publish must reject any release lacking successful public, tokened, admin, asset, and schema probes. This is how a machine diagnoses which half of code-plus-data failed and retries safely; I would change my mind if one atomic deployment protocol already supplies equivalent durable states and a readiness representation keyed to the exact release.
+    stake: false
+
+  - id: H7-agent-autonomy-4
+    statement: >
+      PKT-04 is not yet a sufficient autonomous contract because it gives idempotency only to create and specifies no atomic event-manifest write, optimistic revision precondition, stable machine error schema, or converged-state readback for page, copy, invitee, link, and publish mutations.
+    author: H7-agent-autonomy
+    provenance: ["/Users/ronitnath/dev/personal/universe-ronitnath/changes/pitch-1/packets.md", "/Users/ronitnath/dev/portfolio/products/ronitnath-universe/pitches/PITCH-001-event-platform.md"]
+    supports: []
+    rebuts: []
+    resolution: unresolved
+    note: >
+      Require agent_credential(id, owner_account_id, token_hash, scopes, revoked_at), mutation_request(id, credential_id, idempotency_key, request_hash, result_status, result_body), and an event manifest revision changed by one transaction; uniqueness on (credential_id, idempotency_key) must make every retry return the original result, while stale revisions return a typed 409 and validation failures return field paths and codes. Audit rows must key credential_id and request_id rather than relying on a token label. I would change my mind when a versioned OpenAPI/MCP contract and fixture transcript demonstrate timeout retries, validation repair, conflict repair, and exact final readback without duplicates.
+    stake: false
+
+  - id: H7-agent-autonomy-5
+    statement: >
+      F-3's last-write-wins copy rule can silently overwrite an owner edit while giving an API agent a successful response, because "surfaced" is defined as a visual condition rather than a protocol conflict.
+    author: H7-agent-autonomy
+    provenance: [EV-018, "/Users/ronitnath/dev/portfolio/products/ronitnath-universe/flows/FLOWS-001-event-platform.md", "/Users/ronitnath/dev/personal/universe-ronitnath/changes/pitch-1/packets.md"]
+    supports: []
+    rebuts: []
+    resolution: unresolved
+    note: >
+      Model copy_field(event_id, module_instance_key, field_key, value, revision) with a unique composite key, plus copy_change(id, field_id, prior_revision, new_revision, actor_credential_id, request_id); writes must carry expected_revision and either commit atomically or return a machine-readable conflict containing the current value. Without this, a transcript says 200 while production wording is not what the agent intended; I would change my mind if the API's documented concurrency contract provides equivalent compare-and-swap evidence.
+    stake: false
+
+  - id: H7-agent-autonomy-6
+    statement: >
+      DEC-006's promised gap-free Last-Event-ID reconnect is not implementable with only an in-process broadcast bus or PostgreSQL LISTEN/NOTIFY because neither transport durably replays events missed during disconnect.
+    author: H7-agent-autonomy
+    provenance: [DEC-006, "/Users/ronitnath/dev/personal/universe-ronitnath/changes/pitch-1/packets.md"]
+    supports: []
+    rebuts: []
+    resolution: unresolved
+    note: >
+      Add change_event(id, aggregate_type, aggregate_id, aggregate_revision, audience_scope, event_type, payload, committed_at) in the same transaction as each mutation; SSE must replay after the cursor, then attach live, and return a typed snapshot-required condition after retention expiry. Mutation responses must include aggregate_revision and change_event.id so an agent can correlate its transcript, and normal GET readback must remain the authority rather than SSE arrival. I would change my mind if the data model names another durable replay source and tests a deploy-length disconnect with no gap or duplicate effect.
+    stake: false
+
+  - id: H7-agent-autonomy-7
+    statement: >
+      Per-event page and admin composition plus visual identity as code is not machine-verifiable as "styled and complete" unless each deployed release exposes a structured manifest and automated conformance results through the API.
+    author: H7-agent-autonomy
+    provenance: [EV-011, EV-013, EV-016, "/Users/ronitnath/dev/personal/ronitnath/src/seed.rs", "/Users/ronitnath/dev/personal/universe-ronitnath/docs/design.md"]
+    supports: []
+    rebuts: []
+    resolution: unresolved
+    note: >
+      The model needs component_release(registry_key, schema_version, code_sha), visual_identity(event_release_id, theme_key, asset_manifest, token_overrides), composition_revision(id, event_id, surface, document, schema_version), and check_result(release_id, check_key, status, diagnostics); a release becomes publishable only after every referenced component and asset resolves and SSR, tier filtering, forms, accessibility, and route probes pass. The real seed proves that no schedule, a flat schedule, and keyed RSVP segments all occur, so one fixed completeness test is insufficient. I would change my mind if the API can already enumerate every bound component, asset, copy key, route, and check result for an exact release.
+    stake: false
+
+  - id: H7-agent-autonomy-8
+    statement: >
+      The people directory may be the human console's base screen, but it cannot be the canonical acceptance surface for event creation because it does not represent code release, composition, copy revision, invite minting, delivery, or public-route readiness.
+    author: H7-agent-autonomy
+    provenance: [DEC-005, "/Users/ronitnath/dev/portfolio/products/ronitnath-universe/flows/FLOWS-001-event-platform.md", "/Users/ronitnath/dev/personal/universe-ronitnath/docs/design.md"]
+    supports: []
+    rebuts: []
+    resolution: unresolved
+    note: >
+      Keep the directory for the owner, but make a versioned event manifest plus creation-run status the platform-canonical machine surface, with all web screens as projections of those resources. Otherwise design-gate evidence can certify a beautiful unrelated screen while the creating actor remains blind. I would change my mind if a complete pickleball creation can be verified from one API transcript whose final resource links all of those states unambiguously.
+    stake: false
+
+  - id: H7-agent-autonomy-9
+    statement: >
+      Following agent autonomy absolutely will damage the product by forcing every bespoke visual experiment and one-off component through manifests, schemas, probes, and machine-readable completion gates before it can ship, reducing the expressive variance that made the predecessor events distinct.
+    author: H7-agent-autonomy
+    provenance: [EV-011, EV-013, DEC-005]
+    supports: []
+    rebuts: []
+    resolution: unresolved
+    note: >
+      That ceremony and constraint are the direct cost of forbidding visual human verification: starfields, fireworks, unusual RSVP semantics, and event-specific admin tiles become slower and may be rejected despite being delightful. My mandate still takes that damage because ambiguous autonomous success is worse under this lens; I would change my mind only if measured creation runs show unrestricted bespoke components achieving the same machine-diagnosable success rate without formal manifests and gates.
+    stake: false

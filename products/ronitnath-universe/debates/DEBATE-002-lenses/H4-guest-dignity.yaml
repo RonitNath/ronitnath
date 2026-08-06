@@ -1,0 +1,134 @@
+claims:
+  - id: H4-guest-dignity-1
+    statement: >
+      F-7 is incomplete because it asks a no-account guest for status, party size, a note, and segment answers without a step that names every stored field, its audience, its retention period, or a delete-and-correct route.
+    author: H4-guest-dignity
+    provenance:
+      - /Users/ronitnath/dev/portfolio/products/ronitnath-universe/flows/FLOWS-001-event-platform.md
+      - /Users/ronitnath/dev/personal/ronitnath/src/handlers/event_public.rs
+      - /Users/ronitnath/dev/personal/ronitnath/templates/event_public.html
+    supports: []
+    rebuts: []
+    resolution: unresolved
+    note: >
+      Add a guest-owned journey before submission and beside every saved answer: “Ronit stores your name, response, party size, note, and segment choices; Ronit can see them; they are kept until DATE,” followed by view, correct, and delete controls available through the link without an account. F-10 is owner administration, not a guest data-rights flow. I would change my mind only after a working F-7 board and route let a guest inspect and erase the complete record that the owner can inspect.
+    stake: false
+
+  - id: H4-guest-dignity-2
+    statement: >
+      A partner who opens a forwarded personalized link can see and overwrite the intended invitee's current RSVP because F-7 binds every return through that link to one identity row.
+    author: H4-guest-dignity
+    provenance:
+      - /Users/ronitnath/dev/portfolio/products/ronitnath-universe/flows/FLOWS-001-event-platform.md
+      - /Users/ronitnath/dev/personal/ronitnath/src/handlers/event_public.rs
+      - /Users/ronitnath/dev/personal/ronitnath/migrations/0013_event_links.up.sql
+    supports: []
+    rebuts: []
+    resolution: unresolved
+    note: >
+      The archived handler demonstrates the trap: a bound link ignores the submitted name and writes its person_id, while the returned view includes that person's attendance. The model needs invitation(invitation_id, event_id, intended_contact_id, expires_at), capability(capability_id, invitation_id, token_hash, revoked_at), respondent(respondent_id, self_name), and response(response_id, event_id, respondent_id, invitation_id, status, party_size, note), with an “I am the named guest / this was forwarded to me” choice before any existing response is shown. A forwarded recipient must receive a separate respondent and edit capability, never inherit attribution from the URL. I would change my mind only if an end-to-end forwarding test proves two people using one original invite cannot read or mutate each other's response.
+    stake: false
+
+  - id: H4-guest-dignity-3
+    statement: >
+      F-5 falsely attributes an external send to the platform even though its only observable action is the owner copying a URL.
+    author: H4-guest-dignity
+    provenance:
+      - /Users/ronitnath/dev/portfolio/products/ronitnath-universe/flows/FLOWS-001-event-platform.md
+      - EV-019
+    supports: []
+    rebuts: []
+    resolution: unresolved
+    note: >
+      “Copied” must never be labeled “sent,” “delivered,” “opened,” or “no reply,” and the data model may hold only owner-side share_action(invitation_id, copied_count, last_copied_at) if this affordance survives. There must be no delivery inference and no product pressure to add open receipts just to make the owner dashboard's claim true. I would change my mind if the product actually performed a disclosed send through a channel that truthfully reported delivery without monitoring link opens.
+    stake: false
+
+  - id: H4-guest-dignity-4
+    statement: >
+      F-9 makes an owner-only cross-event dossier the platform's base screen and explicitly includes a person whose only record is a never-opened link.
+    author: H4-guest-dignity
+    provenance:
+      - /Users/ronitnath/dev/portfolio/products/ronitnath-universe/flows/FLOWS-001-event-platform.md
+      - EV-009
+      - /tmp/h4-events/src/seed.rs
+    supports: []
+    rebuts: []
+    resolution: unresolved
+    note: >
+      This is surveillance-shaped by construction: sort by recency, invitation history, attendance, last response, and “whether they showed,” all for humans who have no account and no corresponding view. Never-opened invitee stubs must remain event-scoped and auto-delete shortly after the event; cross-event identity and attendance history require an explicit guest choice. The same capability must expose a canonical “What is stored about me?” view and deletion control before People can be the base screen. I would change my mind only if every profiled guest can see the same dossier, correct it, delete it, and affirmatively choose cross-event retention.
+    stake: true
+
+  - id: H4-guest-dignity-5
+    statement: >
+      Any schema that uses one universal identity row for an owner-authored nickname, invite targeting, guest self-description, and longitudinal attendance will silently turn the owner's guesses into the guest's identity.
+    author: H4-guest-dignity
+    provenance:
+      - EV-005
+      - EV-019
+      - /tmp/h4-events/src/seed.rs
+      - /tmp/h4-events/migrations/0011_people.up.sql
+    supports: []
+    rebuts: []
+    resolution: unresolved
+    note: >
+      The recovered rows include handles, inconsistent names, “with bf,” and two different Alex records, proving these are host notes rather than authoritative identities. Require owner_contact(contact_id, owner_id, owner_label, nickname, source), event_invitation(invitation_id, event_id, contact_id, expires_at), respondent(respondent_id, self_name, created_at), response(response_id, event_id, respondent_id, notice_version_id, fields), and an optional identity_link(contact_id, respondent_id, guest_confirmed_at). Never merge on name, never greet as if an owner nickname were self-chosen, purge unopened invitations after event_end plus 30 days, and purge response detail after 90 days unless the respondent opts into history. Without these boundaries, merge and delete rules corrupt attribution across events. I would change my mind if the schema proves owner assertions and guest assertions cannot be conflated without a guest-confirmed link.
+    stake: false
+
+  - id: H4-guest-dignity-6
+    statement: >
+      Recording uses and last_used_at on every capability GET turns merely opening an invitation into an undisclosed behavioral event.
+    author: H4-guest-dignity
+    provenance:
+      - /Users/ronitnath/dev/personal/ronitnath/migrations/0013_event_links.up.sql
+      - /Users/ronitnath/dev/personal/ronitnath/src/store/event_links.rs
+      - /Users/ronitnath/dev/personal/ronitnath/templates/events/detail.html
+    supports: []
+    rebuts: []
+    resolution: unresolved
+    note: >
+      The archived predecessor increments a use counter and timestamp during token resolution, then exposes “never used” and “last used” to the owner; that pattern must not enter the new model. Do not create link_open or guest_presence entities, do not mutate on GET, redact token paths and guest IP or user-agent data from application telemetry, and retain only short-lived aggregate operational metrics. SSE connection and reconnection must likewise remain ephemeral transport, not presence history. I would change my mind only for a guest-initiated, plainly labeled opt-in receipt rather than passive measurement.
+    stake: false
+
+  - id: H4-guest-dignity-7
+    statement: >
+      Letting agent-authored per-event code own all of F-7 makes recipient checking, data disclosure, and response deletion optional because the invite-page contract currently binds only accessibility and modules.
+    author: H4-guest-dignity
+    provenance:
+      - /Users/ronitnath/dev/personal/universe-ronitnath/docs/design.md
+      - EV-020
+      - /Users/ronitnath/dev/portfolio/products/ronitnath-universe/flows/FLOWS-001-event-platform.md
+    supports: []
+    rebuts: []
+    resolution: unresolved
+    note: >
+      Per-event visual identity may compose inside a canonical guest shell, but it must not replace the intended-recipient or forwarded-link choice, the exact-data disclosure, saved-response summary, delete control, capability expiry, or dead-link behavior. Those controls need one platform-owned implementation and contract tests against every generated event page. I would change my mind if the component registry mechanically refused to register or publish an event composition missing that immutable shell.
+    stake: false
+
+  - id: H4-guest-dignity-8
+    statement: >
+      F-3 permits event wording to change around a guest mid-RSVP without preserving or showing which wording the guest answered.
+    author: H4-guest-dignity
+    provenance:
+      - EV-018
+      - /Users/ronitnath/dev/portfolio/products/ronitnath-universe/flows/FLOWS-001-event-platform.md
+    supports: []
+    rebuts: []
+    resolution: unresolved
+    note: >
+      Add copy_revision(revision_id, event_id, created_at, changed_fields) and response.submitted_revision_id, show a visible “details changed” notice for material updates, and never silently replace RSVP labels or choices while a form is active. The guest needs to understand what their answer meant; preserving a content revision is not permission to preserve browsing behavior. SSE subscriptions must be event-and-tier scoped, carry no person identifier, and leave no connection history. I would change my mind if tests prove a material streamed change is announced and every confirmation identifies the revision submitted.
+    stake: false
+
+  - id: H4-guest-dignity-9
+    statement: >
+      Applying this mandate absolutely by forbidding person-level records before affirmative guest action would make F-5's pre-personalized links, F-9's never-opened rows, and the imported cross-event attendance history impossible.
+    author: H4-guest-dignity
+    provenance:
+      - /Users/ronitnath/dev/portfolio/products/ronitnath-universe/flows/FLOWS-001-event-platform.md
+      - EV-009
+      - /tmp/h4-events/src/seed.rs
+    supports: []
+    rebuts: []
+    resolution: unresolved
+    note: >
+      That damage is real: the product would lose its named pre-invite workflow and its longitudinal people thesis, leaving generic invitations and aggregate event history until guests opt in. Under this mandate, that is preferable to quietly conscripting friends into a private social graph. I would change my mind only for verifiable, informed agreement from the affected guests to pre-create and retain those person-level records.
+    stake: false
