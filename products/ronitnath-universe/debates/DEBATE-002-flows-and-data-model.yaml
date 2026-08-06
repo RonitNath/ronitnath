@@ -191,12 +191,14 @@ claims:
     provenance: [H4-guest-dignity-6, H4-guest-dignity-2, H4-guest-dignity-1, PKT-02, PKT-06]
     supports: []
     rebuts: []
-    resolution: escalated
+    resolution: resolved
     note: >
       Two distinct issues, both escalated. The forwarded-link overwrite is a concrete correctness
       problem the flows do not address (F-7 binds every return through a link to one identity). The
       open-tracking question is a values call: the data is useful to the owner and invisible to the
       guest. Nothing in the artifacts currently argues the guest's side, which is why this lens exists.
+      OWNER RULING 2026-08-05: no guest disclosure surface; link opens ARE recorded (DEC-009). The forwarded-link overwrite is fixed regardless — the page names whose invitation it is; bearer model unchanged.
+
 
   - id: C-12
     statement: >
@@ -207,12 +209,14 @@ claims:
     provenance: [H2-archivist-9, H4-guest-dignity-9, H2-archivist-6, H8-failure-realist-5]
     supports: []
     rebuts: []
-    resolution: escalated
+    resolution: resolved
     note: >
       Both lenses flagged this against their own mandate, which is the panel working as designed. It
       decides F-10's merge and archive semantics, which are already flagged T3-irreversible. H8-5 adds
       that the predecessor foreign keys cascade-delete attendance, so a naive delete destroys the data
       the bet exists to keep.
+      OWNER RULING 2026-08-05: merge yields one person with no retained trace of the duplicate rows; the duplicates were an artifact of three codebases, not two people (DEC-010). Archive never cascades into responses or attendance.
+
 
   - id: C-13
     statement: >

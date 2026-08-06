@@ -201,13 +201,13 @@ directory as identities appear. Polling and manual refresh are the exception and
   double-submit; **copy changing under them while they read** (F-3 step 4) without disturbing what
   they've typed.
 - **non-goals in this bet**: per-invite page composition (EV-020); guest login (FRIEND, later bet).
-- **open (DEBATE-002 C-11, escalated)**: a personalized link is a bearer capability, so **whoever
-  opens a forwarded link can read and overwrite the intended invitee's answer** — F-7 binds every
-  return through that link to one identity. Minimum fix regardless of policy: the page states whose
-  invitation it is and whose answer is being changed ("You're answering as Nikhil"), so a partner who
-  opens a forwarded link sees it isn't theirs rather than silently overwriting. Whether to go further
-  — bind on first use, or split shared links — is the owner's call, batched with the disclosure
-  question.
+- **decided (DEBATE-002 C-11, DEC-009)**: **no disclosure surface** — a guest is not shown what is
+  stored about them and gets no correction or deletion route; the trust here is the friendship, not a
+  privacy notice. **Link opens are recorded** (`uses`, `last_used_at`) — the owner's real question as
+  an event approaches is who hasn't looked. Separately, the **forwarded-link overwrite is fixed**: the
+  page names whose invitation it is and whose answer is being changed ("You're answering as Nikhil"),
+  so a partner opening a forwarded link sees it isn't theirs instead of silently overwriting. The
+  bearer model is unchanged.
 
 ## F-8 Arrive without a link
 
@@ -264,13 +264,17 @@ directory as identities appear. Polling and manual refresh are the exception and
      the name is what their link slug is built from (EV-019), so changing the name raises the
      question of whether existing links follow.
   4. **Delete** — remove a person from the system.
-- **branches**: **merge two identities** into one, which is how import duplicates get resolved — the
-  survivor keeps every attendance record from both.
-- **states**: merging two identities that both responded to the *same* event with *different*
-  answers (the conflict needs an explicit rule, not a silent pick); deleting a person who has
-  attendance history — the owner's stated reason for this whole bet is that this data must not be
-  lost, so delete is almost certainly archive; creating a person whose name matches an existing one
-  (allowed — the hash disambiguates links — but flagged so duplicates aren't made by accident).
+- **branches**: **merge two identities** into one, which is how import duplicates get resolved. Per
+  DEC-010 the result is simply one person, with no retained trace of the two rows — they were an
+  artifact of three codebases re-creating the same humans, not two people. Response logs concatenate
+  and the latest revision is the current answer; attendance is "showed" if either row says so; **every
+  capability link from both rows keeps working**; copy counts sum.
+- **states**: merging two identities that answered the *same* event differently (latest revision
+  wins — DEC-010); **archive, never delete** — the predecessor foreign keys cascade-delete attendance,
+  which would destroy exactly what this bet exists to preserve, so no archive path may cascade into
+  the response log or attendance; creating a person whose name matches an existing one (allowed — the
+  hash disambiguates links — but flagged so duplicates aren't made by accident); a merge that
+  combined two genuinely different people (no undo — DEC-010 accepts this).
 - **open**: merge conflict rule; delete vs archive semantics; whether renaming a person re-slugs
   their live links or leaves them. All three are data-gate questions and all three are
   irreversibility-flavoured (T3).
