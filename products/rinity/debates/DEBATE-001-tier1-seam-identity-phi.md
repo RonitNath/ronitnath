@@ -4,7 +4,7 @@ product: rinity
 date: 2026-08-06
 trigger: "T3 (irreversibility: PHI/call-data retention, customer identity model, config-schema and self-serve URL commitments, the rinity↔audgent seam) + T2 (bound waived entirely, EV-014)"
 scope: BRIEF-001 + FLOWS-001 (flow set in scope per SYS-DEC-004); brief OQs all pre-resolved by owner (EV-021..EV-025)
-status: RESOLVED (judge fan-in complete) — 1 escalation (E-1) awaiting owner ruling; memo + graph ready for owner review
+status: CLOSED 2026-08-06 — E-1 ruled by owner (EV-030 → DEC-001); J-1 refined by owner (holds + live PMS sync → DEC-002); J-2 boundary revised (EV-029: no real *patient data*, not no real calls)
 ---
 
 # DEBATE-001 — tier-1 cut, the seam, the customer door, the PHI posture
@@ -143,3 +143,9 @@ staged realm/compliance evidence given its friendly status (EV-005), or are the 
 realm and full posture hard gates even for RCDA? Blocking (sequences the in-bet cutover,
 EV-025) and owner-only (doctrine exception + risk appetite). PITCH-001 is drafted with
 the conservative reading (hard gates) and marks where E-1 would relax it.
+
+**Closed same day** — owner: "Yes for interim door" (EV-030), plus a staged real-call
+ladder (asterisk → owner-phone → RCDA fake-patients → compliant posture; EV-029).
+Recorded as DEC-001. In the same review the owner closed J-1's residual double-booking
+risk with a hold-then-resolve protocol and near-real-time PMS sync (EV-027, EV-028 →
+DEC-002). The pitch draft is revised accordingly before freeze.

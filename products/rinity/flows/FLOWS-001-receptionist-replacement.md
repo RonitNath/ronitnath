@@ -3,8 +3,8 @@ id: FLOWS-001
 product: rinity
 pitch: PITCH-001 (freezes with it)
 date: 2026-08-06
-status: draft — in scope for DEBATE-001
-sources: EV-012, EV-013, EV-015, EV-016, EV-019, EV-020, EV-021..EV-026, EV-011 (engine capabilities), EV-010 (as-built)
+status: draft rev 2 — debated (DEBATE-001), then extended by owner requirements batch 2026-08-06 (EV-027..EV-038); freezes with PITCH-001
+sources: EV-012, EV-013, EV-015, EV-016, EV-019, EV-020, EV-021..EV-026, EV-027..EV-038, DEC-001, DEC-002, EV-011 (engine capabilities), EV-010 (as-built)
 ---
 
 # FLOWS-001 — receptionist replacement, tier 1 (inbound)
@@ -30,9 +30,13 @@ rinity surfaces.
      the agent greets as the practice
   2. (phone) agent identifies the caller: existing-patient match (name/DOB) or new-patient
      capture (name, callback number, reason)
-  3. (phone) agent negotiates a slot: offers real openings for the right provider/visit type
-  4. (machine) agent books through the same adapter path the console uses; conflict re-checked
-     at write time
+  3. (phone) agent negotiates a slot **per the office's offer policy** (EV-033: ~2 offers
+     per week then advance — anti-enumeration, customizable) from the office's bookable pool
+     (in dedicated-slots mode that pool is the agent's reserved slots, not the open
+     calendar — EV-032)
+  4. (machine) offered slots are **held** the moment they're offered (EV-027, DEC-002); the
+     hold resolves to a booking once the caller has supplied enough, or expires; the write
+     reconciles through the adapter path the console uses
   5. (phone) agent confirms details back and closes; caller hangs up with a time
   6. (machine) call record (recording, transcript, outcome, booked-appointment link) lands in
      the console feed (F-4)
@@ -40,9 +44,10 @@ rinity surfaces.
   (→F-3); caller demands a human or the agent judges it should hand off (→F-5); caller
   hangs up mid-flow
 - states: no matching patient and caller declines intake → message for DESK (F-5 outcome);
-  no acceptable slot → offer waitlist/message, never silent failure; adapter write conflict →
-  re-offer, apologize once; engine outage → practice-configured fallback (voicemail/forward,
-  a DEC for the data gate)
+  no acceptable slot → offer waitlist/message, never silent failure; hold beaten by an
+  out-of-band PMS write (rare by construction, DEC-002) → re-offer, apologize once, F-4
+  conflict item; engine outage → practice-configured fallback (voicemail/forward, a DEC for
+  the data gate)
 - packets: derived at packet stage
 - open: visit-type taxonomy per office (maps to adapter's appointment types); how "the right
   provider" is chosen (continuity vs first-available) — per-office policy config
@@ -74,7 +79,9 @@ rinity surfaces.
   guidance per practice policy
 - states: knowledge stale (hours changed, doctor left) — staleness is OWNER's to fix via F-7;
   the agent must never contradict the system of record on schedule facts
-- open: insurance answers are high-stakes — tier 1 scope is accept/don't-accept lists only?
+- resolved (DEBATE-001 COL-3): tier 1 answers from configured practice facts (accepted
+  plans included); anything deeper is captured verbatim with a promised follow-up — never a
+  stonewall; live eligibility stays a gated integration (EV-022)
 
 **F-4 DESK reviews what the agent did** — the console's new center of gravity
 - actor: DESK
@@ -85,7 +92,9 @@ rinity surfaces.
 - steps:
   1. (web) console shows the call feed: time, caller, intent, outcome (booked/changed/
      message/handed-off), links to the affected appointment
-  2. (web) DESK opens a call: transcript + recording + what the agent committed to
+  2. (web) DESK opens a call: transcript + recording + what the agent committed to + the
+     call's LLM grade (per-aspect agent-behavior ratings, caller-emotion read, resolution
+     efficacy/speed — EV-034)
   3. (web) DESK works the needs-attention queue (messages, failed intents, callbacks)
   4. (web) resolved items are marked done; the queue reaches zero
 - branches: DESK disputes an agent action → corrects the appointment on the calendar (F-6)
@@ -132,8 +141,10 @@ rinity surfaces.
 - steps:
   1. (web) practice profile: hours, holidays, location, parking, phone etiquette/voice
   2. (web) knowledge: services, insurance accepted, FAQs in the practice's wording
-  3. (web) policies: booking rules (who books with whom, buffer rules), handoff rules (F-5),
-     urgent-case script, fallback behavior on outage
+  3. (web) policies: **answering model** (overflow — agent answers only after the office
+     doesn't pick up — or dedicated agent-bookable slots, EV-032), **slot-offer policy**
+     (offers per week / advance behavior, EV-033), booking rules (who books with whom,
+     buffer rules), handoff rules (F-5), urgent-case script, fallback behavior on outage
   4. (web) preview/test: OWNER hears the agent handle a test call before going live
 - branches: config error discovered via a bad call (F-4 dispute) → edit → verify
 - states: unconfigured office (defaults must be safe and honest); conflicting rules
@@ -151,9 +162,15 @@ rinity surfaces.
   1. (web) front door says what rinity is for a high-end practice (EV-024) and what it costs
      (per office, EV-024)
   2. (web) sign up → org + first office created; no Isoastra human required (EV-016)
-  3. (web) guided into F-7 configuration with rinity-native scheduling available immediately;
-     PMS integration shown as gated (sales call unlock, EV-022)
-  4. (web) billing established per office before/at go-live (EV-019 — cash flow needs this)
+  3. (web) **onboarding takes the practice's website URL and scrapes everything it can**
+     (hours, services, providers, insurance, location, tone) — the owner is asked **only
+     for what scraping couldn't determine** (EV-031; spec'd beforehand, a design-gate
+     deliverable — the bar is "RCDA has seen good AI product before")
+  4. (web) guided into F-7 to review scraped config and fill gaps, with rinity-native
+     scheduling available immediately; PMS integration shown as gated (sales call unlock,
+     EV-022)
+  5. (web) billing established per office before/at go-live (EV-019 — cash flow needs
+     this), and only after the browser test call has proven value (C2-4)
 - branches: sales-call onboarding path lands in the identical console state (EV-022 — both
   paths first-class); multi-office group adds offices
 - states: abandoned mid-signup; payment failure; org exists but no line connected (product
@@ -167,9 +184,10 @@ rinity surfaces.
 - outcome: real calls reach the agent; the practice can roll back to their old answering
   path at will
 - surface: web + outside-web (carrier reality)
-- steps: choose path (new number forwarding / port / carrier config per engine's telephony
-  providers, EV-011/AC-01) → guided setup with verification call → go-live switch with
-  explicit rollback control
+- steps: choose answering model (EV-032: full answering, or **overflow** — forward on
+  no-answer so the agent works only when the office doesn't pick up) → choose path (new
+  number forwarding / port / carrier config per engine's telephony providers, EV-011/AC-01)
+  → guided setup with verification call → go-live switch with explicit rollback control
 - branches: gated-integration variant: assisted cutover via sales call (EV-022) — likely
   the RCDA path
 - states: misconfigured forwarding (detection, not silent dead air); after-go-live cold feet
@@ -184,10 +202,43 @@ rinity surfaces.
   routine ops should live so customer-visible state has one source of truth)
 - surface: web (rinity operator surface) + outside-web (audgent/observability for deep work)
 - steps: fleet view (calls, error rates, capacity vs the alien numbers in EV-011 §4) →
-  drill into an office's failed calls → act (config fix, engine escalation)
-- branches: capacity limit approached (EV-011: warn at 6 concurrent) → scaling decision
+  **cost analytics: cost per call, component-level cost drivers, per-office cost
+  projections** (EV-035) → drill into an office's failed or low-graded calls (grades,
+  EV-034) → act (config fix, engine escalation)
+- branches: capacity limit approached (EV-011: warn at 6 concurrent) → scaling decision;
+  cost anomaly → drill down to the calls (including **test traffic** — every test run is a
+  saved, labeled, reviewable record inside the same cost ledger, EV-038; run labeling may
+  require an audgent change)
 - states: an office with zero calls (line misconfig? seasonal?) — surfaced, not silent
 - open: how much of this is rinity UI vs existing Grafana/observability in tier 1?
+
+**F-11 Listening in live on a call in progress** (EV-037)
+- actor: DESK/OWNER (own office), ISO (any office)
+- trigger: a call is in progress and someone needs ears on it — training, spot-checking a
+  new config, an escalation forming
+- outcome: live one-way audio of the call in the browser; the caller experience is
+  unaffected
+- surface: web (+ engine tap)
+- steps: in-progress calls visible in the console (live status) → open one → hear it live
+  → optionally trigger handoff (F-5) if it's going wrong
+- branches: call ends while listening → lands as the normal F-4 record
+- states: no engine tap available (whether audgent exposes live audio out of the call path
+  is an open engine question — data gate); concurrent listeners
+- open: access model (practice on own calls vs ISO on any) and whether listen-in events are
+  themselves audited — data gate
+
+**F-12 OWNER reads the practice's analytics** (EV-036)
+- actor: OWNER (DESK occasionally)
+- trigger: monthly "what am I paying for" moment; a quality doubt; a staffing decision
+- outcome: OWNER sees call volume (answered, booked, handed off, missed) and quality (grade
+  trends by aspect, EV-034) for their office
+- surface: web
+- steps: console analytics view → volume over time, outcome mix, grade trends → drill into
+  a specific low-graded call (→F-4 record)
+- branches: quality dips after a config change → back to F-7
+- states: sparse data (first weeks — must not look broken); overflow mode (EV-032) framing:
+  volume shown is *calls the office would otherwise have missed*
+- open: which aggregates are tier-1 vs later polish — design gate
 
 ---
 
@@ -203,6 +254,14 @@ rinity surfaces.
 ## For the data gate
 
 Call/transcript/recording retention + PHI posture (EV-018); customer identity realm vs
-internal Kanidm door; office config schema + versioning; attribution model (who booked:
-agent/DESK/ISO); the rinity↔audgent seam contract (EV-011 §2 vs EV-010 §3 — the missing
-wiring is the load-bearing seam of the whole bet).
+internal Kanidm door (interim-door exception scoped by DEC-001); office config schema +
+versioning; attribution model (who booked: agent/DESK/ISO); the rinity↔audgent seam
+contract (EV-011 §2 vs EV-010 §3 — the missing wiring is the load-bearing seam of the
+whole bet). From the 2026-08-06 owner batch: **hold semantics** (TTL, scope, what beats a
+hold — DEC-002); **PMS sync freshness contract** (which adapters push vs poll, staleness
+bound the agent may act on — EV-028); **dedicated-slots modeling** (office-open ≠
+agent-bookable, EV-032); **grading schema** (aspects, scales, grader cost attribution —
+EV-034); **cost attribution + projection model** (engine usage/cost → rinity per-call/
+per-office, EV-035); **test-run labeling** (test vs real traffic separable in the cost
+ledger — likely an audgent contract change, EV-038); **live listen-in transport + access
+model + audit** (EV-037).
