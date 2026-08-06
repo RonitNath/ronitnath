@@ -8,5 +8,16 @@ products:
     summary: Greenfield personal-universe platform (Rust/Leptos). Current bet in discovery: events platform + identity model.
     code_repo: RonitNath/universe-ronitnath (private GitHub); live predecessor RonitNath/ronitnath
     context: ~/dev/context/ronitnath/platform-scope.md
+  - name: rinity
+    tier: real
+    status: discovery
+    summary: >-
+      Healthcare voice-agent SaaS, the Isoastra flagship (only pushed brand). Brownfield onboard
+      2026-08-06: continue the existing codebase, extract its feature surface, then first-principles
+      PM from evidence (EV-007). Audgent engine is the expected voice-stack target and in design
+      scope (EV-008); nothing in the codebase is sacred (EV-009). Promote to client-facing at
+      first external deploy (RCDA pilot).
+    code_repo: isoastra/rinity on the forge (control plane; nexus ~/dev/isoastra/rinity); engine isoastra/audgent + isoastra/pipecat
+    context: ~/dev/context/isoastra/business-direction.md, ~/dev/context/isoastra/products-history-20260724.md
 # Other products (frontdesk-dental, rcda-mail, …) onboard when they are next touched,
 # each with an explicit tier — corner-cutting is deliberate, not accidental.
