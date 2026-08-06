@@ -3,7 +3,7 @@ gate: design (session ② of PITCH-001's 5-session bound)
 product: ronitnath-universe
 pitch: pitch/ronitnath-universe-1
 date: 2026-08-05
-status: REDESIGNED 2026-08-06 — 16 pages, 69 boards, one prototype flow per page. Second owner review taken; awaiting design-language sign-off on layer 1, the last gate item.
+status: SIGNED OFF 2026-08-06 (EV-026) — 16 pages, 69 boards, one prototype flow per page. Session ② closes; the design language is the contract the build styles against. Caveat recorded below: what was approved is the language, not the pickleball event's own look.
 artifact: Penpot "Design gate — universe pitch-1 (console)" — file 310e8e79-e53d-81b8-8008-707f2932c1b6, team ronitnath.com
 generators: universe-ronitnath `design/penpot/` (boards are regenerable; scripts are the source)
 ---
@@ -116,8 +116,32 @@ and has no revoke control.
 5. **Root is the personal dashboard, and the route surface is settled** (EV-022, DASH-001, DEC-011),
    which is what turned the layer-1 rebuild into two screens rather than one.
 
-Still outstanding: **design-language sign-off** on the rebuilt layer 1, after which the tokens are the
-contract the build styles against. That is now the only open item in this gate.
+## Sign-off (2026-08-06, EV-026) — the gate closes
+
+The owner approved the redesigned file and directed the bet to the data gate. Session ② is spent.
+The tokens, the component library and the canonical surfaces are now the contract the build styles
+against; the five language rules are DEC-012.
+
+**Approved with one caveat, recorded so it is not mistaken for an open item.** The owner's words:
+*"this layout/design is still specific to this event, and other events will likely have other
+designs… even this even needs more focused design work, because as-is it still looks bad."*
+
+- **This does not reopen the gate.** What the gate locks is the design *language* and the canonical
+  surfaces. Any single event's invite page and admin panel are per-event compositions by DEC-005, so
+  the pickleball rendering was always an instance rather than a specification.
+- **The focused design work on that event lands at session ⑤**, the pickleball-test acceptance,
+  where the event that has to look good is the one being judged. It is not a build task inside this
+  gate and it is not a packet.
+- **A template library for events is later work**, outside PITCH-001. It is what DEC-005's and
+  DEC-007's shared revisit condition — *revisit after two real events* — produces if the answer comes
+  back that the compositions are the same composition. Building it against one event is the failure
+  the predecessors demonstrated three times (EV-013).
+- **Constraint carried to the data gate**: nothing in the schema may assume the pickleball
+  composition. A second event with a different design must need no migration.
+
+Two records were promised by the second review and are now written: **EV-023** (nickname out of the
+bet) and **EV-024** (forwarding is not detectable), the latter amending DEC-009's prescribed fix.
+The language rules are **DEC-012**.
 
 ## What the rebuild has to show that the first one didn't
 
