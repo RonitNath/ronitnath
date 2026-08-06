@@ -3,7 +3,7 @@ gate: design (session ② of PITCH-001's 5-session bound)
 product: ronitnath-universe
 pitch: pitch/ronitnath-universe-1
 date: 2026-08-05
-status: DECISIONS TAKEN 2026-08-05 (ember; base screen = people directory; flows signed off) — layer 1/3 rebuild outstanding
+status: REBUILT 2026-08-06 — 16 pages, 67 boards, one prototype flow per page. Awaiting design-language sign-off on layer 1, the last gate item.
 artifact: Penpot "Design gate — universe pitch-1 (console)" — file 310e8e79-e53d-81b8-8008-707f2932c1b6, team ronitnath.com
 generators: universe-ronitnath `design/penpot/` (boards are regenerable; scripts are the source)
 ---
@@ -30,18 +30,28 @@ drawing into the product and the process:
 
 Recorded as EV-015/016/017, DEC-005, PITCH-001 delta-3, packets delta-3.
 
-## Current state of the file
+## Current state of the file — rebuilt 2026-08-06
+
+**16 pages · 67 boards · one named prototype flow per page**, boards chained in journey order so the
+owner clicks through rather than reading stills.
 
 | Page | State |
 | --- | --- |
-| `1 · Base screen` | **Rebuild against the people directory** (F-9/PKT-12). The ember styling, typography and density hold; the screen it renders does not. |
-| `2 · Component gallery` | **Stands, and is promoted** — with both admin panels and invite pages composed per instance, the library *is* the design artifact (DEC-005). Add PKT-14's copy-button states and the disconnected-stream indicator. |
-| `3 · User flows` | **Withdrawn; rebuild from FLOWS-001** — ten pages, one per flow, full viewport, with before/after pairs on the streaming surfaces. |
-| `4 · Breakpoints` | Stands; phone-first behaviour unaffected. |
-| `5 · Options` | **Retires** — ember is picked, so there is no live decision for it to hold. |
+| `1 · Base screen` | **Rebuilt** against the **dashboard and Contacts**, ember dark and light. Two surfaces, not one: the dashboard is the root, Contacts is where density is actually under load. |
+| `2 · Component gallery` | **Rebuilt and promoted** — with admin panels and invite pages both composed per instance, the library *is* the design artifact (DEC-005). Now carries PKT-14's copy-button states and the three stream states. |
+| `3a … 3m` | **Thirteen pages, one per flow**, F-1 … F-13, at real viewport size. Streaming surfaces (F-3, F-6, F-9) carry before/after pairs and a disconnected board. Terminal flows (F-2, F-4) render the terminal as a surface rather than skipping it. |
+| `4 · Breakpoints` | **Rebuilt** — dashboard 390/834/1440, Contacts 390/1440, invite 390/834. |
+| ~~`5 · Options`~~ | **Retired**, as ruled. Ember is decided, so nothing live is left for it to hold. |
 
-Colours remain **linked library assets** (`ember/dark/*`, `ember/light/*`, `brass/dark/*`), values
-transcribed from the hallmark contract, so a token change still cascades everywhere.
+Colours remain **linked library assets** (`ember/dark/*`, `ember/light/*`, plus `presence/dark/*` for
+the night-sky boards on 3h), values transcribed from the hallmark contract, so a token change still
+cascades everywhere.
+
+**Two of the rebuilt boards answer questions the first file didn't raise.** Layer 4's Contacts-at-390
+shows the six-column table ceasing to be a table — and the three facts (invited / answered / showed)
+surviving that, rather than collapsing into one "attended" number at exactly the width the screen is
+read on most. Layer 4's dashboard-at-1440 deliberately does *not* spread to fill the width; the empty
+right-hand column is the DASH-001 constraint made visible.
 
 ## Owner decisions taken (2026-08-05)
 
@@ -50,12 +60,15 @@ transcribed from the hallmark contract, so a token change still cascades everywh
 2. **Base screen: the people directory** (F-9, PKT-12). Layer 1 rebuilds against it; the per-event
    admin overview it currently renders is a bespoke composition and can't be canonical.
 3. **Flows signed off** — with F-3, F-5 and F-9 rewritten and F-10 added in the same pass
-   (delta-4). Layer 3 rebuilds from FLOWS-001: **ten pages, one per flow**, full viewport.
+   (delta-4), then F-12 and F-13 added by delta-6. Layer 3 rebuilt from FLOWS-001: **thirteen pages,
+   one per flow**, full viewport.
 4. **F-3's seam resolved out of the design gate**: copy is database rows edited in the console, not a
    file (EV-018). It stopped being a design question and became a scope decision.
+5. **Root is the personal dashboard, and the route surface is settled** (EV-022, DASH-001, DEC-011),
+   which is what turned the layer-1 rebuild into two screens rather than one.
 
 Still outstanding: **design-language sign-off** on the rebuilt layer 1, after which the tokens are the
-contract the build styles against.
+contract the build styles against. That is now the only open item in this gate.
 
 ## What the rebuild has to show that the first one didn't
 
