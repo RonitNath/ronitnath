@@ -21,7 +21,7 @@ depends:      packet IDs
 2. **States** — for every human-visible surface: empty state, error state, loading/latency, and the unauthorized/expired path. For every API: invalid input, auth failure, idempotency.
 3. **Data lifecycle** — creation, mutation, export, deletion/retention, migration/rollback for every new table.
 4. **Instrumentation** — how the owner will *know* it works in production (logs/metrics/audit), per packet or explicitly waived.
-5. **UX artifacts** — human-visible surfaces get design work structured per `design-gate.md` (base screen, gallery, flows, breakpoints — prototyped, linked tokens), linked by packet ID. Where the product's code repo carries its own design procedure or token contract, that is what the boards transcribe. Reviewed at the design gate.
+5. **UX artifacts** — human-visible surfaces get design work structured per `design-gate.md` (base screen, flows, breakpoints — prototyped, linked tokens), linked by packet ID. Where the product's code repo carries its own design procedure or token contract, that is what the boards transcribe. Reviewed at the design gate.
 6. **Verification** — each acceptance scenario names how it will be evidenced (test, browser walk, query). CI rejects implementation PRs lacking packet IDs or acceptance evidence.
 
 A checklist row may be waived, but the waiver is written on the packet set — skipping is a decision, never an accident (same principle as debate triggers).

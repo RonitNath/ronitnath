@@ -17,7 +17,7 @@ Owner flagged at the pilot bet's first pitch freeze: user stories and adjacent "
 
 Owner added two review stations between packet derivation and build, because inspecting working software is too late to catch a missing workflow, a wrong design direction, or a wrong domain model:
 
-- **Design gate** (`design-gate.md`): layered Penpot review — dense base screen with linked tokens → component gallery → all user flows → select flows at breakpoints, all prototyped; option pages for iteration-by-selection. Owner verifies workflow completeness + ordering and locks the design language.
+- **Design gate** (`design-gate.md`): layered Penpot review — dense base screen with linked tokens → all user flows → select flows at breakpoints, all prototyped (component-gallery layer struck by owner 2026-08-06, rinity EV-043); option pages for iteration-by-selection. Owner verifies workflow completeness + ordering and locks the design language.
 - **Data gate** (`data-gate.md`): domain model, access patterns, transport seams (HTTP/SSE/WS/RPC), operational posture (elastic scaling, zero-downtime rolling upgrades), peripheral-service requirements. May loop back to the design gate when iteration reveals new UI surfaces.
 
 Both are owner sessions and count against the bet's bound.

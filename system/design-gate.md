@@ -20,13 +20,12 @@ journeys exist, the flow addendum was skipped or wrong — stop, fix it there, c
    Pick a **genuinely platform-level** surface. If the product's main surfaces are composed per
    instance (per event, per tenant, per invite), a bespoke instance is the wrong base screen — use a
    canonical surface, and lock the shared component library that the compositions draw from.
-2. **Component gallery** — every component in one view, to inspect the vibe the application gives off.
-3. **User flows** — **one page per flow**, boards at real viewport size (full screens, not
+2. **User flows** — **one page per flow**, boards at real viewport size (full screens, not
    thumbnails), laid out in journey order. A flow whose steps happen outside the web UI still gets a
    page, showing the before and after states around the non-UI step.
-4. **Breakpoints** — select flows rendered at different widths (phone-first products: phone is the
+3. **Breakpoints** — select flows rendered at different widths (phone-first products: phone is the
    primary rendering, desktop the variant).
-5. **Options** — **conditional**. An options page exists only when there is a live decision the agent
+4. **Options** — **conditional**. An options page exists only when there is a live decision the agent
    needs the owner to make. Alternatives side by side, chosen by selection rather than serial rework.
    No open decision, no options page.
 
@@ -39,8 +38,12 @@ above each board for Penpot's own board-name label so it doesn't collide with dr
 
 ## Exit criteria
 
-Owner signs off the design language, and strikes/reorders anything wrong in layer 3 — which now means
+Owner signs off the design language, and strikes/reorders anything wrong in layer 2 — which now means
 a flow *rendering* is wrong, since the flow *set* was settled at the pitch. Corrections land as
 deltas against the flow addendum and the packets. After sign-off, tokens are the contract the build
-styles against. A later loop-back from the data gate (new surfaces discovered) reopens layers 3–4 for
+styles against. A later loop-back from the data gate (new surfaces discovered) reopens layers 2–3 for
 those flows only; layer 1 reopens only if direction itself failed.
+
+*(A component-gallery layer existed in earlier revisions; the owner struck it 2026-08-06 — the base
+screen plus real flow boards already show every component in context, so a gallery inspects nothing
+the gate doesn't. Recorded in rinity EV-043.)*
