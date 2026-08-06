@@ -63,6 +63,8 @@ claims:
       that "surfaced" is a visual condition, so an API agent gets a success response for a write that
       silently clobbered the owner. Requires a revision per copy value and an optimistic precondition
       on write. Whether superseded revisions are retained is contested — see C-9.
+      OWNER RULING 2026-08-05: narrowed — the optimistic precondition stands, but copy history is NOT retained; no downstream question depends on superseded wording (DEC-008).
+
 
   - id: C-4
     statement: >
@@ -105,10 +107,12 @@ claims:
     provenance: [H1-minimalist-5, H1-minimalist-4]
     supports: []
     rebuts: [C-7]
-    resolution: escalated
+    resolution: resolved
     note: >
       Escalated with C-7 as one decision. Minimalism's six-table model is the cheapest thing that
       satisfies today's evidence and preserves DEBATE-001 C-6 (identity is code).
+      OWNER RULING 2026-08-05: upheld — presentation stays code, no composition/theme/snapshot rows (DEC-008).
+
 
   - id: C-7
     statement: >
@@ -118,13 +122,15 @@ claims:
     provenance: [H2-archivist-4, H5-cohesion-5, H8-failure-realist-7]
     supports: []
     rebuts: [C-6]
-    resolution: escalated
+    resolution: resolved
     note: >
       The load-bearing collision of the round, and it attacks DEBATE-001 C-6 — the ruling the whole
       product shape rests on. The owner's stated reason for this bet is that data about his friends
       survived three codebases badly; the archivist observes that under identity-as-code the *pages*
       do not survive at all. Escalated: this is a values question about what "preserved" means, and it
       sets how much of presentation the data model must hold.
+      OWNER RULING 2026-08-05: accepted as true and judged not worth its cost; deliberately giving up page reconstruction. Narrowed: responses become an append-only audit log and attendance a separately recorded fact (DEC-008).
+
 
   - id: C-8
     statement: >
@@ -134,10 +140,12 @@ claims:
     provenance: [H5-cohesion-1, H5-cohesion-4, H5-cohesion-8]
     supports: []
     rebuts: [C-9]
-    resolution: escalated
+    resolution: resolved
     note: >
       Escalated with C-9. Without a boundary of roughly this shape, "per-event admin panel" (EV-016)
       means N unrelated applications sharing a database.
+      OWNER RULING 2026-08-05: partially upheld — routes, authorization and SSE topics stay central (DEC-007).
+
 
   - id: C-9
     statement: >
@@ -148,13 +156,15 @@ claims:
     provenance: [H6-expressive-variance-1, H6-expressive-variance-2, H6-expressive-variance-3, H6-expressive-variance-7, "/tmp/h6-events/migrations/0020_segment_paid_attended.up.sql", "/tmp/h6-rn-events/src/routes/admin/images.rs"]
     supports: []
     rebuts: [C-8]
-    resolution: escalated
+    resolution: resolved
     note: >
       H6 carries the better evidence: it cites a real migration and a real admin route from past
       events that added exactly the persistence C-8 forbids. The bet exists because events forced
       rebuilds (EV-011); a boundary that forbids per-event persistence reproduces the cause.
       Escalated as one decision with C-8 — where the extension boundary sits is the single question
       that most shapes the data model.
+      OWNER RULING 2026-08-05: upheld on persistence — extensions may own event-scoped tables and commands; H6's cited predecessor migration decided it (DEC-007).
+
 
   - id: C-10
     statement: >

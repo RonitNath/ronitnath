@@ -3,13 +3,13 @@ id: FLOWS-001
 product: ronitnath-universe
 pitch: PITCH-001 (addendum, added retroactively by delta-3 — SYS-DEC-004)
 date: 2026-08-05
-status: SIGNED OFF 2026-08-05 (owner: "Lgtm on the rest of the flows") — F-3, F-5, F-9 rewritten and F-10 added by the same review; those four await confirmation
-sources: EV-012, EV-015, EV-016, EV-017, EV-018, EV-019, EV-020, DEC-005, DEC-006
+status: SIGNED OFF 2026-08-05; amended by DEBATE-002 + owner rulings DEC-007/DEC-008 (F-11 added; F-3/F-7/F-9 amended). Three claims remain escalated: base screen, guest disclosure, retention.
+sources: EV-012, EV-015..EV-020, DEC-005, DEC-006, DEC-007, DEC-008, DEBATE-002
 ---
 
 # User flows — event platform + minimum identity
 
-Ten flows. Written per `system/flow-addendum.md`: journeys that happen in a terminal are flows too,
+Eleven flows. Written per `system/flow-addendum.md`: journeys that happen in a terminal are flows too,
 and one-time machine-mediated work is not.
 
 **Actors**: OWNER (browser session), GUEST (holds a capability link, no account), VISITOR (public
@@ -35,6 +35,7 @@ directory as identities appear. Polling and manual refresh are the exception and
 | F-8 | Arrive without a link | VISITOR | web | canonical |
 | F-9 | People directory | OWNER | web | canonical — **base screen** |
 | F-10 | Manage an identity | OWNER | web | canonical |
+| F-11 | Close an event and record who came | OWNER | web | per-event |
 
 ---
 
@@ -95,8 +96,12 @@ directory as identities appear. Polling and manual refresh are the exception and
   named, never half-applied; a guest **mid-RSVP** when copy changes → their form state survives the
   re-render (the copy updates around them); a viewer offline or reconnecting → gets current copy on
   reconnect, not a gap; concurrent owner+agent write on one field (last-write-wins, surfaced).
-- **open**: does the SSE frame carry the changed field or the whole copy set for the event? Does copy
-  keep history — is there an undo, or is the previous value gone? Data gate.
+- **decided (DEBATE-002 C-3, DEC-008)**: a save carries an **optimistic precondition on the value's
+  revision** — a stale save is rejected and re-presented, never silently applied. "Surfaced" is not
+  enough: it is a visual condition, so an API agent would receive success for a write that clobbered
+  the owner. **Copy history is not retained** — the precondition prevents the loss, and no downstream
+  question depends on superseded wording (owner: retain what people answered, not what they saw).
+- **open**: does the SSE frame carry the changed field or the whole copy set for the event? Data gate.
 
 ## F-4 Change structure
 
@@ -183,6 +188,11 @@ directory as identities appear. Polling and manual refresh are the exception and
   3. Guest sets status, party size, and a note; per-segment answers if the event uses segments.
   4. Confirmation is on the page itself — the answer is now visible as *their* answer, and it has
      already reached the owner's dashboard (F-6).
+- **decided (DEBATE-002 C-15/DEC-008)**: a response is **one idempotent revision committed in one
+  transaction**, appended to a log — status, party size, note and every segment answer together. It is
+  never a destructive update, and never a mutable row plus separately upserted segment rows, which
+  could persist a combination nobody submitted or expose a half-written answer if a segment write
+  failed. The current answer is the latest revision; the log is the audit trail the owner keeps.
 - **branches**: **returning guest** — same link, sees their current answer, changes it, upserts
   against the same identity row (no duplicate people); no-JS → the form posts and works, without the
   live updates.
@@ -191,7 +201,13 @@ directory as identities appear. Polling and manual refresh are the exception and
   double-submit; **copy changing under them while they read** (F-3 step 4) without disturbing what
   they've typed.
 - **non-goals in this bet**: per-invite page composition (EV-020); guest login (FRIEND, later bet).
-- **open**: none.
+- **open (DEBATE-002 C-11, escalated)**: a personalized link is a bearer capability, so **whoever
+  opens a forwarded link can read and overwrite the intended invitee's answer** — F-7 binds every
+  return through that link to one identity. Minimum fix regardless of policy: the page states whose
+  invitation it is and whose answer is being changed ("You're answering as Nikhil"), so a partner who
+  opens a forwarded link sees it isn't theirs rather than silently overwriting. Whether to go further
+  — bind on first use, or split shared links — is the owner's call, batched with the disclosure
+  question.
 
 ## F-8 Arrive without a link
 
@@ -217,8 +233,11 @@ directory as identities appear. Polling and manual refresh are the exception and
 - **outcome**: Owner sees everyone in the system, one row per human, with their history.
 - **steps**:
   1. Owner opens **People** — the console's home, and the platform's densest canonical surface.
-  2. One row per person across all events: name, nickname, events invited to, events attended, last
-     response. **Not** one row per event-attendance — the collapse is the point (EV-013).
+  2. One row per person across all events. **Three independently sourced facts, never derived from
+     each other** (DEBATE-002 C-5, DEC-008): **invited** (a capability link exists), **answered** (the
+     response log), **showed** (the owner's own record, F-11). Deriving "attended" from RSVP status is
+     what would make this screen lie. **Not** one row per event-attendance — the collapse is the point
+     (EV-013).
   3. Search and filter; sort by how recently they've been around.
   4. Open a person → every event they were invited to, what they answered, whether they showed, and
      their contact record.
@@ -256,6 +275,27 @@ directory as identities appear. Polling and manual refresh are the exception and
   their live links or leaves them. All three are data-gate questions and all three are
   irreversibility-flavoured (T3).
 
+## F-11 Close an event and record who came  *(added by DEBATE-002 C-5)*
+
+- **actor**: OWNER · **surface**: web, per-event · **packets**: PKT-16, PKT-12
+- **trigger**: The event is over — that night, or the next morning.
+- **outcome**: The system knows who actually showed, as a fact distinct from what they answered, and
+  the event is archived against the release that rendered it.
+- **steps**:
+  1. Owner opens the event and closes it.
+  2. Marks who showed, working from the response list — the common case is confirming the yeses and
+     correcting a handful.
+  3. Records anyone who came without an invite (a plus-one who materialised, a friend of a friend) —
+     they become an identity, which is how the directory learns about people organically.
+  4. The event archives: pinned to its release, no longer accepting responses.
+- **branches**: closing an event nobody answered; correcting attendance days later; an event that is
+  never formally closed (attendance stays unknown rather than assumed).
+- **states**: attendance recorded for a person who answered "can't" (allowed — people show up
+  anyway); a person marked as attended who has no response row; re-opening a closed event.
+- **decided (DEC-008)**: attendance is the **owner's own observation**, never inferred from RSVP
+  status. Unknown is a real value and must be distinguishable from "did not attend".
+- **open**: does archiving freeze the guest-facing page, the admin panel, or both?
+
 ---
 
 ## Not flows (deliberate)
@@ -270,7 +310,7 @@ directory as identities appear. Polling and manual refresh are the exception and
 
 ## Design-gate rendering
 
-One Penpot page per flow, boards at real viewport size, in journey order. F-4 gets a page despite
+One Penpot page per flow (eleven), boards at real viewport size, in journey order. F-4 gets a page despite
 being `terminal`: it shows the state before and after the conversation, which is where the deploy
 seam becomes visible. Live-updating surfaces (F-3, F-6, F-9) need a before/after board pair so the
 streamed change is legible as motion, not just a final state.
