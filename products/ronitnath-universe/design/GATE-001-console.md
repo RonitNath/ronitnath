@@ -34,7 +34,7 @@ Recorded as EV-015/016/017, DEC-005, PITCH-001 delta-3, packets delta-3.
 
 **16 pages · 69 boards · one named prototype flow per page**, boards chained in journey order so the
 owner clicks through rather than reading stills. Redesigned 2026-08-06 against the five language
-rules above; the coverage below is unchanged from the rebuild.
+rules in the second review below; coverage is unchanged from the rebuild.
 
 | Page | State |
 | --- | --- |
@@ -49,7 +49,7 @@ the night-sky boards on 3h), values transcribed from the hallmark contract, so a
 cascades everywhere.
 
 **Two of the rebuilt boards answer questions the first file didn't raise.** Layer 4's Contacts-at-390
-shows the six-column table ceasing to be a table — and the three facts (invited / answered / showed)
+shows the wide table ceasing to be a table — and the three facts (invited / answered / showed)
 surviving that, rather than collapsing into one "attended" number at exactly the width the screen is
 read on most. Layer 4's dashboard-at-1440 deliberately does *not* spread to fill the width; the empty
 right-hand column is the DASH-001 constraint made visible.
