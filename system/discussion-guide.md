@@ -16,7 +16,7 @@ The interviewer is a separate role from the spec-writer. Its output is a structu
 | --- | --- |
 | Problem | Why this bet, why now; what hurts today (tie to evidence) |
 | Users | Who touches this; whose behavior changes |
-| Appetite | Fixed time budget; and whether this is one bet or several |
+| Bound | The bet's fixed budget — owner review sessions and/or a real-world deadline, never time estimates (SYS-DEC-001) — and whether this is one bet or several |
 | Constraints | Hard requirements: compatibility, migrations, rulings already made |
 | No-gos | What is explicitly out, even if adjacent and tempting |
 | Success signals | The observable event that marks the bet won |

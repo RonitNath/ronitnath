@@ -7,8 +7,8 @@ Not everything gets a debate. Skipping must be a decision, not an accident: ever
 | # | Trigger | Default threshold (revisable by decision, not by drift) |
 | --- | --- | --- |
 | T1 | Product tier | `client-facing` → always debate |
-| T2 | Appetite | > 2 weeks of build time |
-| T3 | Irreversibility | Schema/data-model commitments on stored user data; public URL or API commitments; identity/auth model changes; key-custody choices; anything whose reversal costs more than the appetite |
+| T2 | Bound size | Review budget > 3 owner sessions, or deadline > 6 weeks out (SYS-DEC-001: bounds are sessions/deadlines, never time estimates) |
+| T3 | Irreversibility | Schema/data-model commitments on stored user data; public URL or API commitments; identity/auth model changes; key-custody choices; anything whose reversal costs more than the bound allows |
 | T4 | Evidence conflict | Two evidence items contradict on a load-bearing claim of the brief |
 | T5 | Interviewer confidence | Brief flagged `confidence: low` |
 | T6 | Provenance | The brief's supporting evidence is entirely `inference` (no ground truth) |
@@ -22,8 +22,8 @@ One agent, one page, **fatal flaws only** — wrong-problem, impossible-constrai
 ## Record line (mandatory, in the pitch)
 
 ```
-debate: skipped (tier=real, appetite=3d, no triggers)
-debate: sanity-pass (tier=real, appetite=1w) → no fatal flaws
+debate: skipped (tier=real, bound=2 sessions, no triggers)
+debate: sanity-pass (tier=real, bound=3 sessions) → no fatal flaws
 debate: triggered (T3: identity data model) → memo DEBATE-###
 ```
 

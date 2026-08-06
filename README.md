@@ -18,7 +18,7 @@ signal → evidence log → PM interview → [debate | sanity pass] → pitch (f
 - **Signal capture**: human feeds raw signal (calls, dogfooding, inspiration) into the product's `evidence/`. Every item is provenance-tagged `ground-truth` (human-originated) or `inference` (agent-produced). A pitch resting only on inference is flagged.
 - **PM interview**: interviewer agent drafts a discussion-guide agenda (`system/discussion-guide.md`), shows it for strike/add edits, runs a freeform interview with coverage-checklist semantics, outputs a structured brief to `briefs/`.
 - **Adversarial review**: selective — trigger rules in `system/debate-triggers.md`. Skipping is a recorded decision, never an accident. Debate output is an argument graph (`system/claim-schema.md`); the memo is generated from the graph.
-- **Pitch**: Shape Up shape — problem, appetite, rough solution, rabbit holes, no-gos. Frozen as the baseline (git tag `pitch/<product>-<n>`). Appetite is fixed time, variable scope.
+- **Pitch**: Shape Up shape — problem, bound, rough solution, rabbit holes, no-gos. Frozen as the baseline (git tag `pitch/<product>-<n>`). The bound is fixed budget, variable scope — denominated in owner review sessions and/or a real-world deadline, never time estimates (`system/decisions.md` SYS-DEC-001).
 - **Build**: work packets carry stable IDs, pinned baseline, acceptance scenarios, explicit non-goals. Requirement deltas are PRs against the pitch, never silent rewrites.
 - **Retro**: bet closes with a short note ("appetite was X, took Y, because…") attached to the pitch. PM judgment accretes one file per bet.
 
@@ -41,6 +41,7 @@ products/<name>/
   evidence/EV-###-slug.md       # provenance-tagged signal
   decisions/DEC-###-slug.md     # chose A over B because C
   briefs/BRIEF-###-slug.md      # interview output
+  debates/DEBATE-###-slug.{yaml,md}  # claim graph + memo generated from it
   pitches/PITCH-###-slug.md     # frozen baselines (tagged at freeze)
 ```
 

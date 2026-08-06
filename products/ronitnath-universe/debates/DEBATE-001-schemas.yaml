@@ -1,0 +1,154 @@
+# DEBATE-001 — the two schemas that outlive the bet + the agent-API surface
+# Trigger: T3 (BRIEF-001). Pilot caveat: single-context debate (one model in
+# proposer/red-team/synthesis passes); multi-agent independence deferred to a
+# later bet — recorded so the limitation is visible, not hidden.
+inherited_open_questions: [OQ-4, OQ-5, OQ-6]
+claims:
+  # ── identity cluster ──────────────────────────────────────────────
+  - id: C-1
+    statement: >
+      Cut one needs only a minimal identity schema: identity(kind=human),
+      account, credential(email), auth_factor(password), session,
+      capability_link, audit — with guests existing as identity rows
+      WITHOUT accounts (longitudinal people continuity).
+    author: proposer
+    provenance: [EV-005, EV-009, EV-013]
+    supports: [C-11]
+    rebuts: []
+    resolution: resolved
+    note: ""
+  - id: C-2
+    statement: >
+      Deferring project/role_template/grant tables until the friend-accounts
+      bet risks building admin assumptions into every handler that are
+      wrong once a second account exists.
+    author: red-team
+    provenance: [inference]
+    supports: []
+    rebuts: [C-1]
+    resolution: deferred-as-assumption
+    note: >
+      Assumed cheap to reverse: no second account exists during this bet,
+      export/import is first-class (C-11), and adding grant tables is an
+      additive migration. Guard adopted into the pitch: handlers check a
+      single authorize(actor, action) seam from day one, so authority has
+      one choke point even while the answer is always "owner".
+  - id: C-3
+    statement: >
+      Agent MCP/HTTP access authenticates as owner-minted NAMED bearer
+      tokens (hashed at rest, audit rows carry the token label), acting on
+      the owner's account — no agent identity rows, per owner ruling.
+    author: proposer
+    provenance: [EV-009, EV-012, EV-013]
+    supports: []
+    rebuts: []
+    resolution: resolved
+    note: Resolves OQ-5. July4's api_token factor is the precedent. A coarse scope field (events-write) is carried on the token from day one; fine-grained enforcement can start coarse.
+  - id: C-4
+    statement: >
+      Encrypted wire-ids (EV-004 ruling) are implemented from the first
+      table — trivial in Rust (~20ns/op, aes crate) — rather than deferred;
+      sessions and capability links remain random bearer tokens.
+    author: proposer
+    provenance: [EV-004]
+    supports: []
+    rebuts: []
+    resolution: resolved
+    note: Ruled decision (DEC-002); included for completeness, not re-litigated. Key custody = same secret-materialization path as other app secrets.
+  # ── page/module cluster ───────────────────────────────────────────
+  - id: C-5
+    statement: >
+      A fixed event template repeats the exact failure that forced three
+      rebuilds; modular page composition is required, not optional.
+    author: proposer
+    provenance: [EV-011, EV-013]
+    supports: [C-6]
+    rebuts: []
+    resolution: resolved
+    note: ""
+  - id: C-6
+    statement: >
+      Per-event style identity CANNOT be a props-only theme: two of three
+      past identities required bespoke code (Starlight starfield, canvas
+      fireworks). The registry must treat per-event bespoke modules/themes
+      written in code — by the agent, at event-creation time — as the
+      NORMAL path, not an escape hatch. Content stays in the page doc;
+      identity lives in code.
+    author: synthesis
+    provenance: [EV-011, EV-013]
+    supports: []
+    rebuts: []
+    resolution: resolved
+    note: This is the load-bearing design insight of the debate — it reconciles EV-006 (curated registry, no dynamic loading) with EV-011 (specialized identities) via the agent-creates flow (EV-012).
+  - id: C-7
+    statement: >
+      Agent-authored page-doc props will drift as module schemas evolve;
+      archived events then break silently.
+    author: red-team
+    provenance: [inference]
+    supports: []
+    rebuts: [C-5]
+    resolution: deferred-as-assumption
+    note: >
+      Mitigation adopted: per-module props validated against a schema at
+      write time. Assumption: archived events may be FROZEN to their last
+      rendered form instead of staying render-compatible forever — all
+      three recovered past events already live as semi-static content
+      (EV-013), so freezing matches observed reality. Cheap to revisit.
+  - id: C-8
+    statement: >
+      Cut-one module set, grounded in the recurring variance axes: hero,
+      rich body (markdown/HTML + images), schedule (flat list AND keyed
+      segments with optional per-segment RSVP), RSVP/status panel,
+      photo-guided entry instructions, and the per-event style wrapper.
+    author: proposer
+    provenance: [EV-013]
+    supports: [C-5]
+    rebuts: []
+    resolution: resolved
+    note: Covers everything the Housewarming and B24 pages needed and the July4 page minus deferred items (C-9, C-10).
+  - id: C-9
+    statement: >
+      Per-segment paid/attended bookkeeping and capacity enforcement are
+      out of cut one — only July4 needed them and the pickleball test does
+      not.
+    author: red-team
+    provenance: [EV-013]
+    supports: []
+    rebuts: []
+    resolution: deferred-as-assumption
+    note: Segment schema tolerates the later additive columns; assumed cheap.
+  # ── data / constraints cluster ────────────────────────────────────
+  - id: C-10
+    statement: >
+      Telegram host pings are excluded from cut one (OQ-4).
+    author: proposer
+    provenance: [EV-007]
+    supports: []
+    rebuts: []
+    resolution: deferred-as-assumption
+    note: Swappable-channel notifier seam kept (July4 notify.rs precedent); re-add deliberately when guest activity resumes.
+  - id: C-11
+    statement: >
+      Import of the three past events (people, attendance, content) is the
+      ACCEPTANCE TEST of the data model: if the recovered data cannot be
+      expressed, the model is wrong. Export is the reverse of the same
+      path. The live site's app.db is snapshotted before any cutover.
+    author: synthesis
+    provenance: [EV-008, EV-009, EV-013]
+    supports: []
+    rebuts: []
+    resolution: resolved
+    note: Turns the owner's one hard data constraint into mechanical verification instead of a promise.
+  - id: C-12
+    statement: >
+      Legacy /e/{token} URL continuity (OQ-6) is moot: the site is dormant
+      and the owner is sharing nothing from it; the new platform mints
+      fresh links.
+    author: red-team
+    provenance: [EV-008]
+    supports: []
+    rebuts: []
+    resolution: resolved
+    note: The dormant site retires at cutover; its data survives via C-11.
+escalations: []   # nothing both blocking and agent-undecidable; round-two is freeze-only

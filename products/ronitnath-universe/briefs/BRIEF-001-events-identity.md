@@ -13,7 +13,7 @@ confidence: high
 | --- | --- | --- | --- |
 | A1 | Problem | **covered** | Site dormant; historical mode was one codebase per event (EV-013). No self-serve path to create an event ("pickleball Aug 15"). Want a CMS-style create/modify/manage interface, then make it shareable. (EV-008) |
 | A2 | Users | **covered** | Friends get accounts; long-term ronitnath.com = hub + private social platform. Agents get NO identities — machine edits via MCP/HTTP. (EV-009) |
-| A3 | Bet shape & appetite | **covered (number pending)** | One bet ("ok" to interviewer's read): event platform + minimum identity under it. Time budget not stated — interviewer proposes **2 weeks**, to be struck or confirmed at pitch freeze. |
+| A3 | Bet shape & bound | **covered (bound pending)** | One bet ("ok" to interviewer's read): event platform + minimum identity under it. Owner rejected time-denominated appetite (→ SYS-DEC-001); proposed bound: **3 owner review sessions**, optionally pinned to a real event date, confirmed at pitch freeze. |
 | A4 | Constraints | **covered** | Data export + import required. Backup of past three events (friends, attendance) is the one hard data constraint — analytics, future accounts, future invites. Postgres seam + isoastra-separate accounts stand (EV-002). |
 | A5 | No-gos | **covered** | Calendar, circles, photos wait until event CMS is easy + shareable. Photos vision recorded for a later bet (EV-010). Flexibility + per-event style identity are IN — resolved OQ-2 (EV-011, EV-013). |
 | A6 | Success signals | **covered** | Revised pickleball test: owner tells agent about the event → agent creates it via API → owner tweaks wording + manages invites in UI → shares link → friend RSVPs — **on the real public ronitnath.com** (EV-012). |
