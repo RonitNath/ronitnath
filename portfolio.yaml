@@ -19,5 +19,17 @@ products:
       first external deploy (RCDA pilot).
     code_repo: isoastra/rinity on the forge (control plane; nexus ~/dev/isoastra/rinity); engine isoastra/audgent + isoastra/pipecat
     context: ~/dev/context/isoastra/business-direction.md, ~/dev/context/isoastra/products-history-20260724.md
+  - name: isoastra-services
+    tier: real
+    status: discovery
+    summary: >-
+      services.isoastra.com — HA hiqlite-backed central point for internal services, on the
+      universe-ronitnath stack (Rust/Leptos islands/Axum/hiqlite). Absorbs the ingress-controller
+      rebuild handoff (2026-08-06) and widens it: takes over ingress-ctl (routing), the mailer
+      (mailing), and later service-gateway. T1 scope is routing + mailing only (EV-005). RBAC from
+      day one; principals today are the owner and agents, employee roles deferred (EV-004). The
+      live nanode daemon + ingress-ctl stay canonical until cutover (EV-009).
+    code_repo: none yet — greenfield; prior art Isoastra/service-ingress, isoastra/mailer, Isoastra/service-gateway
+    context: ~/dev/context/resources/networks.md (ingress-ctl), ~/dev/context/procedures/ha-service.md, ~/dev/context/resources/mail-fabric.md
 # Other products (frontdesk-dental, rcda-mail, …) onboard when they are next touched,
 # each with an explicit tier — corner-cutting is deliberate, not accidental.
