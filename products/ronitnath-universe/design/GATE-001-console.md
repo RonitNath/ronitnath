@@ -16,17 +16,21 @@ the base screen (owner ruling). Console language is hallmark `ember` (DEC-004).
 
 ## What is on the canvas
 
-| Layer | Boards | What the owner checks |
+**One layer per Penpot page** (owner correction 2026-08-05 — the layers were first built on a single
+page, which is wrong: each layer is its own review surface).
+
+| Page | Boards | What the owner checks |
 | --- | --- | --- |
-| 1 · Base screen | Console event overview, ember dark + light, 1440×1024 | Direction, dark/light, typography, spacing, density |
-| 2 · Component gallery | Every component, both themes | The vibe the application gives off |
-| 3 · User flows | 5 rows, 22 screens: sign-in; agent-creates-owner-refines; mint & share invite; guest RSVP; express past events | **Completeness and ordering of the workflows** — the gate's stated purpose |
-| 4 · Breakpoints | Phone 390 / tablet 834 / desktop 1440 | Phone-first behaviour: rail → tabs, pinned primary action |
-| 5 · Options | Ember vs brass vs ember-light, same screen | The identity decision |
+| `1 · Base screen` | Console event overview, ember dark + light, 1440×1024 | Direction, dark/light, typography, spacing, density |
+| `2 · Component gallery` | Every component, both themes | The vibe the application gives off |
+| `3 · User flows` | 5 rows, 23 screens: sign-in; agent-creates-owner-refines; mint & share invite; guest RSVP; express past events | **Completeness and ordering of the workflows** — the gate's stated purpose |
+| `4 · Breakpoints` | Phone 390 / tablet 834 / desktop 1440 | Phone-first behaviour: rail → tabs, pinned primary action |
+| `5 · Options` | Ember vs brass vs ember-light, same screen | The identity decision |
 
 All colours are **linked library assets** (`ember/dark/*`, `ember/light/*`, `brass/dark/*`) — editing
-one asset updates every board. Values transcribed exactly from the hallmark contract. Nine prototype
-flows are wired, so every layer clicks through in Play mode.
+one asset updates every board. Values transcribed exactly from the hallmark contract. Prototypes are
+wired per page (9 named starting points: one each on pages 1, 2, 4, 5 and five on page 3), so every
+layer clicks through in Play mode.
 
 ## Decisions this gate needs
 
