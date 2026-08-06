@@ -3,7 +3,7 @@ gate: design (session ② of PITCH-001's 5-session bound)
 product: ronitnath-universe
 pitch: pitch/ronitnath-universe-1
 date: 2026-08-05
-status: PARTIALLY REJECTED — flow layer withdrawn, rebuild blocked on FLOWS-001 sign-off
+status: DECISIONS TAKEN 2026-08-05 (ember; base screen = people directory; flows signed off) — layer 1/3 rebuild outstanding
 artifact: Penpot "Design gate — universe pitch-1 (console)" — file 310e8e79-e53d-81b8-8008-707f2932c1b6, team ronitnath.com
 generators: universe-ronitnath `design/penpot/` (boards are regenerable; scripts are the source)
 ---
@@ -34,28 +34,37 @@ Recorded as EV-015/016/017, DEC-005, PITCH-001 delta-3, packets delta-3.
 
 | Page | State |
 | --- | --- |
-| `1 · Base screen` | **Stands as a styling check, void as a structural one** — it renders a per-event admin overview, which DEC-005 says has no canonical layout. Direction/typography/density feedback still counts. Base screen moves to the **people view** (PKT-12) on rebuild. |
-| `2 · Component gallery` | **Stands, and is promoted** — with both admin panels and invite pages composed per instance, the library *is* the design artifact (DEC-005). |
-| `3 · User flows` | **Withdrawn.** 23 thumbnail screens against a superseded flow set. Rebuild is one page per flow, full viewport, from FLOWS-001 — after sign-off, not before. |
-| `4 · Breakpoints` | Stands; phone-first behaviour unaffected by the pivot. |
-| `5 · Options` | Stands — ember vs brass is a live decision. |
+| `1 · Base screen` | **Rebuild against the people directory** (F-9/PKT-12). The ember styling, typography and density hold; the screen it renders does not. |
+| `2 · Component gallery` | **Stands, and is promoted** — with both admin panels and invite pages composed per instance, the library *is* the design artifact (DEC-005). Add PKT-14's copy-button states and the disconnected-stream indicator. |
+| `3 · User flows` | **Withdrawn; rebuild from FLOWS-001** — ten pages, one per flow, full viewport, with before/after pairs on the streaming surfaces. |
+| `4 · Breakpoints` | Stands; phone-first behaviour unaffected. |
+| `5 · Options` | **Retires** — ember is picked, so there is no live decision for it to hold. |
 
 Colours remain **linked library assets** (`ember/dark/*`, `ember/light/*`, `brass/dark/*`), values
 transcribed from the hallmark contract, so a token change still cascades everywhere.
 
-## What the owner decides next
+## Owner decisions taken (2026-08-05)
 
-1. **FLOWS-001 sign-off** — strike, add, reorder the nine flows. This is now a document review, not a
-   canvas review. Rebuild of layer 3 waits on it.
-2. **Identity** — ember or brass (page 5, built for real).
-3. **Base screen** — confirm the people view as the canonical dense screen, or name another.
-4. **Design-language sign-off** — after which the tokens are the contract the build styles against.
+1. **Identity: `ember`.** Picked from the option boards; DEC-004 resolved. Page 5 has done its job and
+   retires — options pages exist only while a decision is live.
+2. **Base screen: the people directory** (F-9, PKT-12). Layer 1 rebuilds against it; the per-event
+   admin overview it currently renders is a bespoke composition and can't be canonical.
+3. **Flows signed off** — with F-3, F-5 and F-9 rewritten and F-10 added in the same pass
+   (delta-4). Layer 3 rebuilds from FLOWS-001: **ten pages, one per flow**, full viewport.
+4. **F-3's seam resolved out of the design gate**: copy is database rows edited in the console, not a
+   file (EV-018). It stopped being a design question and became a scope decision.
 
-## Open question this gate surfaced for the data gate
+Still outstanding: **design-language sign-off** on the rebuilt layer 1, after which the tokens are the
+contract the build styles against.
 
-F-3's delivery seam: how an edited `copy.toml` reaches production — compiled in, read at runtime, or
-DB-stored and edited through a plain TOML box. PKT-11 cannot be built until it is settled, and the
-answer decides whether F-3 has a UI at all.
+## What the rebuild has to show that the first one didn't
+
+SSE (DEC-006) makes three surfaces *change while being looked at* — F-3 copy landing on open pages,
+F-6 counts moving as guests answer, F-9 the directory filling in. Static boards can't show that, so
+each gets a **before/after board pair** plus its **disconnected** state, which is a first-class state
+now: numbers that stopped updating while still presenting as live are the failure this must design
+against. PKT-14's copy-button states (never / once / many) go in the gallery — that affordance is
+what makes a long invitee list workable.
 
 ## Deliberately not here
 
