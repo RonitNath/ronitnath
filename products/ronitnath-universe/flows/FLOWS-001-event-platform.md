@@ -9,7 +9,7 @@ sources: EV-012, EV-015..EV-020, DEC-005, DEC-006, DEC-007, DEC-008, DEBATE-002
 
 # User flows — event platform + minimum identity
 
-Eleven flows. Written per `system/flow-addendum.md`: journeys that happen in a terminal are flows too,
+Thirteen flows. Written per `system/flow-addendum.md`: journeys that happen in a terminal are flows too,
 and one-time machine-mediated work is not.
 
 **Actors**: OWNER (browser session), GUEST (holds a capability link, no account), VISITOR (public
@@ -33,9 +33,11 @@ directory as identities appear. Polling and manual refresh are the exception and
 | F-6 | Watch responses come in live | OWNER | web | **per-event composition** |
 | F-7 | Open an invite and respond | GUEST | web | per-event composition |
 | F-8 | Arrive without a link | VISITOR | web | canonical |
-| F-9 | People directory | OWNER | web | canonical — **base screen** |
+| F-9 | Contacts (the CRM) | OWNER | web | canonical |
 | F-10 | Manage an identity | OWNER | web | canonical |
 | F-11 | Close an event and record who came | OWNER | web | per-event |
+| F-12 | Land on the dashboard and route from it | OWNER | web | canonical — **root** |
+| F-13 | Manage accounts | OWNER | web | canonical |
 
 ---
 
@@ -45,9 +47,9 @@ directory as identities appear. Polling and manual refresh are the exception and
 - **trigger**: Owner opens an admin URL, or returns after a session lapsed.
 - **outcome**: Owner holds a session cookie; admin surfaces are reachable.
 - **steps**:
-  1. Owner hits any admin URL → redirected to sign-in, target URL retained.
+  1. Owner hits any admin URL → sent to `/auth`, target URL retained (DEC-011; register lives here later too).
   2. Enters email + password → session cookie set (token stored only as a hash).
-  3. Lands on the target URL, or the **people directory** (F-9) if there wasn't one.
+  3. Lands on the target URL, or `/` — the personal dashboard (F-12) — if there wasn't one.
 - **branches**: already signed in → straight through, no sign-in screen.
 - **states**: wrong password / unknown email → one generic failure (no user enumeration); session
   expired mid-form → return to sign-in and *keep the target*; no-DB or migration-pending → the app
@@ -215,7 +217,7 @@ directory as identities appear. Polling and manual refresh are the exception and
 - **trigger**: Someone types ronitnath.com, or a published event URL is passed around.
 - **outcome**: They see what's public and nothing else.
 - **steps**:
-  1. Visitor lands on presence (night-sky language, unchanged — `docs/design.md`).
+  1. Visitor lands on `/` and gets presence (night-sky language, unchanged — `docs/design.md`). Signed-in roles get their dashboard at `/` instead, and reach presence at **`/landing`**, which always renders it for everyone (DEC-011).
   2. A published event reached without a link renders at public tier: private fields absent, not
      hidden-but-present.
   3. No RSVP path without a link.
@@ -226,13 +228,13 @@ directory as identities appear. Polling and manual refresh are the exception and
   authenticated-or-tokened privilege? Cheapest correct answer is probably yes-for-everyone, but it
   is a fan-out question. Data gate.
 
-## F-9 People directory  *(base screen)*
+## F-9 Contacts — the CRM
 
 - **actor**: OWNER · **surface**: web, canonical · **packets**: PKT-12, PKT-08
 - **trigger**: Planning an event, deciding who to invite, or just looking someone up.
 - **outcome**: Owner sees everyone in the system, one row per human, with their history.
 - **steps**:
-  1. Owner opens **People** — the console's home, and the platform's densest canonical surface.
+  1. Owner opens **Contacts** at `/contacts` — reached from the dashboard's `X contacts` card.
   2. One row per person across all events. **Three independently sourced facts, never derived from
      each other** (DEBATE-002 C-5, DEC-008): **invited** (a capability link exists), **answered** (the
      response log), **showed** (the owner's own record, F-11). Deriving "attended" from RSVP status is
@@ -300,6 +302,44 @@ directory as identities appear. Polling and manual refresh are the exception and
   status. Unknown is a real value and must be distinguishable from "did not attend".
 - **open**: does archiving freeze the guest-facing page, the admin panel, or both?
 
+## F-12 Land on the dashboard and route from it  *(added from DASH-001)*
+
+- **actor**: OWNER · **surface**: web, canonical · **packets**: PKT-17
+- **trigger**: Opening ronitnath.com at all — this is the root, not a destination.
+- **outcome**: The owner knows whether anything needs him and is one tap from wherever he was going.
+- **steps**:
+  1. Owner opens `/` and gets the dashboard rather than presence (DEC-011, role-resolved render).
+  2. **Present event** — the event with the soonest end time still in the future, with counts as
+     `x/y/z` (yes / maybe / no). Tap → that event's panel at `/e/{event}`.
+  3. **`X contacts`** → `/contacts` (F-9). **`X accounts`** → `/accounts` (F-13).
+  4. **System** — one green/amber line; amber routes to detail, never fixes anything here.
+  5. All four cards update over SSE without a refresh.
+- **branches**: nothing upcoming → the present-event card is **absent**, not an empty state; owner
+  wants the front of the site → `/landing`.
+- **states**: no events at all (first run); an event running right now; stream disconnected — per card,
+  never blanking the others; amber system line.
+- **decided**: present-event is keyed on **end time**, so an event stays present through its whole run
+  rather than disappearing when it starts — which is exactly when it matters. Cards are routes only;
+  nothing on this surface mutates state.
+- **open**: events need an **end time** in the model, which not every predecessor had. Data gate.
+
+## F-13 Manage accounts
+
+- **actor**: OWNER · **surface**: web, canonical · **packets**: PKT-18
+- **trigger**: Reached from the dashboard's `X accounts` card. Today it answers "who can sign in".
+- **outcome**: The owner can see and manage who has an account on the platform.
+- **steps**:
+  1. Owner opens `/accounts` — a list that currently holds exactly one row, himself.
+  2. Sees his own account: email, when the session was created, credential status.
+  3. Changes his password.
+- **branches**: none yet. **This is the seam friend accounts arrive on** — onboarding is a pitch
+  no-go for this bet, and the surface exists so that later bet has somewhere to land rather than
+  needing a new one invented.
+- **states**: exactly one account (the normal case today); an account with no active session.
+- **non-goals in this bet**: inviting or creating other accounts, roles/grants (DEBATE-001 C-2),
+  passkeys, anything friend-facing.
+- **open**: none — deliberately thin.
+
 ---
 
 ## Not flows (deliberate)
@@ -314,7 +354,7 @@ directory as identities appear. Polling and manual refresh are the exception and
 
 ## Design-gate rendering
 
-One Penpot page per flow (eleven), boards at real viewport size, in journey order. F-4 gets a page despite
+One Penpot page per flow (thirteen), boards at real viewport size, in journey order. F-4 gets a page despite
 being `terminal`: it shows the state before and after the conversation, which is where the deploy
 seam becomes visible. Live-updating surfaces (F-3, F-6, F-9) need a before/after board pair so the
 streamed change is legible as motion, not just a final state.
