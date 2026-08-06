@@ -36,8 +36,16 @@ was the first place both documents were read together.
 3. **Binary rollback is safe by construction**, given rule 1: hiqlite's migrator logs a warning and
    continues when a binary's migration set is shorter than what is applied.
 4. **Backup must exist before the first product write.** The `backup` feature is off today, correctly,
-   for a table rebuilt every boot. Product data changes that: schedule, off-node destination, and a
-   restore drill run once. PKT-09 delta.
+   for a table rebuilt every boot. Product data changes that. hiqlite has a standard path (checked
+   against 0.14.0 at the owner's prompt): a nightly cron writes a consistent local backup **on every
+   node**, the leader encrypts and pushes to S3 if a bucket is configured, and restore is
+   `HQL_BACKUP_RESTORE=file:…|s3:…` at boot on node 1. **Chosen shape**: enable `backup`, leave S3
+   unconfigured in the app, and let the fleet's existing per-app restic→B2 job take the local backups
+   off-node — that inherits `AppBackupStale`/`AppRestoreDrillStale` alerting and a weekly restore
+   drill the predecessor site already uses, instead of standing up a second unmonitored path, and it
+   keeps S3 credentials out of the app. Keep `HQL_BACKUP_KEEP_DAYS` short so restic owns retention.
+   The one piece of real work is that the per-app timer set is webdeploy-shaped while universe is
+   podman/playbook-deployed. PKT-09 delta.
 5. **Scaling is an operator act.** Raft needs an odd membership and a majority; three nodes grow to
    five deliberately, never by an autoscaler.
 6. **SQLite dialect is accepted.** `segment_answers` and `event_release.manifest` are JSON text
