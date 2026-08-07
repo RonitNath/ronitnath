@@ -138,6 +138,9 @@ discussed is out by default and needs a new evidence item to get in.
   traffic to migrate).
 - **No bound + no clock** (EV-020, EV-023) is the drift risk. The scope list above is the
   guard; treat it as a fence, not a starting point.
+- **Debug logging is already leaking payloads** (EV-029): `LOG_LEVEL` defaults to `DEBUG`, so tool
+  request bodies flow to container logs today with no retention or redaction policy. Small to fix,
+  and it should not survive a bet that is explicitly deciding a payload-capture posture.
 - **The agent-test cost demand can regress under its own solution**: giving agents a test verb
   (EV-011) increases exactly the traffic EV-013 complains about. Attribution must land with the
   verb, not after it.
@@ -146,18 +149,21 @@ discussed is out by default and needs a new evidence item to get in.
 
 | OQ | Statement | Why it matters | Blocking? |
 | --- | --- | --- | --- |
-| OQ-1 | Does "one organization" mean removing org scoping from the schema, or pinning a single org row and hiding it? | Decides whether this is a migration or a configuration. EV-023's long horizon and EV-019's lack of traffic both argue for removal; the owner ruled the *effect*, not the mechanism | no — resolve at data gate |
+| OQ-1 | Does "one organization" mean removing org scoping from the schema, or pinning a single org row and hiding it? | **Sized by EV-029**: 41 org columns, 202 files, 98 migrations — wide and mechanical, not deep. Degeneration is far cheaper and reversible; removal buys a smaller schema and no vestigial concept. EV-019 makes either affordable, EV-023 argues for doing it properly | no — but this is the decision the debate should take |
 | OQ-2 | What replaces per-org identity as the caller model — existing Kanidm service principals and scopes, or something simpler now that there is one org and two callers? | The current machinery was built for customer backend integrations; whether it fits product keys and agent callers is untested | no — data gate |
 | OQ-3 | What does an agent's "test" verb actually return? Is the T9 harness / call-flow evals the substrate, or is this a new agent-facing capability? | The two test verbs are the load-bearing half of EV-011; without a verdict contract they are just a trigger | no — but blocks packet derivation |
 | OQ-4 | Is production-vs-agent-test a property of the credential, of the run, or declared per call? | Credential-derived is self-enforcing and needs no discipline; declared is trivially wrong the first time an agent forgets | no — data gate |
 | ~~OQ-5~~ | ~~Does the human surface stay the existing console reshaped, or become a new surface?~~ | **Resolved by EV-027**: the surfaces stay — flow builder, model configuration and the rest are re-cut for one org. Only three views are new construction: agent activity, the cost split, and the wire drill-down | resolved |
-| OQ-8 | Retention and redaction for captured request/response payloads — how long, what is scrubbed, are agent-test and production runs treated alike, and is capture always-on or armed? | Always-on capture is what catches the failure nobody predicted, and is also what makes volume, cost and PHI exposure real (EV-026). Compounds OQ-1 and OQ-6 as a third data-model commitment | no — data gate, but it is the bet's largest new commitment |
+| OQ-8 | Retention and redaction for captured request/response payloads — how long, what is scrubbed, are agent-test and production runs treated alike, and is capture always-on or armed? | Always-on capture is what catches the failure nobody predicted, and is also what makes volume, cost and PHI exposure real (EV-026). **Scoped by EV-029**: the tool *response* half largely exists (status code + parsed body persist in run logs and already render); the tool *request* half goes only to the Python logger; provider exchanges aren't captured at all unless Langfuse is enabled, and it defaults off | no — data gate, but it is the bet's largest new commitment |
+| OQ-10 | `LOG_LEVEL` defaults to `DEBUG`, so tool request bodies already flow to container logs — uncorrelated to runs, with no retention or redaction policy (EV-029) | The payloads OQ-8 proposes to capture deliberately are partly being captured accidentally today, with none of the controls. It is also cheap to fix | no — but answer it in the same breath as OQ-8 |
 | OQ-9 | With editing retained but rare (EV-024), how does the configuration surface stay read-shaped without hiding the edit path? | The inherited console gets this exactly backwards — it is built for data entry — and re-cutting it is most of the UI work | no — design gate |
-| OQ-6 | Does a configuration change history exist today, or must it be introduced? | The fifth read (EV-014) is the owner's only handle on a system he no longer configures himself; if there's no audit trail it is a new data-model commitment, which compounds OQ-1 | no — data gate |
+| ~~OQ-6~~ | ~~Does a configuration change history exist today, or must it be introduced?~~ | **Answered by EV-029: it does not.** No audit table, no `updated_by` column anywhere. Workflows are the sole exception — genuinely versioned, with runs pinning their definition. Provider and model configuration is overwritten in place. So F-5 is new construction over exactly the space EV-025 calls the main one, and **it must land before agents start changing things** — history cannot be backfilled | answered; the commitment stands |
 | OQ-7 | Is `voice` allowed to inherit anything built here, or is the split absolute? | Bears on whether seams are worth generalizing; EV-016 already assumes the pipecat work carries forward for bet 2 | no |
 
-None blocking. All inherited by the debate or sanity pass. OQ-1, OQ-6 and OQ-8 are all data-model
-commitments and should be read together — the bet has three, not one.
+None blocking. All inherited by the debate or sanity pass. The source check (EV-029) closed OQ-6 and
+sized OQ-1 and OQ-8; what remains is a **two-part data commitment**, not three: a configuration
+change log (none exists) and wire capture (half exists, and it is the wrong half — responses without
+requests). Both must be settled before agents start changing things, since neither can be backfilled.
 
 ## Debate recommendation
 
