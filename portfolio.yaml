@@ -48,9 +48,15 @@ products:
       repurposed for Isoastra rather than designed for it (EV-004). Built incrementally from
       the basics so the owner can judge each component (EV-005), on the ronitnath domain as
       the testing-mode signal (EV-006), graduating to Isoastra on an owner verdict about the
-      internals (EV-007). Stack is ruled: same as ronitnath-universe (EV-008).
-    code_repo: none yet — greenfield; prior art ~/dev/console (Rust voice lab, frame core +
-      replay harness + ledger), isoastra/audgent, isoastra/pipecat
+      internals (EV-007). Stack is ruled: same as ronitnath-universe (EV-008). Interviewed
+      2026-08-06 (BRIEF-001): the shape is a ladder — accept/store/replay audio, then
+      segmentation + STT with scrubbable transcript-aligned replay and word-level timing,
+      then an LLM turn, then TTS last (EV-014..020); above it multi-LLM latency cover, a
+      conversation supervisor / sanity check, phonetic repair, diarization, injection
+      defense and cost accounting (EV-021..027). Web only, no telephony (EV-028). console is
+      discarded outright, not harvested (EV-009, EV-011). Bound waived (EV-030), so ladder
+      order is the only scope control. Next: debate (T3, rung-1 data commitments).
+    code_repo: none yet — greenfield; console is explicitly NOT prior art (EV-011)
     context: ~/dev/context/ronitnath/platform-scope.md, ~/dev/context/isoastra/business-direction.md
   - name: isoastra-services
     tier: real
