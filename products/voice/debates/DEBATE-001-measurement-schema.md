@@ -151,6 +151,13 @@ evidence that the corpus is not in fact kept forever.
 
 ## Escalated — one consolidated round for the owner
 
+> **RESOLVED 2026-08-06 by owner ruling (EV-043): envelope-now.** Rung 1 creates `audio_clips`,
+> `runs`, `signal_definitions`, `observations`; its signals are waveform, duration, sample rate
+> and channels. Registry compatibility edges, coverage observations and comparison contracts wait
+> for a producer. C-15 settles with it — a waveform is an observation, not a storage fact. The
+> whole graph is now resolved or deferred-as-assumption; nothing remains unresolved. Consequences
+> are written into DEC-002.
+
 **E-1 (C-9, C-2): how much of the envelope ships at rung 1?**
 
 Blocking and undecidable by agents, because it sits between two of your own rulings and the

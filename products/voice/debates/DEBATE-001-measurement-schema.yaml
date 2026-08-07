@@ -34,9 +34,9 @@ claims:
   stake: false
   rationale: |
     A generic payload without a frozen definition is an opaque bag of fields once its Rust producer is gone. Definitions should be immutable and content-addressed; a changed meaning creates a new definition ID, while declared compatibility edges state whether conversion is lossless, conditional, or impossible. This makes old observations independently interpretable and prevents a plausible modern rendering from silently assigning them modern semantics.
-  resolution: escalated
+  resolution: resolved
   note: |
-    Escalated with C-9: the immutable signal-definition registry is the single most expensive element of the envelope and the one that most clearly buys nothing until the second signal family exists.
+    Resolved by EV-043 in part — signal_definitions ships at rung 1 (id, name, version, schema, units); the immutable compatibility-edge machinery does not, having no rung-1 producer.
 - id: C-3
   lens: archivist
   statement: |
@@ -130,9 +130,9 @@ claims:
   stake: false
   rationale: |
     These invariants cover bulk and streaming revisions, multiple producers on one output, parallel supervisor signals, diarized speakers, and signal families not yet named without freezing guessed payload columns. Future payload shapes must enter through new immutable definitions under this same contract, never through alteration of prior definitions or reuse of an old signal ID. Participant attribution belongs in the envelope before the text agent because EV-024 and EV-040 reject a single-speaker assumption at the foundation.
-  resolution: escalated
+  resolution: resolved
   note: |
-    Escalated: blocking and undecidable by agents. The full envelope — content-addressed signal-definition registry, named clock domains with declared precision, causal parent edges, explicit absence and coverage observations — is either the thing that makes a forever-corpus worth keeping (EV-041) or the overbuilt foundation that killed console (EV-009). Both are owner rulings and the panel cannot rank them. Needs an owner call on how much of it ships at rung 1.
+    Resolved by owner ruling EV-043: envelope-now. The invariant envelope, two time coordinates, run manifests and subject attribution ship at rung 1; registry compatibility edges and coverage observations wait for a producer.
 - id: C-10
   lens: rung1-builder
   statement: |
@@ -218,9 +218,9 @@ claims:
   - C-20
   - C-32
   - C-48
-  resolution: unresolved
+  resolution: resolved
   note: |
-    Turns on whether a waveform is an observation or a storage fact. Judge leans observation (it is derived, it has a producer version, and F-04 renders it), but this is exactly the rung-1 scope call EV-038 reserves to the owner.
+    Settled by EV-043 against this claim: a waveform is an observation, not a storage fact. It is derived, it carries a producer version, and F-04 renders it.
 - id: C-16
   lens: rung1-builder
   statement: |
