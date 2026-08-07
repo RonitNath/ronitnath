@@ -39,7 +39,7 @@ products:
     context: ~/dev/context/isoastra/products-history-20260724.md, ~/dev/context/isoastra/business-direction.md
   - name: voice
     tier: real
-    status: discovery
+    status: betting
     summary: >-
       voice.ronitnath.com — greenfield Rust voice-agent orchestration service, the intended
       replacement for audgent. Onboarded 2026-08-06: voice agents are a baseline product in
@@ -55,7 +55,9 @@ products:
       conversation supervisor / sanity check, phonetic repair, diarization, injection
       defense and cost accounting (EV-021..027). Web only, no telephony (EV-028). console is
       discarded outright, not harvested (EV-009, EV-011). Bound waived (EV-030), so ladder
-      order is the only scope control. Next: debate (T3, rung-1 data commitments).
+      order is the only scope control. DEBATE-001 settled the measurement model (DEC-002);
+      PITCH-001 frozen at tag pitch/voice-1 covering rungs 1-4, intelligence layer is bet 2.
+      Next: work packets for rung 1, then design + data gates.
     code_repo: none yet — greenfield; console is explicitly NOT prior art (EV-011)
     context: ~/dev/context/ronitnath/platform-scope.md, ~/dev/context/isoastra/business-direction.md
   - name: isoastra-services
