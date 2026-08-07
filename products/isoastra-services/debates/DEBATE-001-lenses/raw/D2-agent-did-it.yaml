@@ -1,0 +1,46 @@
+claims:
+  - id: L-1
+    statement: >
+      A routing agent credential that may upsert any syntactically valid hostname can replace or overlap a route outside the deployment it was authorized to publish.
+    provenance: [EV-004, EV-013, EV-015, portfolio/products/isoastra-services/flows/FLOWS-001-routing-and-mailing.md, /private/tmp/claude-502/-Users-ronitnath-dev/f4d0a51b-3dfd-47c6-865d-98af240862ec/scratchpad/priorart/service-ingress/src/api.rs, /private/tmp/claude-502/-Users-ronitnath-dev/f4d0a51b-3dfd-47c6-865d-98af240862ec/scratchpad/priorart/service-ingress/src/auth.rs, /private/tmp/claude-502/-Users-ronitnath-dev/f4d0a51b-3dfd-47c6-865d-98af240862ec/scratchpad/priorart/service-ingress/src/caddy.rs]
+    stake: true
+    consequence: >
+      One inferred hostname, wildcard, apex, or path matcher can redirect traffic for an application the agent was never deploying, and a shared bearer with unrestricted upsert and delete authority makes the full route inventory the mistake's blast radius.
+    recommendation: >
+      Authorize routing with resource capabilities, not a routing-wide role: each deployment grant must name one canonical exact hostname, the owning application, permitted upstream identities and data class; create must fail if any exact, wildcard, apex, or path matcher overlaps another owner; update and retire must require the same owner plus an If-Match generation; wildcard, apex, catch-all, raw-config, edge-adoption, and authority-transfer actions must be unavailable to autonomous agent credentials.
+  - id: L-2
+    statement: >
+      Exact-host duplicate checks and Caddy syntax validation accept semantically valid configurations that dispatch unchanged hostnames to the wrong handler.
+    provenance: [portfolio/products/isoastra-services/flows/FLOWS-001-routing-and-mailing.md, /private/tmp/claude-502/-Users-ronitnath-dev/f4d0a51b-3dfd-47c6-865d-98af240862ec/scratchpad/priorart/service-ingress/src/desired.rs, /private/tmp/claude-502/-Users-ronitnath-dev/f4d0a51b-3dfd-47c6-865d-98af240862ec/scratchpad/priorart/service-ingress/src/caddy.rs, /private/tmp/claude-502/-Users-ronitnath-dev/f4d0a51b-3dfd-47c6-865d-98af240862ec/scratchpad/priorart/service-ingress/docs/control-plane.md, /private/tmp/claude-502/-Users-ronitnath-dev/f4d0a51b-3dfd-47c6-865d-98af240862ec/scratchpad/priorart/service-ingress/catalog/ingress.yaml]
+    stake: false
+    consequence: >
+      A candidate can pass every parser and reload gate while shadowing a wildcard, apex, or path route, after which whole-config distribution propagates the same wrong-but-valid behavior to every edge.
+    recommendation: >
+      Make noninterference a mandatory admission invariant: adapt the candidate to Caddy's canonical matcher graph, compare every existing hostname and path to the prior generation, refuse any ownership or handler change outside the granted route, then run the complete retained-host semantic probe suite against an isolated candidate and one staged edge before releasing that immutable generation to the remaining edges; any mismatch must automatically retain or restore the last-known-good generation.
+  - id: L-3
+    statement: >
+      An edge fetching a config version does not prove that Caddy applied it or that the hostname serves the intended application.
+    provenance: [EV-013, EV-016, EV-026, portfolio/products/isoastra-services/flows/FLOWS-001-routing-and-mailing.md, context/procedures/ha-service.md, personal/universe-ronitnath/src/server/mod.rs]
+    stake: false
+    consequence: >
+      The service can report convergence after merely offering bytes, while an apply failure leaves the old route live or a successful apply serves the wrong healthy application with HTTP 200, reproducing the false-success condition in the mandate.
+    recommendation: >
+      Expose separate immutable states for recorded, rendered, offered, observed-on-edge, and publicly-verified; derive observed-on-edge only from an independent SNI-and-Host probe to each selected edge that asserts the route's expected application and release identity, derive publicly-verified from the external DNS/CDN path with the same identity assertion, and reserve success or serving for the required probes on the exact generation rather than for an API 2xx, a config GET, Caddy syntax validity, or a generic health 200.
+  - id: L-4
+    statement: >
+      Indefinite coexistence with ingress-ctl is unsafe unless every edge has exactly one fenced configuration authority at a time.
+    provenance: [EV-009, EV-018, EV-026, portfolio/products/isoastra-services/flows/FLOWS-001-routing-and-mailing.md, context/resources/networks.md]
+    stake: false
+    consequence: >
+      The legacy daemon and the new whole-config loader can alternately restore their own valid state, making a route appear fixed and then regress, while neither system's success report describes what remains live.
+    recommendation: >
+      Put an authority epoch and writer identity in fleet-owned edge configuration, require that epoch on every config fetch or legacy mutation, and permit activation only after the other writer is demonstrably read-only for that edge; fallback must be an explicit fenced epoch transfer that invalidates the former writer, never simultaneous write access or an agent-inferred takeover.
+  - id: L-5
+    statement: >
+      Storing delivery mode on an application prevents per-request mistakes but still lets an agent's mistaken registration redirect every message from that credential.
+    provenance: [EV-010, EV-017, EV-023, EV-025, portfolio/products/isoastra-services/flows/FLOWS-001-routing-and-mailing.md, /private/tmp/claude-502/-Users-ronitnath-dev/f4d0a51b-3dfd-47c6-865d-98af240862ec/scratchpad/priorart/mailer/docs/architecture.md]
+    stake: false
+    consequence: >
+      A staging credential registered as production can send test identities or content through SES, while a production credential registered as testing can divert all live mail into the disposable Stalwart fabric, and both failures persist across otherwise identical sends.
+    recommendation: >
+      Make application mode immutable, let ordinary agent credentials create testing registrations only, and require a separate narrowly scoped production-enrollment capability that pre-binds the application identity, verified sender, allowed recipient policy, and SES destination; changing mode must mint a new application and credential, and production activation must not be inferable from names, environment labels, or request fields.

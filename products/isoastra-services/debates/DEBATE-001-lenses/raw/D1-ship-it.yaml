@@ -1,0 +1,46 @@
+claims:
+  - id: L-1
+    statement: >
+      F-03 does not yet deliver the owner's "deploy this product" path because the agent must separately choose and submit hostname, upstreams, data class, authentication, and then invent its own convergence-and-public-probe loop.
+    provenance: [EV-013, EV-020, portfolio/products/isoastra-services/flows/FLOWS-001-routing-and-mailing.md, context/procedures/ha-service.md]
+    stake: true
+    consequence: >
+      Every deployment still contains service-specific networking decisions, and two agents deploying the same product can produce different upstream ordering, health behavior, placement, or definitions of done.
+    recommendation: >
+      Make the common path one idempotent ensure-public-route operation invoked by the deployment tool from its deployment receipt: infer all replica mesh endpoints, default data class to public, default multi-upstream health to /healthz, measure and order upstreams per edge, and return one operation URL that becomes complete only after every applicable edge has converged and the public hostname passes its probe; require an extra field only for the exceptional PHI class or a nonstandard health contract.
+  - id: L-2
+    statement: >
+      F-05 turns mail enablement into a five-step owner workflow even though deployment mode already exists and the evidence fixes mode as a property of the registered application rather than of each send.
+    provenance: [EV-010, EV-017, EV-025, portfolio/products/isoastra-services/flows/FLOWS-001-routing-and-mailing.md, context/procedures/deployment.md]
+    stake: false
+    consequence: >
+      "Deploy this product" stalls at application registration, mode selection, credential transfer, and sender selection before the first email workflow can run.
+    recommendation: >
+      Add an idempotent ensure-mail-application operation to the deployment integration: map release to production and deployed-dev or local-loopback to testing, select the service's configured default verified sender, create a stable application identity, and return the credential in the deployment system's machine-consumable secret-binding shape; only a nondefault sender or an explicit mode override should require input.
+  - id: L-3
+    statement: >
+      Leaving the edge applicator as OQ-1 forces every deployment implementation to choose a transport even though stock Caddy already provides the required pull loader and a successful pulled config must recursively include that loader or the edge stops polling.
+    provenance: [EV-026, EV-016, portfolio/products/isoastra-services/briefs/BRIEF-001-routing-and-mailing.md, portfolio/products/isoastra-services/flows/FLOWS-001-routing-and-mailing.md]
+    stake: false
+    consequence: >
+      Route registration cannot have one dependable meaning of "live," and an edge can fetch exactly one valid generation and then remain permanently stale while agents wait on convergence.
+    recommendation: >
+      Close OQ-1 with caddy.config_loaders.http as the sole T1 applicator, ship one fleet-owned edge profile that supplies its mTLS identity and service URL, and make the renderer unconditionally embed the same loader block with a positive load_delay in every generated Caddyfile so no caller or edge operator can omit it.
+  - id: L-4
+    statement: >
+      The flows name distinct routing and mailing failure states but define no closed machine error contract that tells an agent the exact next operation.
+    provenance: [EV-011, EV-027, portfolio/products/isoastra-services/flows/FLOWS-001-routing-and-mailing.md, /private/tmp/claude-502/-Users-ronitnath-dev/f4d0a51b-3dfd-47c6-865d-98af240862ec/scratchpad/priorart/mailer/docs/architecture.md]
+    stake: false
+    consequence: >
+      Agents must translate prose, HTTP status codes, and partial state into guesses about retrying, replacing, taking over, waiting, or changing input, so the same recoverable condition repeatedly returns to a human.
+    recommendation: >
+      Use one versioned error envelope across both domains with a closed code, retryability, affected resource, observed state, operation URL, and executable next_action; cover at minimum route_owned_elsewhere, no_applicable_edge, edge_not_fetching, edge_stale, identity_unavailable, sender_not_allowed, recipient_suppressed, quota_exceeded, delivery_deferred, and delivery_terminal, with takeover or correction fields populated from current state rather than explanatory prose.
+  - id: L-5
+    statement: >
+      OQ-3 leaves operators to divide one SES account's pacing across three replicas even though the existing mailer has one measured account-wide ceiling and hiqlite already supplies a single cluster leader.
+    provenance: [EV-011, EV-016, portfolio/products/isoastra-services/briefs/BRIEF-001-routing-and-mailing.md, /private/tmp/claude-502/-Users-ronitnath-dev/f4d0a51b-3dfd-47c6-865d-98af240862ec/scratchpad/priorart/mailer/README.md, /private/tmp/claude-502/-Users-ronitnath-dev/f4d0a51b-3dfd-47c6-865d-98af240862ec/scratchpad/priorart/mailer/docs/architecture.md]
+    stake: false
+    consequence: >
+      A nominally identical three-node deployment needs per-node worker knobs whose correct values change with replica count, and scaling or failover silently changes aggregate send rate.
+    recommendation: >
+      Make mail delivery leader-owned in T1: every node accepts into the replicated queue, only the current hiqlite leader claims and sends, and one cluster-level sends-per-second value defaults below the measured SES ceiling; leadership change resumes the same queue and idempotency records without any node-specific rate configuration.

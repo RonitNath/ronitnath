@@ -1,0 +1,46 @@
+claims:
+  - id: L-1
+    statement: >
+      Production mailing cannot satisfy one-vault while the live mailer and services.isoastra.com each retain an independent SES delivery credential.
+    provenance: [EV-014, EV-018, EV-024, /private/tmp/claude-502/-Users-ronitnath-dev/f4d0a51b-3dfd-47c6-865d-98af240862ec/scratchpad/priorart/mailer/docs/architecture.md]
+    stake: true
+    consequence: >
+      The indefinite coexistence plan leaves two provider-custody boundaries, makes SES rotation and revocation a coordinated legacy-and-successor operation, and prevents a provider event from being attributed through one authoritative principal ledger.
+    recommendation: >
+      Preserve the old mailer's public contract as a compatibility facade but make it enqueue into services.isoastra.com under a dedicated legacy-mailer application principal, remove its SES access, and revoke every previously shared SES key before enabling the successor's production delivery path.
+  - id: L-2
+    statement: >
+      Reusing the reference cluster's shared env-file deployment pattern for AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY would place the same standing SES credential on nexus, sfo, and nyc.
+    provenance: [EV-016, /Users/ronitnath/dev/personal/universe-ronitnath/deploy/compose.yaml, /Users/ronitnath/dev/personal/universe-ronitnath/deploy/provision.sh, /private/tmp/claude-502/-Users-ronitnath-dev/f4d0a51b-3dfd-47c6-865d-98af240862ec/scratchpad/priorart/mailer/docs/deployment.md]
+    stake: false
+    consequence: >
+      A compromise of any replica yields the fleet-wide provider key, rotation requires mutating three hosts, and mixed old/new runtime state during a serial rollout makes credential use impossible to reason about.
+    recommendation: >
+      Keep one provider authorization object in the central vault and have each services replica exchange its own workload identity for short-lived SES sessions; never materialize the standing AWS key into a repo, Compose env file, consumer, or replica filesystem.
+  - id: L-3
+    statement: >
+      Storing an SES secret in hiqlite would replicate it to all three members and carry it into the per-node backup path, so hiqlite cannot be the provider vault.
+    provenance: [DEC-013-hiqlite-is-the-data-seam.md, context/procedures/ha-service.md, /Users/ronitnath/dev/personal/universe-ronitnath/deploy/compose.yaml]
+    stake: false
+    consequence: >
+      One logical database row would create multiple plaintext-capable custody locations plus backup copies, expanding both the rotation set and the blast radius of a database or backup disclosure.
+    recommendation: >
+      Replicate only a non-secret provider identity and credential-generation reference in hiqlite; resolve that reference through the single vault at runtime, and store application M2M credentials only as one-way hashes with plaintext shown once at issuance.
+  - id: L-4
+    statement: >
+      The live mailer's SES client loads AWS credentials once during process startup, so replacing its env-file secret does not rotate credentials in running workers.
+    provenance: [/private/tmp/claude-502/-Users-ronitnath-dev/f4d0a51b-3dfd-47c6-865d-98af240862ec/scratchpad/priorart/mailer/src/app.rs, /private/tmp/claude-502/-Users-ronitnath-dev/f4d0a51b-3dfd-47c6-865d-98af240862ec/scratchpad/priorart/mailer/src/ses.rs, portfolio/products/isoastra-services/flows/FLOWS-001-routing-and-mailing.md]
+    stake: false
+    consequence: >
+      A leaked provider key remains usable until every worker restarts, and a rolling restart can send through two credential generations without a cluster-wide proof that the replacement works.
+    recommendation: >
+      Implement a versioned, reloadable provider-credential handle with an overlap state: activate the replacement centrally, prove send, account, and suppression calls from every worker generation, observe the old generation go unused, then revoke it without changing or restarting consumers.
+  - id: L-5
+    statement: >
+      Tenant-only attribution is insufficient because the current mailer maps OAuth clients to tenants but persists messages and email events with tenant_id rather than the authenticating client or credential id.
+    provenance: [EV-015, EV-023, EV-025, /private/tmp/claude-502/-Users-ronitnath-dev/f4d0a51b-3dfd-47c6-865d-98af240862ec/scratchpad/priorart/mailer/src/auth.rs, /private/tmp/claude-502/-Users-ronitnath-dev/f4d0a51b-3dfd-47c6-865d-98af240862ec/scratchpad/priorart/mailer/migrations/0001_product.sql]
+    stake: false
+    consequence: >
+      Two credentials mapped to one application or tenant become indistinguishable, so a leaked credential cannot be scoped by observed sends and no audit can answer which principal caused a provider-side message.
+    recommendation: >
+      Give every application and every issued credential stable ids, bind each accepted message and append-only delivery event to application_id, principal_id, credential_id, and provider credential generation, update last-used from authenticated sends, and propagate the internal message id into SES metadata for provider-event correlation.

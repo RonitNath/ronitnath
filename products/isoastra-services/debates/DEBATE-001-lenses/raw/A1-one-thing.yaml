@@ -1,0 +1,46 @@
+claims:
+  - id: L-1
+    statement: >
+      T1 is one Rust binary, one OCI image replicated identically on nexus, sfo, and nyc, and one hiqlite schema: routing, mailing, authentication, the Leptos UI, diagnostics, and background work are modules and tasks inside that process, not independently operated systems.
+    provenance: [EV-001, EV-002, EV-012, EV-016, context/procedures/ha-service.md, personal/universe-ronitnath/deploy/compose.yaml, personal/universe-ronitnath/src/main.rs]
+    stake: true
+    consequence: >
+      Splitting any domain, worker, API, or UI into another artifact creates another rollout state, health model, credential boundary, version skew, and 11pm branch in the failure theory, directly recreating the fragmentation this product was commissioned to eliminate.
+    recommendation: >
+      Ship a single workspace package and executable whose Axum router mounts routing, mail, machine API, owner UI, and operational endpoints, whose startup opens one hiqlite client and applies one ordered migration set, and whose shutdown drains its in-process tasks before leaving Raft.
+  - id: L-2
+    statement: >
+      Public edges should pull their complete generated Caddy configuration directly from the same Axum instances, because stock Caddy already supplies the applicator, authentication, atomic load, retry, and last-known-good behavior and therefore a custom edge agent or reconciler would be an avoidable second control system.
+    provenance: [EV-008, EV-022, EV-026, portfolio/products/isoastra-services/flows/FLOWS-001-routing-and-mailing.md, context/resources/networks.md, /private/tmp/claude-502/-Users-ronitnath-dev/f4d0a51b-3dfd-47c6-865d-98af240862ec/scratchpad/priorart/service-ingress/docs/control-plane.md]
+    stake: false
+    consequence: >
+      A bespoke applicator introduces its own deployment, credential, local state, retry loop, version protocol, and convergence bugs; the retired controller demonstrates the resulting catalog-generation-controller-applicator chain, while a missing recursive loader block already suffices to make an edge silently stop updating.
+    recommendation: >
+      Persist route intent, rendered generation, and each edge's last acknowledged generation in hiqlite; expose one authenticated per-edge Caddyfile endpoint; validate the whole file before publication; always render the positive load_delay loader block; and add no queue, push daemon, plugin, or edge-side store.
+  - id: L-3
+    statement: >
+      Mail acceptance, durable queuing, claiming, retry classification, global suppression, delivery history, and SES account pacing must all live in the same hiqlite database and the same process that accepts the request.
+    provenance: [EV-010, EV-011, EV-014, EV-025, portfolio/products/isoastra-services/flows/FLOWS-001-routing-and-mailing.md, /private/tmp/claude-502/-Users-ronitnath-dev/f4d0a51b-3dfd-47c6-865d-98af240862ec/scratchpad/priorart/mailer/docs/architecture.md, /private/tmp/claude-502/-Users-ronitnath-dev/f4d0a51b-3dfd-47c6-865d-98af240862ec/scratchpad/priorart/mailer/src/worker/store.rs, /private/tmp/claude-502/-Users-ronitnath-dev/f4d0a51b-3dfd-47c6-865d-98af240862ec/scratchpad/priorart/mailer/deploy/mailer.compose.yaml]
+    stake: false
+    consequence: >
+      A broker, PostgreSQL service, worker deployment, or separate scheduler turns accepted-but-not-delivered into a distributed investigation across ownership and replication boundaries, and three uncoordinated local rate limiters can collectively exceed the one SES account ceiling.
+    recommendation: >
+      Commit message, payload, idempotency key, application mode, and initial status in one hiqlite transaction; run a supervised Tokio delivery loop in every replica; use expiring compare-and-update claims and a persisted account-wide next-send slot in that same schema; and derive retries, suppressions, volumes, and lifecycle views from those rows.
+  - id: L-4
+    statement: >
+      The machine API, owner diagnosis UI, readiness response, and mail/routing status must be projections of the same authoritative hiqlite rows rather than separately collected views of the system.
+    provenance: [EV-027, portfolio/products/isoastra-services/flows/FLOWS-001-routing-and-mailing.md, context/procedures/ha-service.md, personal/universe-ronitnath/src/server/store.rs, personal/universe-ronitnath/src/main.rs]
+    stake: false
+    consequence: >
+      A read model, audit database, configuration cache, or UI backend can be green while the route or message truth is stale, making the rare emergency UI another system whose disagreement must be diagnosed before the original incident can be understood.
+    recommendation: >
+      Keep desired route state, rendered generations, edge acknowledgements, application registrations, message lifecycle, credential metadata, audit attribution, and node release rows together; have shared Rust query functions feed both JSON and Leptos views, and export metrics as ephemeral measurements of those same queries rather than as product truth.
+  - id: L-5
+    statement: >
+      Coexistence with ingress-ctl and the live mailer must contain no runtime bridge, dual write, shared ownership, compatibility adapter, or replicated state between old and new systems.
+    provenance: [EV-009, EV-018, EV-024, context/resources/networks.md, /private/tmp/claude-502/-Users-ronitnath-dev/f4d0a51b-3dfd-47c6-865d-98af240862ec/scratchpad/priorart/service-ingress/catalog/ingress.yaml]
+    stake: false
+    consequence: >
+      Any bridge makes an incident theory span both generations indefinitely and permits two writers to fight over an edge or two mail paths to act for one application, so the promised fallback becomes an always-on distributed system.
+    recommendation: >
+      Assign each route and each registered application to exactly one owner at a time, record that ownership in the new hiqlite schema, reject conflicting activation, leave existing consumers untouched, and make fallback a deliberate manual pointer swap that transfers ownership instead of synchronizing systems.

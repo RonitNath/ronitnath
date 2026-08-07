@@ -1,0 +1,50 @@
+claims:
+  - id: L-1
+    statement: >
+      A credential used for routine agent deployment is unacceptably overpowered if it can mutate arbitrary hostnames, register edges, retire routes, create or rotate application credentials, change a registered application's production mode or sender grant, or invoke a raw-Caddy escape hatch.
+    provenance: [EV-013, EV-023, EV-025, EV-027, /Users/ronitnath/dev/portfolio/products/isoastra-services/flows/FLOWS-001-routing-and-mailing.md, /private/tmp/claude-502/-Users-ronitnath-dev/f4d0a51b-3dfd-47c6-865d-98af240862ec/scratchpad/priorart/service-ingress/src/auth.rs, /private/tmp/claude-502/-Users-ronitnath-dev/f4d0a51b-3dfd-47c6-865d-98af240862ec/scratchpad/priorart/service-ingress/src/api.rs]
+    stake: false
+    consequence: >
+      The retired ingress API demonstrates the failure shape: one static bearer gates list, upsert, delete, raw update, and every blue-green transition, so its theft permits a fast sweep across the catalog's identity, mail-event, product, and wildcard hosts; if the successor combines those powers with application registration, the same holder can then create a production sender and emit convincing brand mail before a human opens the inspection UI.
+    recommendation: >
+      Issue distinct short-lived capabilities with an immutable principal kind and audience: applications get only mail.send for one application; deployment agents get idempotent create/update only for an explicit hostname or product namespace and never raw config; edge registration, route retirement, bulk or wildcard changes, sender grants, production-mode creation, and credential lifecycle require separate owner step-up capabilities, with no endpoint accepting a union token.
+
+  - id: L-2
+    statement: >
+      If an edge accepts an unsigned whole Caddy configuration rendered by services.isoastra.com, compromise of any serving cluster node can repoint every hostname when edges next poll while the same compromised cluster can falsify its hiqlite audit and convergence views.
+    provenance: [EV-016, EV-021, EV-026, EV-027, /private/tmp/claude-502/-Users-ronitnath-dev/f4d0a51b-3dfd-47c6-865d-98af240862ec/scratchpad/priorart/service-ingress/catalog/ingress.yaml, /private/tmp/claude-502/-Users-ronitnath-dev/f4d0a51b-3dfd-47c6-865d-98af240862ec/scratchpad/priorart/service-ingress/docs/control-plane.md, /Users/ronitnath/dev/portfolio/products/ronitnath-universe/decisions/DEC-013-hiqlite-is-the-data-seam.md]
+    stake: true
+    consequence: >
+      DNS remains unchanged, but every reached edge can atomically load attacker-selected upstreams for apexes, wildcards, identity endpoints, mail-event endpoints, and PHI routes; users still reach familiar TLS hostnames while credentials, sessions, webhooks, and application traffic are proxied elsewhere, and an in-service audit trail can be rewritten to claim the malicious generation is intended.
+    recommendation: >
+      Make route authoring and route activation different authorities: edges must accept only deterministic generations signed by a signer outside the web service and hiqlite credentials, pin the verification key, enforce local edge and data-class constraints, and retain last-known-good on any signature or fetch failure; the signer may automatically approve a narrowly scoped single-route update, but protected hostnames, wildcards, edge-set changes, and multi-route diffs require an owner step-up authorization that the routine agent token cannot mint.
+
+  - id: L-3
+    statement: >
+      Deriving mode and sender from an application registry bounds a leaked application credential only while the mail-accepting service remains honest, because a compromised service that also holds SES authority can forge registry state, queue rows, and arbitrary From addresses.
+    provenance: [EV-014, EV-023, EV-025, /private/tmp/claude-502/-Users-ronitnath-dev/f4d0a51b-3dfd-47c6-865d-98af240862ec/scratchpad/priorart/mailer/src/features/mailer_api/mod.rs, /private/tmp/claude-502/-Users-ronitnath-dev/f4d0a51b-3dfd-47c6-865d-98af240862ec/scratchpad/priorart/mailer/src/features/mailer_api/store.rs, /private/tmp/claude-502/-Users-ronitnath-dev/f4d0a51b-3dfd-47c6-865d-98af240862ec/scratchpad/priorart/mailer/src/ses.rs, /private/tmp/claude-502/-Users-ronitnath-dev/f4d0a51b-3dfd-47c6-865d-98af240862ec/scratchpad/priorart/mailer/migrations/0001_product.sql]
+    stake: false
+    consequence: >
+      A stolen application token can otherwise impersonate every configured sender and consume the account-global reputation and quota, while service compromise can bypass even correct tenant_sender and tenant_quota checks and send phishing, password-reset lures, or bulk spam as every verified brand until SES throttles or an operator notices volume.
+    recommendation: >
+      Keep provider credentials out of the Axum admission process and run least-privilege delivery executors under separate identities, with separate SES credentials constrained by provider policy to one sender domain or identity; require each queued envelope to retain an application signature plus an owner-signed grant binding application public key, sender, mode, limits, and expiry, and make the executor verify both, a nonce, and its own per-application rate and recipient budgets before sending so neither hiqlite mutation nor admission-process compromise can manufacture valid mail.
+
+  - id: L-4
+    statement: >
+      The owner UI, a hiqlite audit table, and metrics emitted by services.isoastra.com cannot be the primary breach detector because the suspected service controls all three and the UI is explicitly opened only after something already looks wrong.
+    provenance: [EV-027, /Users/ronitnath/dev/portfolio/products/isoastra-services/flows/FLOWS-001-routing-and-mailing.md, /private/tmp/claude-502/-Users-ronitnath-dev/f4d0a51b-3dfd-47c6-865d-98af240862ec/scratchpad/priorart/service-ingress/src/audit.rs, /private/tmp/claude-502/-Users-ronitnath-dev/f4d0a51b-3dfd-47c6-865d-98af240862ec/scratchpad/priorart/mailer/migrations/0001_product.sql, /Users/ronitnath/dev/context/procedures/ha-service.md]
+    stake: false
+    consequence: >
+      The attacker has a quiet window lasting until a recipient reports suspicious mail, a public route visibly fails, or someone manually inspects configuration, and database-level append-only triggers do not preserve evidence from a process or principal able to alter the database or its presentation.
+    recommendation: >
+      Export every authentication decision, grant or credential change, route diff, signed generation, edge fetch and applied digest, mail acceptance, sender identity, delivery result, and quota rejection to an append-only sink outside this cluster before acknowledging dangerous actions; have edges report applied digests directly to that sink, probe protected public hostnames from outside through the real CDN path, ingest SES-side send and reputation events independently, and page on protected-host changes, wildcard or multi-route diffs, new production grants, abnormal per-application volume, repeated denials, or any edge whose reported digest differs from the signed generation.
+
+  - id: L-5
+    statement: >
+      Emergency containment fails if revocation, route rollback, and mail shutdown are available only through the service or credential believed compromised.
+    provenance: [EV-018, EV-026, /Users/ronitnath/dev/portfolio/products/isoastra-services/flows/FLOWS-001-routing-and-mailing.md, /private/tmp/claude-502/-Users-ronitnath-dev/f4d0a51b-3dfd-47c6-865d-98af240862ec/scratchpad/priorart/service-ingress/docs/control-plane.md, /Users/ronitnath/dev/context/procedures/deployment.md]
+    stake: false
+    consequence: >
+      Once compromise is suspected, using the normal UI or API may notify the attacker, preserve their access, or produce another malicious generation, while globally stopping the combined service unnecessarily sacrifices both routing and mail and turns containment into the emergency outage EV-016 warns about.
+    recommendation: >
+      Maintain and drill two independent break-glass paths: the route path disables the external signer, revokes the affected principal at the identity provider, and reissues a previously verified signed generation from a clean workstation while edges keep last-known-good; the mail path independently revokes only the affected application key or sender-scoped SES credential and can pause that executor without freezing routing, with the retained ingress-ctl fallback placed under explicit single-writer fencing rather than left as a concurrent mutation path.

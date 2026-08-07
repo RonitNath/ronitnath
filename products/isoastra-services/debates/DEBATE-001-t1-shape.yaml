@@ -1,0 +1,527 @@
+debate: DEBATE-001
+product: isoastra-services
+bet: 1 — services.isoastra.com T1 (routing + mailing)
+date: 2026-08-06
+trigger: "T3 (key custody + identity model + API commitment); T2 (no bound)"
+panel: debates/DEBATE-001-lenses/PANEL.md
+provenance:
+  orchestrator: Claude Opus 5 — also authored BRIEF-001 and FLOWS-001, therefore compromised as judge (rule 6)
+  lenses: 10 lenses / 5 axes, each a detached `codex exec` process on gpt-5.6-sol (rule 5 — different model family)
+  asymmetry: no lens received BRIEF-001; all received evidence/, FLOWS-001, procedures, and clones of service-ingress + mailer
+  validity: 10/10 returned, 50/50 claims parsed, 50/50 grounded in at least one real file, 10/10 staked a claim. No void lenses.
+
+claims:
+
+  # ---- Axis A: blast radius ----
+  - id: C-1
+    lens: A1-one-thing
+    stake: true
+    statement: >
+      T1 is one Rust binary, one OCI image on nexus/sfo/nyc, and one hiqlite schema; routing, mailing,
+      auth, UI and background work are modules inside it, not independently operated systems.
+    provenance: [EV-001, EV-002, EV-012, EV-016, universe-ronitnath/deploy/compose.yaml]
+    rebuts: [C-6, C-7]
+    resolution: resolved
+    note: >
+      Survives as the artifact/repo/release rule, which is what EV-012 actually ruled. Does not survive
+      as a one-container rule — see C-6.
+  - id: C-2
+    lens: A1-one-thing
+    statement: >
+      Edges should pull their complete generated Caddy config from the same Axum instances, because stock
+      Caddy already supplies applicator, auth, atomic load, retry and last-known-good.
+    provenance: [EV-008, EV-022, EV-026, service-ingress/docs/control-plane.md]
+    supports: [C-16, C-33]
+    resolution: resolved
+  - id: C-3
+    lens: A1-one-thing
+    statement: >
+      Mail acceptance, queue, claiming, retry classification, suppression, history and SES pacing all live
+      in the same hiqlite database and the same process that accepts the request.
+    provenance: [EV-010, EV-011, EV-014, EV-025, mailer/src/worker/store.rs]
+    rebuts: [C-7]
+    resolution: resolved
+    note: One store, yes. Same process as the HTTP surface, no — C-6 carries.
+  - id: C-4
+    lens: A1-one-thing
+    statement: >
+      Machine API, owner UI, readiness and status must be projections of the same authoritative hiqlite
+      rows, never separately collected views.
+    provenance: [EV-027, universe-ronitnath/src/server/store.rs]
+    resolution: resolved
+  - id: C-5
+    lens: A1-one-thing
+    statement: >
+      Coexistence with ingress-ctl and the live mailer must contain no runtime bridge, dual write, shared
+      ownership or replicated state between old and new.
+    provenance: [EV-009, EV-018, EV-024, service-ingress/catalog/ingress.yaml]
+    supports: [C-39]
+    rebuts: [C-21]
+    resolution: resolved
+
+  - id: C-6
+    lens: A2-wedged-queue
+    stake: true
+    statement: >
+      A deployment where the route-serving surface and the mail delivery worker share one process or one
+      container cannot satisfy the requirement that an SES retry storm not take routing down.
+    provenance: [EV-012, EV-016, mailer/src/app.rs, mailer/deploy/mailer.compose.yaml]
+    rebuts: [C-1, C-3]
+    resolution: resolved
+    note: >
+      Accepted, and it is grounded in the live prior art rather than in theory — the mailer starts its
+      worker inside Application, giving the combined site one CPU/PID/OOM/restart boundary. Resolution is
+      one image and one release with two runtime roles as separate containers per node.
+  - id: C-7
+    lens: A2-wedged-queue
+    statement: >
+      Separate processes are not isolation if routing intent and the mail queue contend on the same hiqlite
+      Raft node, log, file or disk quota; give routing and mailing independent three-member clusters.
+    provenance: [EV-001, EV-016, DEC-013, mailer/src/worker/store.rs]
+    rebuts: [C-1, C-3]
+    resolution: unresolved
+    note: >
+      REJECTED for T1. Two Raft clusters doubles the operational surface C-48/C-50 warn about, and the
+      contention is bounded instead by C-9's admission budgets. Recorded because the failure it names is
+      real: what would reopen it is measured commit-latency interference from mail load on route writes.
+  - id: C-8
+    lens: A2-wedged-queue
+    statement: >
+      Public routing survives a total services.isoastra.com failure only if every edge serves independently
+      persisted last-known-good config with no control-plane call on the request path.
+    provenance: [EV-013, EV-016, EV-026, service-ingress/docs/control-plane.md]
+    supports: [C-16, C-17, C-18]
+    resolution: resolved
+  - id: C-9
+    lens: A2-wedged-queue
+    statement: >
+      A durable mail queue without hard admission, retry, concurrency, timeout and storage budgets lets an
+      SES failure become an unbounded local resource attack.
+    provenance: [EV-011, EV-016, mailer/src/worker/mod.rs]
+    resolution: resolved
+  - id: C-10
+    lens: A2-wedged-queue
+    statement: >
+      Node failover drills do not prove service-domain isolation; acceptance needs a cross-domain chaos
+      drill that wedges mail while probing routes, and the reciprocal.
+    provenance: [EV-016, ha-service.md]
+    resolution: resolved
+
+  # ---- Axis B: edge authority ----
+  - id: C-11
+    lens: B1-live-now
+    stake: true
+    statement: >
+      Pull-only distribution makes a route committed just after a fetch wait a full load_delay before it can
+      serve, so activation latency is the polling interval by construction.
+    provenance: [EV-013, EV-026, FLOWS-001]
+    rebuts: [C-2]
+    resolution: resolved
+    note: >
+      Accepted as a real cost of C-2, and resolved by adding push-on-commit rather than by abandoning pull.
+      Does not collide with C-16: pushing when the cluster is up is compatible with never depending on it.
+  - id: C-12
+    lens: B1-live-now
+    statement: >
+      The drafted agent flow leaves public-path confirmation to the agent, so the routing API cannot answer
+      whether its accepted mutation became a serving hostname; it needs a durable activation receipt.
+    provenance: [EV-013, EV-027, FLOWS-001]
+    supports: [C-31]
+    resolution: resolved
+  - id: C-13
+    lens: B1-live-now
+    statement: >
+      A successful HTTP fetch cannot prove Caddy accepted and began serving the generation, yet the proposed
+      status surface treats last-fetch as convergence evidence.
+    provenance: [EV-026, FLOWS-001]
+    supports: [C-38, C-43, C-47]
+    resolution: resolved
+    note: FOUR lenses on four different axes independently found this. Strongest signal in the round.
+  - id: C-14
+    lens: B1-live-now
+    statement: >
+      Config validation and Caddy application still do not prove a hostname serves through TLS to a healthy
+      upstream; those are separate gates the live artifacts already distinguish.
+    provenance: [networks.md, service-ingress/docs/control-plane.md]
+    supports: [C-38]
+    resolution: resolved
+  - id: C-15
+    lens: B1-live-now
+    statement: >
+      Treating a route as unfinished until every edge converges hides the owner-relevant fact that the
+      hostname is already serving somewhere; serving and fully-converged are separate milestones.
+    provenance: [EV-013, FLOWS-001]
+    resolution: resolved
+
+  - id: C-16
+    lens: B2-edge-autonomy
+    stake: true
+    statement: >
+      With every services.isoastra.com address blackholed, a converged edge must boot from durable local
+      state and serve every previously active hostname over TLS without fetching or authenticating first.
+    provenance: [EV-016, EV-026, FLOWS-001, ha-service.md]
+    resolution: resolved
+    note: >
+      EV-026 only assumed Caddy autosave plus --resume. This makes cold-start an explicit contract, which
+      is the difference between a harmless control-plane outage and losing every site on a rebooting edge.
+  - id: C-17
+    lens: B2-edge-autonomy
+    statement: >
+      Reboot autonomy also requires local retention of certificate, key and ACME-account state; pointing
+      tls.get_certificate.http at services.isoastra.com would put the control plane in the handshake path.
+    provenance: [EV-021, EV-026, service-ingress/content/caddy.md]
+    rebuts: [C-26]
+    supports: [C-45]
+    resolution: resolved
+    note: Directly corrects an option EV-026 floated for OQ-8. That option is now closed.
+  - id: C-18
+    lens: B2-edge-autonomy
+    statement: >
+      Every activated generation must be self-contained: no dynamic upstream resolver, permission callback,
+      certificate getter or remote include pointing at the central service.
+    provenance: [EV-013, EV-021, EV-026, service-ingress/catalog/ingress.yaml]
+    resolution: resolved
+    note: Closes the dynamic-upstreams idea EV-026 raised as "possibly relevant". It is not.
+  - id: C-19
+    lens: B2-edge-autonomy
+    statement: >
+      Edges must retain the active and previous fully provisioned generations; a single autosave gives no
+      recovery source if the newest artifact is truncated or loses the recursive loader block.
+    provenance: [EV-026, deployment.md, service-ingress/content/sync.md]
+    rebuts: [C-50]
+    resolution: resolved
+    note: Edge-side retention and control-plane-side rollback are different things; both C-19 and C-50 hold.
+  - id: C-20
+    lens: B2-edge-autonomy
+    statement: >
+      Acceptance must demonstrate continuous public service through a 40-minute total cluster blackhole with
+      each edge rebooted in turn, not infer autonomy from convergence telemetry.
+    provenance: [EV-016, FLOWS-001, ha-service.md]
+    resolution: resolved
+
+  # ---- Axis C: custody vs concentration ----
+  - id: C-21
+    lens: C1-one-vault
+    stake: true
+    statement: >
+      Production mailing cannot satisfy one-vault while the live mailer and services.isoastra.com each hold
+      an independent SES credential.
+    provenance: [EV-014, EV-018, EV-024, mailer/docs/architecture.md]
+    rebuts: [C-5]
+    resolution: escalated
+    note: >
+      ESCALATED. Its remedy — make the old mailer a facade enqueuing into the new service and strip its SES
+      access — is a direct contradiction of EV-024 ("don't touch other services") and EV-018's fallback.
+      Only the owner can trade indefinite dual custody against touching the legacy path.
+  - id: C-22
+    lens: C1-one-vault
+    statement: >
+      Reusing the reference cluster's shared env-file pattern would place the same standing SES key on all
+      three nodes; replicas should exchange workload identity for short-lived SES sessions.
+    provenance: [EV-016, universe-ronitnath/deploy/provision.sh, mailer/docs/deployment.md]
+    resolution: resolved
+  - id: C-23
+    lens: C1-one-vault
+    statement: >
+      Storing an SES secret in hiqlite replicates it to three members and into the backup path, so hiqlite
+      cannot be the provider vault.
+    provenance: [DEC-013, ha-service.md]
+    rebuts: [C-3]
+    resolution: resolved
+    note: Clean carve-out from C-3's "everything in one store". Secrets are the exception; a real one.
+  - id: C-24
+    lens: C1-one-vault
+    statement: >
+      The live mailer loads AWS credentials once at startup, so replacing the env-file secret does not
+      rotate credentials in running workers; a versioned reloadable handle with overlap is required.
+    provenance: [mailer/src/ses.rs, mailer/src/app.rs]
+    resolution: resolved
+  - id: C-25
+    lens: C1-one-vault
+    statement: >
+      Tenant-only attribution is insufficient; messages and events must bind application_id, principal_id,
+      credential_id and provider credential generation, because the mailer persists only tenant_id.
+    provenance: [EV-015, EV-023, EV-025, mailer/migrations/0001_product.sql, mailer/src/auth.rs]
+    resolution: resolved
+
+  - id: C-26
+    lens: C2-single-breach
+    statement: >
+      A routine agent deployment credential is overpowered if it can also register edges, retire routes,
+      rotate application credentials, change production mode or reach a raw-Caddy escape hatch.
+    provenance: [EV-013, EV-023, EV-025, EV-027, service-ingress/src/auth.rs, service-ingress/src/api.rs]
+    supports: [C-36, C-40]
+    resolution: resolved
+    note: >
+      Grounded in the retired API's actual shape — one static bearer gating list, upsert, delete, raw update
+      and every blue-green transition. The successor must not inherit that union token.
+  - id: C-27
+    lens: C2-single-breach
+    stake: true
+    statement: >
+      If edges accept unsigned whole configs rendered by the service, compromise of any cluster node
+      repoints every hostname at next poll while the same node falsifies its own audit and status views.
+    provenance: [EV-016, EV-021, EV-026, EV-027, DEC-013, service-ingress/docs/control-plane.md]
+    rebuts: [C-46, C-48]
+    resolution: escalated
+    note: >
+      ESCALATED. Remedy is generation signing by a signer outside the web service and hiqlite, with owner
+      step-up for protected hosts, wildcards and multi-route diffs. Real cost, real mechanism, and E2's
+      smallness mandate argues against it. Owner call.
+  - id: C-28
+    lens: C2-single-breach
+    statement: >
+      Registry-derived mode bounds a leaked application credential only while the service is honest; a
+      compromised service holding SES authority can forge registry state and send as every verified brand.
+    provenance: [EV-014, EV-023, EV-025, mailer/src/features/mailer_api/store.rs, mailer/src/ses.rs]
+    supports: [C-27]
+    resolution: deferred-as-assumption
+    note: >
+      Its full remedy (owner-signed per-application grants verified by a separate executor) is heavier than
+      T1 warrants. Assume service-honest for T1; C-22's sender-scoped short-lived credentials bound the
+      damage. Reverses if signing (C-27) is adopted, since the machinery is then already there.
+  - id: C-29
+    lens: C2-single-breach
+    statement: >
+      The owner UI, an in-cluster audit table and metrics emitted by the service cannot be the primary
+      breach detector, because the suspected service controls all three and the UI is opened only after
+      something already looks wrong.
+    provenance: [EV-027, service-ingress/src/audit.rs, ha-service.md]
+    resolution: escalated
+    note: >
+      ESCALATED with C-27. Remedy is an append-only sink outside the cluster plus external probing of
+      protected hostnames. Sharpened by EV-027: the owner is rarely watching, so in-band detection has no
+      human behind it.
+  - id: C-30
+    lens: C2-single-breach
+    statement: >
+      Containment fails if revocation, route rollback and mail shutdown are only reachable through the
+      service or credential believed compromised; two independent break-glass paths are required.
+    provenance: [EV-018, EV-026, deployment.md, service-ingress/docs/control-plane.md]
+    supports: [C-39]
+    resolution: resolved
+    note: >
+      Also names the correct use of the EV-018 fallback: ingress-ctl under explicit single-writer fencing is
+      a containment path, not a concurrent mutation path.
+
+  # ---- Axis D: velocity ----
+  - id: C-31
+    lens: D1-ship-it
+    stake: true
+    statement: >
+      F-03 does not deliver "deploy this product" because the agent must still choose hostname, upstreams,
+      data class and auth, then invent its own convergence-and-probe loop.
+    provenance: [EV-013, EV-020, FLOWS-001, ha-service.md]
+    supports: [C-12]
+    resolution: resolved
+    note: >
+      One idempotent ensure-public-route call that infers replica endpoints, defaults data class to public
+      and health to /healthz, orders upstreams by measured latency per edge, and returns one operation URL
+      that completes only on probe success. Extra input only for PHI or a nonstandard health contract.
+  - id: C-32
+    lens: D1-ship-it
+    statement: >
+      F-05 makes mail enablement a five-step owner workflow although deployment mode already exists; an
+      ensure-mail-application call should map release→production and dev→testing automatically.
+    provenance: [EV-010, EV-017, EV-025, FLOWS-001, deployment.md]
+    rebuts: [C-40]
+    resolution: resolved
+    note: See C-40 — the automatic mapping survives for testing only, never for production.
+  - id: C-33
+    lens: D1-ship-it
+    statement: >
+      Leaving the applicator open (OQ-1) forces every deployment to choose a transport; close it on
+      caddy.config_loaders.http and make the renderer unconditionally embed the loader block.
+    provenance: [EV-026, EV-016, FLOWS-001]
+    supports: [C-2]
+    resolution: resolved
+    note: OQ-1 closed. The unconditional loader block is the guard against EV-026's deaf-edge trap.
+  - id: C-34
+    lens: D1-ship-it
+    statement: >
+      The flows name failure states but define no closed machine error contract telling an agent the exact
+      next operation; one versioned envelope should span both domains.
+    provenance: [EV-011, EV-027, FLOWS-001, mailer/docs/architecture.md]
+    resolution: resolved
+    note: >
+      Directly discharges EV-011's scar — the DentConnex 429 defect was a consumer unable to tell retry
+      from terminal. The named codes include route_owned_elsewhere, edge_stale, recipient_suppressed,
+      delivery_deferred, delivery_terminal.
+  - id: C-35
+    lens: D1-ship-it
+    statement: >
+      OQ-3 should be closed by leader-owned delivery: all nodes accept into the replicated queue, only the
+      hiqlite leader claims and sends, one cluster-level rate value below the measured SES ceiling.
+    provenance: [EV-011, EV-016, mailer/README.md, mailer/docs/architecture.md]
+    rebuts: [C-48]
+    resolution: resolved
+    note: >
+      Chosen over C-48's static per-node split. Both are simple; leader-owned reuses an election hiqlite
+      already runs and keeps the rate value correct when a node is lost or added, which the static split
+      does not. What would change it: a throughput requirement that one sender cannot meet.
+
+  - id: C-36
+    lens: D2-agent-did-it
+    stake: true
+    statement: >
+      A routing credential that may upsert any syntactically valid hostname can replace or overlap a route
+      outside the deployment it was authorized to publish.
+    provenance: [EV-004, EV-013, EV-015, service-ingress/src/api.rs, service-ingress/src/caddy.rs]
+    rebuts: [C-31]
+    supports: [C-26]
+    resolution: resolved
+    note: >
+      Resolves with C-31 rather than against it: the ensure-route call stays one call, but the grant names
+      one exact hostname and owner, and wildcard/apex/catch-all/raw-config/edge-adoption are unavailable to
+      autonomous agent credentials. Velocity survives; unbounded authority does not.
+  - id: C-37
+    lens: D2-agent-did-it
+    statement: >
+      Exact-host duplicate checks and Caddy syntax validation still accept configs that dispatch unchanged
+      hostnames to the wrong handler; non-interference against the prior generation must be an admission
+      invariant.
+    provenance: [FLOWS-001, service-ingress/src/desired.rs, service-ingress/src/caddy.rs]
+    resolution: resolved
+    note: The shadowing case (wildcard/apex/path) that a hostname-uniqueness check cannot see.
+  - id: C-38
+    lens: D2-agent-did-it
+    statement: >
+      An edge fetching a version does not prove Caddy applied it or that the hostname serves the intended
+      application; recorded, rendered, offered, observed-on-edge and publicly-verified are distinct states.
+    provenance: [EV-013, EV-016, EV-026, FLOWS-001, ha-service.md]
+    supports: [C-13]
+    resolution: resolved
+  - id: C-39
+    lens: D2-agent-did-it
+    statement: >
+      Indefinite coexistence with ingress-ctl is unsafe unless every edge has exactly one fenced config
+      authority at a time, carried as an authority epoch in fleet-owned edge configuration.
+    provenance: [EV-009, EV-018, EV-026, FLOWS-001, networks.md]
+    supports: [C-5, C-30]
+    resolution: resolved
+    note: OQ-4 closed. Three lenses on three axes converged here.
+  - id: C-40
+    lens: D2-agent-did-it
+    statement: >
+      Application mode must be immutable and production enrollment a separate capability; a staging
+      credential registered as production sends test content through SES, and the reverse diverts live mail
+      into the disposable fabric.
+    provenance: [EV-010, EV-017, EV-023, EV-025, FLOWS-001]
+    rebuts: [C-32]
+    resolution: resolved
+    note: >
+      Wins over C-32's blanket auto-mapping. Synthesis: agents freely self-serve TESTING registrations
+      (C-32's ergonomics preserved where the blast radius is a test inbox); production requires an owner
+      step-up that pre-binds sender and recipient policy. Answers FLOWS-001's F-05 open question — mode
+      cannot be changed after registration; a mode change mints a new application.
+
+  # ---- Axis E: reliability ----
+  - id: C-41
+    lens: E1-never-down
+    stake: true
+    statement: >
+      An SES MessageId must be recorded as provider-accepted rather than delivered, and every
+      provider-accepted message must reach a verified terminal event within a bounded interval or raise an
+      alert naming the missing event.
+    provenance: [EV-011, mailer/src/worker/mod.rs, mailer/src/features/mailer_api/mod.rs]
+    resolution: resolved
+    note: >
+      The strongest single finding. Grounded in live code: the inherited worker marks sent as soon as
+      SendEmail returns an id while its SES event receiver is a fail-closed stub — exactly the six-hour
+      silent-drop scenario, already latent in the system being replaced.
+  - id: C-42
+    lens: E1-never-down
+    statement: >
+      A delivery lease expiring after a send began but before its outcome was committed is indeterminate
+      and must never be silently reclaimed as an ordinary retry.
+    provenance: [FLOWS-001, mailer/src/worker/mod.rs, mailer/src/worker/store.rs]
+    supports: [C-46]
+    resolution: resolved
+  - id: C-43
+    lens: E1-never-down
+    statement: >
+      No edge may be labeled converged from pull access logs; expose desired, last-fetched, last-applied,
+      last-probed and last-known-good generations separately.
+    provenance: [EV-026, FLOWS-001, service-ingress/docs/control-plane.md]
+    supports: [C-13]
+    rebuts: [C-47]
+    resolution: resolved
+  - id: C-44
+    lens: E1-never-down
+    statement: >
+      Quorum loss must be paged by observers outside the cluster while survivors serve an explicitly
+      read-only mode; process liveness, read availability and write-quorum readiness are three signals.
+    provenance: [EV-016, FLOWS-001, ha-service.md, universe-ronitnath/src/server/telemetry.rs]
+    supports: [C-29]
+    resolution: resolved
+    note: A dashboard inside the failed quorum cannot be the alarm for its own failure. Answers F-09.
+  - id: C-45
+    lens: E1-never-down
+    statement: >
+      Multi-edge routing is not available until every eligible edge can present a valid certificate for
+      every assigned hostname without racing ACME or depending on the routing quorum during a handshake.
+    provenance: [EV-013, EV-021, EV-026, FLOWS-001]
+    supports: [C-17]
+    resolution: resolved
+    note: OQ-8 direction settled — per-edge durable cert material and independent renewal, decided before a second edge is activated.
+
+  - id: C-46
+    lens: E2-you-maintain-this
+    stake: true
+    statement: >
+      A successful SES send followed by a failed terminal commit will resend on lease expiry, so this
+      service cannot truthfully promise exactly-once; declare at-least-once and record indeterminate
+      outcomes rather than building a coordinator SES cannot join.
+    provenance: [EV-011, mailer/src/worker/mod.rs, mailer/src/worker/store.rs]
+    rebuts: [C-27]
+    supports: [C-42]
+    resolution: resolved
+    note: Agrees with C-42 on the defect and adds the honest contract. Both stand.
+  - id: C-47
+    lens: E2-you-maintain-this
+    statement: >
+      Remove the converged state entirely; expose only desired hash, last-served hash and last-fetch time,
+      and let the agent's public-path probe be the completion criterion.
+    provenance: [EV-026, FLOWS-001]
+    rebuts: [C-43]
+    resolution: resolved
+    note: >
+      Loses on mechanism, wins on diagnosis. Adopted: delete "converged" as a word (it is the lie C-13
+      identified) and keep the separate observable states of C-43 — which are facts, not a state machine.
+  - id: C-48
+    lens: E2-you-maintain-this
+    statement: >
+      A process-local 75ms pacer becomes an account-wide violation with three replicas (~40/s against a
+      documented 14/s ceiling); give each fixed member a static 4/s budget rather than building a
+      distributed limiter or leader dispatcher.
+    provenance: [EV-016, mailer/src/worker/mod.rs, mailer/docs/architecture.md]
+    rebuts: [C-35, C-27]
+    resolution: resolved
+    note: >
+      The defect is confirmed and important; the remedy loses to C-35. Recorded because it is the cheapest
+      fallback if leader-owned delivery proves awkward.
+  - id: C-49
+    lens: E2-you-maintain-this
+    statement: >
+      The failover drill must stay an external operator-run play; a self-orchestrated drill needs
+      host-control privileges inside the app and lets it certify its own health model.
+    provenance: [EV-016, ha-service.md, universe-ronitnath/deploy/compose.yaml]
+    resolution: resolved
+    note: Answers FLOWS-001's F-09 open question. No drill scheduler or host credential ships in the app.
+  - id: C-50
+    lens: E2-you-maintain-this
+    statement: >
+      A first-class route-snapshot rollback state machine duplicates Caddy's last-known-good and can
+      restore upstream facts that went stale after the snapshot; repair with one forward edit plus an
+      append-only audit record instead.
+    provenance: [EV-018, EV-026, FLOWS-001, service-ingress/docs/control-plane.md]
+    rebuts: [C-19]
+    resolution: resolved
+    note: >
+      Both hold — they are different layers. Edge keeps active+previous artifacts (C-19); the control plane
+      ships no rollback state machine (C-50). Answers F-02's open question on rollback.
+
+escalations:
+  - to_owner: [C-21, C-27, C-29]
+    why: blocking and not decidable by agents — each trades an owner value against another owner value
+    batched: true

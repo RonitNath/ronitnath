@@ -1,0 +1,50 @@
+claims:
+  - id: L-1
+    statement: >
+      A successful SES SendEmail followed by failure to commit the terminal queue state will cause the expired lease to resend the same message, so this service cannot truthfully promise exactly-once delivery.
+    provenance: [EV-011, /private/tmp/claude-502/-Users-ronitnath-dev/f4d0a51b-3dfd-47c6-865d-98af240862ec/scratchpad/priorart/mailer/src/worker/mod.rs, /private/tmp/claude-502/-Users-ronitnath-dev/f4d0a51b-3dfd-47c6-865d-98af240862ec/scratchpad/priorart/mailer/src/worker/store.rs]
+    stake: true
+    consequence: >
+      A database or quorum fault in the narrow post-send window produces duplicate password resets, signup messages, or notifications while the lifecycle UI reports only one queued message and obscures why the duplicate happened.
+    recommendation: >
+      Declare delivery at-least-once, keep enqueue idempotency for lost API acknowledgements, record an indeterminate outcome when the upstream result cannot be committed, and do not add an exactly-once coordinator that SES cannot participate in.
+
+  - id: L-2
+    statement: >
+      An HTTP config pull proves only that an edge fetched bytes and cannot distinguish successful Caddy application from a fetch followed by adaptation or reload rejection.
+    provenance: [EV-026, portfolio/products/isoastra-services/flows/FLOWS-001-routing-and-mailing.md]
+    stake: false
+    consequence: >
+      The proposed convergence tracker can show an edge as current while it is still serving the previous config, making the incident UI most misleading precisely during a bad route change.
+    recommendation: >
+      Remove the converged state and expose only desired config hash, last config hash served, and last fetch time; make the agent's existing public-path probe the completion criterion for a route change.
+
+  - id: L-3
+    statement: >
+      A process-local 75 ms send pacer becomes an account-wide rate-limit violation when the ruled three replicas each run a worker.
+    provenance: [EV-016, /private/tmp/claude-502/-Users-ronitnath-dev/f4d0a51b-3dfd-47c6-865d-98af240862ec/scratchpad/priorart/mailer/src/worker/mod.rs, /private/tmp/claude-502/-Users-ronitnath-dev/f4d0a51b-3dfd-47c6-865d-98af240862ec/scratchpad/priorart/mailer/docs/architecture.md]
+    stake: false
+    consequence: >
+      Three healthy replicas can attempt roughly forty sends per second against the documented fourteen-per-second SES account ceiling, creating throttling, queue churn, and retries because HA is working.
+    recommendation: >
+      Give each of the three fixed members a static four-sends-per-second budget and accept reduced throughput during node loss; do not build a distributed rate limiter or leader-only dispatcher for a workload with no stated minimum throughput.
+
+  - id: L-4
+    statement: >
+      Putting the failover drill inside this service would require the service under test to orchestrate its own replica failure and judge its own public availability, invalidating the independence of the existing acceptance procedure.
+    provenance: [EV-016, context/procedures/ha-service.md, personal/universe-ronitnath/deploy/compose.yaml]
+    stake: false
+    consequence: >
+      A defect in the app's drill path can either take down multiple members or certify the same broken health model that caused the incident, while also placing host-control privileges inside the application.
+    recommendation: >
+      Keep the drill as an external operator-run play that probes the public hostname, stops one replica, restarts it, and records responses; ship no drill scheduler, host-control credential, or self-certification code in the app.
+
+  - id: L-5
+    statement: >
+      A first-class route-snapshot rollback state machine duplicates Caddy's last-known-good behavior and can deliberately restore upstream or placement facts that became stale after the snapshot was taken.
+    provenance: [EV-018, EV-026, portfolio/products/isoastra-services/flows/FLOWS-001-routing-and-mailing.md, /private/tmp/claude-502/-Users-ronitnath-dev/f4d0a51b-3dfd-47c6-865d-98af240862ec/scratchpad/priorart/service-ingress/docs/control-plane.md]
+    stake: false
+    consequence: >
+      At 3am the operator must reason about desired state, per-edge versions, rollback eligibility, and independently changed deployments, and a mechanically successful rollback can route traffic to a retired target.
+    recommendation: >
+      Store an append-only audit record and content hash for diagnosis, let Caddy retain its last applied config when a new one is invalid or unavailable, and repair bad desired state with one forward edit instead of executable snapshot rollback.

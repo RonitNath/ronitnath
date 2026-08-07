@@ -1,0 +1,46 @@
+claims:
+  - id: L-1
+    statement: >
+      With every address for services.isoastra.com blackholed, a previously converged public edge must boot from durable local state and serve every previously active hostname over TLS without first fetching, authenticating to, or rendering from the hiqlite-backed service.
+    provenance: [EV-016, EV-026, portfolio/products/isoastra-services/flows/FLOWS-001-routing-and-mailing.md, context/procedures/ha-service.md]
+    stake: true
+    consequence: >
+      The flow set currently says that an edge fetches its config and that a stale edge may keep serving, while EV-026 merely assumes Caddy autosave plus --resume; without an explicit cold-start contract, a reboot converts a harmless control-plane outage into loss of every site on that edge.
+    recommendation: >
+      Provision each edge with a systemd-owned, durable last-known-good Caddy JSON artifact and an explicit --resume startup path that precedes all remote fetches, retain it across package and host reboots, and refuse to make Caddy readiness depend on the config endpoint or its mTLS peer being reachable.
+  - id: L-2
+    statement: >
+      A locally cached route document is insufficient for reboot autonomy unless the edge also retains all TLS certificate, private-key, ACME-account, and issuance state needed to complete a fresh handshake while the services cluster is unreachable.
+    provenance: [EV-021, EV-026, /private/tmp/claude-502/-Users-ronitnath-dev/f4d0a51b-3dfd-47c6-865d-98af240862ec/scratchpad/priorart/service-ingress/content/caddy.md]
+    stake: false
+    consequence: >
+      An edge can load valid proxy routes after reboot yet fail every public request at TLS, and using tls.get_certificate.http against services.isoastra.com would place the unavailable control plane directly in the handshake path.
+    recommendation: >
+      Give every edge durable local Caddy storage and its own renewal capability, keep that storage outside ephemeral container or tmpfs paths, forbid certificate retrieval and on-demand-issuance authorization callbacks to services.isoastra.com in rendered configs, and drill with an empty process cache but intact disk state.
+  - id: L-3
+    statement: >
+      Every activated edge generation must be a self-contained data-plane artifact whose request handling, upstream health selection, redirects, static roots, and TLS operation contain no runtime call back to the route registry or hiqlite cluster.
+    provenance: [EV-013, EV-021, EV-026, /private/tmp/claude-502/-Users-ronitnath-dev/f4d0a51b-3dfd-47c6-865d-98af240862ec/scratchpad/priorart/service-ingress/catalog/ingress.yaml, /private/tmp/claude-502/-Users-ronitnath-dev/f4d0a51b-3dfd-47c6-865d-98af240862ec/scratchpad/priorart/service-ingress/docs/control-plane.md]
+    stake: false
+    consequence: >
+      A dynamic upstream resolver, permission callback, certificate getter, auth check, or remote include aimed at the central service makes public correctness depend on the very failure domain this design is supposed to remove.
+    recommendation: >
+      Compile placement and upstream membership into the complete per-edge generation, validate and provision it on the edge before atomic activation, preserve static-file assets locally where a route requires them, and add a rendered-config audit that rejects every services-cluster address outside the inactive config-loader stanza.
+  - id: L-4
+    statement: >
+      The edge must retain at least the active and previous fully provisioned generations because a single autosave provides no recovery source when the newest artifact is truncated, incompatible with the booted Caddy binary, or loses the recursive loader block required by native pull distribution.
+    provenance: [EV-026, context/procedures/deployment.md, /private/tmp/claude-502/-Users-ronitnath-dev/f4d0a51b-3dfd-47c6-865d-98af240862ec/scratchpad/priorart/service-ingress/content/sync.md]
+    stake: false
+    consequence: >
+      The edge may have served correctly before reboot and still come back dark, or may load once and permanently stop receiving future generations, with no control-plane-independent rollback target.
+    recommendation: >
+      Store immutable generation-addressed artifacts plus an atomically updated active pointer, retain the prior verified artifact, validate with the exact local Caddy binary before switching, and make boot fall back to the prior artifact whenever the active one cannot be provisioned.
+  - id: L-5
+    statement: >
+      Acceptance must demonstrate continuous public service through a forty-minute total services-cluster blackhole while each edge is rebooted in turn, rather than infer edge autonomy from cluster failover or convergence telemetry.
+    provenance: [EV-016, portfolio/products/isoastra-services/flows/FLOWS-001-routing-and-mailing.md, context/procedures/ha-service.md]
+    stake: false
+    consequence: >
+      The existing HA procedure proves loss of an application replica behind an already-running ingress, not cold-start independence of ingress itself, and F-09's cluster and last-fetch status surfaces disappear with the control plane whose absence is under test.
+    recommendation: >
+      Add a release-blocking drill that firewall-drops every services-cluster address from all public edges, probes every catalog hostname externally throughout sequential host reboots, verifies TLS and representative proxy, redirect, static, and multi-upstream behavior, and records that route writes and convergence reporting are absent from the serving path.

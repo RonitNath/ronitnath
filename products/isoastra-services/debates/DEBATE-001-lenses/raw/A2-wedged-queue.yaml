@@ -1,0 +1,50 @@
+claims:
+  - id: L-1
+    statement: >
+      A deployment in which the route-serving surface and mail delivery worker share one process or one container cannot satisfy the requirement that an SES retry storm cannot take routing down.
+    provenance: [EV-012, EV-016, /private/tmp/claude-502/-Users-ronitnath-dev/f4d0a51b-3dfd-47c6-865d-98af240862ec/scratchpad/priorart/mailer/src/app.rs, /private/tmp/claude-502/-Users-ronitnath-dev/f4d0a51b-3dfd-47c6-865d-98af240862ec/scratchpad/priorart/mailer/deploy/mailer.compose.yaml, personal/universe-ronitnath/deploy/compose.yaml]
+    stake: true
+    consequence: >
+      The live prior art starts the worker inside Application, stores it beside both routers, and gives the combined site one CPU, memory, PID, restart, and OOM boundary; therefore mail-side CPU starvation, memory growth, panic, abort, or shutdown necessarily removes the route endpoint in the proposed combined shape.
+    recommendation: >
+      Ship one versioned product artifact but run at least a route-plane container and a mail-worker container on every cluster node, with separate cgroups, PID namespaces, restart policies, listeners, and credentials; the route plane must contain no SES client or delivery loop, and the mail worker must expose no routing surface.
+
+  - id: L-2
+    statement: >
+      Separate processes are still not failure isolation if routing intent and the mail queue contend on the same embedded hiqlite Raft node, database file, write path, or disk quota.
+    provenance: [EV-001, EV-016, portfolio/products/ronitnath-universe/decisions/DEC-013-hiqlite-is-the-data-seam.md, personal/universe-ronitnath/deploy/compose.yaml, /private/tmp/claude-502/-Users-ronitnath-dev/f4d0a51b-3dfd-47c6-865d-98af240862ec/scratchpad/priorart/mailer/src/worker/store.rs]
+    stake: false
+    consequence: >
+      A mail backlog generates repeated claim, retry, event, suppression, pruning, and metrics work while storing message payloads; on a shared Raft log and bounded volume that workload can exhaust space or monopolize commits needed to register, render, or serve current routing state even after the worker has its own process.
+    recommendation: >
+      Give routing and mailing independent three-member hiqlite clusters with distinct ports, data directories, backup sets, disk quotas, and runtime identities on nexus, sfo, and nyc; keep them under one product API and release, but do not share a Raft log or writable filesystem between domains.
+
+  - id: L-3
+    statement: >
+      Public request routing remains available during a total services.isoastra.com failure only if every edge serves an independently persisted last-known-good Caddy configuration without consulting the control plane on the request path.
+    provenance: [EV-013, EV-016, EV-026, portfolio/products/isoastra-services/flows/FLOWS-001-routing-and-mailing.md, /private/tmp/claude-502/-Users-ronitnath-dev/f4d0a51b-3dfd-47c6-865d-98af240862ec/scratchpad/priorart/service-ingress/docs/control-plane.md]
+    stake: false
+    consequence: >
+      If Caddy asks this application to authorize, resolve, or render during each visitor request, any mail-induced application or database outage immediately becomes a fleet-wide public-site outage despite three application replicas.
+    recommendation: >
+      Use Caddy's native authenticated pull loader solely to fetch whole validated generations, include a positive load_delay loader block in every served generation, retain Caddy's autosaved configuration with resume enabled, and require that fetch failure leaves the active generation untouched indefinitely.
+
+  - id: L-4
+    statement: >
+      A durable mail queue without hard admission, retry, concurrency, timeout, and storage budgets permits an upstream SES failure to become an unbounded local resource attack.
+    provenance: [EV-011, EV-016, portfolio/products/isoastra-services/flows/FLOWS-001-routing-and-mailing.md, /private/tmp/claude-502/-Users-ronitnath-dev/f4d0a51b-3dfd-47c6-865d-98af240862ec/scratchpad/priorart/mailer/src/worker/mod.rs, /private/tmp/claude-502/-Users-ronitnath-dev/f4d0a51b-3dfd-47c6-865d-98af240862ec/scratchpad/priorart/mailer/docs/architecture.md]
+    stake: false
+    consequence: >
+      During an SES throttle or blackhole, applications can continue committing payloads faster than bounded delivery drains them, while due retries and suppression reconciliation consume storage and execution indefinitely until the host or shared infrastructure fails.
+    recommendation: >
+      Enforce per-application and global queued-message and queued-byte ceilings at durable acceptance, cap attempts and elapsed retry age, bound SES calls with deadlines and a circuit breaker, limit global delivery concurrency and rate, reserve disk headroom, and return a closed retryable overload response before accepting work that exceeds those budgets.
+
+  - id: L-5
+    statement: >
+      Node failover drills alone do not prove service-domain isolation because they never demonstrate that a live but pathological mail workload leaves routing latency and availability unchanged.
+    provenance: [EV-016, context/procedures/ha-service.md, portfolio/products/isoastra-services/flows/FLOWS-001-routing-and-mailing.md]
+    stake: false
+    consequence: >
+      The release can pass the existing stop-one-replica probe while still collapsing all route-serving replicas simultaneously when each receives the same queue backlog, SES timeout pattern, or disk-pressure condition.
+    recommendation: >
+      Make release acceptance include a cross-domain chaos drill that blackholes and throttles SES, fills the mail queue to every configured ceiling, crashes and restarts mail workers, and proves continuous external public-route probes plus route-config fetch latency stay within declared bounds; run the reciprocal route-plane wedge while proving mail acceptance and draining continue.

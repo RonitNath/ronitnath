@@ -1,0 +1,46 @@
+claims:
+  - id: L-1
+    statement: >
+      A pull-only Caddy distribution path makes a route committed just after an edge fetch wait until that edge's next positive load_delay before it can serve, so registration latency is deliberately the polling interval rather than the fastest available activation path.
+    provenance: [EV-013, EV-026, portfolio/products/isoastra-services/flows/FLOWS-001-routing-and-mailing.md]
+    stake: true
+    consequence: >
+      The owner can watch a deployed hostname fail for an entire polling window even though the route is valid, committed, and every component is reachable, with no action available except waiting.
+    recommendation: >
+      Make commit trigger immediate authenticated per-edge application through Caddy's remote admin load path, retain a generation-addressed fetch endpoint for the payload, and reserve periodic pull for later reconciliation rather than normal activation.
+  - id: L-2
+    statement: >
+      The drafted agent flow records a route and leaves the public-path confirmation to the deploying agent, so the routing API itself cannot answer whether its accepted mutation became a serving hostname.
+    provenance: [EV-013, EV-027, portfolio/products/isoastra-services/flows/FLOWS-001-routing-and-mailing.md]
+    stake: false
+    consequence: >
+      A successful registration response ends the only correlated transaction, forcing agents to invent polling, timeouts, and diagnosis logic and leaving the owner unable to distinguish slow activation from a failed one.
+    recommendation: >
+      Return a durable activation receipt keyed by route revision and idempotency key, expose wait and event-stream forms of that receipt, and keep it terminally queryable with per-edge timestamps, errors, and probe evidence.
+  - id: L-3
+    statement: >
+      An edge's successful HTTP fetch cannot prove that Caddy accepted and began serving the fetched generation because application occurs after the fetch response, yet the proposed status surface treats last successful fetch and config version as convergence evidence.
+    provenance: [EV-026, portfolio/products/isoastra-services/flows/FLOWS-001-routing-and-mailing.md]
+    stake: false
+    consequence: >
+      The dashboard and machine API can report an edge green on a generation that Caddy rejected, turning the exact registered-but-not-serving failure under review into a false success.
+    recommendation: >
+      Require an explicit per-edge applied acknowledgment containing generation, rendered digest, Caddy load result, and applied_at, and label fetch-only state as fetched rather than converged.
+  - id: L-4
+    statement: >
+      Config validation and Caddy application still do not prove a hostname serves through TLS to a healthy upstream, although the live ingress artifacts already distinguish validation, reload, health contracts, and public behavior as separate gates.
+    provenance: [context/resources/networks.md, /private/tmp/claude-502/-Users-ronitnath-dev/f4d0a51b-3dfd-47c6-865d-98af240862ec/scratchpad/priorart/service-ingress/catalog/ingress.yaml, /private/tmp/claude-502/-Users-ronitnath-dev/f4d0a51b-3dfd-47c6-865d-98af240862ec/scratchpad/priorart/service-ingress/docs/control-plane.md]
+    stake: false
+    consequence: >
+      A syntactically valid and applied route can remain broken by certificate issuance, listener reachability, forwarding behavior, or an unhealthy upstream while every control-plane indicator says it took.
+    recommendation: >
+      After each apply, run the route's declared health contract through each applicable edge with the real hostname and TLS SNI and also through the ordinary public hostname, recording the exact failing stage and response on the activation receipt.
+  - id: L-5
+    statement: >
+      Treating the route flow as unfinished until every applicable edge converges hides the earlier and owner-relevant fact that the hostname has begun serving on at least one eligible public edge.
+    provenance: [EV-013, portfolio/products/isoastra-services/flows/FLOWS-001-routing-and-mailing.md]
+    stake: false
+    consequence: >
+      One slow edge makes a working deployment look pending and gives neither the owner nor an agent an immediate, truthful answer about whether refreshing the hostname can succeed now.
+    recommendation: >
+      Model serving and fully_converged as separate monotonic milestones, emit serving on the first successful public-path probe, and continue the same receipt until every targeted edge is applied and independently proven.

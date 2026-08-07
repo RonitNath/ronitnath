@@ -1,0 +1,46 @@
+claims:
+  - id: L-1
+    statement: >
+      The mail lifecycle is not safe until an SES MessageId is recorded as provider-accepted rather than delivered and every provider-accepted message either receives a verified delivery, bounce, complaint, or suppression event within a bounded interval or raises an alert naming the missing event.
+    provenance: [EV-011, portfolio/products/isoastra-services/flows/FLOWS-001-routing-and-mailing.md, /private/tmp/claude-502/-Users-ronitnath-dev/f4d0a51b-3dfd-47c6-865d-98af240862ec/scratchpad/priorart/mailer/src/worker/mod.rs, /private/tmp/claude-502/-Users-ronitnath-dev/f4d0a51b-3dfd-47c6-865d-98af240862ec/scratchpad/priorart/mailer/src/features/mailer_api/mod.rs]
+    stake: true
+    consequence: >
+      The inherited worker marks a message sent as soon as SendEmail returns an id while its SES event receiver is a fail-closed stub, so SES can accept and then suppress or fail a message for six hours while the API and operator surface report success.
+    recommendation: >
+      Make the closed lifecycle queued, attempting, provider-accepted, delivered, bounced, complained, suppressed, terminal-failed, and outcome-unknown; ingest and authenticate SES configuration-set events, correlate them by provider id, expose each observed transition with its source and timestamp in both API and UI, page on stale provider-accepted messages and stale event-ingest watermarks, and continuously prove both the SES path and the Stalwart path with synthetic messages whose terminal observations are asserted.
+  - id: L-2
+    statement: >
+      Any delivery lease that expires after an external send began but before its outcome was durably committed is indeterminate and must never be silently reclaimed as an ordinary retry.
+    provenance: [portfolio/products/isoastra-services/flows/FLOWS-001-routing-and-mailing.md, /private/tmp/claude-502/-Users-ronitnath-dev/f4d0a51b-3dfd-47c6-865d-98af240862ec/scratchpad/priorart/mailer/src/worker/mod.rs, /private/tmp/claude-502/-Users-ronitnath-dev/f4d0a51b-3dfd-47c6-865d-98af240862ec/scratchpad/priorart/mailer/src/worker/store.rs]
+    stake: false
+    consequence: >
+      The prior worker performs the irreversible SES call before its terminal database transaction and reclaims expired sending leases, so a process or quorum failure in that gap can produce either duplicate mail or a false failure with no record of what SES observed.
+    recommendation: >
+      Persist a unique attempt and an attempting transition before the network call, persist the provider id separately from the eventual delivery outcome, classify every expired in-flight attempt as outcome-unknown, reconcile it from provider events where possible, and require an explicit per-application policy and loud audit event before resending an outcome-unknown attempt.
+  - id: L-3
+    statement: >
+      A Caddy config fetch is not evidence that the edge applied or is serving that config, so no edge may be labeled converged from pull access logs or desired state alone.
+    provenance: [EV-026, portfolio/products/isoastra-services/flows/FLOWS-001-routing-and-mailing.md, /private/tmp/claude-502/-Users-ronitnath-dev/f4d0a51b-3dfd-47c6-865d-98af240862ec/scratchpad/priorart/service-ingress/docs/control-plane.md]
+    stake: false
+    consequence: >
+      An edge can fetch a generation and then reject it, lose the recursive loader block and go deaf, or keep serving a retired route while the UI claims convergence, leaving route changes frozen or dangerous stale exposure silent.
+    recommendation: >
+      Give every rendered generation an immutable id, reject any render lacking its positive-load-delay loader block, obtain an edge-side applied-generation attestation, independently probe representative behavior through each edge, and expose desired, last-fetched, last-applied, last-probed, and last-known-good generations separately; page on age-bounded disagreement and prove automatic catch-up plus rollback by partition and invalid-config drills.
+  - id: L-4
+    statement: >
+      Quorum loss must be detected and paged by observers outside the services cluster while surviving replicas continue an explicitly read-only control-plane mode and refuse every durability-requiring acceptance.
+    provenance: [EV-016, portfolio/products/isoastra-services/flows/FLOWS-001-routing-and-mailing.md, context/procedures/ha-service.md, personal/universe-ronitnath/src/server/store.rs, personal/universe-ronitnath/src/server/telemetry.rs]
+    stake: false
+    consequence: >
+      A dashboard inside the failed quorum cannot be the alarm for its own failure, and a single undifferentiated readiness gate can either remove all readable replicas from ingress or leave write callers timing out without being told that routing changes and mail acceptance are frozen.
+    recommendation: >
+      Separate process liveness, read availability, and write-quorum readiness; return an immediate typed quorum-unavailable response with node, term, leader, visible members, and observation time for writes; keep last-known-good routing and diagnostic reads available; export per-node quorum facts and a replicated write canary to both existing independent telemetry planes; and page on loss of one member before quorum loss, loss of quorum immediately, missing series, and canary staleness, with recurring one-node, leader, partition, and two-node-loss drills.
+  - id: L-5
+    statement: >
+      Multi-edge routing is not available until every eligible edge can present a valid certificate for every assigned hostname without independently racing ACME issuance or depending on the routing-control quorum during a handshake.
+    provenance: [EV-013, EV-021, EV-026, portfolio/products/isoastra-services/flows/FLOWS-001-routing-and-mailing.md]
+    stake: false
+    consequence: >
+      Routes can be correctly distributed yet fail TLS on a replacement edge, duplicate issuance can hit certificate-authority limits, and an outage or reboot can turn the intended failover edge into a certificate failure exactly when it is needed.
+    recommendation: >
+      Choose certificate ownership before activating a second edge, provision the same required apex and wildcard certificate material to every eligible edge through a path independent of this app and its quorum, retain it locally across restarts, alert on per-edge expiry and renewal failure, and make failover acceptance include cold-starting an edge with the control plane unavailable and completing real TLS handshakes for every assigned certificate class.
