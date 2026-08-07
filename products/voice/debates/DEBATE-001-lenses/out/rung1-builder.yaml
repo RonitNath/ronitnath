@@ -1,0 +1,57 @@
+lens: rung1-builder
+claims:
+  - id: L-1
+    statement: |
+      The rung-1 corpus schema should contain exactly one table, `audio_clips`, with `clip_id`, `relative_path`, `original_name`, `media_type`, `byte_length`, `sha256`, and `ingested_at`, and no measurement columns.
+    provenance: [EV-014, EV-032, EV-033]
+    stake: false
+    rationale: |
+      This is enough to accept a file, locate it on the filesystem, verify its bytes, list it, and replay it. The row records storage facts only; the audio remains outside SQLite as required. An opaque `clip_id` keeps identity independent of a filename while making this tiny schema easy to discard and rebuild.
+
+  - id: L-2
+    statement: |
+      An ingest should write a new file under the configured audio root, fsync it, atomically rename it to a never-overwritten `clip_id` path, and only then insert the corresponding `audio_clips` row.
+    provenance: [EV-014, EV-033]
+    stake: false
+    rationale: |
+      The filesystem is the durable corpus, while SQLite merely points at it. Publishing the file before the row ensures a committed row never names bytes that were not durably stored. Replay should open only the recorded relative path beneath the configured root and stream those exact bytes.
+
+  - id: L-3
+    statement: |
+      Once an `audio_clips` row is inserted, both its row and its referenced file should be immutable, enforced by create-new file semantics and SQLite triggers that abort `UPDATE` and `DELETE`.
+    provenance: [EV-033]
+    stake: false
+    rationale: |
+      Append-only is a concrete rung-1 rule, not a lifecycle to model. Database triggers make accidental mutation fail even if application code is wrong, while create-new semantics prevent replacement at the filesystem seam. No status, soft-delete, retention, or cleanup fields belong in the row.
+
+  - id: L-4
+    statement: |
+      Rung 1 should create neither typed measurement tables nor a generic annotation or run stream.
+    provenance: [EV-005, EV-009, EV-014, EV-038]
+    stake: true
+    rationale: |
+      D1 is therefore deliberately undecided in the executable schema: the approved increment has clips, not measurements. A generic stream would still commit storage and interpretation machinery without an exercised producer, while typed tables would claim entities the service cannot produce. Building either before the owner has greenlit accept-store-replay repeats the overbuilt-foundation failure.
+
+  - id: L-5
+    statement: |
+      Rung 1 should expose no run-comparison API or query, so no comparability predicate should live in either Rust or SQLite and no degraded comparison should be returned.
+    provenance: [EV-014, EV-038]
+    stake: false
+    rationale: |
+      D2 has no operands in this increment because the service records no measurement runs. A refusal rule would manufacture a contract for an operation that does not exist, and degradation would present an unsupported result as useful. The honest rung-1 behavior is absence of the operation rather than a result-shaped placeholder.
+
+  - id: L-6
+    statement: |
+      Rung 1 should persist no derived observations and run no regeneration jobs; replay should read the stored source file without creating timeline data.
+    provenance: [EV-009, EV-014]
+    stake: false
+    rationale: |
+      D3 is empty at this rung because the only approved durable object is the accepted audio clip. The hash and byte count are storage-integrity facts, not observations against an audio timeline. Persisting waveform data, duration statistics, playback events, or other computed rows would broaden the increment beyond accept-store-replay.
+
+  - id: L-7
+    statement: |
+      The initial migration should reserve zero measurement shape: it should create only `audio_clips` and its immutability triggers, with no event-kind enum, payload JSON contract, timeline coordinates, run identity, or configuration hash.
+    provenance: [EV-005, EV-009, EV-038]
+    stake: false
+    rationale: |
+      D4 should commit only to facts exercised by the first increment. Empty extension points are still commitments because application code and queries begin depending on their names and semantics. A single small migration keeps the implemented model inspectable and cheap to replace before any additional rung is approved.

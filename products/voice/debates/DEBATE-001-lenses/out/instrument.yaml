@@ -1,0 +1,73 @@
+lens: instrument
+claims:
+  - id: L-1
+    statement: |
+      The authoritative measurement model should be one append-only observation stream with a fixed typed envelope and schema-versioned signal payloads, not mutable typed tables as the source of truth.
+    provenance: [EV-016, EV-022, EV-041]
+    stake: false
+    rationale: |
+      The envelope should contain observation ID, run ID, signal type, payload schema version, producer component instance, causal parent IDs, media coordinates, observation timestamps, status, and payload. A signal registry should validate each payload version, while typed SQL views or Rust decoders provide signal-specific access. New supervisor signals can then be added as new stream types without reshaping measurements already used for transcript and timing comparisons.
+
+  - id: L-2
+    statement: |
+      Every component boundary should emit immutable received, started, emitted, completed, and failed observations linked by run, component-instance, attempt, and causal IDs.
+    provenance: [EV-017, EV-029, EV-035]
+    stake: true
+    rationale: |
+      This structure makes a gap attributable: the last upstream emission, downstream receipt, provider request, provider response, and local processing interval can be ordered from stored facts. Each boundary observation should include a canonical payload hash and, where available, the exact non-secret request or response body and provider request ID. A component trace that records only its final value cannot distinguish queueing, transport delay, provider delay, local processing, or dropped handoff after the call.
+
+  - id: L-3
+    statement: |
+      An observation's time model should preserve media sample coordinates, run-relative monotonic time, wall-clock time, clock-domain identity, and stated uncertainty rather than collapsing them into one timestamp.
+    provenance: [EV-016, EV-017, EV-018, EV-035]
+    stake: false
+    rationale: |
+      Audio truth belongs at sample positions, while arrival and handoff latency belong to the observing process's monotonic clock. Wall time is only for correlation across processes and hosted-provider records, so synchronization markers and clock-domain mappings must also be observations. Resampling, segmentation, and channel extraction should record explicit source-to-derived coordinate transforms so every word, turn decision, and provider exchange can be traced back to the exact source-audio interval.
+
+  - id: L-4
+    statement: |
+      Every derived signal should be retained as an immutable observation, and regeneration should create a new derivation run linked to its inputs rather than replace the earlier result.
+    provenance: [EV-023, EV-033, EV-035, EV-041]
+    stake: true
+    rationale: |
+      Hosted-provider behavior and live arrival timing cannot be reconstructed from the audio and current configuration after the fact. The same rule should cover deterministic outputs such as waveforms and segmentation because implementation and configuration revisions can change their meaning. Each derived observation should name its input observation or audio artifact hashes, derivation implementation, configuration snapshot, and predecessor or superseded observation when it is a correction.
+
+  - id: L-5
+    statement: |
+      The stream should represent expected-but-absent output and trace incompleteness explicitly, because a missing row must never mean successful silence, provider silence, dropped telemetry, or unfinished work interchangeably.
+    provenance: [EV-009, EV-017, EV-029]
+    stake: false
+    rationale: |
+      Each invocation should declare its expected output class and terminate with completed, failed, timed-out, cancelled, or incomplete status. Sequence numbers and explicit stream-open and stream-close observations should expose missing chunks, while coverage observations should identify intervals for which instrumentation itself is absent. This lets the inspection surface show an observed empty result separately from a hole in the evidence.
+
+  - id: L-6
+    statement: |
+      Each run should pin an immutable manifest containing the audio content identity, pipeline graph, component builds, provider and model identifiers, canonical configuration, execution mode, and measurement-contract versions.
+    provenance: [EV-019, EV-034, EV-041]
+    stake: false
+    rationale: |
+      A mutable configuration name is not provenance and cannot support a later diagnosis. The manifest should preserve resolved values, defaults, threshold units, adapter version, and provider-reported model identity, with a canonical hash used by all observations in the run. Repeating a named configuration should therefore produce a new run against the same manifest hash rather than append into an old run.
+
+  - id: L-7
+    statement: |
+      Comparability should be decided per metric by a versioned measurement contract stored in the database and evaluated by one canonical predicate that returns both a verdict and machine-readable reasons.
+    provenance: [EV-019, EV-034, EV-041]
+    stake: true
+    rationale: |
+      Whole-run equality is the wrong predicate because provider, model, and threshold differences are often the intended comparison dimensions. A metric contract should declare required signal schemas, audio identity or corpus-selection rule, media coordinate semantics, clock requirements, normalization, reference-truth policy, and allowed varying dimensions. The system should persist the predicate version and its result with each comparison so the basis of an old judgment remains inspectable after comparison logic evolves.
+
+  - id: L-8
+    statement: |
+      When a requested metric fails its comparability contract, the system should refuse aggregation and winner claims while permitting a diagnostic side-by-side view labeled with every incompatibility.
+    provenance: [EV-009, EV-041]
+    stake: false
+    rationale: |
+      Degrading an incompatible measurement into a number would recreate the theater the owner rejected. Refusing all inspection would also hide the evidence needed to understand why runs differ, so raw timelines and manifests should remain juxtaposed without being described as a valid metric comparison. Compatibility should be granular: one pair of runs may support transcript disagreement while refusing an arrival-latency comparison because their clocks or signal definitions differ.
+
+  - id: L-9
+    statement: |
+      The first increment should commit only to the stable observation envelope, identity and causality rules, clock and media-coordinate semantics, schema registry, append-only correction rule, and initial signal schemas—not to columns for anticipated future signals.
+    provenance: [EV-005, EV-022, EV-024, EV-041]
+    stake: false
+    rationale: |
+      These are the invariants required to join future evidence to old runs and to explain a failure after the fact. The initial registry should define clip statistics, waveform derivation, component lifecycle, and trace-coverage signals needed by rung 1, then add transcript, word-arrival, turn, diarization, and later supervisor payload schemas without altering old payload definitions. Speaker, channel, and component references should be generic identities in the envelope or referenced entities, while the detailed shape of emotion, intention, phonetics, and signals not yet conceived remains versioned extension data.

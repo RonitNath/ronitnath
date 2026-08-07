@@ -2,8 +2,9 @@
 product: isoastra-services
 bet: 1 — services.isoastra.com T1 (routing + mailing)
 date: 2026-08-06
-status: draft — freezes with PITCH-001
-addendum-to: PITCH-001 (unwritten)
+status: frozen with PITCH-001 (tag pitch/isoastra-services-1)
+addendum-to: PITCH-001
+debate: DEBATE-001 — four flow defects found and corrected before freeze
 brief: BRIEF-001
 ---
 
@@ -47,11 +48,12 @@ surface:  outside-web → web
    (whether it may carry PHI — EV-020).
 4. *(web)* The service shows which existing routes now apply to this edge, before anything is served.
 5. *(machine)* The edge fetches its config and begins serving.
-6. *(web)* Owner sees the edge reporting itself as converged, on the config version it was given.
+6. *(web)* Owner sees the edge **applied** the generation it was given — an edge-side attestation,
+   never inferred from the fact that it fetched (DEBATE-001 C-13/C-43).
 
 **branches**
 
-- Edge registered but never fetches → it appears registered-but-silent, distinct from converged.
+- Edge registered but never fetches → registered-but-silent, distinct from fetched and from applied.
 - Owner registers a non-BAA edge → routes carrying the PHI data class are excluded from it, and the
   exclusion is shown as a fact about that edge, not hidden.
 
@@ -92,7 +94,9 @@ which by EV-027 usually means something has already gone wrong.*
    not a promise.
 4. *(web)* Owner commits. The service records a new config version.
 5. *(machine)* Edges fetch and converge, each at its own pace.
-6. *(web)* Owner watches each edge move onto the new version; the flow is done when they all have.
+6. *(web)* Owner watches each edge move onto the new generation. **Serving** (the hostname answers on at
+   least one eligible edge, proven by probe) and **fully applied** (every targeted edge attested) are
+   separate milestones — the first is the one worth waiting for (DEBATE-001 C-15).
 
 **branches**
 
@@ -112,8 +116,9 @@ which by EV-027 usually means something has already gone wrong.*
 **packets**: PKT-03 (route model + data-class placement), PKT-04 (config version + rollback),
 PKT-07 (owner UI — routes and per-edge diff)
 
-**open**: Is a route version rollback a first-class action, or is it re-editing forward? What is the
-unit of versioning — the whole desired state, or per route? (data gate)
+**resolved (DEBATE-001 C-50 + C-19)**: no control-plane rollback state machine — repair is one forward
+edit plus an append-only audit record. The *edge* retains active and previous artifacts and falls back
+locally. Versioning unit remains a data-gate question.
 
 ---
 
@@ -232,8 +237,9 @@ agent has the advantage, because it is already holding the application's configu
 **packets**: PKT-09 (application registry + mode), PKT-10 (M2M credential issuance), PKT-12 (owner
 UI — applications)
 
-**open**: Can an application's mode be changed after registration, or is a mode change a new
-registration? (Changing it silently redirects live mail — the safer answer may be no.) (data gate)
+**resolved (DEBATE-001 C-40 over C-32)**: mode is **immutable**. Agents self-serve testing registrations
+freely; production enrollment is a separate owner step-up capability that pre-binds sender and recipient
+policy. A mode change mints a new application and credential.
 
 ---
 
@@ -271,8 +277,10 @@ surface:  machine-only
 **packets**: PKT-11 (mail accept API + durable queue), PKT-13 (delivery workers + pacing + retry
 classification), PKT-14 (suppression)
 
-**open**: Which node sends — leader-only, or all nodes claiming from a replicated queue? What owns
-SES's account-global pacing across three senders (OQ-3)? (data gate)
+**resolved (DEBATE-001 C-35 over C-48)**: every node accepts into the replicated queue; only the hiqlite
+leader claims and sends, under one cluster-level rate value below the measured SES ceiling. Delivery is
+**at-least-once**, and an attempt whose outcome could not be committed is *indeterminate*, never a silent
+retry (C-42, C-46).
 
 ---
 
@@ -372,7 +380,9 @@ the owner opens the UI for. Agents read the same facts to diagnose, so it is a m
 **steps**
 
 1. *(web)* Owner opens the service and sees, without asking: the Raft cluster's members and leader,
-   and each edge's last successful fetch and the config version it is on.
+   and per edge the **desired, last-fetched, last-applied, last-probed and last-known-good**
+   generations as distinct facts. The word "converged" does not appear — it conflates receiving
+   bytes with serving them (DEBATE-001 C-13, C-43, C-47).
 2. *(web)* Owner sees any edge that has not converged, and how long it has been that way.
 3. *(web)* Owner sees whether mail delivery is flowing or backing up.
 
@@ -390,7 +400,9 @@ the owner opens the UI for. Agents read the same facts to diagnose, so it is a m
 
 **packets**: PKT-17 (convergence/health reporting), PKT-18 (owner UI — status)
 
-**open**: Does this service also run the failover drill, or is the drill external (as with universe)?
+**resolved (DEBATE-001 C-49)**: the drill stays an external operator-run play. No drill scheduler, host
+control credential or self-certification code ships in the app. Acceptance adds the cross-domain chaos
+drill of C-10.
 
 ---
 
@@ -463,8 +475,10 @@ this is where a distribution design either self-heals or does not (OQ-1).
 
 **packets**: PKT-02, PKT-17
 
-**open**: Blocked on OQ-1 — pull-based distribution (EV-026) gives step 1 and 2 natively; a push
-design has to build both.
+**resolved (DEBATE-001 C-33, C-16, C-19)**: OQ-1 closed on `caddy.config_loaders.http`. Step 1 is an
+explicit cold-start contract — durable local last-known-good, `--resume`, no fetch or auth on the boot
+path — and the edge retains active plus previous artifacts. Push-on-commit is added for immediacy
+(C-11) without the data plane ever depending on the cluster.
 
 ---
 

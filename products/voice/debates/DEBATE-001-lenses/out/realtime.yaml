@@ -1,0 +1,65 @@
+lens: realtime
+claims:
+  - id: L-1
+    statement: |
+      The persisted timeline should consist of immutable `runs`, additive `signal_kinds`, and one append-only `observations` stream, rather than a write table per signal.
+    provenance: [EV-029, EV-041]
+    stake: false
+    rationale: |
+      A stable observation envelope lets a newly introduced streaming producer use the existing recorder without adding SQL branches or migrations to the live path. Each `signal_kind` names a versioned binary payload codec; typed Rust decoders, SQL views, or offline materializations belong on the read side. Existing kind versions remain immutable, and a semantic change creates a new kind version instead of rewriting rows.
+
+  - id: L-2
+    statement: |
+      No live measurement emission may execute SQLite or filesystem I/O, await recorder capacity, serialize solely for persistence, or acquire a recorder-owned mutex.
+    provenance: [EV-010, EV-029, EV-032]
+    stake: true
+    rationale: |
+      Each live producer should move its already-owned output plus a fixed-size header into a bounded, preallocated single-producer queue. A dedicated recorder thread with the sole SQLite write connection should encode payloads and commit inserts in batches. Run manifests and signal-kind identifiers are resolved before audio starts, so emission performs no database lookup.
+
+  - id: L-3
+    statement: |
+      When a live observation queue is full, the producer must drop that observation and continue rather than block, allocate an overflow buffer, or backpressure audio.
+    provenance: [EV-010, EV-029]
+    stake: true
+    rationale: |
+      Queue memory must have a configured hard ceiling per producer, because unbounded buffering converts a slow disk into caller latency or process growth. The producer increments its local sequence even for a dropped item and updates only a preallocated atomic drop counter; the recorder later appends a gap observation when capacity returns. Offline bulk runs may use blocking queues because they are not on the audio path.
+
+  - id: L-4
+    statement: |
+      Every observation should be keyed by `(run_id, producer_id, producer_seq)` and carry `kind_id`, `payload_version`, `observed_mono_ns`, optional integer audio-sample bounds, optional `speaker_id`, and optional causal parent keys.
+    provenance: [EV-016, EV-017, EV-024, EV-040]
+    stake: false
+    rationale: |
+      Producer identifiers and sequence counters are allocated before the run, avoiding a contended global event counter and random-ID generation on every callback. Integer sample positions anchor signals to audio without floating-point drift, while monotonic time records arrivals and processing events independently of wall-clock adjustments. Causal parent keys express cross-producer ordering where timestamps alone cannot; SQLite may assign an internal rowid only after dequeue.
+
+  - id: L-5
+    statement: |
+      Comparability should be a metric-specific equivalence predicate over immutable run manifests, not equality of run IDs or all configuration fields.
+    provenance: [EV-019, EV-034, EV-035, EV-041]
+    stake: false
+    rationale: |
+      A run manifest should contain the audio content hash, channel and sample range, execution mode, provider and model identifiers, canonical configuration digest, code revision, signal semantic versions, and relevant runtime environment. A provider comparison intentionally varies provider or model while holding the audio basis and other predicate-selected dimensions equal. Keeping these facts outside observation payloads avoids repeating and hashing large configuration on each event.
+
+  - id: L-6
+    statement: |
+      Comparison predicates must live in a versioned offline comparator registry keyed by signal kind and metric, and a failed or missing predicate must return `incomparable` rather than a degraded numeric result.
+    provenance: [EV-034, EV-041]
+    stake: false
+    rationale: |
+      Neither the recorder nor any producer should branch on whether a future query could compare two runs. The comparator returns structured mismatch reasons such as different audio spans, modes, or semantic versions and does not coerce unlike events into a shared bucket. Adding a signal therefore adds comparator code without changing ingestion behavior or the stable observation table.
+
+  - id: L-7
+    statement: |
+      Outputs produced by a live component must be stored as observations, while regenerating them from audio must be an explicit offline run with a new manifest and lineage rather than work triggered by a read.
+    provenance: [EV-017, EV-022, EV-033, EV-041]
+    stake: false
+    rationale: |
+      Word arrivals, detector decisions, hosted-provider responses, and scheduling delays are properties of an execution and cannot be recreated by decoding the audio later. Re-running a model on demand would also introduce uncontrolled CPU, memory, network, and disk work alongside live audio. Cheap arithmetic over stored events may remain a read-side metric, but every model or detector execution appends a new run instead of replacing its predecessor.
+
+  - id: L-8
+    statement: |
+      The first increment should commit only to the run manifest, the fixed observation envelope, append-only versioning rules, and bounded recorder protocol, leaving every signal-specific payload shape additive.
+    provenance: [EV-005, EV-014, EV-022, EV-024, EV-041]
+    stake: false
+    rationale: |
+      Rung 1 needs audio-range events but does not need columns for transcripts, turn boundaries, costs, emotion, or later unknown signals. Speaker identity belongs in the envelope as an optional dimension from the start, while the meaning and encoding of each signal stays behind its versioned kind. This fixes the concurrency and time-coordinate contract that producers depend on without predicting the fields of systems that have not been built.

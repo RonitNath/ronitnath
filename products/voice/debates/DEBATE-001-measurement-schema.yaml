@@ -1,0 +1,700 @@
+id: DEBATE-001
+product: voice
+bet: bet 1 — the ladder
+subject: the measurement/timeline schema (T3, relocated by EV-041)
+date: '2026-08-06'
+trigger: T3 — irreversible commitment
+panel: DEBATE-001-lenses/panel.md — 3 axes, 6 lenses, one OS process each
+lens_models: gpt-5.6-sol via pi/openai-codex (decorrelated family, heuristics rule 5)
+judge: Claude (Opus 5) — authored FLOWS-001 and BRIEF-001; compromised judge, heuristics rule 6
+context_asymmetry:
+  archivist, instrument, notary: evidence/*, DEC-001, FLOWS-001
+  rung1-builder, realtime, replayer: evidence/*, DEC-001 (no flows)
+  withheld from all: BRIEF-001
+claims:
+- id: C-1
+  lens: archivist
+  statement: |
+    The canonical measurement store should be an append-only generic observation ledger with a fixed envelope and immutable versioned payload definitions, rather than signal-specific tables as the source of truth.
+  provenance:
+  - EV-016
+  - EV-022
+  - EV-041
+  stake: true
+  rationale: |
+    EV-016 requires transcripts and every later signal to share one audio timeline, while EV-022 names future signal families whose payloads differ radically from words and turns. Each observation should carry stable identity, run, subject, producer invocation, signal-definition version, status, payload, and provenance references. Signal-specific typed tables may exist only as disposable projections whose rows can be regenerated from the ledger; otherwise each schema generation strands measurements in an obsolete table shape.
+- id: C-2
+  lens: archivist
+  statement: |
+    Every signal-definition version should be a retained database object that fixes payload schema, field semantics, units, null and absence meaning, coordinate axes, and semantic lineage without relying on the producer's code.
+  provenance:
+  - EV-009
+  - EV-017
+  - EV-041
+  stake: false
+  rationale: |
+    A generic payload without a frozen definition is an opaque bag of fields once its Rust producer is gone. Definitions should be immutable and content-addressed; a changed meaning creates a new definition ID, while declared compatibility edges state whether conversion is lossless, conditional, or impossible. This makes old observations independently interpretable and prevents a plausible modern rendering from silently assigning them modern semantics.
+  resolution: escalated
+  note: |
+    Escalated with C-9: the immutable signal-definition registry is the single most expensive element of the envelope and the one that most clearly buys nothing until the second signal family exists.
+- id: C-3
+  lens: archivist
+  statement: |
+    Schema migrations should never rewrite or drop recorded observations or mutate their definitions, and cross-generation normalization should be represented as new, versioned transformation observations with explicit source edges.
+  provenance:
+  - EV-033
+  - EV-041
+  stake: false
+  rationale: |
+    The permanent corpus is valuable specifically because an early clip can be measured against later pipelines. Reinterpreting an old row in place destroys the historical statement of what the old system observed. A migration may add definitions, compatibility mappings, indexes, and projections, but the original bytes and semantics must remain addressable through all schema generations.
+- id: C-4
+  lens: archivist
+  statement: |
+    Each run should own an immutable manifest containing input content hashes, corpus or cohort identity, canonical configuration, provider and model identifiers, code and build identity, component graph, environment facts, pricing basis, and measurement-protocol versions.
+  provenance:
+  - EV-019
+  - EV-027
+  - EV-034
+  - EV-035
+  - EV-041
+  stake: false
+  rationale: |
+    A code-version string alone cannot explain whether latency changed because of code, provider configuration, network placement, hardware, or the measurement protocol. Canonical snapshots and their digests preserve the exact independent variables even after defaults, provider APIs, and pricing schedules have changed. Failed, rejected, rate-limited, and timed-out executions remain runs with manifests and terminal observations rather than disappearing from the record.
+- id: C-5
+  lens: archivist
+  statement: |
+    Time should be stored as coordinates on named versioned axes, including audio offset, run-monotonic time, producer or provider time when supplied, and wall time, with origin, resolution, calibration, and uncertainty retained for each axis.
+  provenance:
+  - EV-016
+  - EV-017
+  - EV-018
+  - EV-035
+  stake: false
+  rationale: |
+    Per-word arrival and speech-stop-to-first-token latency require both media position and observation arrival, which are not the same clock. Hosted providers introduce clocks and network boundaries that cannot safely be reconstructed from wall timestamps. Explicit clock metadata makes a 2026 duration recomputable and shows when precision or synchronization is insufficient for a 2029 claim.
+- id: C-6
+  lens: archivist
+  statement: |
+    Comparability should be decided per metric by an immutable declarative comparison contract in the database, not by schema equality, code-version equality, or application logic alone.
+  provenance:
+  - EV-019
+  - EV-027
+  - EV-034
+  - EV-041
+  stake: true
+  rationale: |
+    Each contract should name the metric definition, population and aggregation rule, required matched dimensions, permitted experimental dimensions, units, clock requirements, and accepted compatibility transformations. This allows code generation to vary when asking whether code improved latency while requiring the clip or cohort, transport, provider configuration, and measurement semantics to match as the particular contract dictates. Keeping the predicate as retained data lets a future evaluator reproduce why two old runs were admitted without possessing the old application.
+  supports:
+  - C-23
+  - C-31
+  - C-39
+  - C-49
+  resolution: resolved
+  note: |
+    Five lenses converged on a versioned comparison contract held as data. Caveat recorded: all five read EV-041, which states the concern, so the convergence is partly evidence-driven rather than independent. It survives because each derived a different reason for it.
+- id: C-7
+  lens: archivist
+  statement: |
+    A comparison should classify every requested metric as exact, transformed under a named compatibility rule, or incomparable with machine-readable reasons, and it should refuse aggregation only for the affected metrics rather than silently coercing or globally accepting the run pair.
+  provenance:
+  - EV-009
+  - EV-041
+  stake: false
+  rationale: |
+    Two runs can remain comparable for speech-stop latency while being incomparable for cost because one lacks a preserved pricing basis. The comparison record should itself be append-only and cite its contract version, source observations, transformations, exclusions, and verdicts. The surface may show surviving dimensions, but it must never average an incomparable dimension or render missing evidence as an observed value.
+- id: C-8
+  lens: archivist
+  statement: |
+    Every derived signal should be persisted as an observation at production time, and any later regeneration should create a new run linked to its source observations rather than replacing the historical result.
+  provenance:
+  - EV-017
+  - EV-023
+  - EV-029
+  - EV-035
+  - EV-041
+  stake: true
+  rationale: |
+    Arrival times, provider responses, diarization, phonetic repairs, and model-dependent inferences cannot be reproduced faithfully from audio after hosted services and old code disappear. Stored derivations must identify their algorithm or model definition, configuration, inputs, and producer invocation, so an old conclusion remains auditable. Reprocessing permanent audio is valuable as a new measurement, but treating it as reconstruction would erase the very generational difference the corpus exists to measure.
+- id: C-9
+  lens: archivist
+  statement: |
+    The first increment should commit to the complete invariant envelope and extension protocol, including open signal IDs, multi-axis intervals and points, participant and track subjects, producer invocations, provenance edges, raw artifacts, explicit absence and error states, and immutable definition registration.
+  provenance:
+  - EV-015
+  - EV-017
+  - EV-021
+  - EV-022
+  - EV-024
+  - EV-040
+  - EV-041
+  stake: false
+  rationale: |
+    These invariants cover bulk and streaming revisions, multiple producers on one output, parallel supervisor signals, diarized speakers, and signal families not yet named without freezing guessed payload columns. Future payload shapes must enter through new immutable definitions under this same contract, never through alteration of prior definitions or reuse of an old signal ID. Participant attribution belongs in the envelope before the text agent because EV-024 and EV-040 reject a single-speaker assumption at the foundation.
+  resolution: escalated
+  note: |
+    Escalated: blocking and undecidable by agents. The full envelope — content-addressed signal-definition registry, named clock domains with declared precision, causal parent edges, explicit absence and coverage observations — is either the thing that makes a forever-corpus worth keeping (EV-041) or the overbuilt foundation that killed console (EV-009). Both are owner rulings and the panel cannot rank them. Needs an owner call on how much of it ships at rung 1.
+- id: C-10
+  lens: rung1-builder
+  statement: |
+    The rung-1 corpus schema should contain exactly one table, `audio_clips`, with `clip_id`, `relative_path`, `original_name`, `media_type`, `byte_length`, `sha256`, and `ingested_at`, and no measurement columns.
+  provenance:
+  - EV-014
+  - EV-032
+  - EV-033
+  stake: false
+  rationale: |
+    This is enough to accept a file, locate it on the filesystem, verify its bytes, list it, and replay it. The row records storage facts only; the audio remains outside SQLite as required. An opaque `clip_id` keeps identity independent of a filename while making this tiny schema easy to discard and rebuild.
+- id: C-11
+  lens: rung1-builder
+  statement: |
+    An ingest should write a new file under the configured audio root, fsync it, atomically rename it to a never-overwritten `clip_id` path, and only then insert the corresponding `audio_clips` row.
+  provenance:
+  - EV-014
+  - EV-033
+  stake: false
+  rationale: |
+    The filesystem is the durable corpus, while SQLite merely points at it. Publishing the file before the row ensures a committed row never names bytes that were not durably stored. Replay should open only the recorded relative path beneath the configured root and stream those exact bytes.
+- id: C-12
+  lens: rung1-builder
+  statement: |
+    Once an `audio_clips` row is inserted, both its row and its referenced file should be immutable, enforced by create-new file semantics and SQLite triggers that abort `UPDATE` and `DELETE`.
+  provenance:
+  - EV-033
+  stake: false
+  rationale: |
+    Append-only is a concrete rung-1 rule, not a lifecycle to model. Database triggers make accidental mutation fail even if application code is wrong, while create-new semantics prevent replacement at the filesystem seam. No status, soft-delete, retention, or cleanup fields belong in the row.
+- id: C-13
+  lens: rung1-builder
+  statement: |
+    Rung 1 should create neither typed measurement tables nor a generic annotation or run stream.
+  provenance:
+  - EV-005
+  - EV-009
+  - EV-014
+  - EV-038
+  stake: true
+  rationale: |
+    D1 is therefore deliberately undecided in the executable schema: the approved increment has clips, not measurements. A generic stream would still commit storage and interpretation machinery without an exercised producer, while typed tables would claim entities the service cannot produce. Building either before the owner has greenlit accept-store-replay repeats the overbuilt-foundation failure.
+  rebuts:
+  - C-9
+  - C-25
+  - C-33
+  - C-41
+  - C-44
+  resolution: resolved
+  note: |
+    Rejected on its own criterion. The lens argues nothing unexercised may be built, but rung 1 does produce derived signals — EV-014 says statistics are measured at rung 1 and F-02 computes a waveform. The envelope therefore has a live producer at rung 1 and is not speculative. This lens was not given FLOWS-001 (recorded asymmetry) and read EV-014 as storage-only.
+- id: C-14
+  lens: rung1-builder
+  statement: |
+    Rung 1 should expose no run-comparison API or query, so no comparability predicate should live in either Rust or SQLite and no degraded comparison should be returned.
+  provenance:
+  - EV-014
+  - EV-038
+  stake: false
+  rationale: |
+    D2 has no operands in this increment because the service records no measurement runs. A refusal rule would manufacture a contract for an operation that does not exist, and degradation would present an unsupported result as useful. The honest rung-1 behavior is absence of the operation rather than a result-shaped placeholder.
+  rebuts:
+  - C-6
+  - C-23
+  - C-31
+  - C-39
+  - C-49
+  resolution: resolved
+  note: |
+    Correct for rung 1 and does not survive rung 2. No comparison operation exists until runs exist, so no predicate ships at rung 1; the contract table arrives with the first run. Recorded so the predicate is not built early.
+- id: C-15
+  lens: rung1-builder
+  statement: |
+    Rung 1 should persist no derived observations and run no regeneration jobs; replay should read the stored source file without creating timeline data.
+  provenance:
+  - EV-009
+  - EV-014
+  stake: false
+  rationale: |
+    D3 is empty at this rung because the only approved durable object is the accepted audio clip. The hash and byte count are storage-integrity facts, not observations against an audio timeline. Persisting waveform data, duration statistics, playback events, or other computed rows would broaden the increment beyond accept-store-replay.
+  rebuts:
+  - C-8
+  - C-20
+  - C-32
+  - C-48
+  resolution: unresolved
+  note: |
+    Turns on whether a waveform is an observation or a storage fact. Judge leans observation (it is derived, it has a producer version, and F-04 renders it), but this is exactly the rung-1 scope call EV-038 reserves to the owner.
+- id: C-16
+  lens: rung1-builder
+  statement: |
+    The initial migration should reserve zero measurement shape: it should create only `audio_clips` and its immutability triggers, with no event-kind enum, payload JSON contract, timeline coordinates, run identity, or configuration hash.
+  provenance:
+  - EV-005
+  - EV-009
+  - EV-038
+  stake: false
+  rationale: |
+    D4 should commit only to facts exercised by the first increment. Empty extension points are still commitments because application code and queries begin depending on their names and semantics. A single small migration keeps the implemented model inspectable and cheap to replace before any additional rung is approved.
+  rebuts:
+  - C-9
+  - C-25
+  - C-33
+  - C-41
+  - C-44
+  resolution: resolved
+  note: |
+    Same defeat as C-13. Its strongest surviving point is kept: empty extension points ARE commitments, so the rung-1 migration creates only what rung 1 produces — clips, waveform and clip-statistic observations — and no reserved columns for later signals.
+- id: C-17
+  lens: instrument
+  statement: |
+    The authoritative measurement model should be one append-only observation stream with a fixed typed envelope and schema-versioned signal payloads, not mutable typed tables as the source of truth.
+  provenance:
+  - EV-016
+  - EV-022
+  - EV-041
+  stake: false
+  rationale: |
+    The envelope should contain observation ID, run ID, signal type, payload schema version, producer component instance, causal parent IDs, media coordinates, observation timestamps, status, and payload. A signal registry should validate each payload version, while typed SQL views or Rust decoders provide signal-specific access. New supervisor signals can then be added as new stream types without reshaping measurements already used for transcript and timing comparisons.
+- id: C-18
+  lens: instrument
+  statement: |
+    Every component boundary should emit immutable received, started, emitted, completed, and failed observations linked by run, component-instance, attempt, and causal IDs.
+  provenance:
+  - EV-017
+  - EV-029
+  - EV-035
+  stake: true
+  rationale: |
+    This structure makes a gap attributable: the last upstream emission, downstream receipt, provider request, provider response, and local processing interval can be ordered from stored facts. Each boundary observation should include a canonical payload hash and, where available, the exact non-secret request or response body and provider request ID. A component trace that records only its final value cannot distinguish queueing, transport delay, provider delay, local processing, or dropped handoff after the call.
+- id: C-19
+  lens: instrument
+  statement: |
+    An observation's time model should preserve media sample coordinates, run-relative monotonic time, wall-clock time, clock-domain identity, and stated uncertainty rather than collapsing them into one timestamp.
+  provenance:
+  - EV-016
+  - EV-017
+  - EV-018
+  - EV-035
+  stake: false
+  rationale: |
+    Audio truth belongs at sample positions, while arrival and handoff latency belong to the observing process's monotonic clock. Wall time is only for correlation across processes and hosted-provider records, so synchronization markers and clock-domain mappings must also be observations. Resampling, segmentation, and channel extraction should record explicit source-to-derived coordinate transforms so every word, turn decision, and provider exchange can be traced back to the exact source-audio interval.
+- id: C-20
+  lens: instrument
+  statement: |
+    Every derived signal should be retained as an immutable observation, and regeneration should create a new derivation run linked to its inputs rather than replace the earlier result.
+  provenance:
+  - EV-023
+  - EV-033
+  - EV-035
+  - EV-041
+  stake: true
+  rationale: |
+    Hosted-provider behavior and live arrival timing cannot be reconstructed from the audio and current configuration after the fact. The same rule should cover deterministic outputs such as waveforms and segmentation because implementation and configuration revisions can change their meaning. Each derived observation should name its input observation or audio artifact hashes, derivation implementation, configuration snapshot, and predecessor or superseded observation when it is a correction.
+- id: C-21
+  lens: instrument
+  statement: |
+    The stream should represent expected-but-absent output and trace incompleteness explicitly, because a missing row must never mean successful silence, provider silence, dropped telemetry, or unfinished work interchangeably.
+  provenance:
+  - EV-009
+  - EV-017
+  - EV-029
+  stake: false
+  rationale: |
+    Each invocation should declare its expected output class and terminate with completed, failed, timed-out, cancelled, or incomplete status. Sequence numbers and explicit stream-open and stream-close observations should expose missing chunks, while coverage observations should identify intervals for which instrumentation itself is absent. This lets the inspection surface show an observed empty result separately from a hole in the evidence.
+- id: C-22
+  lens: instrument
+  statement: |
+    Each run should pin an immutable manifest containing the audio content identity, pipeline graph, component builds, provider and model identifiers, canonical configuration, execution mode, and measurement-contract versions.
+  provenance:
+  - EV-019
+  - EV-034
+  - EV-041
+  stake: false
+  rationale: |
+    A mutable configuration name is not provenance and cannot support a later diagnosis. The manifest should preserve resolved values, defaults, threshold units, adapter version, and provider-reported model identity, with a canonical hash used by all observations in the run. Repeating a named configuration should therefore produce a new run against the same manifest hash rather than append into an old run.
+- id: C-23
+  lens: instrument
+  statement: |
+    Comparability should be decided per metric by a versioned measurement contract stored in the database and evaluated by one canonical predicate that returns both a verdict and machine-readable reasons.
+  provenance:
+  - EV-019
+  - EV-034
+  - EV-041
+  stake: true
+  rationale: |
+    Whole-run equality is the wrong predicate because provider, model, and threshold differences are often the intended comparison dimensions. A metric contract should declare required signal schemas, audio identity or corpus-selection rule, media coordinate semantics, clock requirements, normalization, reference-truth policy, and allowed varying dimensions. The system should persist the predicate version and its result with each comparison so the basis of an old judgment remains inspectable after comparison logic evolves.
+- id: C-24
+  lens: instrument
+  statement: |
+    When a requested metric fails its comparability contract, the system should refuse aggregation and winner claims while permitting a diagnostic side-by-side view labeled with every incompatibility.
+  provenance:
+  - EV-009
+  - EV-041
+  stake: false
+  rationale: |
+    Degrading an incompatible measurement into a number would recreate the theater the owner rejected. Refusing all inspection would also hide the evidence needed to understand why runs differ, so raw timelines and manifests should remain juxtaposed without being described as a valid metric comparison. Compatibility should be granular: one pair of runs may support transcript disagreement while refusing an arrival-latency comparison because their clocks or signal definitions differ.
+  supports:
+  - C-7
+  - C-40
+  - C-50
+  resolution: resolved
+  note: |
+    Refuse, do not degrade — and refuse per metric, not per run pair. Two runs may support a transcript-disagreement comparison while refusing an arrival-latency one. The refusal lives in the comparator, not in presentation code.
+- id: C-25
+  lens: instrument
+  statement: |
+    The first increment should commit only to the stable observation envelope, identity and causality rules, clock and media-coordinate semantics, schema registry, append-only correction rule, and initial signal schemas—not to columns for anticipated future signals.
+  provenance:
+  - EV-005
+  - EV-022
+  - EV-024
+  - EV-041
+  stake: false
+  rationale: |
+    These are the invariants required to join future evidence to old runs and to explain a failure after the fact. The initial registry should define clip statistics, waveform derivation, component lifecycle, and trace-coverage signals needed by rung 1, then add transcript, word-arrival, turn, diarization, and later supervisor payload schemas without altering old payload definitions. Speaker, channel, and component references should be generic identities in the envelope or referenced entities, while the detailed shape of emotion, intention, phonetics, and signals not yet conceived remains versioned extension data.
+- id: C-26
+  lens: realtime
+  statement: |
+    The persisted timeline should consist of immutable `runs`, additive `signal_kinds`, and one append-only `observations` stream, rather than a write table per signal.
+  provenance:
+  - EV-029
+  - EV-041
+  stake: false
+  rationale: |
+    A stable observation envelope lets a newly introduced streaming producer use the existing recorder without adding SQL branches or migrations to the live path. Each `signal_kind` names a versioned binary payload codec; typed Rust decoders, SQL views, or offline materializations belong on the read side. Existing kind versions remain immutable, and a semantic change creates a new kind version instead of rewriting rows.
+- id: C-27
+  lens: realtime
+  statement: |
+    No live measurement emission may execute SQLite or filesystem I/O, await recorder capacity, serialize solely for persistence, or acquire a recorder-owned mutex.
+  provenance:
+  - EV-010
+  - EV-029
+  - EV-032
+  stake: true
+  rationale: |
+    Each live producer should move its already-owned output plus a fixed-size header into a bounded, preallocated single-producer queue. A dedicated recorder thread with the sole SQLite write connection should encode payloads and commit inserts in batches. Run manifests and signal-kind identifiers are resolved before audio starts, so emission performs no database lookup.
+  supports:
+  - C-2
+  - C-18
+  resolution: resolved
+  note: |
+    Adopted without conflict. No SQLite or filesystem I/O on the audio path; a single recorder thread owns the write connection and batches inserts. This is the reason the envelope must be resolvable before audio starts (C-29).
+- id: C-28
+  lens: realtime
+  statement: |
+    When a live observation queue is full, the producer must drop that observation and continue rather than block, allocate an overflow buffer, or backpressure audio.
+  provenance:
+  - EV-010
+  - EV-029
+  stake: true
+  rationale: |
+    Queue memory must have a configured hard ceiling per producer, because unbounded buffering converts a slow disk into caller latency or process growth. The producer increments its local sequence even for a dropped item and updates only a preallocated atomic drop counter; the recorder later appends a gap observation when capacity returns. Offline bulk runs may use blocking queues because they are not on the audio path.
+  rebuts:
+  - C-21
+  resolution: deferred-as-assumption
+  note: |
+    Assume bounded queue with drop-and-record: the live path never blocks, and every drop appends an explicit gap observation with counts, which satisfies the requirement that absence be visible rather than ambiguous. Assumption to revisit: lifecycle and terminal observations (start, failure, completion, provider request identity) are never droppable — only high-volume payload observations are. Cheap to reverse; it is a queue policy, not a schema shape.
+- id: C-29
+  lens: realtime
+  statement: |
+    Every observation should be keyed by `(run_id, producer_id, producer_seq)` and carry `kind_id`, `payload_version`, `observed_mono_ns`, optional integer audio-sample bounds, optional `speaker_id`, and optional causal parent keys.
+  provenance:
+  - EV-016
+  - EV-017
+  - EV-024
+  - EV-040
+  stake: false
+  rationale: |
+    Producer identifiers and sequence counters are allocated before the run, avoiding a contended global event counter and random-ID generation on every callback. Integer sample positions anchor signals to audio without floating-point drift, while monotonic time records arrivals and processing events independently of wall-clock adjustments. Causal parent keys express cross-producer ordering where timestamps alone cannot; SQLite may assign an internal rowid only after dequeue.
+- id: C-30
+  lens: realtime
+  statement: |
+    Comparability should be a metric-specific equivalence predicate over immutable run manifests, not equality of run IDs or all configuration fields.
+  provenance:
+  - EV-019
+  - EV-034
+  - EV-035
+  - EV-041
+  stake: false
+  rationale: |
+    A run manifest should contain the audio content hash, channel and sample range, execution mode, provider and model identifiers, canonical configuration digest, code revision, signal semantic versions, and relevant runtime environment. A provider comparison intentionally varies provider or model while holding the audio basis and other predicate-selected dimensions equal. Keeping these facts outside observation payloads avoids repeating and hashing large configuration on each event.
+- id: C-31
+  lens: realtime
+  statement: |
+    Comparison predicates must live in a versioned offline comparator registry keyed by signal kind and metric, and a failed or missing predicate must return `incomparable` rather than a degraded numeric result.
+  provenance:
+  - EV-034
+  - EV-041
+  stake: false
+  rationale: |
+    Neither the recorder nor any producer should branch on whether a future query could compare two runs. The comparator returns structured mismatch reasons such as different audio spans, modes, or semantic versions and does not coerce unlike events into a shared bucket. Adding a signal therefore adds comparator code without changing ingestion behavior or the stable observation table.
+- id: C-32
+  lens: realtime
+  statement: |
+    Outputs produced by a live component must be stored as observations, while regenerating them from audio must be an explicit offline run with a new manifest and lineage rather than work triggered by a read.
+  provenance:
+  - EV-017
+  - EV-022
+  - EV-033
+  - EV-041
+  stake: false
+  rationale: |
+    Word arrivals, detector decisions, hosted-provider responses, and scheduling delays are properties of an execution and cannot be recreated by decoding the audio later. Re-running a model on demand would also introduce uncontrolled CPU, memory, network, and disk work alongside live audio. Cheap arithmetic over stored events may remain a read-side metric, but every model or detector execution appends a new run instead of replacing its predecessor.
+- id: C-33
+  lens: realtime
+  statement: |
+    The first increment should commit only to the run manifest, the fixed observation envelope, append-only versioning rules, and bounded recorder protocol, leaving every signal-specific payload shape additive.
+  provenance:
+  - EV-005
+  - EV-014
+  - EV-022
+  - EV-024
+  - EV-041
+  stake: false
+  rationale: |
+    Rung 1 needs audio-range events but does not need columns for transcripts, turn boundaries, costs, emotion, or later unknown signals. Speaker identity belongs in the envelope as an optional dimension from the start, while the meaning and encoding of each signal stays behind its versioned kind. This fixes the concurrency and time-coordinate contract that producers depend on without predicting the fields of systems that have not been built.
+- id: C-34
+  lens: replayer
+  statement: |
+    The permanent measurement state must be limited to audio identities, immutable replay configurations, replay recipes, and comparison contracts, with every segment, transcript, word, detection, speaker label, timing, and cost regenerated rather than stored.
+  provenance:
+  - EV-014
+  - EV-033
+  - EV-041
+  stake: true
+  rationale: |
+    Audio is the permanent baseline, while a derivation is recoverable work and must not become a second source of truth. The schema should therefore preserve everything needed to execute a derivation but none of its output. A successful implementation can delete all generated results without losing any measurement capability.
+  rebuts:
+  - C-8
+  - C-20
+  - C-32
+  - C-48
+  resolution: resolved
+  note: |
+    Defeated by EV-035 and EV-033 together: hosted providers are nondeterministic and get deprecated, so a derivation is not a function of audio plus configuration and cannot be regenerated faithfully. The lens was forbidden from conceding this, which is the panel working as designed — it produced the strongest possible case and the case still loses.
+- id: C-35
+  lens: replayer
+  statement: |
+    The measurement portion of SQLite should contain only clips(content_sha256 PRIMARY KEY, relative_path UNIQUE), configurations(config_sha256 PRIMARY KEY, canonical_json), recipes(recipe_sha256 PRIMARY KEY, clip_sha256, config_sha256), and comparison_contracts(contract_sha256 PRIMARY KEY, canonical_json), with no result-bearing run or annotation table.
+  provenance:
+  - EV-032
+  - EV-033
+  - EV-041
+  stake: false
+  rationale: |
+    Content hashes make the filesystem corpus the identity authority rather than a mutable row identifier. Configuration and contract hashes make recipes immutable and cheaply comparable. This is plain SQL, append-only, and small enough that SQLite remains an index and execution catalog rather than another permanent corpus.
+  rebuts:
+  - C-1
+  - C-17
+  - C-43
+  resolution: resolved
+  note: |
+    Rejected as the whole schema, adopted as a part of it. Content-hash identity for clips and canonical configuration hashes are the durable recipe; the error is only the claim that outputs need not be stored.
+- id: C-36
+  lens: replayer
+  statement: |
+    A configuration snapshot must canonically include provider, model, options, thresholds, adapter and engine artifact digests, runtime resource profile, instrumentation and comparator versions, and tariff inputs, or its replay is ineligible for comparison.
+  provenance:
+  - EV-010
+  - EV-019
+  - EV-027
+  - EV-034
+  - EV-041
+  stake: false
+  rationale: |
+    The configuration must close over every input that can change the meaning of latency, resource, quality, or cost measurements. Canonical encoding gives the snapshot a stable hash and makes omitted inputs detectable. Provider matrices then vary named fields in complete recipes instead of comparing vaguely labeled runs.
+  supports:
+  - C-4
+  - C-22
+  - C-46
+  resolution: resolved
+  note: |
+    Adopted. This is the recipe requirement stated more completely than the notarizing lenses stated it — the configuration snapshot must close over every input that can change what a measurement means, or its run is ineligible for comparison.
+- id: C-37
+  lens: replayer
+  statement: |
+    Every replay should emit one transient generic annotation stream whose stable envelope is event_id, parent_event_id, signal_type, payload_schema, producer, config_hash, optional subject_ref, optional clip sample span, replay_offset_ns, and opaque typed payload.
+  provenance:
+  - EV-016
+  - EV-017
+  - EV-022
+  - EV-024
+  - EV-029
+  - EV-041
+  stake: false
+  rationale: |
+    A single envelope gives transcript alignment, speaker attribution, tracing, and future supervisory signals common coordinates without creating a table per signal. Payload schemas remain typed and versioned in Rust decoders, but they do not force SQLite migrations. Parent links retain enough causal structure to localize failures among independently streaming components.
+- id: C-38
+  lens: replayer
+  statement: |
+    Source alignment must use integer sample indices in the immutable clip, while execution timing must use monotonic nanoseconds from replay start rather than wall-clock timestamps or floating-point seconds.
+  provenance:
+  - EV-016
+  - EV-017
+  - EV-018
+  stake: false
+  rationale: |
+    Sample indices give words, segments, turns, and waveform scrubbing one exact source coordinate. A separate monotonic replay coordinate expresses word arrival and detection latency without clock jumps or timezone semantics. Derived views may render milliseconds, but comparison operates on these two canonical coordinates.
+- id: C-39
+  lens: replayer
+  statement: |
+    Two replay outputs are comparable if and only if a named comparison contract requires the same audio hash, metric schema, timebase, and controlled configuration paths and every configuration difference is contained in that contract's explicit vary paths.
+  provenance:
+  - EV-019
+  - EV-034
+  - EV-041
+  stake: false
+  rationale: |
+    The predicate should live in a versioned comparison-contract registry loaded by the comparator, not in signal tables or UI heuristics. A request names the contract hash, and the comparator evaluates exact JSON paths before computing a delta. This permits deliberate provider, model, or threshold sweeps while holding all undeclared dimensions fixed.
+- id: C-40
+  lens: replayer
+  statement: |
+    If the comparison predicate fails, the system must refuse every aggregate, delta, and ranking while permitting only separately labeled raw replay views that explicitly state they are not a comparison.
+  provenance:
+  - EV-009
+  - EV-013
+  - EV-041
+  stake: false
+  rationale: |
+    Degrading to an approximate comparison would manufacture confidence from measurements with different meanings. Refusal is visible and testable: no comparative number is returned. Separate views preserve debugging access without presenting theater as evidence.
+- id: C-41
+  lens: replayer
+  statement: |
+    The first increment should commit only content identity, canonical configuration, the generic envelope and its two time coordinates, subject and causal references, and versioned comparison contracts, with no columns dedicated to any future signal payload.
+  provenance:
+  - EV-005
+  - EV-014
+  - EV-022
+  - EV-023
+  - EV-024
+  - EV-040
+  - EV-041
+  stake: false
+  rationale: |
+    This is enough structure to align and trace later signals without guessing their shapes at rung 1. Diarization can populate subject_ref, and phonetics or supervisory systems can introduce new payload schemas without changing permanent tables. A new signal should require a Rust type and decoder, not a database migration.
+- id: C-42
+  lens: replayer
+  statement: |
+    A run must be an executable recipe rather than a durable historical observation, so opening it re-executes the recipe and creates a fresh transient timeline that is discarded when the replay or comparison session ends.
+  provenance:
+  - EV-017
+  - EV-033
+  - EV-041
+  stake: false
+  rationale: |
+    Components still emit exact word-arrival and boundary events during execution; those events feed the active measurement surface rather than permanent rows. Re-execution prevents an old derivation from silently disagreeing with its audio or configuration. The durable object remains the recipe that can produce the timeline, not a copy of the timeline.
+  rebuts:
+  - C-8
+  - C-20
+  - C-32
+  - C-48
+  resolution: resolved
+  note: |
+    Same defeat. Re-execution on read also violates EV-010 by putting model work next to live audio (C-32).
+- id: C-43
+  lens: notary
+  statement: |
+    The authoritative timeline must be one append-only observation ledger with a fixed typed envelope and versioned payload definitions, not a collection of authoritative per-signal tables.
+  provenance:
+  - EV-016
+  - EV-022
+  - EV-023
+  - EV-041
+  stake: true
+  rationale: |
+    Implement an `observations` table whose rows represent facts or events and whose UPDATE and DELETE operations are rejected by SQLite triggers. New signal kinds append rows and registry entries instead of requiring old measurements to move or change shape. Signal-specific query views may exist, but every displayed fact must retain its authoritative observation ID.
+- id: C-44
+  lens: notary
+  statement: |
+    Rung 1 must freeze only the observation envelope, identity rules, temporal coordinate rules, provenance links, and signal-definition mechanism rather than columns for every anticipated signal.
+  provenance:
+  - EV-005
+  - EV-014
+  - EV-022
+  - EV-024
+  - EV-041
+  stake: false
+  rationale: |
+    The envelope should include `observation_id`, `artifact_id`, `run_id`, `signal_definition_id`, `producer_id`, nullable `subject_id`, media coordinates, occurrence coordinates, payload bytes, payload hash, source-observation IDs, and `recorded_at`. Speaker attribution belongs in that envelope from the start because diarization precedes the text agent. Emotion, phonetics, handoffs, and other future shapes should arrive through new definitions and payloads without altering prior rows.
+- id: C-45
+  lens: notary
+  statement: |
+    Every signal kind must reference an immutable registry entry containing a stable name, semantic version, canonical schema or descriptor bytes, descriptor hash, units, and temporal interpretation.
+  provenance:
+  - EV-017
+  - EV-023
+  - EV-041
+  stake: false
+  rationale: |
+    Generic payloads must not become untyped blobs whose meaning depends on current Rust code. Inserts are validated against the referenced definition, and a changed unit, field meaning, or timing interpretation requires a new registry entry. Historical definitions remain present verbatim so an old number remains intelligible independently of later releases.
+- id: C-46
+  lens: notary
+  statement: |
+    Each run must begin with an immutable manifest that identifies its input bytes and span, measurement protocol, requested provider and model, canonical configuration snapshot and hash, component build digests, and clock domains.
+  provenance:
+  - EV-019
+  - EV-027
+  - EV-033
+  - EV-034
+  - EV-035
+  - EV-041
+  stake: false
+  rationale: |
+    A mutable foreign key to a configuration table is insufficient because the referenced settings could later acquire different contents or meaning. Provider-resolved model identifiers, request IDs, billing reports, and other facts learned after start should be appended as run observations rather than patched into the manifest. The manifest and those observations together preserve exactly what was asked for and exactly what the hosted provider reported.
+- id: C-47
+  lens: notary
+  statement: |
+    Every timing observation must carry both its media-time interval and its occurrence or receipt time in a named clock domain, with integer units and declared precision.
+  provenance:
+  - EV-016
+  - EV-017
+  - EV-018
+  - EV-021
+  stake: false
+  rationale: |
+    Store media offsets such as `[start_ns, end_ns)` separately from component emission and local receipt offsets relative to the run's monotonic origin. This allows a word's location in the clip, its provider arrival, and its local observation to coexist without collapsing distinct facts into one timestamp. Clock-domain and precision fields prevent a later comparison from treating wall time, provider time, and process-monotonic time as equivalent.
+- id: C-48
+  lens: notary
+  statement: |
+    Waveforms, segments, transcript revisions, words, boundary detections, speaker labels, latencies, billing amounts, and every later derived signal must be stored as immutable observations when produced and must never be regenerated as substitutes for historical observations.
+  provenance:
+  - EV-009
+  - EV-014
+  - EV-017
+  - EV-023
+  - EV-027
+  - EV-029
+  stake: false
+  rationale: |
+    Each derived observation should cite its source observation IDs, configuration hash, producer build, and signal definition. Raw provider emissions and local receipt events should be retained before interpretation so a derived number remains auditable against what was actually witnessed. A missing stored result must render as missing, not as a value calculated under present-day semantics.
+- id: C-49
+  lens: notary
+  statement: |
+    Comparability must be decided by a versioned immutable measurement-protocol record that names controlled dimensions, permitted varying dimensions, required signal-definition hashes, and a comparator version.
+  provenance:
+  - EV-019
+  - EV-034
+  - EV-041
+  stake: false
+  rationale: |
+    Provider or model may be the intended varying dimension in one matrix, while code build or streaming mode may be controlled; equality of whole run manifests is therefore not the predicate. Each run references a protocol hash, and one Rust comparator interprets that protocol for every API and UI path. Every comparison attempt should itself be appended with selected run IDs, comparator version, verdict, and machine-readable reasons.
+- id: C-50
+  lens: notary
+  statement: |
+    When the comparability predicate fails, the service must refuse deltas, rankings, averages, and merged distributions while permitting only a side-by-side display explicitly marked `INCOMPARABLE` with the failed dimensions.
+  provenance:
+  - EV-009
+  - EV-013
+  - EV-041
+  stake: false
+  rationale: |
+    Quietly combining incompatible runs would create a plausible measurement that was never observed. Returning structured failure reasons lets the owner inspect both records without mistaking juxtaposition for an analytical result. The refusal belongs in the comparator and API, not only in presentation code that another caller could bypass.
+- id: C-51
+  lens: notary
+  statement: |
+    Run starts, provider chunks, local receipts, component outputs, failures, timeouts, completion, and explicit no-output findings must all be first-class observations rather than mutable run status.
+  provenance:
+  - EV-009
+  - EV-017
+  - EV-029
+  - EV-035
+  stake: false
+  rationale: |
+    A run row should not be updated from running to failed or complete because that erases the sequence that occurred. Terminal events close the sequence without changing it, and provider or component failures retain their timing, request identity, and any reported billing facts. Explicit no-output observations distinguish witnessed silence from missing instrumentation.

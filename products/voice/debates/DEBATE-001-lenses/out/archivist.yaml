@@ -1,0 +1,73 @@
+lens: archivist
+claims:
+  - id: L-1
+    statement: |
+      The canonical measurement store should be an append-only generic observation ledger with a fixed envelope and immutable versioned payload definitions, rather than signal-specific tables as the source of truth.
+    provenance: [EV-016, EV-022, EV-041]
+    stake: true
+    rationale: |
+      EV-016 requires transcripts and every later signal to share one audio timeline, while EV-022 names future signal families whose payloads differ radically from words and turns. Each observation should carry stable identity, run, subject, producer invocation, signal-definition version, status, payload, and provenance references. Signal-specific typed tables may exist only as disposable projections whose rows can be regenerated from the ledger; otherwise each schema generation strands measurements in an obsolete table shape.
+
+  - id: L-2
+    statement: |
+      Every signal-definition version should be a retained database object that fixes payload schema, field semantics, units, null and absence meaning, coordinate axes, and semantic lineage without relying on the producer's code.
+    provenance: [EV-009, EV-017, EV-041]
+    stake: false
+    rationale: |
+      A generic payload without a frozen definition is an opaque bag of fields once its Rust producer is gone. Definitions should be immutable and content-addressed; a changed meaning creates a new definition ID, while declared compatibility edges state whether conversion is lossless, conditional, or impossible. This makes old observations independently interpretable and prevents a plausible modern rendering from silently assigning them modern semantics.
+
+  - id: L-3
+    statement: |
+      Schema migrations should never rewrite or drop recorded observations or mutate their definitions, and cross-generation normalization should be represented as new, versioned transformation observations with explicit source edges.
+    provenance: [EV-033, EV-041]
+    stake: false
+    rationale: |
+      The permanent corpus is valuable specifically because an early clip can be measured against later pipelines. Reinterpreting an old row in place destroys the historical statement of what the old system observed. A migration may add definitions, compatibility mappings, indexes, and projections, but the original bytes and semantics must remain addressable through all schema generations.
+
+  - id: L-4
+    statement: |
+      Each run should own an immutable manifest containing input content hashes, corpus or cohort identity, canonical configuration, provider and model identifiers, code and build identity, component graph, environment facts, pricing basis, and measurement-protocol versions.
+    provenance: [EV-019, EV-027, EV-034, EV-035, EV-041]
+    stake: false
+    rationale: |
+      A code-version string alone cannot explain whether latency changed because of code, provider configuration, network placement, hardware, or the measurement protocol. Canonical snapshots and their digests preserve the exact independent variables even after defaults, provider APIs, and pricing schedules have changed. Failed, rejected, rate-limited, and timed-out executions remain runs with manifests and terminal observations rather than disappearing from the record.
+
+  - id: L-5
+    statement: |
+      Time should be stored as coordinates on named versioned axes, including audio offset, run-monotonic time, producer or provider time when supplied, and wall time, with origin, resolution, calibration, and uncertainty retained for each axis.
+    provenance: [EV-016, EV-017, EV-018, EV-035]
+    stake: false
+    rationale: |
+      Per-word arrival and speech-stop-to-first-token latency require both media position and observation arrival, which are not the same clock. Hosted providers introduce clocks and network boundaries that cannot safely be reconstructed from wall timestamps. Explicit clock metadata makes a 2026 duration recomputable and shows when precision or synchronization is insufficient for a 2029 claim.
+
+  - id: L-6
+    statement: |
+      Comparability should be decided per metric by an immutable declarative comparison contract in the database, not by schema equality, code-version equality, or application logic alone.
+    provenance: [EV-019, EV-027, EV-034, EV-041]
+    stake: true
+    rationale: |
+      Each contract should name the metric definition, population and aggregation rule, required matched dimensions, permitted experimental dimensions, units, clock requirements, and accepted compatibility transformations. This allows code generation to vary when asking whether code improved latency while requiring the clip or cohort, transport, provider configuration, and measurement semantics to match as the particular contract dictates. Keeping the predicate as retained data lets a future evaluator reproduce why two old runs were admitted without possessing the old application.
+
+  - id: L-7
+    statement: |
+      A comparison should classify every requested metric as exact, transformed under a named compatibility rule, or incomparable with machine-readable reasons, and it should refuse aggregation only for the affected metrics rather than silently coercing or globally accepting the run pair.
+    provenance: [EV-009, EV-041]
+    stake: false
+    rationale: |
+      Two runs can remain comparable for speech-stop latency while being incomparable for cost because one lacks a preserved pricing basis. The comparison record should itself be append-only and cite its contract version, source observations, transformations, exclusions, and verdicts. The surface may show surviving dimensions, but it must never average an incomparable dimension or render missing evidence as an observed value.
+
+  - id: L-8
+    statement: |
+      Every derived signal should be persisted as an observation at production time, and any later regeneration should create a new run linked to its source observations rather than replacing the historical result.
+    provenance: [EV-017, EV-023, EV-029, EV-035, EV-041]
+    stake: true
+    rationale: |
+      Arrival times, provider responses, diarization, phonetic repairs, and model-dependent inferences cannot be reproduced faithfully from audio after hosted services and old code disappear. Stored derivations must identify their algorithm or model definition, configuration, inputs, and producer invocation, so an old conclusion remains auditable. Reprocessing permanent audio is valuable as a new measurement, but treating it as reconstruction would erase the very generational difference the corpus exists to measure.
+
+  - id: L-9
+    statement: |
+      The first increment should commit to the complete invariant envelope and extension protocol, including open signal IDs, multi-axis intervals and points, participant and track subjects, producer invocations, provenance edges, raw artifacts, explicit absence and error states, and immutable definition registration.
+    provenance: [EV-015, EV-017, EV-021, EV-022, EV-024, EV-040, EV-041]
+    stake: false
+    rationale: |
+      These invariants cover bulk and streaming revisions, multiple producers on one output, parallel supervisor signals, diarized speakers, and signal families not yet named without freezing guessed payload columns. Future payload shapes must enter through new immutable definitions under this same contract, never through alteration of prior definitions or reuse of an old signal ID. Participant attribution belongs in the envelope before the text agent because EV-024 and EV-040 reject a single-speaker assumption at the foundation.

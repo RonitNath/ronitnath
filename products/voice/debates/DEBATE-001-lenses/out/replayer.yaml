@@ -1,0 +1,73 @@
+lens: replayer
+claims:
+  - id: L-1
+    statement: |
+      The permanent measurement state must be limited to audio identities, immutable replay configurations, replay recipes, and comparison contracts, with every segment, transcript, word, detection, speaker label, timing, and cost regenerated rather than stored.
+    provenance: [EV-014, EV-033, EV-041]
+    stake: true
+    rationale: |
+      Audio is the permanent baseline, while a derivation is recoverable work and must not become a second source of truth. The schema should therefore preserve everything needed to execute a derivation but none of its output. A successful implementation can delete all generated results without losing any measurement capability.
+
+  - id: L-2
+    statement: |
+      The measurement portion of SQLite should contain only clips(content_sha256 PRIMARY KEY, relative_path UNIQUE), configurations(config_sha256 PRIMARY KEY, canonical_json), recipes(recipe_sha256 PRIMARY KEY, clip_sha256, config_sha256), and comparison_contracts(contract_sha256 PRIMARY KEY, canonical_json), with no result-bearing run or annotation table.
+    provenance: [EV-032, EV-033, EV-041]
+    stake: false
+    rationale: |
+      Content hashes make the filesystem corpus the identity authority rather than a mutable row identifier. Configuration and contract hashes make recipes immutable and cheaply comparable. This is plain SQL, append-only, and small enough that SQLite remains an index and execution catalog rather than another permanent corpus.
+
+  - id: L-3
+    statement: |
+      A configuration snapshot must canonically include provider, model, options, thresholds, adapter and engine artifact digests, runtime resource profile, instrumentation and comparator versions, and tariff inputs, or its replay is ineligible for comparison.
+    provenance: [EV-010, EV-019, EV-027, EV-034, EV-041]
+    stake: false
+    rationale: |
+      The configuration must close over every input that can change the meaning of latency, resource, quality, or cost measurements. Canonical encoding gives the snapshot a stable hash and makes omitted inputs detectable. Provider matrices then vary named fields in complete recipes instead of comparing vaguely labeled runs.
+
+  - id: L-4
+    statement: |
+      Every replay should emit one transient generic annotation stream whose stable envelope is event_id, parent_event_id, signal_type, payload_schema, producer, config_hash, optional subject_ref, optional clip sample span, replay_offset_ns, and opaque typed payload.
+    provenance: [EV-016, EV-017, EV-022, EV-024, EV-029, EV-041]
+    stake: false
+    rationale: |
+      A single envelope gives transcript alignment, speaker attribution, tracing, and future supervisory signals common coordinates without creating a table per signal. Payload schemas remain typed and versioned in Rust decoders, but they do not force SQLite migrations. Parent links retain enough causal structure to localize failures among independently streaming components.
+
+  - id: L-5
+    statement: |
+      Source alignment must use integer sample indices in the immutable clip, while execution timing must use monotonic nanoseconds from replay start rather than wall-clock timestamps or floating-point seconds.
+    provenance: [EV-016, EV-017, EV-018]
+    stake: false
+    rationale: |
+      Sample indices give words, segments, turns, and waveform scrubbing one exact source coordinate. A separate monotonic replay coordinate expresses word arrival and detection latency without clock jumps or timezone semantics. Derived views may render milliseconds, but comparison operates on these two canonical coordinates.
+
+  - id: L-6
+    statement: |
+      Two replay outputs are comparable if and only if a named comparison contract requires the same audio hash, metric schema, timebase, and controlled configuration paths and every configuration difference is contained in that contract's explicit vary paths.
+    provenance: [EV-019, EV-034, EV-041]
+    stake: false
+    rationale: |
+      The predicate should live in a versioned comparison-contract registry loaded by the comparator, not in signal tables or UI heuristics. A request names the contract hash, and the comparator evaluates exact JSON paths before computing a delta. This permits deliberate provider, model, or threshold sweeps while holding all undeclared dimensions fixed.
+
+  - id: L-7
+    statement: |
+      If the comparison predicate fails, the system must refuse every aggregate, delta, and ranking while permitting only separately labeled raw replay views that explicitly state they are not a comparison.
+    provenance: [EV-009, EV-013, EV-041]
+    stake: false
+    rationale: |
+      Degrading to an approximate comparison would manufacture confidence from measurements with different meanings. Refusal is visible and testable: no comparative number is returned. Separate views preserve debugging access without presenting theater as evidence.
+
+  - id: L-8
+    statement: |
+      The first increment should commit only content identity, canonical configuration, the generic envelope and its two time coordinates, subject and causal references, and versioned comparison contracts, with no columns dedicated to any future signal payload.
+    provenance: [EV-005, EV-014, EV-022, EV-023, EV-024, EV-040, EV-041]
+    stake: false
+    rationale: |
+      This is enough structure to align and trace later signals without guessing their shapes at rung 1. Diarization can populate subject_ref, and phonetics or supervisory systems can introduce new payload schemas without changing permanent tables. A new signal should require a Rust type and decoder, not a database migration.
+
+  - id: L-9
+    statement: |
+      A run must be an executable recipe rather than a durable historical observation, so opening it re-executes the recipe and creates a fresh transient timeline that is discarded when the replay or comparison session ends.
+    provenance: [EV-017, EV-033, EV-041]
+    stake: false
+    rationale: |
+      Components still emit exact word-arrival and boundary events during execution; those events feed the active measurement surface rather than permanent rows. Re-execution prevents an old derivation from silently disagreeing with its audio or configuration. The durable object remains the recipe that can produce the timeline, not a copy of the timeline.

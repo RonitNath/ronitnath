@@ -1,0 +1,73 @@
+lens: notary
+claims:
+  - id: L-1
+    statement: |
+      The authoritative timeline must be one append-only observation ledger with a fixed typed envelope and versioned payload definitions, not a collection of authoritative per-signal tables.
+    provenance: [EV-016, EV-022, EV-023, EV-041]
+    stake: true
+    rationale: |
+      Implement an `observations` table whose rows represent facts or events and whose UPDATE and DELETE operations are rejected by SQLite triggers. New signal kinds append rows and registry entries instead of requiring old measurements to move or change shape. Signal-specific query views may exist, but every displayed fact must retain its authoritative observation ID.
+
+  - id: L-2
+    statement: |
+      Rung 1 must freeze only the observation envelope, identity rules, temporal coordinate rules, provenance links, and signal-definition mechanism rather than columns for every anticipated signal.
+    provenance: [EV-005, EV-014, EV-022, EV-024, EV-041]
+    stake: false
+    rationale: |
+      The envelope should include `observation_id`, `artifact_id`, `run_id`, `signal_definition_id`, `producer_id`, nullable `subject_id`, media coordinates, occurrence coordinates, payload bytes, payload hash, source-observation IDs, and `recorded_at`. Speaker attribution belongs in that envelope from the start because diarization precedes the text agent. Emotion, phonetics, handoffs, and other future shapes should arrive through new definitions and payloads without altering prior rows.
+
+  - id: L-3
+    statement: |
+      Every signal kind must reference an immutable registry entry containing a stable name, semantic version, canonical schema or descriptor bytes, descriptor hash, units, and temporal interpretation.
+    provenance: [EV-017, EV-023, EV-041]
+    stake: false
+    rationale: |
+      Generic payloads must not become untyped blobs whose meaning depends on current Rust code. Inserts are validated against the referenced definition, and a changed unit, field meaning, or timing interpretation requires a new registry entry. Historical definitions remain present verbatim so an old number remains intelligible independently of later releases.
+
+  - id: L-4
+    statement: |
+      Each run must begin with an immutable manifest that identifies its input bytes and span, measurement protocol, requested provider and model, canonical configuration snapshot and hash, component build digests, and clock domains.
+    provenance: [EV-019, EV-027, EV-033, EV-034, EV-035, EV-041]
+    stake: false
+    rationale: |
+      A mutable foreign key to a configuration table is insufficient because the referenced settings could later acquire different contents or meaning. Provider-resolved model identifiers, request IDs, billing reports, and other facts learned after start should be appended as run observations rather than patched into the manifest. The manifest and those observations together preserve exactly what was asked for and exactly what the hosted provider reported.
+
+  - id: L-5
+    statement: |
+      Every timing observation must carry both its media-time interval and its occurrence or receipt time in a named clock domain, with integer units and declared precision.
+    provenance: [EV-016, EV-017, EV-018, EV-021]
+    stake: false
+    rationale: |
+      Store media offsets such as `[start_ns, end_ns)` separately from component emission and local receipt offsets relative to the run's monotonic origin. This allows a word's location in the clip, its provider arrival, and its local observation to coexist without collapsing distinct facts into one timestamp. Clock-domain and precision fields prevent a later comparison from treating wall time, provider time, and process-monotonic time as equivalent.
+
+  - id: L-6
+    statement: |
+      Waveforms, segments, transcript revisions, words, boundary detections, speaker labels, latencies, billing amounts, and every later derived signal must be stored as immutable observations when produced and must never be regenerated as substitutes for historical observations.
+    provenance: [EV-009, EV-014, EV-017, EV-023, EV-027, EV-029]
+    stake: false
+    rationale: |
+      Each derived observation should cite its source observation IDs, configuration hash, producer build, and signal definition. Raw provider emissions and local receipt events should be retained before interpretation so a derived number remains auditable against what was actually witnessed. A missing stored result must render as missing, not as a value calculated under present-day semantics.
+
+  - id: L-7
+    statement: |
+      Comparability must be decided by a versioned immutable measurement-protocol record that names controlled dimensions, permitted varying dimensions, required signal-definition hashes, and a comparator version.
+    provenance: [EV-019, EV-034, EV-041]
+    stake: false
+    rationale: |
+      Provider or model may be the intended varying dimension in one matrix, while code build or streaming mode may be controlled; equality of whole run manifests is therefore not the predicate. Each run references a protocol hash, and one Rust comparator interprets that protocol for every API and UI path. Every comparison attempt should itself be appended with selected run IDs, comparator version, verdict, and machine-readable reasons.
+
+  - id: L-8
+    statement: |
+      When the comparability predicate fails, the service must refuse deltas, rankings, averages, and merged distributions while permitting only a side-by-side display explicitly marked `INCOMPARABLE` with the failed dimensions.
+    provenance: [EV-009, EV-013, EV-041]
+    stake: false
+    rationale: |
+      Quietly combining incompatible runs would create a plausible measurement that was never observed. Returning structured failure reasons lets the owner inspect both records without mistaking juxtaposition for an analytical result. The refusal belongs in the comparator and API, not only in presentation code that another caller could bypass.
+
+  - id: L-9
+    statement: |
+      Run starts, provider chunks, local receipts, component outputs, failures, timeouts, completion, and explicit no-output findings must all be first-class observations rather than mutable run status.
+    provenance: [EV-009, EV-017, EV-029, EV-035]
+    stake: false
+    rationale: |
+      A run row should not be updated from running to failed or complete because that erases the sequence that occurred. Terminal events close the sequence without changing it, and provider or component failures retain their timing, request identity, and any reported billing facts. Explicit no-output observations distinguish witnessed silence from missing instrumentation.

@@ -208,11 +208,11 @@ claims:
       an independent SES credential.
     provenance: [EV-014, EV-018, EV-024, mailer/docs/architecture.md]
     rebuts: [C-5]
-    resolution: escalated
+    resolution: resolved
     note: >
-      ESCALATED. Its remedy — make the old mailer a facade enqueuing into the new service and strip its SES
-      access — is a direct contradiction of EV-024 ("don't touch other services") and EV-018's fallback.
-      Only the owner can trade indefinite dual custody against touching the legacy path.
+      OWNER RULED (EV-028): the old mailer keeps its SES credential; dual custody accepted for the
+      coexistence period. The remedy is rejected because it requires touching the legacy path (EV-024).
+      Costs accepted by name: two-system rotation, no single principal ledger across both.
   - id: C-22
     lens: C1-one-vault
     statement: >
@@ -263,11 +263,12 @@ claims:
       repoints every hostname at next poll while the same node falsifies its own audit and status views.
     provenance: [EV-016, EV-021, EV-026, EV-027, DEC-013, service-ingress/docs/control-plane.md]
     rebuts: [C-46, C-48]
-    resolution: escalated
+    resolution: unresolved
     note: >
-      ESCALATED. Remedy is generation signing by a signer outside the web service and hiqlite, with owner
-      step-up for protected hosts, wildcards and multi-route diffs. Real cost, real mechanism, and E2's
-      smallness mandate argues against it. Owner call.
+      OWNER RULED AGAINST (EV-029): edges trust the cluster; generations are unsigned. The claim is not
+      refuted — the attack it describes is accepted as a known exposure, with C-26/C-36 capability scoping
+      and C-29's external sink as the compensating controls. Reopens if a principal outside owner+agents
+      ever holds routing authority.
   - id: C-28
     lens: C2-single-breach
     statement: >
@@ -279,7 +280,8 @@ claims:
     note: >
       Its full remedy (owner-signed per-application grants verified by a separate executor) is heavier than
       T1 warrants. Assume service-honest for T1; C-22's sender-scoped short-lived credentials bound the
-      damage. Reverses if signing (C-27) is adopted, since the machinery is then already there.
+      damage. Its reversal trigger is now closed: EV-029 declined signing, so the machinery will not exist
+      as a side effect. Reopens only with C-27.
   - id: C-29
     lens: C2-single-breach
     statement: >
@@ -287,11 +289,11 @@ claims:
       breach detector, because the suspected service controls all three and the UI is opened only after
       something already looks wrong.
     provenance: [EV-027, service-ingress/src/audit.rs, ha-service.md]
-    resolution: escalated
+    resolution: resolved
     note: >
-      ESCALATED with C-27. Remedy is an append-only sink outside the cluster plus external probing of
-      protected hostnames. Sharpened by EV-027: the owner is rarely watching, so in-band detection has no
-      human behind it.
+      OWNER RULED (EV-030): yes, an external append-only sink, scoped to the dangerous-action set. Load
+      bearing twice over — EV-027 leaves no human behind an in-band alarm, and EV-029 makes this the only
+      detector not controlled by the subject.
   - id: C-30
     lens: C2-single-breach
     statement: >
@@ -525,3 +527,8 @@ escalations:
   - to_owner: [C-21, C-27, C-29]
     why: blocking and not decidable by agents — each trades an owner value against another owner value
     batched: true
+    answered: 2026-08-06
+    outcome:
+      C-21: "keeps it — dual SES custody accepted (EV-028)"
+      C-27: "trust — generations unsigned, exposure accepted (EV-029)"
+      C-29: "yes — external append-only sink, dangerous-action set (EV-030)" 
