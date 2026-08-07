@@ -3,9 +3,18 @@ product: audgent
 bet: 1 — internal reshaping (phonetics split out as bet 2, EV-022)
 date: 2026-08-06
 interviewer: claude (opus-5), PM-mode session
-status: final
+status: final — amended 2026-08-06 after flow review (EV-024..EV-028)
 confidence: medium
 ---
+
+> **Amendment, 2026-08-06.** Reviewing FLOWS-001 produced five further rulings, two of which
+> change the bet rather than clarify it: **wire-level request/response inspection** (EV-026) is
+> a new fifth scope item and the largest data commitment in the bet, and **agent diagnosis**
+> (EV-028) is admitted as a fifth agent verb after being written as a non-goal. Also: the owner
+> retains direct edit capability (EV-024, qualifying EV-012), provider selection is what
+> "configuration" chiefly means (EV-025), and the existing console surfaces stay and are re-cut
+> for one org rather than replaced (EV-027, resolving OQ-5). Sections below are updated in place;
+> this note records that the interview did not surface EV-026 and the flow review did.
 
 # audgent — bet 1 brief: internal reshaping
 
@@ -17,7 +26,7 @@ multi-tenant world it will never be in. This bet takes that shape off it.
 | Topic | State | Distillation |
 | --- | --- | --- |
 | Problem | covered | A multi-tenant console structurally shows the owner one workspace when he needs the whole system (EV-010); the SaaS shape is the defect, not any feature (EV-001) |
-| Users | covered | One human (the owner, inspecting) and worker agents (authoring, testing); one consuming product, rinity (EV-009, EV-011) |
+| Users | covered | One human (the owner — inspecting mostly, editing rarely) and worker agents (authoring, testing, diagnosing); one consuming product, rinity (EV-009, EV-011, EV-024, EV-028) |
 | Bound | **waived** | No deadline, no session budget — an explicit owner waiver of SYS-DEC-001 (EV-020) |
 | Constraints | covered | Almost none: nothing is carrying calls, no dates, no provider is load-bearing (EV-019) |
 | No-gos | covered | Everything not discussed in this interview (EV-021); phonetics, deferred to bet 2 (EV-022) |
@@ -43,13 +52,15 @@ land in the same undifferentiated spend, so the owner can neither explain it nor
 
 ### Users — one inspector, several workers, one consumer
 
-- **The owner**, in an inspection-only role. His surface is five reads: calls going through,
-  call logs, costs, current configuration, and what the agents have been changing (EV-014).
-  Nothing on that list is authoring.
-- **Worker agents**, the primary interfacing surface (EV-006), with four verbs: create
-  workflow, test workflow, configure provider, test provider (EV-011). The two *test* verbs
-  are the load-bearing half — they are what lets an agent close its own loop without a human
-  confirming that a change worked.
+- **The owner**, predominantly inspecting. His surface is five reads: calls going through,
+  call logs, costs, current configuration, and what the agents have been changing (EV-014) —
+  plus, below all of them, the wire (EV-026). He retains direct edit capability and uses it
+  rarely (EV-024): agents are the normal path, not the only one. What "configuration" mostly
+  means is which providers to use (EV-025).
+- **Worker agents**, the primary interfacing surface (EV-006), with five verbs: create
+  workflow, test workflow, configure provider, test provider (EV-011), and diagnose a failure
+  (EV-028). The *test* verbs let an agent close its own loop without a human confirming that a
+  change worked; the *diagnose* verb lets it close the loop when the answer is bad.
 - **rinity** (the front desk service), the only consuming product, plugging in downward with
   its own auth key (EV-009, EV-017). `frontdesk-dental` and its predecessors are inactive and
   are not callers.
@@ -65,7 +76,7 @@ ownership outweighs cost of construction. Build it to stay legible, inside the d
 The codebase continues, modified in place — never rebuilt, because rebuilding is `voice`'s job
 (EV-018).
 
-### Scope — four changes
+### Scope — five changes
 
 1. **Degenerate to one organization** (EV-017). Tenancy is never needed: products are the unit
    that gets a credential, not customers, and rinity holds whatever per-customer separation its
@@ -73,12 +84,20 @@ The codebase continues, modified in place — never rebuilt, because rebuilding 
    being product surface. This is the change that unblocks (2).
 2. **Whole-system observability** (EV-010, EV-014). The five reads, each answerable across the
    system rather than within a workspace.
-3. **Agent-first authoring and testing** (EV-011, EV-012). The four verbs as a first-class
-   surface; configuration screens become readback, not data entry.
+3. **Agent-first authoring and testing** (EV-011, EV-012). The five verbs as a first-class
+   surface; configuration screens become read-first, with the owner's rare direct edit
+   preserved rather than removed (EV-024, EV-027).
 4. **Cost attribution** (EV-013). Every run labelled production or agent-test, with cost
    rolling up separately. Two distinct demands live here — attribution (can I see it) and
    containment (is the cheap path the default for agent testing) — and they should not be
    conflated in packets.
+5. **Wire-level diagnostics** (EV-026, EV-028). Every outbound request and response — to
+   providers and to tool endpoints — captured, ordered, and reachable from the run: by the
+   owner as a drill-down (F-10) and by an agent as a query (F-11). The failure it targets is
+   *silent wrongness*, not error pages: a tool call rejected on its schema leaves a transcript
+   in which the agent simply, inexplicably, didn't do the thing. This was not surfaced in the
+   interview and is the largest addition to the bet — it is a volume, retention and redaction
+   commitment, since captured payloads are big and may carry credentials or PHI.
 
 Out: phonetic misrecognition repair (bet 2, EV-022), and everything not discussed — local
 inference depth, the immutable deployment contract, campaigns, provider parity, the
@@ -106,6 +125,10 @@ discussed is out by default and needs a new evidence item to get in.
 - An agent creates a workflow, tests it, configures a provider, tests it, and reads back a
   verdict — with no human in the loop and no console visit (EV-011).
 - The owner can answer "what have the agents changed" from the interface (EV-014).
+- A call fails, and the owner names the cause from the request and response themselves — not
+  by inference from a transcript — in one drill-down from the call (EV-026). The sharper
+  version: the vapi case, where the call *sounded* fine and a tool call was being rejected on
+  its schema, is diagnosable here in minutes.
 
 ### Risks and irreversibility
 
@@ -127,11 +150,14 @@ discussed is out by default and needs a new evidence item to get in.
 | OQ-2 | What replaces per-org identity as the caller model — existing Kanidm service principals and scopes, or something simpler now that there is one org and two callers? | The current machinery was built for customer backend integrations; whether it fits product keys and agent callers is untested | no — data gate |
 | OQ-3 | What does an agent's "test" verb actually return? Is the T9 harness / call-flow evals the substrate, or is this a new agent-facing capability? | The two test verbs are the load-bearing half of EV-011; without a verdict contract they are just a trigger | no — but blocks packet derivation |
 | OQ-4 | Is production-vs-agent-test a property of the credential, of the run, or declared per call? | Credential-derived is self-enforcing and needs no discipline; declared is trivially wrong the first time an agent forgets | no — data gate |
-| OQ-5 | Does the human surface stay the existing console reshaped, or become a new surface? | EV-014's five reads have little overlap with what the dograh console is organized around, especially the agents-activity read | no — but shapes the design gate's first board |
+| ~~OQ-5~~ | ~~Does the human surface stay the existing console reshaped, or become a new surface?~~ | **Resolved by EV-027**: the surfaces stay — flow builder, model configuration and the rest are re-cut for one org. Only three views are new construction: agent activity, the cost split, and the wire drill-down | resolved |
+| OQ-8 | Retention and redaction for captured request/response payloads — how long, what is scrubbed, are agent-test and production runs treated alike, and is capture always-on or armed? | Always-on capture is what catches the failure nobody predicted, and is also what makes volume, cost and PHI exposure real (EV-026). Compounds OQ-1 and OQ-6 as a third data-model commitment | no — data gate, but it is the bet's largest new commitment |
+| OQ-9 | With editing retained but rare (EV-024), how does the configuration surface stay read-shaped without hiding the edit path? | The inherited console gets this exactly backwards — it is built for data entry — and re-cutting it is most of the UI work | no — design gate |
 | OQ-6 | Does a configuration change history exist today, or must it be introduced? | The fifth read (EV-014) is the owner's only handle on a system he no longer configures himself; if there's no audit trail it is a new data-model commitment, which compounds OQ-1 | no — data gate |
 | OQ-7 | Is `voice` allowed to inherit anything built here, or is the split absolute? | Bears on whether seams are worth generalizing; EV-016 already assumes the pipecat work carries forward for bet 2 | no |
 
-None blocking. All inherited by the debate or sanity pass.
+None blocking. All inherited by the debate or sanity pass. OQ-1, OQ-6 and OQ-8 are all data-model
+commitments and should be read together — the bet has three, not one.
 
 ## Debate recommendation
 

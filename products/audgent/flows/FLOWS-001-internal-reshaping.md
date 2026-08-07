@@ -4,21 +4,29 @@ product: audgent
 bet: 1 — internal reshaping
 pitch: PITCH-001 (not yet written; freezes with it)
 date: 2026-08-06
-status: draft — for owner strike/add, then debate, then freeze with PITCH-001
-sources: BRIEF-001; EV-009..EV-014, EV-017, EV-019, EV-021, EV-022
+status: draft rev 2 — owner review round 1 folded in (EV-024..EV-028); then debate, then freeze with PITCH-001
+sources: BRIEF-001; EV-009..EV-014, EV-017, EV-019, EV-021, EV-022, EV-024..EV-028
 ---
 
 # FLOWS-001 — audgent internal reshaping
 
-Actors: **OWNER** (the only human; inspects, does not configure — EV-012, EV-014),
-**AGENT** (worker agents; the primary interfacing surface — EV-006, EV-011),
-**RINITY** (the front desk service; the only consuming product — EV-009, EV-017).
+Actors: **OWNER** (the only human; predominantly inspects, edits rarely but really —
+EV-012, EV-014, EV-024), **AGENT** (worker agents; the primary interfacing surface — EV-006,
+EV-011, EV-028), **RINITY** (the front desk service; the only consuming product — EV-009,
+EV-017).
 
 The inversion this bet encodes: in the inherited product a human configures and machines
-execute. Here machines configure and a human watches. Every OWNER flow below is a read; every
-authoring flow belongs to AGENT.
+execute. Here machines configure and a human watches — but the human keeps the keys. Agents
+are the *normal* path, not the *only* path (EV-024); the design problem is keeping an
+infrequent edit path available without letting it shape the layout, which is what the
+inherited console gets backwards.
 
-Two structural notes:
+Three structural notes:
+
+- **The surfaces stay.** The no-code flow builder, model configuration, and the rest are
+  re-cut for one org, not replaced (EV-027, EV-018). Only three views are genuinely new
+  construction: agent activity (F-5), the production/agent-test cost split (F-3), and
+  wire-level drill-down (F-10).
 
 - **Scoping is gone from every flow.** Each OWNER read spans the whole system, not a
   workspace (EV-010, EV-017). Where the current console would ask "which org", these flows
@@ -57,7 +65,10 @@ Two structural notes:
   1. (web) call log across the whole system, newest first, labelled production vs agent-test
   2. (web) open a call: transcript, recording, workflow and version it ran, outcome, cost
   3. (web) from the call, reach the configuration it ran under (→F-4)
-- branches: the call reveals a configuration problem → F-6 (direct an agent to fix it)
+  4. (web) when the transcript doesn't explain it, descend to the wire (→F-10)
+- branches: the call reveals a configuration problem → F-6 (fix it, or have an agent fix it);
+  the call looks fine but the work didn't happen → F-10, which is the case the transcript
+  cannot show
 - states: transcript present but recording missing; a run that never completed; a run whose
   workflow definition has since changed — the log must show the version that actually ran,
   not the current one
@@ -89,21 +100,26 @@ Two structural notes:
 - actor: OWNER
 - trigger: needing to know what the system is actually set to — before judging a call, or
   after an agent reports a change
-- outcome: OWNER can read the live configuration of providers, models, workflows and numbers
-  without editing anything
+- outcome: OWNER can read the live configuration — above all, **which providers are in use**
+  (EV-025) — and can change it directly if he chooses to
 - surface: web
 - steps:
   1. (web) configuration view: what providers exist, which are in use, what each workflow
      is pinned to
   2. (web) open one and read it, including which credential it uses (not the secret)
   3. (web) from any configuration item, reach the history of who changed it (→F-5)
-- branches: the configuration is wrong → F-6
+- branches: the configuration is wrong and OWNER edits it himself — **rare but real, and not
+  a degraded path** (EV-024); or he hands it to an agent (→F-6). An edit OWNER makes appears
+  in F-5 alongside the agents' changes, attributed to him
 - states: a provider configured but never exercised; a credential present but invalid — the
-  view must distinguish "set up" from "known to work" (this is what F-8's test verb feeds)
+  view must distinguish "set up" from "known to work" (this is what F-8's test verb feeds);
+  an OWNER edit that contradicts what an agent is mid-way through doing
 - packets: derived at packet stage
-- open: does the reshaped surface keep the existing console's configuration screens as
-  read-only, or is this a new surface (BRIEF-001/OQ-5)? The screens' current organization
-  assumes data entry
+- resolved (EV-027): the existing surfaces stay — the no-code flow builder, model
+  configuration and the rest are reconfigured for one org, not replaced. Resolves
+  BRIEF-001/OQ-5
+- open: with editing retained (EV-024) but rare, how does the surface stay read-shaped
+  without hiding the edit path? A design-gate question, and the sharpest one in the bet
 
 **F-5 OWNER reviews what the agents have been up to**
 - actor: OWNER
@@ -123,9 +139,10 @@ Two structural notes:
   the read with no equivalent in the inherited console — it exists because the owner stopped
   configuring the system himself
 
-**F-6 OWNER corrects the system by directing an agent** ⟨derived — confirm or strike⟩
+**F-6 OWNER corrects the system by directing an agent**
 - actor: OWNER (+ AGENT)
-- trigger: any of F-1..F-5 surfaced something wrong
+- trigger: any of F-1..F-5 or F-10 surfaced something wrong, and OWNER would rather delegate
+  the fix than make it
 - outcome: the thing is fixed, by an agent, and the fix appears in F-5
 - surface: outside-web (a conversation with an agent) + machine-only (the change itself)
 - steps:
@@ -134,16 +151,16 @@ Two structural notes:
   2. (outside-web) OWNER tells an agent
   3. (machine) agent makes the change (→F-8 or F-7)
   4. (web) the change appears in F-5, and OWNER can confirm it landed
-- branches: OWNER decides to change it himself → **there is no such path by design** (EV-012);
-  if that turns out to be intolerable, EV-012 is what needs revisiting, not this flow
+- branches: OWNER changes it himself instead (→F-4 branch) — the two paths coexist, and which
+  one he takes is a matter of convenience, not capability (EV-024); the agent's fix is wrong →
+  back to step 1 with the evidence from F-10
 - states: OWNER can see a problem but cannot name the object precisely enough to hand it off —
-  this is the failure mode that makes an inspection-only surface unusable, and it is what the
-  identifiers in F-1..F-5 exist to prevent
+  the failure mode this flow exists to prevent, and what the identifiers in F-1..F-5 and F-10
+  are for; OWNER and an agent editing the same thing at once
 - packets: derived at packet stage
-- open: **this flow was derived, not stated.** It follows from EV-012 (config is agent work)
-  plus EV-014 (the human surface is five reads) — if the owner sees something wrong, the loop
-  has to close somewhere. Written per `flow-addendum.md` rule 1 (a journey outside the web UI
-  is still a flow). Strike it if the intended answer is that OWNER simply edits directly
+- resolved (EV-024): this flow was derived rather than stated, and the owner confirmed it
+  while correcting its premise — direct editing survives, so F-6 is the delegation path, not
+  the only way to close the loop
 
 **F-7 AGENT builds a workflow and proves it works**
 - actor: AGENT
@@ -204,19 +221,71 @@ Two structural notes:
 - open: does rinity's integration need to change at all for the one-org move, or is the seam
   unchanged from its side? (data gate — it is the only external consumer of the teardown)
 
+**F-10 OWNER drills into the wire to find out why something failed** — the new capability
+- actor: OWNER
+- trigger: a call failed, or worse, a call *succeeded* and the work didn't happen — the agent
+  sounded fine and the tool call never landed (EV-026)
+- outcome: OWNER can name the actual cause — this request was sent, this is what came back,
+  and that is why — without reasoning from a transcript
+- surface: web
+- steps:
+  1. (web) from a call (F-2), open its boundary record: every outbound request and its
+     response, in order, against the provider and against tool endpoints
+  2. (web) locate the failure and read the response verbatim — the rejection, the error body,
+     the status
+  3. (web) read what was sent immediately before it, which is usually where the cause is
+  4. (web) from the cause, reach the configuration that produced it (→F-4), and fix it
+     directly or hand it off (→F-6)
+- branches: the cause is a provider rejecting our request (bad schema, bad credential, bad
+  payload) → configuration fix; the cause is the provider itself failing or degrading → a
+  provider-choice question, which is the main configuration decision there is (EV-025); no
+  request was sent at all → the fault is upstream in the workflow, not on the wire
+- states: payloads large enough that the view must be navigable rather than dumped; a boundary
+  record truncated or expired by retention; **secrets and PHI inside captured payloads**, which
+  is why this cannot simply be raw logging; a run with hundreds of turns
+- packets: derived at packet stage
+- open: retention and redaction posture for captured request/response bodies — how long, what
+  is scrubbed, and whether agent-test runs and production runs are treated alike. This is a
+  data-gate commitment and the largest new one in the bet (EV-026)
+- open: is capture always-on, or armed per workflow / per run? Always-on is what makes it
+  useful for the failure nobody predicted, and is also what makes the volume and retention
+  question real
+
+**F-11 AGENT diagnoses a failure**
+- actor: AGENT
+- trigger: a run failed, a test verdict came back bad (F-7, F-8), or OWNER handed over an
+  investigation (F-6)
+- outcome: the agent knows the cause and can act on it, without a human reading anything to it
+- surface: machine-only
+- steps:
+  1. (machine) agent reads the run: outcome, transcript, cost, configuration it ran under
+  2. (machine) agent reads the same boundary record F-10 renders — requests, responses, order
+  3. (machine) agent identifies the cause and either fixes it (→F-8, F-7) or reports it to
+     OWNER with the evidence
+- branches: cause is outside audgent (the tool endpoint itself, the product) → report, don't
+  fix; cause is ambiguous → the agent needs the full payloads, not a summary, which is the
+  requirement that decides this flow's API shape
+- states: evidence already expired under retention; payloads too large to read whole — the
+  agent needs to query the record, not receive it
+- packets: derived at packet stage
+- resolved (EV-028): admitted as the fifth agent verb, having been listed as a non-goal in
+  rev 1
+- open: **the same record serves F-10 and F-11.** Building it for the UI first and adding an
+  API later is the predictable mistake — the agent path constrains the shape more (it needs
+  query, not render), so it should lead
+
 ---
 
 ## Named non-goals (actors and journeys deliberately absent)
 
 - **A customer or tenant.** No one outside signs in to audgent. Products plug in with keys;
   customers are rinity's, above this line (EV-017, rinity/EV-015).
-- **A human configuring anything.** There is no OWNER authoring flow — that is the point of
-  EV-012, and F-6 is the escape valve.
-- **AGENT diagnosing a failing production call.** A plausible fifth agent verb (read
-  transcripts and costs programmatically to investigate), but it was not discussed, so it is
-  out by default under EV-021. Flagged here rather than silently added — worth an explicit
-  yes or no, since it is the one omission likely to be missed once agents are working in the
-  system.
+- **A *self-serve* configuration journey.** OWNER can edit (EV-024) and the existing surfaces
+  survive (EV-027), but nothing here is shaped for a stranger arriving with their own vendor
+  keys to set themselves up — that is the BYOK model EV-012 rejects. The edit path is an
+  exception path for one person who already owns everything.
+- ~~AGENT diagnosing a failing production call~~ — **admitted as F-11** by EV-028. Kept
+  visible here because it was rev 1's flagged omission and the flag worked.
 - **Phonetic misrecognition repair.** Bet 2 (EV-022). No flow here, and it must not leak into
   this pitch, its packets, or its gates.
 - **The one-org migration.** A work packet, not a journey (rule 2).
