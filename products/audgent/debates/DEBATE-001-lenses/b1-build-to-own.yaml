@@ -1,0 +1,106 @@
+claims:
+  - id: b1-build-to-own-1
+    statement: |
+      The current application can create more than one organization and therefore violates the one-organization invariant.
+    provenance:
+      - EV-017
+      - EV-030
+      - api/db/organization_client.py:44-98
+      - api/routes/auth.py:113-125
+    stake: false
+    note: |
+      The generic organization client inserts a row for every previously unseen provider id, and local signup derives a distinct provider id from each user before calling it. A permanent one-org implementation should have one idempotent bootstrap path, one fixed system organization id, authentication that only attaches identities to that row, removal of runtime organization creation, and startup/tests that fail if zero or multiple rows exist. Merely hiding the selector leaves a live path for creating state that whole-system reads can later omit.
+
+  - id: b1-build-to-own-2
+    statement: |
+      The existing owner-facing reports and usage endpoints are tenant-scoped and therefore do not satisfy the whole-system read contract.
+    provenance:
+      - EV-010
+      - EV-014
+      - EV-030
+      - api/routes/reports.py:48-69
+      - api/routes/organization_usage.py:73-88
+      - api/db/platform_admin_client.py:15-64
+    stake: false
+    note: |
+      Reports and usage derive a selected organization from the operator and pass it into filtered queries, while the unscoped platform-admin client proves that deployment-wide reads already have a viable home. The maintained design should make unscoped owner reads the canonical query layer for live calls, runs, costs, configuration, activity, and wire records; adding separate screen-specific tenant queries would preserve the exact plausible-but-incomplete failure mode DEC-001 identifies.
+
+  - id: b1-build-to-own-3
+    statement: |
+      A production-versus-agent-test split computed from the current run context is unreliable because caller-supplied input can overwrite its provenance fields.
+    provenance:
+      - EV-013
+      - FLOWS-001
+      - api/routes/public_agent.py:229-249
+      - api/db/models.py:565-632
+    stake: true
+    note: |
+      The public-agent route writes `trigger_mode`, workflow identity, and service-principal identity into `initial_context`, then merges the caller's arbitrary `initial_context` over those values. `WorkflowRunModel` has no dedicated purpose or origin column, so one request can relabel itself and corrupt every downstream cost total. Run purpose must be a non-null, immutable typed field set from the authenticated product or agent credential at run creation, with actor/product identity in protected columns and an explicit unattributed value for rows whose origin is genuinely unknown.
+
+  - id: b1-build-to-own-4
+    statement: |
+      The current usage implementation cannot report actual spend because it records quantities but hard-codes reported token cost to zero and has no runtime cost-accounting path.
+    provenance:
+      - EV-013
+      - api/services/pipecat/pipeline_metrics_aggregator.py:128-151
+      - api/db/organization_usage_client.py:180-221
+      - api/services/workflow/run_usage_response.py:16-42
+    stake: false
+    note: |
+      The pipeline persists model-token, TTS-character, STT-duration, and call-duration quantities, but usage history initializes `dograh_tokens` to zero and only exposes `charge_usd` if it somehow already exists in `cost_info`. A durable cost subsystem needs versioned provider/model price inputs and immutable per-run line items containing provider, model, quantity, unit, unit price, currency, and calculation version; the production/test view should aggregate those line items by the protected run-purpose field rather than reinterpret mutable JSON on every read.
+
+  - id: b1-build-to-own-5
+    statement: |
+      Current provider, tool, and credential mutations erase prior values and update-actor attribution, so agent activity history cannot be reconstructed after the fact.
+    provenance:
+      - EV-014
+      - EV-025
+      - EV-029
+      - api/db/organization_configuration_client.py:35-66
+      - api/db/tool_client.py:139-206
+      - api/db/webhook_credential_client.py:102-174
+    stake: false
+    note: |
+      Provider configuration is overwritten in place, and tool and credential updates retain only the latest row plus a timestamp; none records who performed an update or the replaced value. The maintainable implementation is an append-only configuration-change record written in the same transaction as every mutation, with resource type and stable id, operation, redacted before/after snapshots, actor kind and id, agent session/correlation id, and timestamp. That requires shared mutation services with caller context rather than audit calls sprinkled through UI and MCP handlers, because independently committed audit rows will eventually disagree with live state.
+
+  - id: b1-build-to-own-6
+    statement: |
+      The current MCP server cannot serve as the primary worker-agent interface because it accepts only operator session tokens and exposes neither workflow/provider testing nor run diagnosis.
+    provenance:
+      - EV-006
+      - EV-011
+      - EV-028
+      - api/mcp_server/auth.py:8-38
+      - api/mcp_server/server.py:1-49
+    stake: false
+    note: |
+      MCP authentication resolves every invocation to a human `UserModel`, so agent-authored changes are attributed to the owner, and the registered tool list is centered on workflow creation/editing and catalog reads. There are no tools for testing a workflow, configuring or testing a provider, reading a run, or querying boundary records. Worker agents need first-class service-principal identity and scoped capabilities, while MCP and REST should remain thin adapters over the same domain services so validation, auditing, verdicts, and authorization cannot drift by interface.
+
+  - id: b1-build-to-own-7
+    statement: |
+      The current logging and tracing paths cannot provide complete per-run wire records with enforceable redaction and retention.
+    provenance:
+      - EV-026
+      - EV-029
+      - api/services/workflow/tools/custom_tool.py:292-349
+      - api/services/pipecat/realtime_feedback_events.py:87-107
+      - api/services/pipecat/tracing_config.py:141-181
+      - api/engine_settings.py:351-377
+    stake: false
+    note: |
+      Tool requests send method, URL, headers, body, and parameters, but only the body and parameters go to a DEBUG process log; the persisted function result is converted to an opaque string. Provider exchanges depend on optional exporters, and the tracing exporter explicitly allows spans with no destination to be dropped. Wire diagnosis should use a dedicated ordered boundary-exchange model keyed by run and turn, with boundary kind, provider/tool identity, request and response metadata, status, timing, payload references, truncation/hash markers, redaction-policy version, and expiry. Large bodies belong in controlled object storage rather than a growing run JSON document, and both owner and agent APIs should query the same record. The existing DEBUG body logging should be removed when deliberate capture lands so there is one governed copy rather than a second accidental one.
+
+  - id: b1-build-to-own-8
+    statement: |
+      The repository remains architecturally self-contradictory while contributor instructions mandate organization-scoped reads and primary documentation presents a generic self-service platform.
+    provenance:
+      - EV-001
+      - EV-017
+      - EV-027
+      - api/AGENTS.md:58-72
+      - README.md:1-83
+      - api/app.py:70-75
+      - api/mcp_server/instructions.py:24-66
+    stake: false
+    note: |
+      Coding agents are explicitly told that every organization-scoped read must filter by the selected organization, directly opposing the ruling that owner reads never scope. The README, OpenAPI metadata, and MCP instructions still teach Dograh's generic user-facing interaction model and terminology. Updating these authoritative artifacts in the same change as behavior is part of the implementation: otherwise routine maintenance will faithfully reintroduce selectors, scoped reads, human-confirmation steps, and incorrect actor assumptions.

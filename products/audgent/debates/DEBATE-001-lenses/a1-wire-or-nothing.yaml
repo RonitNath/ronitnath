@@ -1,0 +1,123 @@
+claims:
+  - id: a1-wire-or-nothing-1
+    statement: |
+      Audgent as built cannot reconstruct from stored run evidence why a completed call claimed an appointment was booked when no appointment exists.
+    provenance:
+      - EV-026
+      - EV-029
+      - api/services/workflow/tools/custom_tool.py:317
+      - api/services/pipecat/tracing_config.py:146
+      - api/services/pipecat/event_handlers.py:300
+    stake: true
+    note: |
+      The owner requires the actual provider and tool request/response sequence, not an inference from speech.  The tool path persists the model's arguments and a transformed result but omits the resolved request, while provider exchanges exist only as optional exported spans and call events are saved only at finalization.  Those records cannot distinguish a rejected booking payload, a request sent to the wrong endpoint, a provider-side failure, and no request leaving audgent.
+
+  - id: a1-wire-or-nothing-2
+    statement: |
+      The HTTP-tool executor classifies every received HTTP response, including a 4xx or 5xx rejection, as a successful tool result returned to the voice agent.
+    provenance:
+      - EV-026
+      - api/services/workflow/tools/custom_tool.py:338
+      - api/services/workflow/tools/custom_tool.py:352
+      - api/services/workflow/tools/custom_tool.py:354
+      - api/services/workflow/pipecat_engine_custom_tools.py:460
+    stake: false
+    note: |
+      `execute_http_tool` does not raise on an error status: after any response it constructs `{"status": "success", "status_code": response.status_code, "data": ...}` and passes that object through the LLM result callback.  A booking endpoint's schema rejection can therefore coexist with a success-labelled tool result and a spoken booking confirmation, making the exact response indispensable evidence.
+
+  - id: a1-wire-or-nothing-3
+    statement: |
+      A persisted function-call event cannot prove the booking request that crossed the wire because it records model arguments and a stringified result rather than the resolved method, URL, headers, query or body, and raw response.
+    provenance:
+      - EV-026
+      - EV-029
+      - api/services/pipecat/realtime_feedback_events.py:72
+      - api/services/pipecat/realtime_feedback_events.py:87
+      - api/services/pipecat/realtime_feedback_events.py:91
+      - api/services/workflow/tools/custom_tool.py:317
+      - api/services/workflow/tools/custom_tool.py:323
+      - api/services/workflow/tools/custom_tool.py:338
+      - api/services/workflow/tools/custom_tool.py:348
+    stake: false
+    note: |
+      Preset and template parameters are merged only at execution, after the function-call-start event's model arguments have been formed.  The final request is emitted through `httpx`, but only a DEBUG logger sees its body and parameters; the persisted end event converts the parsed result to Python `str()`.  Thus the stored run lacks both the exact outbound envelope and a verbatim inbound envelope.
+
+  - id: a1-wire-or-nothing-4
+    statement: |
+      Any call whose pipeline process exits before `on_pipeline_finished` can lose all accumulated transcript, tool, and error events even though those events already happened.
+    provenance:
+      - FLOWS-001-internal-reshaping.md
+      - api/services/pipecat/in_memory_buffers.py:102
+      - api/services/pipecat/in_memory_buffers.py:107
+      - api/services/pipecat/in_memory_buffers.py:152
+      - api/services/pipecat/event_handlers.py:176
+      - api/services/pipecat/event_handlers.py:300
+      - api/services/pipecat/event_handlers.py:313
+    stake: false
+    note: |
+      `InMemoryLogsBuffer` explicitly retains the call record in process memory and the database write occurs only in the pipeline-finished handler.  Even on that path, a failed log write is caught and reduced to another logger message after the run has already been marked completed at `api/services/pipecat/event_handlers.py:288`.  Durable evidence must be written as the call progresses, because the crash or persistence failure is itself one of the failures that must remain reconstructable.
+
+  - id: a1-wire-or-nothing-5
+    statement: |
+      A run pins a workflow definition but does not pin every mutable provider, tool, and credential value resolved at execution, so a later configuration edit can erase proof of the configuration that produced the call.
+    provenance:
+      - EV-025
+      - EV-029
+      - api/db/models.py:248
+      - api/db/models.py:256
+      - api/db/models.py:565
+      - api/db/models.py:571
+      - api/db/models.py:1143
+      - api/db/models.py:1200
+      - api/services/configuration/ai_model_configuration.py:84
+      - api/services/configuration/ai_model_configuration.py:98
+      - api/services/workflow/pipecat_engine_custom_tools.py:249
+      - api/services/workflow/tools/custom_tool.py:277
+    stake: false
+    note: |
+      Workflow versioning is real, but a workflow without a full model override resolves the current organization configuration at startup, and tool UUIDs resolve current `ToolModel` rows and current credential rows when invoked.  Those rows mutate in place.  Reconstruction therefore requires the run ledger to bind each exchange to the exact effective provider settings, tool definition, endpoint, and credential identity/version used at that moment rather than linking to today's configuration.
+
+  - id: a1-wire-or-nothing-6
+    statement: |
+      A capture containing only completed request/response pairs cannot establish that no request was sent; the diagnostic record must durably record send intent before egress, response after ingress, monotonic sequence, correlation identifiers, and a terminal completeness marker.
+    provenance:
+      - EV-026
+      - EV-028
+      - FLOWS-001-internal-reshaping.md
+      - api/services/pipecat/realtime_feedback_events.py:97
+      - api/services/pipecat/in_memory_buffers.py:161
+    stake: false
+    note: |
+      F-10 explicitly treats “no request was sent” as a different upstream cause, while F-11 requires an agent to query the same evidence.  Absence from an ordinary list is ambiguous between no egress, recorder failure, process death, and an unfinished write.  A before/after append protocol with an explicit closed ledger makes those cases mechanically distinguishable and preserves exact ordering across concurrent turns and tool calls.
+
+  - id: a1-wire-or-nothing-7
+    statement: |
+      OTEL or Langfuse traces cannot serve as audgent's authoritative diagnostic record because provider spans are silently dropped whenever no matching exporter is configured.
+    provenance:
+      - EV-029
+      - api/services/pipecat/tracing_config.py:146
+      - api/services/pipecat/tracing_config.py:156
+      - api/services/pipecat/tracing_config.py:167
+      - api/services/pipecat/tracing_config.py:305
+      - api/engine_settings.py:351
+    stake: false
+    note: |
+      The tracing setup deliberately permits a `None` default exporter and documents silent dropping, while `get_trace_url` returns nothing when Langfuse is disabled.  Optional exported telemetry therefore cannot satisfy happened-once reconstruction.  Exact provider STT, LLM, realtime, and TTS exchanges must land in the run's own durable, queryable evidence record whether or not an external trace backend is active.
+
+  - id: a1-wire-or-nothing-8
+    statement: |
+      Final-webhook retries are not reconstructable attempt by attempt because each attempt overwrites one `last_status_code` and one truncated `last_error`, and a later success clears the prior error.
+    provenance:
+      - EV-026
+      - api/db/models.py:1046
+      - api/db/models.py:1090
+      - api/db/models.py:1111
+      - api/db/models.py:1116
+      - api/db/webhook_delivery_client.py:150
+      - api/db/webhook_delivery_client.py:168
+      - api/db/webhook_delivery_client.py:185
+      - api/tasks/webhook_delivery.py:165
+      - api/tasks/webhook_delivery.py:183
+    stake: false
+    note: |
+      The delivery row usefully freezes the outbound payload, but it stores only the latest aggregate state rather than an immutable exchange per attempt.  The task keeps only the first 200 response characters in its error, the client truncates the resulting error, and `mark_webhook_delivery_succeeded` sets `last_error` to null.  A transient rejection followed by acceptance therefore leaves no stored sequence explaining what the receiver said on each try.

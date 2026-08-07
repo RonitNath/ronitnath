@@ -1,0 +1,105 @@
+claims:
+  - id: d2-the-run-carries-its-own-truth-1
+    statement: |
+      A six-month-old run can be assigned correctly to production or agent-test only when an immutable cost class is required on the run at creation rather than derived from the credential that originated it.
+    provenance:
+      - EV-013
+      - flows/FLOWS-001-internal-reshaping.md:79-96
+      - api/routes/public_agent.py:393-459
+    stake: true
+    note: |
+      EV-013 makes the split a first-class run attribution problem, and F-3 requires costs to roll up without manual reconstruction. The same service principal dependency can invoke both the published endpoints and the test endpoints; those paths differ by `use_draft`, not by caller identity. A credential-derived answer therefore cannot reconstruct what a particular run was, especially after keys are shared, rotated, or repurposed.
+
+  - id: d2-the-run-carries-its-own-truth-2
+    statement: |
+      The current `workflow_runs` schema has no required field for origin, purpose, or cost class, so a persisted run does not carry the minimum historical identity demanded by EV-013.
+    provenance:
+      - EV-013
+      - api/db/models.py:565-610
+      - api/db/workflow_run_client.py:41-108
+    stake: false
+    note: |
+      `WorkflowRunModel` persists workflow and definition references, provider-oriented `mode`, call direction, mutable JSON contexts, usage, and cost, but it has no origin, purpose, or production-versus-agent-test column. `create_workflow_run` likewise accepts none of those three facts and defaults its context dictionaries to empty. Definition pinning preserves what workflow ran; it does not preserve why the run existed or whose activity produced it.
+
+  - id: d2-the-run-carries-its-own-truth-3
+    statement: |
+      `initial_context` cannot be the provenance ledger because a public caller can overwrite the system's trigger mode and principal identifiers before insertion and later code can mutate the same JSON after creation.
+    provenance:
+      - api/routes/public_agent.py:229-250
+      - api/db/workflow_run_client.py:308-315
+      - api/schemas/workflow.py:9-31
+    stake: false
+    note: |
+      The public route writes `trigger_mode`, `service_principal_id`, `service_principal_client_id`, and token id, then applies `initial_context.update(request.initial_context or {})`, giving caller data the final value for those keys. The update client later merges additional patches into `run.initial_context`. Historical attribution stored there is neither protected at creation nor immutable afterward, even though it is returned as if it were ordinary run context.
+
+  - id: d2-the-run-carries-its-own-truth-4
+    statement: |
+      A run needs a purpose distinct from its cost class because workflow testing, provider testing, and production calling are different purposes even when the first two share the agent-test cost class.
+    provenance:
+      - EV-011
+      - EV-013
+      - EV-025
+      - flows/FLOWS-001-internal-reshaping.md:165-203
+    stake: false
+    note: |
+      EV-011 separately requires agents to test workflows and test providers, while EV-013 groups their spend into agent-test. Recording only `agent-test` would make those two mandated activities indistinguishable; recording only a purpose would force cost reporting to reinterpret purpose names later. The run therefore needs both an immutable purpose such as workflow-test or provider-test and an independently immutable cost class.
+
+  - id: d2-the-run-carries-its-own-truth-5
+    statement: |
+      Current run creation paths cannot consistently answer which product, agent, and activity originated a run because only the public-agent path snapshots a service principal while the other seven creation sites record incompatible fragments or no actor at all.
+    provenance:
+      - EV-010
+      - EV-014
+      - flows/FLOWS-001-internal-reshaping.md:40-48
+      - flows/FLOWS-001-internal-reshaping.md:79-92
+      - api/routes/public_agent.py:243-272
+      - api/routes/workflow.py:1202-1244
+      - api/routes/workflow_text_chat.py:167-205
+      - api/routes/agent_stream.py:66-88
+      - api/routes/telephony.py:175-205
+      - api/routes/telephony.py:455-501
+      - api/services/campaign/campaign_call_dispatcher.py:271-300
+      - api/services/telephony/ari_manager.py:668-700
+    stake: false
+    note: |
+      F-1 requires the originating product, and F-3 requires drill-down by agent and activity. The eight direct creation sites cover public API calls, console runs, text tests, agent stream, outbound and inbound telephony, campaigns, and ARI; only `public_agent.py` writes principal identifiers, and none requires an origin product plus activity identifier. One-org degeneration removes tenant context as a useful discriminator, making a run-owned origin snapshot mandatory for both credentialed and credentialless ingress.
+
+  - id: d2-the-run-carries-its-own-truth-6
+    statement: |
+      Any implementation that leaves origin, purpose, or cost class optional in the central run constructor will continue creating new unattributed runs through at least one ingress path.
+    provenance:
+      - EV-013
+      - flows/FLOWS-001-internal-reshaping.md:91-96
+      - api/db/workflow_run_client.py:41-108
+      - api/routes/public_agent.py:272-280
+      - api/routes/telephony.py:475-501
+      - api/services/campaign/campaign_call_dispatcher.py:288-300
+    stake: false
+    note: |
+      Run creation is shared by heterogeneous routes, and the current constructor enforces organization or user plus workflow existence but no provenance contract. Route-by-route conventions have already produced partial labels such as `trigger_mode`, `tester`, campaign ids, and inbound direction. The visible unattributed bucket in F-3 is necessary for pre-labelling history; accepting missing metadata for newly created runs would turn that migration state into an ongoing data-quality failure.
+
+  - id: d2-the-run-carries-its-own-truth-7
+    statement: |
+      Run-owned origin, purpose, and cost class will remain unusable for whole-system observability unless they are top-level response fields and filterable dimensions in both run listings and usage reports.
+    provenance:
+      - EV-010
+      - EV-014
+      - flows/FLOWS-001-internal-reshaping.md:40-96
+      - api/schemas/workflow.py:9-31
+      - api/routes/platform_admin.py:38-69
+      - api/db/organization_usage_client.py:133-151
+    stake: false
+    note: |
+      The current run response exposes generic contexts, mode, costs, and usage, while the platform-wide run projection exposes only mode and completion state. The usage endpoint's filter allowlist omits product, agent, activity, purpose, and cost class. F-1 through F-3 require those dimensions to label live calls, reconstruct old calls, split spend, and drill down, so burying them in JSON would not produce the promised whole-system reads.
+
+  - id: d2-the-run-carries-its-own-truth-8
+    statement: |
+      Assigning provenance during completion processing will lose the truth for calls that fail before the pipeline completes, so origin, purpose, and cost class must exist before the first provider operation.
+    provenance:
+      - EV-013
+      - flows/FLOWS-001-internal-reshaping.md:52-57
+      - api/services/pipecat/event_handlers.py:282-363
+      - api/services/telephony/status_processor.py:190-231
+    stake: false
+    note: |
+      Normal pipeline usage is persisted at shutdown and completion work is then queued, while telephony status handling has a separate path for calls that never connect. F-1 explicitly requires an engine leg that dies mid-flight to remain visible rather than disappear. Creation-time classification is the only common point reached by successful, failed, canceled, and never-connected runs, and it lets later usage and cost records append to an identity that was already fixed.

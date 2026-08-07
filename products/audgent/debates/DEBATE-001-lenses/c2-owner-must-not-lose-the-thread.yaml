@@ -1,0 +1,107 @@
+claims:
+  - id: c2-owner-must-not-lose-the-thread-1
+    statement: |
+      At the inspected commit, once an organization provider or model configuration is overwritten, the owner cannot reconstruct its previous value, actor, or reason from audgent's database.
+    provenance:
+      - EV-014
+      - EV-025
+      - EV-029
+      - api/db/models.py:248-269
+      - api/db/organization_configuration_client.py:36-69
+    stake: true
+    note: |
+      OrganizationConfigurationModel retains one JSON value plus created, updated, and validation timestamps, and upsert_configuration replaces that value in place. There is no audit model, prior-value row, or mutation actor. This is the configuration space the owner says matters most, so F-5 cannot be reconstructed later and the missing past cannot be backfilled after agents have begun changing it continuously.
+
+  - id: c2-owner-must-not-lose-the-thread-2
+    statement: |
+      Two worker agents using the current MCP authoring surface under the owner's session are indistinguishable in durable mutation history.
+    provenance:
+      - EV-006
+      - EV-011
+      - EV-014
+      - api/mcp_server/auth.py:9-43
+      - api/mcp_server/tools/save_workflow.py:65-161
+      - api/mcp_server/tracing.py:35-83
+    stake: false
+    note: |
+      MCP authenticates with the console session and stamps only the human user id; save_workflow then updates the workflow draft without passing any worker-agent identity into persistence. Optional OTEL spans contain truncated tool input and output, but they are not linked from the mutation row and do not identify which worker acted. The owner would therefore see his own identity where F-5 requires the particular agent.
+
+  - id: c2-owner-must-not-lose-the-thread-3
+    statement: |
+      An activity entry containing only actor, timestamp, and diff would still fail six-month reconstruction unless it durably links the change to its initiating instruction or rationale and the validation runs that followed.
+    provenance:
+      - EV-014
+      - FLOWS-001-internal-reshaping.md
+      - inference
+    stake: false
+    note: |
+      F-5 requires enough context to judge a change and a path from the change to subsequent runs, while F-6 requires confirmation that the intended fix landed. A diff can establish what happened but cannot establish why that option was chosen, what problem it was meant to solve, or whether its tests supported the decision. Those links are the owner's thread after the originating agent conversation is no longer at hand.
+
+  - id: c2-owner-must-not-lose-the-thread-4
+    statement: |
+      Audgent's workflow versioning does not record every workflow change because repeated saves mutate one draft in place and WorkflowDefinitionModel stores neither author nor rationale.
+    provenance:
+      - EV-029
+      - api/db/models.py:401-451
+      - api/db/workflow_client.py:71-123
+      - api/routes/workflow.py:297-302
+    stake: false
+    note: |
+      Published snapshots and run-to-definition pinning preserve released behavior, but they are not a complete activity history. While a draft exists, each save overwrites its JSON, configurations, and template variables; intermediate agent and owner edits vanish. The version response exposes number, status, and timestamps, not who made or justified the change.
+
+  - id: c2-owner-must-not-lose-the-thread-5
+    statement: |
+      Current run provenance cannot support a trustworthy production-versus-agent-test cost split because the category is mutable JSON rather than a dedicated run field and caller-supplied initial_context can overwrite it.
+    provenance:
+      - EV-013
+      - FLOWS-001-internal-reshaping.md
+      - api/routes/public_agent.py:230-250
+      - api/db/models.py:565-610
+      - api/routes/organization_usage.py:97-107
+    stake: false
+    note: |
+      Public-agent call creation initially writes trigger_mode and service-principal identifiers, then merges request.initial_context over those reserved keys. WorkflowRunModel has usage and cost JSON but no production or agent-test provenance column, and the usage filters expose no origin dimension. Six months later the owner cannot treat the displayed split as authoritative or reliably attribute test spend to the agent activity that caused it.
+
+  - id: c2-owner-must-not-lose-the-thread-6
+    statement: |
+      A completed run currently cannot show the exact outbound tool request or any provider request-and-response pair that caused a failure.
+    provenance:
+      - EV-026
+      - EV-028
+      - EV-029
+      - api/services/workflow/tools/custom_tool.py:317-359
+      - api/services/pipecat/realtime_feedback_observer.py:201-220
+      - api/services/pipecat/event_handlers.py:295-307
+      - api/engine_settings.py:351-377
+    stake: false
+    note: |
+      Persisted function-call events contain model arguments and the tool result, but the resolved URL, method, preset-expanded body or query, and headers exist only around the HTTP client call and debug logger. Provider exchanges have no per-run wire record. The DEBUG default accidentally emits tool bodies to logs with a seven-day default retention, which is neither a durable run-linked diagnostic trail nor something the owner can reconstruct six months later.
+
+  - id: c2-owner-must-not-lose-the-thread-7
+    statement: |
+      Degenerating to one organization does not make owner reads whole-system while those reads still filter on selected_organization_id, because any mis-scoped row disappears without an error.
+    provenance:
+      - EV-010
+      - EV-030
+      - DEC-001-degenerate-tenancy.md
+      - api/routes/workflow.py:502-571
+      - api/routes/workflow.py:1323-1369
+      - api/routes/reports.py:45-125
+      - api/routes/organization_usage.py:78-165
+      - api/db/workflow_client.py:331-405
+    stake: false
+    note: |
+      The normal workflow, run, report, and usage reads still pass the selected organization into queries. DEC-001 explicitly defines any owner-facing org filter as a bug and warns that vestigial scoping returns plausible but incomplete results. The owner's view therefore needs unscoped whole-system reads whose completeness does not depend on every historical and future row carrying the expected constant correctly.
+
+  - id: c2-owner-must-not-lose-the-thread-8
+    statement: |
+      At the inspected commit, the owner can directly edit providers and workflows, but his edits cannot be distinguished from agent edits in the required activity record because that record does not exist.
+    provenance:
+      - EV-024
+      - EV-027
+      - EV-029
+      - api/routes/organization.py:313-339
+      - api/routes/workflow.py:898-1127
+    stake: false
+    note: |
+      The existing user-authenticated PUT routes are a real direct intervention path and the owner explicitly ruled that this path survives even though he uses it rarely. The reshape must keep those controls reachable from current configuration and record the owner as the actor in the same chronology as worker agents, so correcting the system never depends on an agent relaying, approving, or executing his change.

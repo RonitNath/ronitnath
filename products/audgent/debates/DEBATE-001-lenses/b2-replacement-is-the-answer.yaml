@@ -1,0 +1,124 @@
+claims:
+  - id: b2-replacement-is-the-answer-1
+    statement: |
+      Audgent reaches the stated operability threshold with exactly six deltas—pin one organization, expose provider configuration and validation to service principals, compare test expectations with existing run outcomes, split costs from caller provenance, append configuration activity, and persist wire envelopes for active boundaries—without building another platform subsystem.
+    provenance:
+      - EV-010
+      - EV-011
+      - EV-013
+      - EV-017
+      - EV-025
+      - EV-026
+      - EV-027
+      - EV-030
+      - api/routes/workflow.py:423-476
+      - api/routes/public_agent.py:423-462
+      - api/routes/platform_admin.py:71-123
+      - api/db/models.py:565-610
+    stake: true
+    note: |
+      The inherited engine already supplies the surfaces that carry most of the reshaping: workflow authoring, draft execution, run evidence and costs, provider configuration, validation, and a cross-system workload list. EV-027 explicitly keeps those surfaces. The six named deltas are the missing owner-visible behaviors; anything larger is construction for the platform that is replacing Audgent, not work required to keep this engine usable.
+
+  - id: b2-replacement-is-the-answer-2
+    statement: |
+      Once every login and machine credential resolves to one fixed organization and all organization-creation paths are disabled, existing organization-scoped reads are whole-system reads and no tenancy column, migration, or broad query rewrite is required.
+    provenance:
+      - EV-017
+      - EV-029
+      - EV-030
+      - api/routes/auth.py:108-130
+      - api/routes/auth.py:341-352
+      - api/db/organization_client.py:44-85
+      - api/db/platform_admin_client.py:17-63
+    stake: false
+    note: |
+      EV-029 counts 41 organization columns, 202 Python files, and 98 migrations, while EV-030 rules that those columns stay. The current login paths still call get-or-create organization logic, whereas the platform-admin queries already list workflows and runs without an organization predicate. Pinning authentication to the shared row, refusing creation of another row, and hiding organization controls delivers the one-org result without spending replacement capacity on mechanical deletion.
+
+  - id: b2-replacement-is-the-answer-3
+    statement: |
+      The only missing part of the worker-agent workflow test loop is a machine-readable comparison of an expected result with existing run evidence, because service principals can already create workflows, start draft runs, and read logs, costs, and post-call outcomes.
+    provenance:
+      - EV-011
+      - EV-028
+      - api/services/auth/caller.py:32-140
+      - api/services/auth/scopes.py:15-35
+      - api/routes/workflow.py:423-476
+      - api/routes/public_agent.py:423-462
+      - api/routes/workflow.py:1252-1331
+      - api/services/post_call_analysis.py:18-80
+    stake: false
+    note: |
+      The workflow create route accepts require_caller(WORKFLOW_WRITE), the public draft route accepts CALL_ORIGINATE, and run readback accepts CALL_READ and returns logs, cost_info, annotations, and post_call_analysis. A test request can carry its expected outcome in run context and expose pass or fail by comparing it with the already-produced outcome. A second agent framework or a parallel test execution stack adds no missing verb.
+
+  - id: b2-replacement-is-the-answer-4
+    statement: |
+      A service-principal wrapper around the existing model-configuration save and UserConfigurationValidator path is sufficient for the owner's configure-provider and test-provider verbs.
+    provenance:
+      - EV-011
+      - EV-012
+      - EV-025
+      - api/services/auth/scopes.py:15-35
+      - api/routes/organization.py:279-341
+      - api/routes/user.py:248-279
+      - api/services/configuration/check_validity.py:28-100
+    stake: false
+    note: |
+      The current save path already merges secrets, compiles the effective STT/LLM/TTS selection, invokes the provider validator, and persists only after validation; the separate validation route reuses the same validator and records last validation time. Its blocker for worker agents is the user-session dependency, not absent provider logic. Reusing that service behind CONFIG_WRITE and returning its existing status closes both verbs with one narrow authentication adaptation.
+
+  - id: b2-replacement-is-the-answer-5
+    statement: |
+      Production-versus-agent-test cost separation requires no new run-provenance column because public runs already carry trigger_mode and service-principal identity in initial_context while every run already stores cost_info and usage_info.
+    provenance:
+      - EV-013
+      - EV-017
+      - api/routes/public_agent.py:230-250
+      - api/db/models.py:565-610
+      - api/routes/workflow.py:1285-1331
+      - api/routes/organization_usage.py:105-205
+    stake: false
+    note: |
+      Rinity's credential identifies production and a worker credential identifies agent testing, matching FLOWS-001's self-enforcing credential-derived branch. The minimal change is to prevent caller-supplied initial_context from overwriting reserved provenance keys and aggregate the existing charge fields by credential class, with old runs shown as unattributed. A new provenance schema, tagging service, or cost pipeline duplicates information already persisted on each run.
+
+  - id: b2-replacement-is-the-answer-6
+    statement: |
+      Provider activity history can be implemented as masked append-only events under a reserved organization_configurations key, so F-5 does not require a general audit subsystem or a migration.
+    provenance:
+      - EV-014
+      - EV-025
+      - EV-029
+      - api/db/models.py:248-267
+      - api/routes/organization.py:314-341
+    stake: false
+    note: |
+      EV-029 establishes that provider configuration is overwritten in place and has no history, while workflow definitions already retain versions. OrganizationConfigurationModel already provides a unique per-organization key with a JSON value. Appending timestamp, caller ID, and masked before/after provider selections at the one provider-save seam answers what the agents changed from now onward; it does not create history for unrelated inherited domains.
+
+  - id: b2-replacement-is-the-answer-7
+    statement: |
+      Audgent wire capture must stop at the provider and tool boundaries exercised by Rinity and agent tests, because instrumenting the inherited catalog of unused providers cannot make the sole current consumer operable.
+    provenance:
+      - EV-009
+      - EV-025
+      - EV-026
+      - EV-029
+      - EV-011/AC-04
+      - EV-011/AC-09
+      - api/services/workflow/tools/custom_tool.py:328-375
+      - api/services/pipecat/realtime_feedback_events.py:60-109
+      - api/services/pipecat/realtime_feedback_observer.py:181-220
+      - api/services/pipecat/realtime_feedback_observer.py:284-296
+    stake: false
+    note: |
+      Tool execution already computes method, URL, headers, body, status, and response data; function-call start/end events already enter the per-run log, but the start event omits the resolved HTTP request. Add the masked resolved request to that event and retain the existing response. For model providers, capture request/response envelopes only in the STT/LLM/TTS and realtime adapters selected for Rinity or invoked by a provider test; the dozens of other inherited adapters receive no Audgent work.
+
+  - id: b2-replacement-is-the-answer-8
+    statement: |
+      Phonetic repair and every engine change outside Bet 1's closed operability list consume zero Audgent capacity before the greenfield replacement ships.
+    provenance:
+      - EV-007
+      - EV-020
+      - EV-021
+      - EV-022
+      - EV-023
+    stake: false
+    note: |
+      EV-007 names the greenfield voice product as the durable answer, EV-021 makes the discussed list the only scope control, and EV-022 explicitly removes phonetics from Bet 1. EV-020 supplies no deadline or budget that could halt an expanding Audgent bet, and EV-023 supplies only a retirement condition, not additional Audgent requirements. Therefore incidental provider parity, campaigns, deployment-contract work, UI replacement, and the phonetics follow-on do not enter this codebase while replacement capacity is the constrained resource.

@@ -1,0 +1,126 @@
+claims:
+  - id: a2-least-data-kept-1
+    statement: |
+      If audgent carries Rinity calls without new deletion machinery, every completed call with non-empty media will retain workflow-run contexts, event logs and annotations, a structured post-call analysis, three WAV objects, and a transcript object for an unbounded period.
+    provenance:
+      - EV-026
+      - api/db/models.py:565
+      - api/db/models.py:592
+      - api/db/models.py:604
+      - api/db/models.py:647
+      - api/services/pipecat/event_handlers.py:292
+      - api/services/pipecat/event_handlers.py:320
+      - api/services/workflow_run_artifacts.py:45
+      - api/tasks/workflow_completion.py:24
+    stake: true
+    note: |
+      WorkflowRunModel gives the contexts, logs, annotations, artifact locations, and public token a creation time but no expiry or deletion time. Completion persists the event buffer, converts mixed, user, and bot buffers to WAV, uploads all non-empty tracks plus a transcript, and invokes structured analysis for every completed run. The analysis row stores summary, caller intents, handling, policy-compliance, and reporting dimensions. FLOWS-001/F-2 and F-10 explicitly leave call, transcript, recording, and boundary-record retention unresolved; the inspected source contains no run/artifact expiry or purge path.
+
+  - id: a2-least-data-kept-2
+    statement: |
+      A process using audgent's code defaults writes complete tool arguments and HTTP request bodies or query parameters to stdout at DEBUG, and the application's seven-day retention bound does not apply to that stdout stream.
+    provenance:
+      - EV-029
+      - api/engine_settings.py:370
+      - api/engine_settings.py:377
+      - api/logging_config.py:88
+      - api/logging_config.py:103
+      - api/services/workflow/tools/custom_tool.py:327
+      - api/services/workflow/tools/custom_tool.py:334
+      - api/services/workflow/pipecat_engine_custom_tools.py:416
+      - deploy/isoastra/docker-compose.staging.yaml:3
+    stake: false
+    note: |
+      The settings default is DEBUG. HTTP-tool arguments are logged at INFO and the resolved body or query parameters are logged at DEBUG, creating a second copy outside the per-run record. Loguru applies LOG_RETENTION only when LOG_FILE_PATH selects its file sink; otherwise it writes to stdout without an application-enforced deletion clock. The staging overlay routes container output to journald, so its lifetime is not bounded by the seven-day application setting. Payload-bearing log calls must be removed rather than assigned a longer clock.
+
+  - id: a2-least-data-kept-3
+    statement: |
+      The proposed boundary record is presently an unbounded raw-payload store because F-10 and F-11 require all provider and tool requests and responses while retention, redaction, and always-on versus armed capture remain explicitly undecided.
+    provenance:
+      - EV-026
+      - EV-028
+      - EV-029
+      - FLOWS-001-internal-reshaping.md
+      - api/services/pipecat/realtime_feedback_events.py:62
+      - api/services/pipecat/realtime_feedback_events.py:87
+      - api/services/pipecat/event_handlers.py:292
+    stake: false
+    note: |
+      The flow names secrets and PHI inside payloads and marks retention and redaction as the largest open data commitment. Existing durable feedback events already retain model-supplied function arguments and stringified tool results in workflow_runs.logs, while EV-029 establishes that provider exchanges are not yet captured per run. Adding request URLs, headers, bodies, and provider responses before defining field-level exclusion, truncation bounds, an activation rule, and enforced expiry would multiply retained payload classes without a deletion contract.
+
+  - id: a2-least-data-kept-4
+    statement: |
+      Reading an artifact-bearing run mints a public UUID token with no expiry column or revocation check, so a token obtained through a later-revoked CALL_READ credential continues to expose that run's recordings and transcript.
+    provenance:
+      - DEC-001-degenerate-tenancy.md
+      - api/routes/workflow.py:1250
+      - api/routes/workflow.py:1264
+      - api/routes/workflow.py:1274
+      - api/db/models.py:615
+      - api/db/workflow_run_client.py:372
+      - api/db/workflow_run_client.py:406
+      - api/routes/public_download.py:50
+      - api/routes/public_download.py:98
+    stake: false
+    note: |
+      GET on a run creates and persists a token whenever an artifact exists, then returns unauthenticated public URLs containing it. The public route validates only equality with workflow_runs.public_access_token and issues a one-hour object-store URL; the bearer token itself has neither expires_at nor a revocation state and is reused forever. Under the one-organization decision, product credentials resolve into the same organization, so token lifetime cannot be delegated to credential lifetime.
+
+  - id: a2-least-data-kept-5
+    statement: |
+      For a normal recorded call, audgent persists the conversation as mixed audio, user audio, bot audio, a transcript file, and transcript text inside workflow-run events even though F-2 names only one recording and one transcript.
+    provenance:
+      - FLOWS-001-internal-reshaping.md
+      - api/services/pipecat/in_memory_buffers.py:78
+      - api/services/pipecat/event_handlers.py:292
+      - api/services/pipecat/event_handlers.py:320
+      - api/services/workflow_run_artifacts.py:55
+      - api/services/workflow_run_artifacts.py:72
+      - api/services/workflow_run_artifacts.py:89
+      - api/services/workflow_run_artifacts.py:110
+      - api/services/pipecat/realtime_feedback_events.py:10
+    stake: false
+    note: |
+      InMemoryRecordingBuffers always maintains mixed, user, and bot tracks, and completion uploads every non-empty track. The same logs buffer retains final user and assistant text and then generates a separate transcript object from those events. This is duplication by construction: three audio representations and two text representations, all linked to the durable run and none assigned a deletion time.
+
+  - id: a2-least-data-kept-6
+    statement: |
+      Succeeded and dead-letter webhook rows retain rendered request payloads and response-derived error text indefinitely because terminal transitions clear only scheduling state and the schema contains no expiry or deletion timestamp.
+    provenance:
+      - EV-011/AC-13
+      - api/db/models.py:1046
+      - api/db/models.py:1087
+      - api/tasks/run_integrations.py:334
+      - api/tasks/run_integrations.py:487
+      - api/tasks/webhook_delivery.py:159
+      - api/db/webhook_delivery_client.py:155
+      - api/db/webhook_delivery_client.py:196
+    stake: false
+    note: |
+      The delivery row freezes endpoint, payload, custom headers, credential reference, status, and up to 2,000 characters of the last error. Templates may copy initial_context, gathered_context, annotations, extra data, and artifact URLs into that payload. Success and dead-letter methods set scheduled_for to null but do not erase payloads or establish a purge date, leaving another durable copy after network delivery has terminated.
+
+  - id: a2-least-data-kept-7
+    statement: |
+      F-5's required before-and-after history can be represented by actor, object identifier, timestamp, changed field, and redacted old and new non-secret values, so retaining credential values or complete configuration snapshots would exceed the stated flow.
+    provenance:
+      - EV-014
+      - EV-025
+      - EV-029
+      - FLOWS-001-internal-reshaping.md
+      - api/db/models.py:248
+      - api/db/models.py:974
+    stake: false
+    note: |
+      EV-029 establishes that provider/model configuration and credentials are currently overwritten in place and that no general change-history model exists. EV-025 narrows the principal configuration decision to provider selection, while F-5 asks which agent changed what and from what to what. The new history schema therefore must exclude secret-bearing configuration blobs, record redaction as part of the event shape, and receive its own enforced expiry instead of inheriting permanent row lifetime.
+
+  - id: a2-least-data-kept-8
+    statement: |
+      Production-versus-agent-test cost separation requires only a bounded ledger of run identifier, time, origin, provider usage units, and cost, and supplies no basis for keeping audio, transcripts, contexts, tool payloads, or boundary bodies on the ledger's clock.
+    provenance:
+      - EV-013
+      - FLOWS-001-internal-reshaping.md
+      - api/db/models.py:604
+      - api/db/models.py:605
+      - api/services/pipecat/event_handlers.py:284
+    stake: false
+    note: |
+      EV-013 asks for attribution and separate rollups, and F-3 drills from those rollups by run identity. WorkflowRunModel already separates usage_info and cost_info from initial_context, gathered_context, logs, annotations, and artifacts. Retention must follow those classes separately: aggregate numeric spend may remain on a defined accounting clock while call content and wire content expire on their own shorter, explicitly enforced clocks.

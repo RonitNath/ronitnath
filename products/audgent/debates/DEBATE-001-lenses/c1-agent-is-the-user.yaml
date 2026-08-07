@@ -1,0 +1,107 @@
+claims:
+  - id: c1-agent-is-the-user-1
+    statement: |
+      At revision 312ece2, audgent exposes machine-authenticated workflow creation but does not expose service-principal-accessible end-to-end contracts for all five mandated verbs: create workflow, test workflow, configure provider, test provider, and diagnose failure.
+    provenance:
+      - EV-006
+      - EV-011
+      - EV-028
+      - api/routes/workflow.py:416-475
+      - api/mcp_server/server.py:20-36
+      - api/routes/organization.py:303-340
+    stake: false
+    note: |
+      The REST workflow-create route accepts a Caller with WORKFLOW_WRITE and returns a durable workflow id, so creation has a real machine seam. The registered MCP tools contain workflow authoring and catalogs but no workflow-test, provider-configuration, provider-test, run-read, or diagnostic tool; the provider routes separately require operator UserModel authentication. A service principal therefore cannot close the owner-mandated five-verb loop through one queryable contract surface.
+
+  - id: c1-agent-is-the-user-2
+    statement: |
+      The current workflow-test API cannot distinguish "executed" from "behaved correctly" by contract because it accepts no expected-behavior assertions and returns no verdict evaluated against expectations.
+    provenance:
+      - EV-011
+      - FLOWS-001-internal-reshaping.md:F-7
+      - api/routes/public_agent.py:448-460
+      - api/routes/workflow.py:1250-1310
+      - harness/run_t9.py:507-618
+    stake: true
+    note: |
+      The test route selects the latest draft and initiates a call; run readback supplies completion, transcript/artifacts, costs, logs, annotations, and post-call analysis, but no expected observations or pass/fail evaluation against them. The T9 harness proves the missing distinction is implementable: it asserts transcript content, two-way audio, latency, and webhook properties before writing status "passed". Those assertions are fixed inside a standalone scenario harness rather than exposed as a workflow-generic agent test request and verdict.
+
+  - id: c1-agent-is-the-user-3
+    statement: |
+      The MCP authoring path cannot serve an autonomous worker-agent contract unchanged because it accepts only operator session tokens and instructs the caller to wait for user approval before creating a workflow.
+    provenance:
+      - EV-006
+      - EV-011
+      - api/mcp_server/auth.py:9-45
+      - api/mcp_server/instructions.py:27-33
+      - api/mcp_server/instructions.py:39-42
+    stake: false
+    note: |
+      authenticate_mcp_request explicitly resolves the console's session token and says machine callers are not supported on this surface. The server instructions require a plan to be presented to the user and confirmation awaited, and they direct the user to create credential secrets outside the MCP flow. That is not an autonomous create-test-iterate loop even though the separate REST create route can authenticate a service principal.
+
+  - id: c1-agent-is-the-user-4
+    statement: |
+      A worker service principal cannot configure the model or telephony providers through the current provider endpoints because those endpoints require operator-session get_user dependencies rather than scoped machine-caller authentication.
+    provenance:
+      - EV-012
+      - EV-025
+      - api/routes/organization.py:303-340
+      - api/routes/organization.py:527-642
+      - api/services/auth/depends.py:73-87
+    stake: false
+    note: |
+      Both the organization model-configuration PUT and telephony configuration create/update routes resolve a UserModel from the deployment's operator session JWT. Unlike workflow creation and run readback, they do not use require_caller or service-principal scopes. Thus the configuration verb that the owner assigned to agents has no proper machine identity contract.
+
+  - id: c1-agent-is-the-user-5
+    statement: |
+      The model-provider validation contract can report success without exercising the configured provider because validators for ElevenLabs, Google, Azure, Cartesia, Sarvam, OpenRouter, and multiple other providers unconditionally return True.
+    provenance:
+      - EV-011
+      - EV-025
+      - FLOWS-001-internal-reshaping.md:F-8
+      - api/routes/organization.py:313-339
+      - api/services/configuration/check_validity.py:34-100
+      - api/services/configuration/check_validity.py:312-334
+      - api/services/configuration/check_validity.py:362-445
+    stake: false
+    note: |
+      Saving model configuration invokes UserConfigurationValidator, but many registered provider checks are no-ops after basic field presence. An invalid non-empty key can therefore become last-validated configuration without the smallest real STT, LLM, TTS, or realtime operation succeeding. This violates F-8's required working/not-working verdict and conflates "configured" with "known to work."
+
+  - id: c1-agent-is-the-user-6
+    statement: |
+      An agent reading a failed run cannot query the required wire record because live tool execution persists model arguments and a stringified result but not the resolved request URL, method, headers, and body, while provider STT, LLM, and TTS exchanges are not captured per run.
+    provenance:
+      - EV-026
+      - EV-028
+      - EV-029
+      - api/services/workflow/tools/custom_tool.py:261-361
+      - api/services/pipecat/realtime_feedback_events.py:72-107
+      - api/routes/workflow.py:1277-1310
+    stake: false
+    note: |
+      The live HTTP-tool path constructs the resolved request and writes its URL and body to process logs, but include_request_headers is optional and the realtime event contract records only function arguments plus str(result). EV-029 confirms provider exchanges have only optional OTEL export, not a per-run boundary record. Run readback is machine-accessible, but the evidence needed to answer "what exactly was sent, what came back, and in what order" is absent from what it can query.
+
+  - id: c1-agent-is-the-user-7
+    statement: |
+      Current run provenance cannot enforce production-versus-agent-test cost separation because WorkflowRunModel has no such origin field and caller-supplied initial_context can overwrite the public test route's trigger_mode label.
+    provenance:
+      - EV-013
+      - api/db/models.py:570-610
+      - api/routes/public_agent.py:229-250
+      - api/db/organization_usage_client.py:168-223
+    stake: false
+    note: |
+      The durable run dimensions include mode and inbound/outbound call_type, but no production, agent-test, or unattributed origin. Public origination writes trigger_mode into an untyped context dictionary and then merges caller input over it, so the label is neither immutable nor self-enforcing; other run paths need not set it at all. Usage readback emits that context and charge data but does not provide a trustworthy cost partition for an agent's test verdict.
+
+  - id: c1-agent-is-the-user-8
+    statement: |
+      Historical diagnosis cannot establish the exact organization-level provider configuration used by a run because that configuration is mutated in place without revisions and the run stores resolved provider and model names rather than a configuration-version identifier.
+    provenance:
+      - EV-025
+      - EV-028
+      - EV-029
+      - api/services/pipecat/run_pipeline.py:656-684
+      - api/db/models.py:604-609
+    stake: false
+    note: |
+      EV-029 finds no update attribution or history for organization provider/model configuration, so a later change destroys the previous value. The pipeline stamps provider/model names into initial_context, which identifies selection but not the exact endpoint, options, credential reference, or revision that generated a failed request. A diagnostic agent can therefore inspect a historical run yet still be forced to reason from today's mutable configuration rather than query the configuration that actually executed.

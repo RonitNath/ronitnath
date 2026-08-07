@@ -1,0 +1,1478 @@
+debate: DEBATE-001
+product: audgent
+bet: 1 — internal reshaping
+date: '2026-08-06'
+trigger: 'T3 (stored-data commitments: configuration change log + wire capture; caller/auth model change).
+  T2 unevaluable — bound waived (EV-020).'
+panel: 4 axes / 8 lenses, derived per bet — see DEBATE-001-lenses/PANEL.md
+judge:
+  identity: claude portfolio session (authored BRIEF-001, FLOWS-001, PITCH-001)
+  compromised: true
+  lens_runtime: pi CLI, openai-codex/gpt-5.6-sol, thinking=high, 8 detached processes on nexus
+  context_asymmetry: no lens received PITCH-001 or BRIEF-001; all received evidence/, DEC-001, FLOWS-001,
+    rinity EV-011, and the audgent repo
+  judge_verified_independently:
+  - A1-2 CONFIRMED at api/services/workflow/tools/custom_tool.py:353 — status is hardcoded "success" regardless
+    of status_code
+  - C1-5 CONFIRMED at api/services/configuration/check_validity.py:313-334 — ElevenLabs, Google, Azure
+    x3, Cartesia, Sarvam, OpenRouter validators return True unconditionally; Groq and Inworld do real
+    checks
+  - B1-4 CONFIRMED — no caller passes cost_info into workflow_run_client.update (line 306); format_public_cost_info
+    documents itself as "without doing local cost accounting"
+validity: 63 claims, 0 inference-only claims, 8/8 lenses staked a claim. Round is valid under heuristics
+  rule 2.
+claims:
+- id: A1-1
+  author: a1-wire-or-nothing
+  statement: 'Audgent as built cannot reconstruct from stored run evidence why a completed call claimed
+    an appointment was booked when no appointment exists.
+
+    '
+  provenance:
+  - EV-026
+  - EV-029
+  - api/services/workflow/tools/custom_tool.py:317
+  - api/services/pipecat/tracing_config.py:146
+  - api/services/pipecat/event_handlers.py:300
+  stake: true
+  note: 'The owner requires the actual provider and tool request/response sequence, not an inference from
+    speech.  The tool path persists the model''s arguments and a transformed result but omits the resolved
+    request, while provider exchanges exist only as optional exported spans and call events are saved
+    only at finalization.  Those records cannot distinguish a rejected booking payload, a request sent
+    to the wrong endpoint, a provider-side failure, and no request leaving audgent.
+
+    '
+- id: A1-2
+  author: a1-wire-or-nothing
+  statement: 'The HTTP-tool executor classifies every received HTTP response, including a 4xx or 5xx rejection,
+    as a successful tool result returned to the voice agent.
+
+    '
+  provenance:
+  - EV-026
+  - api/services/workflow/tools/custom_tool.py:338
+  - api/services/workflow/tools/custom_tool.py:352
+  - api/services/workflow/tools/custom_tool.py:354
+  - api/services/workflow/pipecat_engine_custom_tools.py:460
+  stake: false
+  note: '`execute_http_tool` does not raise on an error status: after any response it constructs `{"status":
+    "success", "status_code": response.status_code, "data": ...}` and passes that object through the LLM
+    result callback.  A booking endpoint''s schema rejection can therefore coexist with a success-labelled
+    tool result and a spoken booking confirmation, making the exact response indispensable evidence.
+
+    '
+- id: A1-3
+  author: a1-wire-or-nothing
+  statement: 'A persisted function-call event cannot prove the booking request that crossed the wire because
+    it records model arguments and a stringified result rather than the resolved method, URL, headers,
+    query or body, and raw response.
+
+    '
+  provenance:
+  - EV-026
+  - EV-029
+  - api/services/pipecat/realtime_feedback_events.py:72
+  - api/services/pipecat/realtime_feedback_events.py:87
+  - api/services/pipecat/realtime_feedback_events.py:91
+  - api/services/workflow/tools/custom_tool.py:317
+  - api/services/workflow/tools/custom_tool.py:323
+  - api/services/workflow/tools/custom_tool.py:338
+  - api/services/workflow/tools/custom_tool.py:348
+  stake: false
+  note: 'Preset and template parameters are merged only at execution, after the function-call-start event''s
+    model arguments have been formed.  The final request is emitted through `httpx`, but only a DEBUG
+    logger sees its body and parameters; the persisted end event converts the parsed result to Python
+    `str()`.  Thus the stored run lacks both the exact outbound envelope and a verbatim inbound envelope.
+
+    '
+- id: A1-4
+  author: a1-wire-or-nothing
+  statement: 'Any call whose pipeline process exits before `on_pipeline_finished` can lose all accumulated
+    transcript, tool, and error events even though those events already happened.
+
+    '
+  provenance:
+  - FLOWS-001-internal-reshaping.md
+  - api/services/pipecat/in_memory_buffers.py:102
+  - api/services/pipecat/in_memory_buffers.py:107
+  - api/services/pipecat/in_memory_buffers.py:152
+  - api/services/pipecat/event_handlers.py:176
+  - api/services/pipecat/event_handlers.py:300
+  - api/services/pipecat/event_handlers.py:313
+  stake: false
+  note: '`InMemoryLogsBuffer` explicitly retains the call record in process memory and the database write
+    occurs only in the pipeline-finished handler.  Even on that path, a failed log write is caught and
+    reduced to another logger message after the run has already been marked completed at `api/services/pipecat/event_handlers.py:288`.  Durable
+    evidence must be written as the call progresses, because the crash or persistence failure is itself
+    one of the failures that must remain reconstructable.
+
+    '
+- id: A1-5
+  author: a1-wire-or-nothing
+  statement: 'A run pins a workflow definition but does not pin every mutable provider, tool, and credential
+    value resolved at execution, so a later configuration edit can erase proof of the configuration that
+    produced the call.
+
+    '
+  provenance:
+  - EV-025
+  - EV-029
+  - api/db/models.py:248
+  - api/db/models.py:256
+  - api/db/models.py:565
+  - api/db/models.py:571
+  - api/db/models.py:1143
+  - api/db/models.py:1200
+  - api/services/configuration/ai_model_configuration.py:84
+  - api/services/configuration/ai_model_configuration.py:98
+  - api/services/workflow/pipecat_engine_custom_tools.py:249
+  - api/services/workflow/tools/custom_tool.py:277
+  stake: false
+  note: 'Workflow versioning is real, but a workflow without a full model override resolves the current
+    organization configuration at startup, and tool UUIDs resolve current `ToolModel` rows and current
+    credential rows when invoked.  Those rows mutate in place.  Reconstruction therefore requires the
+    run ledger to bind each exchange to the exact effective provider settings, tool definition, endpoint,
+    and credential identity/version used at that moment rather than linking to today''s configuration.
+
+    '
+- id: A1-6
+  author: a1-wire-or-nothing
+  statement: 'A capture containing only completed request/response pairs cannot establish that no request
+    was sent; the diagnostic record must durably record send intent before egress, response after ingress,
+    monotonic sequence, correlation identifiers, and a terminal completeness marker.
+
+    '
+  provenance:
+  - EV-026
+  - EV-028
+  - FLOWS-001-internal-reshaping.md
+  - api/services/pipecat/realtime_feedback_events.py:97
+  - api/services/pipecat/in_memory_buffers.py:161
+  stake: false
+  note: 'F-10 explicitly treats “no request was sent” as a different upstream cause, while F-11 requires
+    an agent to query the same evidence.  Absence from an ordinary list is ambiguous between no egress,
+    recorder failure, process death, and an unfinished write.  A before/after append protocol with an
+    explicit closed ledger makes those cases mechanically distinguishable and preserves exact ordering
+    across concurrent turns and tool calls.
+
+    '
+  rebuts:
+  - A2-3
+  resolution: resolved
+  note_judge: 'SPLIT. Envelope metadata (method, URL, status, timing, sequence, correlation id, send-intent
+    before egress, terminal completeness marker) is always-on and small; bodies are the part that carries
+    cost and PHI and are governed by the retention/redaction policy OQ-8 must set. A1-6 wins on structure,
+    A2 wins on bodies.
+
+    '
+- id: A1-7
+  author: a1-wire-or-nothing
+  statement: 'OTEL or Langfuse traces cannot serve as audgent''s authoritative diagnostic record because
+    provider spans are silently dropped whenever no matching exporter is configured.
+
+    '
+  provenance:
+  - EV-029
+  - api/services/pipecat/tracing_config.py:146
+  - api/services/pipecat/tracing_config.py:156
+  - api/services/pipecat/tracing_config.py:167
+  - api/services/pipecat/tracing_config.py:305
+  - api/engine_settings.py:351
+  stake: false
+  note: 'The tracing setup deliberately permits a `None` default exporter and documents silent dropping,
+    while `get_trace_url` returns nothing when Langfuse is disabled.  Optional exported telemetry therefore
+    cannot satisfy happened-once reconstruction.  Exact provider STT, LLM, realtime, and TTS exchanges
+    must land in the run''s own durable, queryable evidence record whether or not an external trace backend
+    is active.
+
+    '
+- id: A1-8
+  author: a1-wire-or-nothing
+  statement: 'Final-webhook retries are not reconstructable attempt by attempt because each attempt overwrites
+    one `last_status_code` and one truncated `last_error`, and a later success clears the prior error.
+
+    '
+  provenance:
+  - EV-026
+  - api/db/models.py:1046
+  - api/db/models.py:1090
+  - api/db/models.py:1111
+  - api/db/models.py:1116
+  - api/db/webhook_delivery_client.py:150
+  - api/db/webhook_delivery_client.py:168
+  - api/db/webhook_delivery_client.py:185
+  - api/tasks/webhook_delivery.py:165
+  - api/tasks/webhook_delivery.py:183
+  stake: false
+  note: 'The delivery row usefully freezes the outbound payload, but it stores only the latest aggregate
+    state rather than an immutable exchange per attempt.  The task keeps only the first 200 response characters
+    in its error, the client truncates the resulting error, and `mark_webhook_delivery_succeeded` sets
+    `last_error` to null.  A transient rejection followed by acceptance therefore leaves no stored sequence
+    explaining what the receiver said on each try.
+
+    '
+- id: A2-1
+  author: a2-least-data-kept
+  statement: 'If audgent carries Rinity calls without new deletion machinery, every completed call with
+    non-empty media will retain workflow-run contexts, event logs and annotations, a structured post-call
+    analysis, three WAV objects, and a transcript object for an unbounded period.
+
+    '
+  provenance:
+  - EV-026
+  - api/db/models.py:565
+  - api/db/models.py:592
+  - api/db/models.py:604
+  - api/db/models.py:647
+  - api/services/pipecat/event_handlers.py:292
+  - api/services/pipecat/event_handlers.py:320
+  - api/services/workflow_run_artifacts.py:45
+  - api/tasks/workflow_completion.py:24
+  stake: true
+  note: 'WorkflowRunModel gives the contexts, logs, annotations, artifact locations, and public token
+    a creation time but no expiry or deletion time. Completion persists the event buffer, converts mixed,
+    user, and bot buffers to WAV, uploads all non-empty tracks plus a transcript, and invokes structured
+    analysis for every completed run. The analysis row stores summary, caller intents, handling, policy-compliance,
+    and reporting dimensions. FLOWS-001/F-2 and F-10 explicitly leave call, transcript, recording, and
+    boundary-record retention unresolved; the inspected source contains no run/artifact expiry or purge
+    path.
+
+    '
+- id: A2-2
+  author: a2-least-data-kept
+  statement: 'A process using audgent''s code defaults writes complete tool arguments and HTTP request
+    bodies or query parameters to stdout at DEBUG, and the application''s seven-day retention bound does
+    not apply to that stdout stream.
+
+    '
+  provenance:
+  - EV-029
+  - api/engine_settings.py:370
+  - api/engine_settings.py:377
+  - api/logging_config.py:88
+  - api/logging_config.py:103
+  - api/services/workflow/tools/custom_tool.py:327
+  - api/services/workflow/tools/custom_tool.py:334
+  - api/services/workflow/pipecat_engine_custom_tools.py:416
+  - deploy/isoastra/docker-compose.staging.yaml:3
+  stake: false
+  note: 'The settings default is DEBUG. HTTP-tool arguments are logged at INFO and the resolved body or
+    query parameters are logged at DEBUG, creating a second copy outside the per-run record. Loguru applies
+    LOG_RETENTION only when LOG_FILE_PATH selects its file sink; otherwise it writes to stdout without
+    an application-enforced deletion clock. The staging overlay routes container output to journald, so
+    its lifetime is not bounded by the seven-day application setting. Payload-bearing log calls must be
+    removed rather than assigned a longer clock.
+
+    '
+- id: A2-3
+  author: a2-least-data-kept
+  statement: 'The proposed boundary record is presently an unbounded raw-payload store because F-10 and
+    F-11 require all provider and tool requests and responses while retention, redaction, and always-on
+    versus armed capture remain explicitly undecided.
+
+    '
+  provenance:
+  - EV-026
+  - EV-028
+  - EV-029
+  - FLOWS-001-internal-reshaping.md
+  - api/services/pipecat/realtime_feedback_events.py:62
+  - api/services/pipecat/realtime_feedback_events.py:87
+  - api/services/pipecat/event_handlers.py:292
+  stake: false
+  note: 'The flow names secrets and PHI inside payloads and marks retention and redaction as the largest
+    open data commitment. Existing durable feedback events already retain model-supplied function arguments
+    and stringified tool results in workflow_runs.logs, while EV-029 establishes that provider exchanges
+    are not yet captured per run. Adding request URLs, headers, bodies, and provider responses before
+    defining field-level exclusion, truncation bounds, an activation rule, and enforced expiry would multiply
+    retained payload classes without a deletion contract.
+
+    '
+  rebuts:
+  - A1-6
+  resolution: resolved
+  note_judge: 'See A1-6. A2 additionally wins B2-7 unopposed: capture is limited to boundaries rinity
+    and agent tests actually exercise, not the inherited provider catalog.
+
+    '
+- id: A2-4
+  author: a2-least-data-kept
+  statement: 'Reading an artifact-bearing run mints a public UUID token with no expiry column or revocation
+    check, so a token obtained through a later-revoked CALL_READ credential continues to expose that run''s
+    recordings and transcript.
+
+    '
+  provenance:
+  - DEC-001-degenerate-tenancy.md
+  - api/routes/workflow.py:1250
+  - api/routes/workflow.py:1264
+  - api/routes/workflow.py:1274
+  - api/db/models.py:615
+  - api/db/workflow_run_client.py:372
+  - api/db/workflow_run_client.py:406
+  - api/routes/public_download.py:50
+  - api/routes/public_download.py:98
+  stake: false
+  note: 'GET on a run creates and persists a token whenever an artifact exists, then returns unauthenticated
+    public URLs containing it. The public route validates only equality with workflow_runs.public_access_token
+    and issues a one-hour object-store URL; the bearer token itself has neither expires_at nor a revocation
+    state and is reused forever. Under the one-organization decision, product credentials resolve into
+    the same organization, so token lifetime cannot be delegated to credential lifetime.
+
+    '
+- id: A2-5
+  author: a2-least-data-kept
+  statement: 'For a normal recorded call, audgent persists the conversation as mixed audio, user audio,
+    bot audio, a transcript file, and transcript text inside workflow-run events even though F-2 names
+    only one recording and one transcript.
+
+    '
+  provenance:
+  - FLOWS-001-internal-reshaping.md
+  - api/services/pipecat/in_memory_buffers.py:78
+  - api/services/pipecat/event_handlers.py:292
+  - api/services/pipecat/event_handlers.py:320
+  - api/services/workflow_run_artifacts.py:55
+  - api/services/workflow_run_artifacts.py:72
+  - api/services/workflow_run_artifacts.py:89
+  - api/services/workflow_run_artifacts.py:110
+  - api/services/pipecat/realtime_feedback_events.py:10
+  stake: false
+  note: 'InMemoryRecordingBuffers always maintains mixed, user, and bot tracks, and completion uploads
+    every non-empty track. The same logs buffer retains final user and assistant text and then generates
+    a separate transcript object from those events. This is duplication by construction: three audio representations
+    and two text representations, all linked to the durable run and none assigned a deletion time.
+
+    '
+- id: A2-6
+  author: a2-least-data-kept
+  statement: 'Succeeded and dead-letter webhook rows retain rendered request payloads and response-derived
+    error text indefinitely because terminal transitions clear only scheduling state and the schema contains
+    no expiry or deletion timestamp.
+
+    '
+  provenance:
+  - EV-011/AC-13
+  - api/db/models.py:1046
+  - api/db/models.py:1087
+  - api/tasks/run_integrations.py:334
+  - api/tasks/run_integrations.py:487
+  - api/tasks/webhook_delivery.py:159
+  - api/db/webhook_delivery_client.py:155
+  - api/db/webhook_delivery_client.py:196
+  stake: false
+  note: 'The delivery row freezes endpoint, payload, custom headers, credential reference, status, and
+    up to 2,000 characters of the last error. Templates may copy initial_context, gathered_context, annotations,
+    extra data, and artifact URLs into that payload. Success and dead-letter methods set scheduled_for
+    to null but do not erase payloads or establish a purge date, leaving another durable copy after network
+    delivery has terminated.
+
+    '
+- id: A2-7
+  author: a2-least-data-kept
+  statement: 'F-5''s required before-and-after history can be represented by actor, object identifier,
+    timestamp, changed field, and redacted old and new non-secret values, so retaining credential values
+    or complete configuration snapshots would exceed the stated flow.
+
+    '
+  provenance:
+  - EV-014
+  - EV-025
+  - EV-029
+  - FLOWS-001-internal-reshaping.md
+  - api/db/models.py:248
+  - api/db/models.py:974
+  stake: false
+  note: 'EV-029 establishes that provider/model configuration and credentials are currently overwritten
+    in place and that no general change-history model exists. EV-025 narrows the principal configuration
+    decision to provider selection, while F-5 asks which agent changed what and from what to what. The
+    new history schema therefore must exclude secret-bearing configuration blobs, record redaction as
+    part of the event shape, and receive its own enforced expiry instead of inheriting permanent row lifetime.
+
+    '
+- id: A2-8
+  author: a2-least-data-kept
+  statement: 'Production-versus-agent-test cost separation requires only a bounded ledger of run identifier,
+    time, origin, provider usage units, and cost, and supplies no basis for keeping audio, transcripts,
+    contexts, tool payloads, or boundary bodies on the ledger''s clock.
+
+    '
+  provenance:
+  - EV-013
+  - FLOWS-001-internal-reshaping.md
+  - api/db/models.py:604
+  - api/db/models.py:605
+  - api/services/pipecat/event_handlers.py:284
+  stake: false
+  note: 'EV-013 asks for attribution and separate rollups, and F-3 drills from those rollups by run identity.
+    WorkflowRunModel already separates usage_info and cost_info from initial_context, gathered_context,
+    logs, annotations, and artifacts. Retention must follow those classes separately: aggregate numeric
+    spend may remain on a defined accounting clock while call content and wire content expire on their
+    own shorter, explicitly enforced clocks.
+
+    '
+- id: B1-1
+  author: b1-build-to-own
+  statement: 'The current application can create more than one organization and therefore violates the
+    one-organization invariant.
+
+    '
+  provenance:
+  - EV-017
+  - EV-030
+  - api/db/organization_client.py:44-98
+  - api/routes/auth.py:113-125
+  stake: false
+  note: 'The generic organization client inserts a row for every previously unseen provider id, and local
+    signup derives a distinct provider id from each user before calling it. A permanent one-org implementation
+    should have one idempotent bootstrap path, one fixed system organization id, authentication that only
+    attaches identities to that row, removal of runtime organization creation, and startup/tests that
+    fail if zero or multiple rows exist. Merely hiding the selector leaves a live path for creating state
+    that whole-system reads can later omit.
+
+    '
+- id: B1-2
+  author: b1-build-to-own
+  statement: 'The existing owner-facing reports and usage endpoints are tenant-scoped and therefore do
+    not satisfy the whole-system read contract.
+
+    '
+  provenance:
+  - EV-010
+  - EV-014
+  - EV-030
+  - api/routes/reports.py:48-69
+  - api/routes/organization_usage.py:73-88
+  - api/db/platform_admin_client.py:15-64
+  stake: false
+  note: 'Reports and usage derive a selected organization from the operator and pass it into filtered
+    queries, while the unscoped platform-admin client proves that deployment-wide reads already have a
+    viable home. The maintained design should make unscoped owner reads the canonical query layer for
+    live calls, runs, costs, configuration, activity, and wire records; adding separate screen-specific
+    tenant queries would preserve the exact plausible-but-incomplete failure mode DEC-001 identifies.
+
+    '
+- id: B1-3
+  author: b1-build-to-own
+  statement: 'A production-versus-agent-test split computed from the current run context is unreliable
+    because caller-supplied input can overwrite its provenance fields.
+
+    '
+  provenance:
+  - EV-013
+  - FLOWS-001
+  - api/routes/public_agent.py:229-249
+  - api/db/models.py:565-632
+  stake: true
+  note: 'The public-agent route writes `trigger_mode`, workflow identity, and service-principal identity
+    into `initial_context`, then merges the caller''s arbitrary `initial_context` over those values. `WorkflowRunModel`
+    has no dedicated purpose or origin column, so one request can relabel itself and corrupt every downstream
+    cost total. Run purpose must be a non-null, immutable typed field set from the authenticated product
+    or agent credential at run creation, with actor/product identity in protected columns and an explicit
+    unattributed value for rows whose origin is genuinely unknown.
+
+    '
+- id: B1-4
+  author: b1-build-to-own
+  statement: 'The current usage implementation cannot report actual spend because it records quantities
+    but hard-codes reported token cost to zero and has no runtime cost-accounting path.
+
+    '
+  provenance:
+  - EV-013
+  - api/services/pipecat/pipeline_metrics_aggregator.py:128-151
+  - api/db/organization_usage_client.py:180-221
+  - api/services/workflow/run_usage_response.py:16-42
+  stake: false
+  note: 'The pipeline persists model-token, TTS-character, STT-duration, and call-duration quantities,
+    but usage history initializes `dograh_tokens` to zero and only exposes `charge_usd` if it somehow
+    already exists in `cost_info`. A durable cost subsystem needs versioned provider/model price inputs
+    and immutable per-run line items containing provider, model, quantity, unit, unit price, currency,
+    and calculation version; the production/test view should aggregate those line items by the protected
+    run-purpose field rather than reinterpret mutable JSON on every read.
+
+    '
+- id: B1-5
+  author: b1-build-to-own
+  statement: 'Current provider, tool, and credential mutations erase prior values and update-actor attribution,
+    so agent activity history cannot be reconstructed after the fact.
+
+    '
+  provenance:
+  - EV-014
+  - EV-025
+  - EV-029
+  - api/db/organization_configuration_client.py:35-66
+  - api/db/tool_client.py:139-206
+  - api/db/webhook_credential_client.py:102-174
+  stake: false
+  note: 'Provider configuration is overwritten in place, and tool and credential updates retain only the
+    latest row plus a timestamp; none records who performed an update or the replaced value. The maintainable
+    implementation is an append-only configuration-change record written in the same transaction as every
+    mutation, with resource type and stable id, operation, redacted before/after snapshots, actor kind
+    and id, agent session/correlation id, and timestamp. That requires shared mutation services with caller
+    context rather than audit calls sprinkled through UI and MCP handlers, because independently committed
+    audit rows will eventually disagree with live state.
+
+    '
+- id: B1-6
+  author: b1-build-to-own
+  statement: 'The current MCP server cannot serve as the primary worker-agent interface because it accepts
+    only operator session tokens and exposes neither workflow/provider testing nor run diagnosis.
+
+    '
+  provenance:
+  - EV-006
+  - EV-011
+  - EV-028
+  - api/mcp_server/auth.py:8-38
+  - api/mcp_server/server.py:1-49
+  stake: false
+  note: 'MCP authentication resolves every invocation to a human `UserModel`, so agent-authored changes
+    are attributed to the owner, and the registered tool list is centered on workflow creation/editing
+    and catalog reads. There are no tools for testing a workflow, configuring or testing a provider, reading
+    a run, or querying boundary records. Worker agents need first-class service-principal identity and
+    scoped capabilities, while MCP and REST should remain thin adapters over the same domain services
+    so validation, auditing, verdicts, and authorization cannot drift by interface.
+
+    '
+- id: B1-7
+  author: b1-build-to-own
+  statement: 'The current logging and tracing paths cannot provide complete per-run wire records with
+    enforceable redaction and retention.
+
+    '
+  provenance:
+  - EV-026
+  - EV-029
+  - api/services/workflow/tools/custom_tool.py:292-349
+  - api/services/pipecat/realtime_feedback_events.py:87-107
+  - api/services/pipecat/tracing_config.py:141-181
+  - api/engine_settings.py:351-377
+  stake: false
+  note: 'Tool requests send method, URL, headers, body, and parameters, but only the body and parameters
+    go to a DEBUG process log; the persisted function result is converted to an opaque string. Provider
+    exchanges depend on optional exporters, and the tracing exporter explicitly allows spans with no destination
+    to be dropped. Wire diagnosis should use a dedicated ordered boundary-exchange model keyed by run
+    and turn, with boundary kind, provider/tool identity, request and response metadata, status, timing,
+    payload references, truncation/hash markers, redaction-policy version, and expiry. Large bodies belong
+    in controlled object storage rather than a growing run JSON document, and both owner and agent APIs
+    should query the same record. The existing DEBUG body logging should be removed when deliberate capture
+    lands so there is one governed copy rather than a second accidental one.
+
+    '
+- id: B1-8
+  author: b1-build-to-own
+  statement: 'The repository remains architecturally self-contradictory while contributor instructions
+    mandate organization-scoped reads and primary documentation presents a generic self-service platform.
+
+    '
+  provenance:
+  - EV-001
+  - EV-017
+  - EV-027
+  - api/AGENTS.md:58-72
+  - README.md:1-83
+  - api/app.py:70-75
+  - api/mcp_server/instructions.py:24-66
+  stake: false
+  note: 'Coding agents are explicitly told that every organization-scoped read must filter by the selected
+    organization, directly opposing the ruling that owner reads never scope. The README, OpenAPI metadata,
+    and MCP instructions still teach Dograh''s generic user-facing interaction model and terminology.
+    Updating these authoritative artifacts in the same change as behavior is part of the implementation:
+    otherwise routine maintenance will faithfully reintroduce selectors, scoped reads, human-confirmation
+    steps, and incorrect actor assumptions.
+
+    '
+- id: B2-1
+  author: b2-replacement-is-the-answer
+  statement: 'Audgent reaches the stated operability threshold with exactly six deltas—pin one organization,
+    expose provider configuration and validation to service principals, compare test expectations with
+    existing run outcomes, split costs from caller provenance, append configuration activity, and persist
+    wire envelopes for active boundaries—without building another platform subsystem.
+
+    '
+  provenance:
+  - EV-010
+  - EV-011
+  - EV-013
+  - EV-017
+  - EV-025
+  - EV-026
+  - EV-027
+  - EV-030
+  - api/routes/workflow.py:423-476
+  - api/routes/public_agent.py:423-462
+  - api/routes/platform_admin.py:71-123
+  - api/db/models.py:565-610
+  stake: true
+  note: 'The inherited engine already supplies the surfaces that carry most of the reshaping: workflow
+    authoring, draft execution, run evidence and costs, provider configuration, validation, and a cross-system
+    workload list. EV-027 explicitly keeps those surfaces. The six named deltas are the missing owner-visible
+    behaviors; anything larger is construction for the platform that is replacing Audgent, not work required
+    to keep this engine usable.
+
+    '
+  resolution: escalated
+  note_judge: 'ESCALATED. B2 argues six deltas and nothing more, grounded in EV-021. But the round surfaced
+    three defects the owner has not ruled on (A1-2, C1-5, B1-4), and one of them makes a stated scope
+    item impossible as written. The fence cannot decide its own exceptions.
+
+    '
+- id: B2-2
+  author: b2-replacement-is-the-answer
+  statement: 'Once every login and machine credential resolves to one fixed organization and all organization-creation
+    paths are disabled, existing organization-scoped reads are whole-system reads and no tenancy column,
+    migration, or broad query rewrite is required.
+
+    '
+  provenance:
+  - EV-017
+  - EV-029
+  - EV-030
+  - api/routes/auth.py:108-130
+  - api/routes/auth.py:341-352
+  - api/db/organization_client.py:44-85
+  - api/db/platform_admin_client.py:17-63
+  stake: false
+  note: 'EV-029 counts 41 organization columns, 202 Python files, and 98 migrations, while EV-030 rules
+    that those columns stay. The current login paths still call get-or-create organization logic, whereas
+    the platform-admin queries already list workflows and runs without an organization predicate. Pinning
+    authentication to the shared row, refusing creation of another row, and hiding organization controls
+    delivers the one-org result without spending replacement capacity on mechanical deletion.
+
+    '
+  resolution: resolved
+  note_judge: 'PARTIALLY REJECTED. Pinning one organization is necessary but not sufficient: B1-1 shows
+    the app can still create organizations, and C2-7 shows a mis-scoped read drops rows silently rather
+    than erroring. DEC-001 already names this as the risk it knowingly accepted; the debate turns it into
+    two build rules — disable every org-creation path, and audit reads for selected_organization_id filters.
+
+    '
+- id: B2-3
+  author: b2-replacement-is-the-answer
+  statement: 'The only missing part of the worker-agent workflow test loop is a machine-readable comparison
+    of an expected result with existing run evidence, because service principals can already create workflows,
+    start draft runs, and read logs, costs, and post-call outcomes.
+
+    '
+  provenance:
+  - EV-011
+  - EV-028
+  - api/services/auth/caller.py:32-140
+  - api/services/auth/scopes.py:15-35
+  - api/routes/workflow.py:423-476
+  - api/routes/public_agent.py:423-462
+  - api/routes/workflow.py:1252-1331
+  - api/services/post_call_analysis.py:18-80
+  stake: false
+  note: 'The workflow create route accepts require_caller(WORKFLOW_WRITE), the public draft route accepts
+    CALL_ORIGINATE, and run readback accepts CALL_READ and returns logs, cost_info, annotations, and post_call_analysis.
+    A test request can carry its expected outcome in run context and expose pass or fail by comparing
+    it with the already-produced outcome. A second agent framework or a parallel test execution stack
+    adds no missing verb.
+
+    '
+- id: B2-4
+  author: b2-replacement-is-the-answer
+  statement: 'A service-principal wrapper around the existing model-configuration save and UserConfigurationValidator
+    path is sufficient for the owner''s configure-provider and test-provider verbs.
+
+    '
+  provenance:
+  - EV-011
+  - EV-012
+  - EV-025
+  - api/services/auth/scopes.py:15-35
+  - api/routes/organization.py:279-341
+  - api/routes/user.py:248-279
+  - api/services/configuration/check_validity.py:28-100
+  stake: false
+  note: 'The current save path already merges secrets, compiles the effective STT/LLM/TTS selection, invokes
+    the provider validator, and persists only after validation; the separate validation route reuses the
+    same validator and records last validation time. Its blocker for worker agents is the user-session
+    dependency, not absent provider logic. Reusing that service behind CONFIG_WRITE and returning its
+    existing status closes both verbs with one narrow authentication adaptation.
+
+    '
+- id: B2-5
+  author: b2-replacement-is-the-answer
+  statement: 'Production-versus-agent-test cost separation requires no new run-provenance column because
+    public runs already carry trigger_mode and service-principal identity in initial_context while every
+    run already stores cost_info and usage_info.
+
+    '
+  provenance:
+  - EV-013
+  - EV-017
+  - api/routes/public_agent.py:230-250
+  - api/db/models.py:565-610
+  - api/routes/workflow.py:1285-1331
+  - api/routes/organization_usage.py:105-205
+  stake: false
+  note: 'Rinity''s credential identifies production and a worker credential identifies agent testing,
+    matching FLOWS-001''s self-enforcing credential-derived branch. The minimal change is to prevent caller-supplied
+    initial_context from overwriting reserved provenance keys and aggregate the existing charge fields
+    by credential class, with old runs shown as unattributed. A new provenance schema, tagging service,
+    or cost pipeline duplicates information already persisted on each run.
+
+    '
+  resolution: resolved
+  note_judge: 'REJECTED. Five lenses on three different axes independently found the same defect at the
+    same file:line — initial_context is caller-writable and can overwrite trigger_mode and service_principal
+    attribution (D1-1, D2-3, C1-7, C2-5, B1-3). A forgeable field cannot carry the cost split.
+
+    '
+- id: B2-6
+  author: b2-replacement-is-the-answer
+  statement: 'Provider activity history can be implemented as masked append-only events under a reserved
+    organization_configurations key, so F-5 does not require a general audit subsystem or a migration.
+
+    '
+  provenance:
+  - EV-014
+  - EV-025
+  - EV-029
+  - api/db/models.py:248-267
+  - api/routes/organization.py:314-341
+  stake: false
+  note: 'EV-029 establishes that provider configuration is overwritten in place and has no history, while
+    workflow definitions already retain versions. OrganizationConfigurationModel already provides a unique
+    per-organization key with a JSON value. Appending timestamp, caller ID, and masked before/after provider
+    selections at the one provider-save seam answers what the agents changed from now onward; it does
+    not create history for unrelated inherited domains.
+
+    '
+  resolution: resolved
+  note_judge: 'REJECTED. An append-only JSON blob under a reserved organization_configurations key cannot
+    serve F-5, which needs a time-ordered whole-system read with per-principal attribution (C2-2, D1-5)
+    and cannot capture workflow drafts that mutate in place (C2-4).
+
+    '
+- id: B2-7
+  author: b2-replacement-is-the-answer
+  statement: 'Audgent wire capture must stop at the provider and tool boundaries exercised by Rinity and
+    agent tests, because instrumenting the inherited catalog of unused providers cannot make the sole
+    current consumer operable.
+
+    '
+  provenance:
+  - EV-009
+  - EV-025
+  - EV-026
+  - EV-029
+  - EV-011/AC-04
+  - EV-011/AC-09
+  - api/services/workflow/tools/custom_tool.py:328-375
+  - api/services/pipecat/realtime_feedback_events.py:60-109
+  - api/services/pipecat/realtime_feedback_observer.py:181-220
+  - api/services/pipecat/realtime_feedback_observer.py:284-296
+  stake: false
+  note: 'Tool execution already computes method, URL, headers, body, status, and response data; function-call
+    start/end events already enter the per-run log, but the start event omits the resolved HTTP request.
+    Add the masked resolved request to that event and retain the existing response. For model providers,
+    capture request/response envelopes only in the STT/LLM/TTS and realtime adapters selected for Rinity
+    or invoked by a provider test; the dozens of other inherited adapters receive no Audgent work.
+
+    '
+- id: B2-8
+  author: b2-replacement-is-the-answer
+  statement: 'Phonetic repair and every engine change outside Bet 1''s closed operability list consume
+    zero Audgent capacity before the greenfield replacement ships.
+
+    '
+  provenance:
+  - EV-007
+  - EV-020
+  - EV-021
+  - EV-022
+  - EV-023
+  stake: false
+  note: 'EV-007 names the greenfield voice product as the durable answer, EV-021 makes the discussed list
+    the only scope control, and EV-022 explicitly removes phonetics from Bet 1. EV-020 supplies no deadline
+    or budget that could halt an expanding Audgent bet, and EV-023 supplies only a retirement condition,
+    not additional Audgent requirements. Therefore incidental provider parity, campaigns, deployment-contract
+    work, UI replacement, and the phonetics follow-on do not enter this codebase while replacement capacity
+    is the constrained resource.
+
+    '
+- id: C1-1
+  author: c1-agent-is-the-user
+  statement: 'At revision 312ece2, audgent exposes machine-authenticated workflow creation but does not
+    expose service-principal-accessible end-to-end contracts for all five mandated verbs: create workflow,
+    test workflow, configure provider, test provider, and diagnose failure.
+
+    '
+  provenance:
+  - EV-006
+  - EV-011
+  - EV-028
+  - api/routes/workflow.py:416-475
+  - api/mcp_server/server.py:20-36
+  - api/routes/organization.py:303-340
+  stake: false
+  note: 'The REST workflow-create route accepts a Caller with WORKFLOW_WRITE and returns a durable workflow
+    id, so creation has a real machine seam. The registered MCP tools contain workflow authoring and catalogs
+    but no workflow-test, provider-configuration, provider-test, run-read, or diagnostic tool; the provider
+    routes separately require operator UserModel authentication. A service principal therefore cannot
+    close the owner-mandated five-verb loop through one queryable contract surface.
+
+    '
+- id: C1-2
+  author: c1-agent-is-the-user
+  statement: 'The current workflow-test API cannot distinguish "executed" from "behaved correctly" by
+    contract because it accepts no expected-behavior assertions and returns no verdict evaluated against
+    expectations.
+
+    '
+  provenance:
+  - EV-011
+  - FLOWS-001-internal-reshaping.md:F-7
+  - api/routes/public_agent.py:448-460
+  - api/routes/workflow.py:1250-1310
+  - harness/run_t9.py:507-618
+  stake: true
+  note: 'The test route selects the latest draft and initiates a call; run readback supplies completion,
+    transcript/artifacts, costs, logs, annotations, and post-call analysis, but no expected observations
+    or pass/fail evaluation against them. The T9 harness proves the missing distinction is implementable:
+    it asserts transcript content, two-way audio, latency, and webhook properties before writing status
+    "passed". Those assertions are fixed inside a standalone scenario harness rather than exposed as a
+    workflow-generic agent test request and verdict.
+
+    '
+- id: C1-3
+  author: c1-agent-is-the-user
+  statement: 'The MCP authoring path cannot serve an autonomous worker-agent contract unchanged because
+    it accepts only operator session tokens and instructs the caller to wait for user approval before
+    creating a workflow.
+
+    '
+  provenance:
+  - EV-006
+  - EV-011
+  - api/mcp_server/auth.py:9-45
+  - api/mcp_server/instructions.py:27-33
+  - api/mcp_server/instructions.py:39-42
+  stake: false
+  note: 'authenticate_mcp_request explicitly resolves the console''s session token and says machine callers
+    are not supported on this surface. The server instructions require a plan to be presented to the user
+    and confirmation awaited, and they direct the user to create credential secrets outside the MCP flow.
+    That is not an autonomous create-test-iterate loop even though the separate REST create route can
+    authenticate a service principal.
+
+    '
+- id: C1-4
+  author: c1-agent-is-the-user
+  statement: 'A worker service principal cannot configure the model or telephony providers through the
+    current provider endpoints because those endpoints require operator-session get_user dependencies
+    rather than scoped machine-caller authentication.
+
+    '
+  provenance:
+  - EV-012
+  - EV-025
+  - api/routes/organization.py:303-340
+  - api/routes/organization.py:527-642
+  - api/services/auth/depends.py:73-87
+  stake: false
+  note: 'Both the organization model-configuration PUT and telephony configuration create/update routes
+    resolve a UserModel from the deployment''s operator session JWT. Unlike workflow creation and run
+    readback, they do not use require_caller or service-principal scopes. Thus the configuration verb
+    that the owner assigned to agents has no proper machine identity contract.
+
+    '
+- id: C1-5
+  author: c1-agent-is-the-user
+  statement: 'The model-provider validation contract can report success without exercising the configured
+    provider because validators for ElevenLabs, Google, Azure, Cartesia, Sarvam, OpenRouter, and multiple
+    other providers unconditionally return True.
+
+    '
+  provenance:
+  - EV-011
+  - EV-025
+  - FLOWS-001-internal-reshaping.md:F-8
+  - api/routes/organization.py:313-339
+  - api/services/configuration/check_validity.py:34-100
+  - api/services/configuration/check_validity.py:312-334
+  - api/services/configuration/check_validity.py:362-445
+  stake: false
+  note: 'Saving model configuration invokes UserConfigurationValidator, but many registered provider checks
+    are no-ops after basic field presence. An invalid non-empty key can therefore become last-validated
+    configuration without the smallest real STT, LLM, TTS, or realtime operation succeeding. This violates
+    F-8''s required working/not-working verdict and conflates "configured" with "known to work."
+
+    '
+- id: C1-6
+  author: c1-agent-is-the-user
+  statement: 'An agent reading a failed run cannot query the required wire record because live tool execution
+    persists model arguments and a stringified result but not the resolved request URL, method, headers,
+    and body, while provider STT, LLM, and TTS exchanges are not captured per run.
+
+    '
+  provenance:
+  - EV-026
+  - EV-028
+  - EV-029
+  - api/services/workflow/tools/custom_tool.py:261-361
+  - api/services/pipecat/realtime_feedback_events.py:72-107
+  - api/routes/workflow.py:1277-1310
+  stake: false
+  note: 'The live HTTP-tool path constructs the resolved request and writes its URL and body to process
+    logs, but include_request_headers is optional and the realtime event contract records only function
+    arguments plus str(result). EV-029 confirms provider exchanges have only optional OTEL export, not
+    a per-run boundary record. Run readback is machine-accessible, but the evidence needed to answer "what
+    exactly was sent, what came back, and in what order" is absent from what it can query.
+
+    '
+- id: C1-7
+  author: c1-agent-is-the-user
+  statement: 'Current run provenance cannot enforce production-versus-agent-test cost separation because
+    WorkflowRunModel has no such origin field and caller-supplied initial_context can overwrite the public
+    test route''s trigger_mode label.
+
+    '
+  provenance:
+  - EV-013
+  - api/db/models.py:570-610
+  - api/routes/public_agent.py:229-250
+  - api/db/organization_usage_client.py:168-223
+  stake: false
+  note: 'The durable run dimensions include mode and inbound/outbound call_type, but no production, agent-test,
+    or unattributed origin. Public origination writes trigger_mode into an untyped context dictionary
+    and then merges caller input over it, so the label is neither immutable nor self-enforcing; other
+    run paths need not set it at all. Usage readback emits that context and charge data but does not provide
+    a trustworthy cost partition for an agent''s test verdict.
+
+    '
+- id: C1-8
+  author: c1-agent-is-the-user
+  statement: 'Historical diagnosis cannot establish the exact organization-level provider configuration
+    used by a run because that configuration is mutated in place without revisions and the run stores
+    resolved provider and model names rather than a configuration-version identifier.
+
+    '
+  provenance:
+  - EV-025
+  - EV-028
+  - EV-029
+  - api/services/pipecat/run_pipeline.py:656-684
+  - api/db/models.py:604-609
+  stake: false
+  note: 'EV-029 finds no update attribution or history for organization provider/model configuration,
+    so a later change destroys the previous value. The pipeline stamps provider/model names into initial_context,
+    which identifies selection but not the exact endpoint, options, credential reference, or revision
+    that generated a failed request. A diagnostic agent can therefore inspect a historical run yet still
+    be forced to reason from today''s mutable configuration rather than query the configuration that actually
+    executed.
+
+    '
+- id: C2-1
+  author: c2-owner-must-not-lose-the-thread
+  statement: 'At the inspected commit, once an organization provider or model configuration is overwritten,
+    the owner cannot reconstruct its previous value, actor, or reason from audgent''s database.
+
+    '
+  provenance:
+  - EV-014
+  - EV-025
+  - EV-029
+  - api/db/models.py:248-269
+  - api/db/organization_configuration_client.py:36-69
+  stake: true
+  note: 'OrganizationConfigurationModel retains one JSON value plus created, updated, and validation timestamps,
+    and upsert_configuration replaces that value in place. There is no audit model, prior-value row, or
+    mutation actor. This is the configuration space the owner says matters most, so F-5 cannot be reconstructed
+    later and the missing past cannot be backfilled after agents have begun changing it continuously.
+
+    '
+- id: C2-2
+  author: c2-owner-must-not-lose-the-thread
+  statement: 'Two worker agents using the current MCP authoring surface under the owner''s session are
+    indistinguishable in durable mutation history.
+
+    '
+  provenance:
+  - EV-006
+  - EV-011
+  - EV-014
+  - api/mcp_server/auth.py:9-43
+  - api/mcp_server/tools/save_workflow.py:65-161
+  - api/mcp_server/tracing.py:35-83
+  stake: false
+  note: 'MCP authenticates with the console session and stamps only the human user id; save_workflow then
+    updates the workflow draft without passing any worker-agent identity into persistence. Optional OTEL
+    spans contain truncated tool input and output, but they are not linked from the mutation row and do
+    not identify which worker acted. The owner would therefore see his own identity where F-5 requires
+    the particular agent.
+
+    '
+- id: C2-3
+  author: c2-owner-must-not-lose-the-thread
+  statement: 'An activity entry containing only actor, timestamp, and diff would still fail six-month
+    reconstruction unless it durably links the change to its initiating instruction or rationale and the
+    validation runs that followed.
+
+    '
+  provenance:
+  - EV-014
+  - FLOWS-001-internal-reshaping.md
+  - inference
+  stake: false
+  note: 'F-5 requires enough context to judge a change and a path from the change to subsequent runs,
+    while F-6 requires confirmation that the intended fix landed. A diff can establish what happened but
+    cannot establish why that option was chosen, what problem it was meant to solve, or whether its tests
+    supported the decision. Those links are the owner''s thread after the originating agent conversation
+    is no longer at hand.
+
+    '
+  rebuts:
+  - A2-7
+  resolution: deferred-as-assumption
+  note_judge: 'ASSUMED: the activity record carries actor, object, timestamp, changed field, redacted
+    before/after, and a free-text rationale the agent supplies — but not payloads or credential values.
+    Cheap to reverse in either direction; revisit if six-month reconstruction actually fails.
+
+    '
+- id: C2-4
+  author: c2-owner-must-not-lose-the-thread
+  statement: 'Audgent''s workflow versioning does not record every workflow change because repeated saves
+    mutate one draft in place and WorkflowDefinitionModel stores neither author nor rationale.
+
+    '
+  provenance:
+  - EV-029
+  - api/db/models.py:401-451
+  - api/db/workflow_client.py:71-123
+  - api/routes/workflow.py:297-302
+  stake: false
+  note: 'Published snapshots and run-to-definition pinning preserve released behavior, but they are not
+    a complete activity history. While a draft exists, each save overwrites its JSON, configurations,
+    and template variables; intermediate agent and owner edits vanish. The version response exposes number,
+    status, and timestamps, not who made or justified the change.
+
+    '
+- id: C2-5
+  author: c2-owner-must-not-lose-the-thread
+  statement: 'Current run provenance cannot support a trustworthy production-versus-agent-test cost split
+    because the category is mutable JSON rather than a dedicated run field and caller-supplied initial_context
+    can overwrite it.
+
+    '
+  provenance:
+  - EV-013
+  - FLOWS-001-internal-reshaping.md
+  - api/routes/public_agent.py:230-250
+  - api/db/models.py:565-610
+  - api/routes/organization_usage.py:97-107
+  stake: false
+  note: 'Public-agent call creation initially writes trigger_mode and service-principal identifiers, then
+    merges request.initial_context over those reserved keys. WorkflowRunModel has usage and cost JSON
+    but no production or agent-test provenance column, and the usage filters expose no origin dimension.
+    Six months later the owner cannot treat the displayed split as authoritative or reliably attribute
+    test spend to the agent activity that caused it.
+
+    '
+- id: C2-6
+  author: c2-owner-must-not-lose-the-thread
+  statement: 'A completed run currently cannot show the exact outbound tool request or any provider request-and-response
+    pair that caused a failure.
+
+    '
+  provenance:
+  - EV-026
+  - EV-028
+  - EV-029
+  - api/services/workflow/tools/custom_tool.py:317-359
+  - api/services/pipecat/realtime_feedback_observer.py:201-220
+  - api/services/pipecat/event_handlers.py:295-307
+  - api/engine_settings.py:351-377
+  stake: false
+  note: 'Persisted function-call events contain model arguments and the tool result, but the resolved
+    URL, method, preset-expanded body or query, and headers exist only around the HTTP client call and
+    debug logger. Provider exchanges have no per-run wire record. The DEBUG default accidentally emits
+    tool bodies to logs with a seven-day default retention, which is neither a durable run-linked diagnostic
+    trail nor something the owner can reconstruct six months later.
+
+    '
+- id: C2-7
+  author: c2-owner-must-not-lose-the-thread
+  statement: 'Degenerating to one organization does not make owner reads whole-system while those reads
+    still filter on selected_organization_id, because any mis-scoped row disappears without an error.
+
+    '
+  provenance:
+  - EV-010
+  - EV-030
+  - DEC-001-degenerate-tenancy.md
+  - api/routes/workflow.py:502-571
+  - api/routes/workflow.py:1323-1369
+  - api/routes/reports.py:45-125
+  - api/routes/organization_usage.py:78-165
+  - api/db/workflow_client.py:331-405
+  stake: false
+  note: 'The normal workflow, run, report, and usage reads still pass the selected organization into queries.
+    DEC-001 explicitly defines any owner-facing org filter as a bug and warns that vestigial scoping returns
+    plausible but incomplete results. The owner''s view therefore needs unscoped whole-system reads whose
+    completeness does not depend on every historical and future row carrying the expected constant correctly.
+
+    '
+- id: C2-8
+  author: c2-owner-must-not-lose-the-thread
+  statement: 'At the inspected commit, the owner can directly edit providers and workflows, but his edits
+    cannot be distinguished from agent edits in the required activity record because that record does
+    not exist.
+
+    '
+  provenance:
+  - EV-024
+  - EV-027
+  - EV-029
+  - api/routes/organization.py:313-339
+  - api/routes/workflow.py:898-1127
+  stake: false
+  note: 'The existing user-authenticated PUT routes are a real direct intervention path and the owner
+    explicitly ruled that this path survives even though he uses it rarely. The reshape must keep those
+    controls reachable from current configuration and record the owner as the actor in the same chronology
+    as worker agents, so correcting the system never depends on an agent relaying, approving, or executing
+    his change.
+
+    '
+- id: D1-1
+  author: d1-the-credential-decides
+  statement: 'The current public-agent API lets any credential with `call:originate` choose either production
+    or test execution and overwrite both `trigger_mode` and `service_principal_*` attribution, making
+    the promised cost split and caller identity forgeable.
+
+    '
+  provenance:
+  - EV-013
+  - api/routes/public_agent.py:232-250
+  - api/routes/public_agent.py:394-459
+  - api/services/auth/scopes.py:15-24
+  - api/db/models.py:565-623
+  stake: true
+  note: 'All four production and test routes require the same `CALL_ORIGINATE` scope, and the route path
+    selects `use_draft`; the credential carries no production-versus-agent-test authority. Worse, the
+    implementation writes `trigger_mode` and the verified principal fields into `initial_context` and
+    then applies caller-controlled `request.initial_context`, allowing those reserved keys to be replaced.
+    `WorkflowRunModel` has no typed principal or cost-class column, so the overwritten JSON is the durable
+    record available to the cost split.
+
+    '
+- id: D1-2
+  author: d1-the-credential-decides
+  statement: 'Audgent satisfies the credential-decides rule only when each registered machine principal
+    has a server-managed `production-product` or `worker-agent` class and every run copies that class
+    and principal id into non-client-writable columns.
+
+    '
+  provenance:
+  - EV-006
+  - EV-011
+  - EV-013
+  - EV-017
+  - decisions/DEC-001-degenerate-tenancy.md
+  - api/db/models.py:192-244
+  - api/services/auth/service_principal.py:176-200
+  stake: false
+  note: 'EV-017 assigns credentials to products, while EV-006 and EV-011 identify worker agents as the
+    other machine actor. The existing verifier already resolves an issuer-authenticated `client_id` to
+    a unique local principal with scopes, but the model classifies principals only as tenant or fleet;
+    after degeneration every ordinary caller is the same tenant kind. A credential-owned caller class
+    supplies both attribution and the production-versus-agent-test cost class without accepting either
+    value from the request.
+
+    '
+  rebuts:
+  - D2-1
+  resolution: resolved
+  note_judge: 'SYNTHESIS, and the two ends agree more than they disagree. Cost class and actor are DERIVED
+    from the credential (D1: unforgeable, zero discipline) and STAMPED IMMUTABLY on the run at creation
+    in non-client-writable columns (D2: survives key rotation and reuse). D2-4 additionally wins on its
+    own: purpose (workflow-test / provider-test / production) is distinct from cost class and both are
+    needed.
+
+    '
+- id: D1-3
+  author: d1-the-credential-decides
+  statement: 'A production-product credential must be unable to invoke test execution or mutate workflows
+    or providers, while a worker-agent credential must be unable to originate a production run, regardless
+    of endpoint or payload.
+
+    '
+  provenance:
+  - EV-011
+  - EV-012
+  - EV-013
+  - EV-017
+  - flows/FLOWS-001-internal-reshaping.md
+  - api/services/auth/scopes.py:15-43
+  - api/routes/public_agent.py:394-459
+  stake: false
+  note: 'F-7 assigns workflow creation and testing to agents, F-8 assigns provider configuration and testing
+    to agents, and F-9 says rinity production status follows from its product key. The current scope vocabulary
+    has one undifferentiated `call:originate` grant, and both production and test routes accept it. Separate
+    credential grants for production origination and agent-test origination, enforced after principal
+    verification, make crossing the boundary an authorization failure rather than a caller convention.
+
+    '
+- id: D1-4
+  author: d1-the-credential-decides
+  statement: 'Every run-admission path must reject a request unless its authenticated credential resolves
+    to exactly one actor and one cost class, so no newly created run can enter an unattributed cost bucket.
+
+    '
+  provenance:
+  - EV-013
+  - flows/FLOWS-001-internal-reshaping.md
+  - api/services/auth/service_principal.py:176-200
+  - api/services/auth/service_principal.py:241-256
+  stake: false
+  note: 'F-3 requires visible legacy unattributed data, but EV-013 requires attribution for every new
+    run and cost rollup. The existing service-principal verifier already rejects active issuer tokens
+    whose client is not registered, and route dependencies reject missing scopes. Extending that fail-closed
+    admission rule to credential-owned actor and cost classes prevents silent defaulting and removes caller
+    discipline from the accounting boundary.
+
+    '
+- id: D1-5
+  author: d1-the-credential-decides
+  statement: 'Each worker agent must use its own credential, and every workflow or configuration mutation
+    must persist that principal id in an append-only change record populated by the server.
+
+    '
+  provenance:
+  - EV-014
+  - EV-028
+  - EV-029
+  - flows/FLOWS-001-internal-reshaping.md
+  - api/db/models.py:472-489
+  - api/routes/workflow.py:422-468
+  stake: false
+  note: 'F-5 requires the owner to see which agent changed what, and EV-029 establishes that provider
+    configuration is mutated in place with no history. The machine workflow-create path passes `caller.user_id`,
+    which is `None` for a service principal, into a model that has only a user ownership field, so even
+    the existing machine-authenticated authoring seam drops the principal identity at persistence. Distinct
+    worker credentials plus server-stamped principal foreign keys make authorship follow mechanically
+    from the key and preserve it through later credential rotation or renaming.
+
+    '
+- id: D1-6
+  author: d1-the-credential-decides
+  statement: 'Provider configuration and provider testing are not agent-authorizable in the current code
+    because their routes accept operator sessions rather than service principals with credential-bound
+    scopes.
+
+    '
+  provenance:
+  - EV-011
+  - EV-012
+  - EV-025
+  - api/services/auth/scopes.py:15-24
+  - api/routes/organization.py:279-339
+  - api/routes/organization.py:527-663
+  stake: false
+  note: '`CONFIG_WRITE` exists in the machine scope vocabulary, but the model-configuration and telephony-provider
+    configuration routes depend on `get_user`, not `require_caller(CONFIG_WRITE)`, and there is no credential-gated
+    provider-test verb in those route families. Thus the key cannot currently grant an agent the exact
+    configure-and-test authority the owner assigned it. Moving those machine operations behind principal
+    verification and narrow scopes makes permission a property of the credential rather than of an operator-only
+    route.
+
+    '
+- id: D1-7
+  author: d1-the-credential-decides
+  statement: 'Collapsing audgent to one organization does not collapse credentials: rinity and every worker
+    agent remain distinct principals whose permissions, attribution, and revocation are determined by
+    their own keys.
+
+    '
+  provenance:
+  - EV-017
+  - EV-030
+  - decisions/DEC-001-degenerate-tenancy.md
+  - api/db/models.py:192-244
+  - api/db/service_principal_client.py:13-30
+  - api/db/service_principal_client.py:87-96
+  stake: false
+  note: 'DEC-001 explicitly says keys identify products rather than tenants and resolve the constant organization
+    implicitly. The existing principal table uniquely keys issuer plus client id, stores per-principal
+    scopes and active state, and supports deactivation, so one-org degeneration removes tenant choice
+    without removing caller identity. A shared one-org credential would erase the product-versus-worker
+    distinction, agent-level activity history, least privilege, and independent revocation in one move.
+
+    '
+- id: D2-1
+  author: d2-the-run-carries-its-own-truth
+  statement: 'A six-month-old run can be assigned correctly to production or agent-test only when an immutable
+    cost class is required on the run at creation rather than derived from the credential that originated
+    it.
+
+    '
+  provenance:
+  - EV-013
+  - flows/FLOWS-001-internal-reshaping.md:79-96
+  - api/routes/public_agent.py:393-459
+  stake: true
+  note: 'EV-013 makes the split a first-class run attribution problem, and F-3 requires costs to roll
+    up without manual reconstruction. The same service principal dependency can invoke both the published
+    endpoints and the test endpoints; those paths differ by `use_draft`, not by caller identity. A credential-derived
+    answer therefore cannot reconstruct what a particular run was, especially after keys are shared, rotated,
+    or repurposed.
+
+    '
+  rebuts:
+  - D1-2
+  resolution: resolved
+  note_judge: 'See D1-2.
+
+    '
+- id: D2-2
+  author: d2-the-run-carries-its-own-truth
+  statement: 'The current `workflow_runs` schema has no required field for origin, purpose, or cost class,
+    so a persisted run does not carry the minimum historical identity demanded by EV-013.
+
+    '
+  provenance:
+  - EV-013
+  - api/db/models.py:565-610
+  - api/db/workflow_run_client.py:41-108
+  stake: false
+  note: '`WorkflowRunModel` persists workflow and definition references, provider-oriented `mode`, call
+    direction, mutable JSON contexts, usage, and cost, but it has no origin, purpose, or production-versus-agent-test
+    column. `create_workflow_run` likewise accepts none of those three facts and defaults its context
+    dictionaries to empty. Definition pinning preserves what workflow ran; it does not preserve why the
+    run existed or whose activity produced it.
+
+    '
+- id: D2-3
+  author: d2-the-run-carries-its-own-truth
+  statement: '`initial_context` cannot be the provenance ledger because a public caller can overwrite
+    the system''s trigger mode and principal identifiers before insertion and later code can mutate the
+    same JSON after creation.
+
+    '
+  provenance:
+  - api/routes/public_agent.py:229-250
+  - api/db/workflow_run_client.py:308-315
+  - api/schemas/workflow.py:9-31
+  stake: false
+  note: 'The public route writes `trigger_mode`, `service_principal_id`, `service_principal_client_id`,
+    and token id, then applies `initial_context.update(request.initial_context or {})`, giving caller
+    data the final value for those keys. The update client later merges additional patches into `run.initial_context`.
+    Historical attribution stored there is neither protected at creation nor immutable afterward, even
+    though it is returned as if it were ordinary run context.
+
+    '
+- id: D2-4
+  author: d2-the-run-carries-its-own-truth
+  statement: 'A run needs a purpose distinct from its cost class because workflow testing, provider testing,
+    and production calling are different purposes even when the first two share the agent-test cost class.
+
+    '
+  provenance:
+  - EV-011
+  - EV-013
+  - EV-025
+  - flows/FLOWS-001-internal-reshaping.md:165-203
+  stake: false
+  note: 'EV-011 separately requires agents to test workflows and test providers, while EV-013 groups their
+    spend into agent-test. Recording only `agent-test` would make those two mandated activities indistinguishable;
+    recording only a purpose would force cost reporting to reinterpret purpose names later. The run therefore
+    needs both an immutable purpose such as workflow-test or provider-test and an independently immutable
+    cost class.
+
+    '
+- id: D2-5
+  author: d2-the-run-carries-its-own-truth
+  statement: 'Current run creation paths cannot consistently answer which product, agent, and activity
+    originated a run because only the public-agent path snapshots a service principal while the other
+    seven creation sites record incompatible fragments or no actor at all.
+
+    '
+  provenance:
+  - EV-010
+  - EV-014
+  - flows/FLOWS-001-internal-reshaping.md:40-48
+  - flows/FLOWS-001-internal-reshaping.md:79-92
+  - api/routes/public_agent.py:243-272
+  - api/routes/workflow.py:1202-1244
+  - api/routes/workflow_text_chat.py:167-205
+  - api/routes/agent_stream.py:66-88
+  - api/routes/telephony.py:175-205
+  - api/routes/telephony.py:455-501
+  - api/services/campaign/campaign_call_dispatcher.py:271-300
+  - api/services/telephony/ari_manager.py:668-700
+  stake: false
+  note: 'F-1 requires the originating product, and F-3 requires drill-down by agent and activity. The
+    eight direct creation sites cover public API calls, console runs, text tests, agent stream, outbound
+    and inbound telephony, campaigns, and ARI; only `public_agent.py` writes principal identifiers, and
+    none requires an origin product plus activity identifier. One-org degeneration removes tenant context
+    as a useful discriminator, making a run-owned origin snapshot mandatory for both credentialed and
+    credentialless ingress.
+
+    '
+- id: D2-6
+  author: d2-the-run-carries-its-own-truth
+  statement: 'Any implementation that leaves origin, purpose, or cost class optional in the central run
+    constructor will continue creating new unattributed runs through at least one ingress path.
+
+    '
+  provenance:
+  - EV-013
+  - flows/FLOWS-001-internal-reshaping.md:91-96
+  - api/db/workflow_run_client.py:41-108
+  - api/routes/public_agent.py:272-280
+  - api/routes/telephony.py:475-501
+  - api/services/campaign/campaign_call_dispatcher.py:288-300
+  stake: false
+  note: 'Run creation is shared by heterogeneous routes, and the current constructor enforces organization
+    or user plus workflow existence but no provenance contract. Route-by-route conventions have already
+    produced partial labels such as `trigger_mode`, `tester`, campaign ids, and inbound direction. The
+    visible unattributed bucket in F-3 is necessary for pre-labelling history; accepting missing metadata
+    for newly created runs would turn that migration state into an ongoing data-quality failure.
+
+    '
+- id: D2-7
+  author: d2-the-run-carries-its-own-truth
+  statement: 'Run-owned origin, purpose, and cost class will remain unusable for whole-system observability
+    unless they are top-level response fields and filterable dimensions in both run listings and usage
+    reports.
+
+    '
+  provenance:
+  - EV-010
+  - EV-014
+  - flows/FLOWS-001-internal-reshaping.md:40-96
+  - api/schemas/workflow.py:9-31
+  - api/routes/platform_admin.py:38-69
+  - api/db/organization_usage_client.py:133-151
+  stake: false
+  note: 'The current run response exposes generic contexts, mode, costs, and usage, while the platform-wide
+    run projection exposes only mode and completion state. The usage endpoint''s filter allowlist omits
+    product, agent, activity, purpose, and cost class. F-1 through F-3 require those dimensions to label
+    live calls, reconstruct old calls, split spend, and drill down, so burying them in JSON would not
+    produce the promised whole-system reads.
+
+    '
+- id: D2-8
+  author: d2-the-run-carries-its-own-truth
+  statement: 'Assigning provenance during completion processing will lose the truth for calls that fail
+    before the pipeline completes, so origin, purpose, and cost class must exist before the first provider
+    operation.
+
+    '
+  provenance:
+  - EV-013
+  - flows/FLOWS-001-internal-reshaping.md:52-57
+  - api/services/pipecat/event_handlers.py:282-363
+  - api/services/telephony/status_processor.py:190-231
+  stake: false
+  note: 'Normal pipeline usage is persisted at shutdown and completion work is then queued, while telephony
+    status handling has a separate path for calls that never connect. F-1 explicitly requires an engine
+    leg that dies mid-flight to remain visible rather than disappear. Creation-time classification is
+    the only common point reached by successful, failed, canceled, and never-connected runs, and it lets
+    later usage and cost records append to an identity that was already fixed.
+
+    '
