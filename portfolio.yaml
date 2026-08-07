@@ -23,12 +23,18 @@ products:
     tier: real
     status: discovery
     summary: >-
-      Internal voice/audio engine for Isoastra and the owner's projects. Brownfield onboard
-      2026-08-06 on a direction change: stop being a self-hostable vapi/retell alternative
-      (EV-001), serve internal projects (EV-002), reach frontier audio capability such as
-      force-aligned phonetics (EV-003), drop multi-tenant SaaS (EV-005), and make agents —
-      not the console — the primary interfacing surface (EV-006). Capability inventory of the
-      as-built engine is rinity/EV-011. Cross-product seam with rinity (external plane) is open.
+      Interim production voice engine under the front desk service (rinity), held until the
+      greenfield `voice` product replaces it (EV-007). Brownfield onboard 2026-08-06 on a
+      direction change: stop being a self-hostable vapi/retell alternative (EV-001), degenerate
+      to one organization with product-level auth keys (EV-017), give the owner observability
+      onto the whole system rather than one workspace (EV-010, EV-014), make worker agents the
+      authoring/testing surface with configuration as agent work (EV-011, EV-012), separate
+      agent-test cost from production (EV-013), and add phonetic misrecognition repair on
+      pipecat frames (EV-015, EV-016). Modified in place, never rebuilt (EV-018). Two bets:
+      bet 1 = the reshaping (BRIEF-001), bet 2 = phonetics (EV-022). Bound explicitly waived
+      (EV-020), so EV-021 is the only scope control; disposal needs a hardened, production-tested
+      `voice` and is not near (EV-023). Capability inventory of the as-built engine is
+      rinity/EV-011.
     code_repo: isoastra/audgent on the forge (nexus ~/dev/isoastra/audgent) + isoastra/pipecat submodule
     context: ~/dev/context/isoastra/products-history-20260724.md, ~/dev/context/isoastra/business-direction.md
   - name: voice
