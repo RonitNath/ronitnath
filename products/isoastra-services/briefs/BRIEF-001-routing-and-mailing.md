@@ -3,7 +3,7 @@ product: isoastra-services
 bet: 1 — services.isoastra.com T1 (routing + mailing)
 date: 2026-08-06
 interviewer: agent (Claude, PM session)
-status: final
+status: final — OQ resolutions written back from DEBATE-001 (2026-08-06)
 confidence: high
 ---
 
@@ -176,3 +176,18 @@ scope cuts:
 | OQ-5 | Is the PHI data class advisory metadata, or does the service refuse to place a PHI route on a non-BAA edge? | Advisory metadata that an agent can override is not a compliance control (EV-020). | n |
 | OQ-6 | Does routing cover only public edges, or also mesh-facing/internal routes? | The fleet's `web_app_host` proxies are route-shaped too; including them widens T1 materially. | n |
 | OQ-7 | How much extensibility scaffolding do the future domains (SMS, firewall, deploy config, STT/TTS/LLM/embeddings) justify now, with no T1 content? | EV-012 asks for room; premature module framework is the classic way to spend the bet on nothing shippable. | n |
+
+---
+
+## Open-question resolutions (written back from DEBATE-001, per `claim-schema.md`)
+
+| OQ | Resolution | Where |
+| --- | --- | --- |
+| OQ-1 edge config distribution | **resolved** — `caddy.config_loaders.http`; renderer unconditionally embeds the loader block; push-on-commit added for immediacy without the data plane depending on the cluster | C-33, C-2, C-11, C-16 |
+| OQ-2 identity seam | **deferred-as-assumption** — capability-scoped credentials issued by this service, with the identity provider behind a seam; not welded to Kanidm. Cheap to reverse while principals are owner+agents | C-26, C-36; EV-015 |
+| OQ-3 delivery across three nodes | **resolved** — all nodes accept, hiqlite leader claims and sends, one cluster-wide rate below the SES ceiling; at-least-once with indeterminate outcomes recorded | C-35 over C-48, C-42, C-46 |
+| OQ-4 two writers | **resolved** — authority epoch in fleet-owned edge config; fallback is a fenced transfer, never concurrent write access | C-39, C-5, C-30 |
+| OQ-5 PHI enforcement | **resolved** — data class is an admission constraint, not advisory metadata: a PHI route is refused placement on a non-BAA edge and the agent is told which edges will carry it | C-31, C-36; EV-020 |
+| OQ-6 routing scope | **deferred-as-assumption** — public edges only in T1. Mesh-facing/internal routes are not in the frozen scope | PITCH-001 no-gos |
+| OQ-7 extensibility scaffolding | **resolved** — none. No module framework before a second domain exists; recorded as a rabbit hole | PITCH-001 |
+| OQ-8 certificates across edges | **resolved (direction)** — per-edge durable material with independent renewal, settled before a second edge is activated; the control plane is never in the handshake path | C-45, C-17 |
