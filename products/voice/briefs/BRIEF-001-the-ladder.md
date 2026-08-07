@@ -116,22 +116,32 @@ named failure:
 
 ## Open questions
 
-Inherited by the debate or sanity pass per `debate-triggers.md`.
+**All twelve resolved by owner ruling, 2026-08-06** (same session, immediately after the
+brief). Kept here with their resolutions rather than deleted — the question is why the
+answer binds.
 
-| ID | Question | Why it matters | Blocking |
+| ID | Question | Resolution | Evidence |
 | --- | --- | --- | --- |
-| OQ-1 | Standalone service, or a slice of the universe-ronitnath monolith? "Its own separate voice.ronitnath.com" (EV-006) points standalone; the shared stack ruling (EV-008) does not settle repo topology. | Decides the repo, the deploy, and whether identity is inherited or built. Rung 1 cannot start without it. | **yes** |
-| OQ-2 | Data seam: Postgres (the universe ruling), SQLite, or hiqlite (as isoastra-services chose) for a single-node testing-mode service? | Rung 1 is storage. Also a T3-class commitment once clips and timelines are persisted. | **yes** |
-| OQ-3 | Where does audio actually live — filesystem, object store, in-database — and is there retention or is everything kept forever? | Rung 1's shape; replay-based testing of every later rung depends on the corpus surviving. | **yes** |
-| OQ-4 | EV-019 transcript reads "be able to moratorium to test what are the thresholds"; I read this as running a comparison matrix across provider/model configurations. Confirm. | A mistranscription hardening into a requirement is exactly the inference-for-ground-truth failure the records spec exists to prevent. | no |
-| OQ-5 | Does rung 2 use local models (whisper et al.) or hosted providers from the start? EV-019 implies hosted keys and spend; EV-010's efficiency goal and testing-mode posture imply local. | Decides whether early rungs need provider credentials and a spend decision. | no |
-| OQ-6 | Overlap with audgent's bet 2 (phonetics, audgent/EV-015, EV-016) versus EV-023 here. Two products investing in the same frontier capability. | Duplicate investment, or a deliberate split where audgent gets the production-shim version and voice gets the native one. | no |
-| OQ-7 | When does the system-plug-in seam (EV-012) get designed — now, or at graduation? Nothing consumes this during the internal phase (EV-013). | Designing an integration contract with no live consumer risks the speculative abstraction EV-009 warns against. | no |
-| OQ-8 | What does "hardened" mean operationally as the gate between rungs — an owner session, a test battery, a period of use? | It is the only scope control the bet has, since the bound is waived (EV-030). | no |
-| OQ-9 | Identity/auth for voice.ronitnath.com: Kanidm, the universe identity model, or nothing at all while it is internal-only? | Trust-boundary decision; `procedures/security.md` applies once EV-026 work starts regardless. | no |
-| OQ-10 | Which rung does diarization land on? "Early" (EV-024) is relative — attribution in the data model from rung 1, or a working diarizer at rung 2? | Distinguishes a cheap structural commitment from a real component with its own quality bar. | no |
-| OQ-11 | Does the measurement rig need durable cross-run comparison (experiment tracking), or is per-run inspection enough? | EV-019's threshold sweeps and EV-027's cost comparisons only pay off if runs are comparable after the fact. | no |
-| OQ-12 | With the bound waived, what closes bet 1 and triggers a retro — reaching a particular rung, or an owner call? | Without an end condition the ladder is a program, not a bet, and the retro station never fires. | no |
+| OQ-1 | Standalone service or a slice of the universe monolith? | Standalone service, own repo. | EV-031, DEC-001 |
+| OQ-2 | Data seam — Postgres, SQLite, hiqlite? | SQLite. | EV-032, DEC-001 |
+| OQ-3 | Where does audio live; is anything deleted? | Filesystem; kept forever. | EV-033, DEC-001 |
+| OQ-4 | Is the garbled span in EV-019 a provider comparison matrix? | Yes — reading confirmed. | EV-034 |
+| OQ-5 | Local models or hosted providers at rung 2? | Hosted. Credentials and real spend in scope from rung 2. | EV-035 |
+| OQ-6 | Phonetics duplicated across audgent and voice? | Deliberate duplicate; neither waits on the other. | EV-036 |
+| OQ-7 | When is the system plug-in seam designed? | Not now — there is no consumer; standalone internal product. Seam is designed at graduation, against a real consumer. | EV-037 |
+| OQ-8 | What does "hardened" mean between rungs? | Owner greenlight. No rung N+1 work before rung N is greenlit. | EV-038 |
+| OQ-9 | Identity/auth? | Kanidm, from rung 1. | EV-039, DEC-001 |
+| OQ-10 | Which rung does diarization land on? | A working diarizer at rung 2 — before the text agent ever sees a transcript. | EV-040 |
+| OQ-11 | Durable cross-run comparison needed? | Yes, and the named threat is schema churn breaking comparability. | EV-041 |
+| OQ-12 | What closes bet 1? | Owner call. Not a rung count. | EV-042 |
+
+Two of these reshape the ladder rather than merely answering a question:
+
+- **OQ-10** moves diarization from a schema commitment to a rung-2 deliverable with its own
+  greenlight, ahead of the LLM turn.
+- **OQ-11** identifies the actual irreversibility in this bet. It is not the storage choice
+  (SQLite on a filesystem is easy to walk back); it is the **measurement schema**, because a
+  corpus kept forever (EV-033) is only worth keeping if runs stay comparable across it.
 
 ## Debate-trigger check
 
@@ -148,9 +158,14 @@ Assessed against `debate-triggers.md`, for the record at pitch time:
 - **T5** confidence is `medium`, not low — no fire.
 - **T6** evidence is overwhelmingly ground-truth — no fire.
 
-**Recommendation: debate triggered (T3, with T2 indeterminate-but-substantively-large),
-scoped narrowly to the rung-1 data commitments** — repo topology, data seam, audio storage,
-and the timeline model that every later rung is attributed against. Not a debate about the
+**Recommendation, revised after the OQ round: debate triggered (T3), scoped to one subject —
+the measurement/timeline schema.** Repo topology, data seam and audio storage were T3
+candidates when the brief was written; the owner has since ruled them (DEC-001) and they are
+cheap to reverse besides. What remains is the commitment EV-041 names: the timeline model
+every signal is attributed against — audio, segments, transcript tokens, word arrival times,
+turn and sentence boundaries, speaker attribution, phonemes, LLM timings, cost — which must
+absorb signals that do not exist yet (EV-021..027) without reshaping the ones that do, or the
+permanent corpus stops being comparable and stops being worth keeping. Not a debate about the
 ladder; the ladder is owner-ruled evidence and not up for adversarial review.
 
 ## Interviewer note on confidence
