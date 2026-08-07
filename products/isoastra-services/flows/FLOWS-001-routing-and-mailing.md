@@ -16,8 +16,15 @@ mail, EV-023). Every actor carries at least one flow.
 Named non-goals with deliberately zero flows: **employee** (EV-004), **end recipient of mail** (never
 touches this system), **service-gateway consumer** (EV-005).
 
-Eleven flows. Six are the owner's, three are the agent's, two are machine-only. `PKT-##` references
-are forward-looking — packets derive from this set after the pitch freezes (`work-packets.md` rule 4).
+**Surface primacy (EV-027).** The machine API is the operating surface; the UI is an inspection
+surface the owner uses rarely — when something has gone seriously wrong, when he wants to see what
+configuration exists, or out of curiosity. So where a flow exists in both forms, the agent path is
+the primary one and the owner path is the occasional one, and every diagnostic view carries a
+machine-readable equivalent because agents diagnose too. A flow marked `surface: web` below is not
+thereby the common path — it is the one a human takes on the rare occasion he takes it.
+
+Twelve flows. `PKT-##` references are forward-looking — packets derive from this set after the pitch
+freezes (`work-packets.md` rule 4).
 
 ---
 
@@ -71,6 +78,10 @@ trigger:  a service needs a public hostname, or its upstreams changed
 outcome:  every applicable edge serves the new route; the previous version is recoverable
 surface:  web
 ```
+
+*The occasional path (EV-027). The common one is F-03, where an agent does this over the API.
+This flow exists for when the owner is in the UI anyway and wants to change something directly —
+which by EV-027 usually means something has already gone wrong.*
 
 **steps**
 
@@ -194,6 +205,10 @@ surface:  web → outside-web
 
 The mechanism EV-025 rules: **mode belongs to the registered application, not the request.**
 
+*Agents do this as often as the owner does (EV-027) — a new staging instance is an agent's act. The
+steps below are the owner's; the agent's is the same sequence over the API, and step 4 is where the
+agent has the advantage, because it is already holding the application's configuration.*
+
 **steps**
 
 1. *(web)* Owner registers the application: its name, and whether it is **production** (delivers via
@@ -306,11 +321,15 @@ materially. (data gate)
 ## F-08  Find out why mail did not arrive
 
 ```
-actor:    owner (same surface serves the agent doing forensics — EV-015)
+actor:    owner (same surface serves the agent doing forensics — EV-015, EV-027)
 trigger:  someone says they did not get an email
 outcome:  the owner knows which of accept / deliver / suppress / bounce happened, and when
-surface:  web
+surface:  web + machine-only
 ```
+
+*One of the two things the owner actually opens the UI for (EV-027): the "wtf is going on right now"
+read. It must also exist as a machine-readable surface — agents run this same investigation, and
+more often.*
 
 **steps**
 
@@ -344,10 +363,11 @@ surface:  web
 actor:    owner
 trigger:  routine check, or something looks wrong
 outcome:  owner knows the cluster's state and whether every edge is on the intended config
-surface:  web
+surface:  web + machine-only
 ```
 
-EV-016 makes this the service's own most important self-report.
+EV-016 makes this the service's own most important self-report, and EV-027 makes it the other thing
+the owner opens the UI for. Agents read the same facts to diagnose, so it is a machine surface too.
 
 **steps**
 
@@ -445,3 +465,46 @@ this is where a distribution design either self-heals or does not (OQ-1).
 
 **open**: Blocked on OQ-1 — pull-based distribution (EV-026) gives step 1 and 2 natively; a push
 design has to build both.
+
+---
+
+## F-12  See what configuration exists
+
+```
+actor:    owner
+trigger:  curiosity, or the beginning of an investigation — "what do we actually have right now?"
+outcome:  the owner has an accurate picture of the whole current configuration
+surface:  web
+```
+
+Written because EV-027 names this explicitly as one of the few reasons the owner opens the UI at
+all — wanting to see what configurations exist, or being curious what the routing configuration
+looks like. It is not a sub-step of F-08 or F-09: those start from a symptom, and this starts from
+nothing.
+
+**steps**
+
+1. *(web)* Owner opens the service and sees the whole picture without querying for it: every route,
+   every edge, which routes each edge carries.
+2. *(web)* Owner sees the same for mail: every registered application, its mode, and its sending
+   volume (EV-027 names volumes specifically).
+3. *(web)* Owner can follow anything that looks interesting into its detail — a route to its edges
+   and its history, an application to its recent messages.
+
+**branches**
+
+- The investigation branch: this flow is where F-08 and F-09 often actually start, so it must lead
+  into them rather than being a dead-end display.
+
+**states**
+
+- *empty*: nothing registered yet — should read as "nothing here yet", not as a broken page.
+- *partial-truth*: some edges are unconverged, so what is configured and what is *being served* are
+  not the same thing. This view must not conflate them; showing intent as though it were reality is
+  the specific way this flow can lie.
+
+**packets**: PKT-07, PKT-12, PKT-18, PKT-19 (mail volume reporting)
+
+**open**: Is "volume" a counter this service witnessed directly (messages it accepted and delivered),
+or an aggregate pulled from elsewhere? Per the owner's standing rule, a counter must name what the
+system actually observed. (data gate)
