@@ -241,12 +241,7 @@ fn AuthPage() -> impl IntoView {
 /// nothing to infer about what does or does not exist on the other side.
 const AUTH_REJECTED: &str = "Authentication failed.";
 
-/// Always declines.
-///
-/// It takes the credentials so a submission costs and looks like a real sign-in
-/// attempt, and then deliberately does nothing with them — they are not logged,
-/// stored, hashed, compared, or branched on. Every input follows the identical
-/// path to the identical answer.
+/// Always declines until the identity backend is connected.
 ///
 /// The decline is the *content*, not a transport error: this returns `Ok` and
 /// HTTP 200 rather than a `ServerFnError`, which the framework would render as
@@ -255,11 +250,22 @@ const AUTH_REJECTED: &str = "Authentication failed.";
 /// that the route is broken rather than that it declined you. Nothing is
 /// granted either way: no session, no cookie, no redirect.
 ///
-/// The endpoint is pinned so the URL is stable across builds; the generated
-/// default appends a hash of the function signature.
+/// When a row exists, the email-verification gate runs here (currently warns
+/// and skips). Unknown addresses take the same dummy password path so timing
+/// does not enumerate. The endpoint is pinned so the URL is stable across
+/// builds; the generated default appends a hash of the function signature.
 #[server(endpoint = "authenticate")]
 async fn authenticate(email: String, password: String) -> Result<(), ServerFnError> {
-    drop((email, password));
+    #[cfg(feature = "ssr")]
+    {
+        // No DB lookup yet — treat every submission as an unknown address.
+        let _email = email;
+        crate::auth::run_auth_gates(None, &password, None);
+    }
+    #[cfg(not(feature = "ssr"))]
+    {
+        drop((email, password));
+    }
     Ok(())
 }
 

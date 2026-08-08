@@ -1,4 +1,6 @@
 pub mod app;
+#[cfg(feature = "ssr")]
+pub mod auth;
 pub mod starscape;
 
 #[cfg(feature = "hydrate")]
