@@ -20,24 +20,30 @@ broken. The route stays visible on purpose.
 
 The auth model below is the shape this will grow into; none of it is built.
 
-Auth model:
+Auth model (schema in `migrations/1_auth.sql`, types in `src/auth/`):
+- Identifiers
+    - `id` INTEGER — server-local join key; never crosses to the client
+    - `public_id` UUID v4 — opaque external id; resolved via in-process hashmap
 - Auth Factors
     - Referential:
-        - Email
+        - Email (`verified_at` column kept; verification gate warns and skips for now)
     - Providence
-        - Password
+        - Password (argon2id PHC)
     - External
-        - OIDC/Oauth2
+        - OIDC/Oauth2 (deferred)
 - Identity
     - Who literally is this person?
-    - What kind of entity are they?
+    - What kind of entity are they? (`person` | `service`)
 - Accounts
-    - Personal, Business, Shared
+    - `primary` (default ownership boundary; was "personal"), `business`, `shared`, `alternate`, `service`
     - Legal ownership boundary
 - Access
     - What capabilities does this person have?
 - Session
     - Where is this account authorized to act currently?
+
+Dev-only: `cargo … --features dev-dashboard` enables hiqlite’s query UI. Do not
+ship that feature on the public edge.
 
 ## Ops surface
 
@@ -54,8 +60,20 @@ Auth model:
 
 ```sh
 nix develop            # pins rust, the wasm target and cargo-leptos
-cargo leptos watch     # http://127.0.0.1:3000
+cargo run              # self-contained: config.toml → ensure data/db.sqlite → migrate → serve
+cargo leptos watch     # same app with hydrate rebuilds; http://127.0.0.1:3000
 ```
+
+`config.toml` defaults to `mode = "dev"` and `db_path = "data/db.sqlite"`.
+Override with `RN_SITE__MODE` / `RN_SITE__DB_PATH`, or point at another file with
+`RN_SITE_CONFIG`. On boot the process creates the db directory/file if missing,
+starts embedded hiqlite, and applies `migrations/`. Ctrl+C / SIGTERM runs the
+axum graceful-shutdown path in `src/operations/shutdown.rs` (hiqlite teardown
+lives in the same `select!`).
+
+`COOKIE_SECRET` is read from `.env` at startup. If it is missing, the process
+generates one and appends it to `.env` so session cookies stay valid across
+restarts. `.env` is gitignored.
 
 The gates that CI enforces, runnable locally:
 
@@ -65,8 +83,8 @@ cargo clippy --no-default-features --features ssr --all-targets -- -D warnings
 cargo test --locked --no-default-features --features ssr
 ```
 
-The crate has no default features: `ssr` is the server build and `hydrate` is the
-wasm one, so every command names the feature set it means.
+Package `default = ["ssr"]` so `cargo run` works; `hydrate` is the wasm feature
+set and is selected by cargo-leptos (`lib-default-features = false`).
 
 ## Deployment
 

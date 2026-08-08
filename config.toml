@@ -1,0 +1,5 @@
+# rn-site process config (docs.rs/config).
+# Override with RN_SITE__MODE / RN_SITE__DB_PATH, or another file via RN_SITE_CONFIG.
+
+mode = "dev"
+db_path = "data/db.sqlite"

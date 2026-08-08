@@ -19,15 +19,30 @@ fn node_name() -> String {
 async fn main() {
     use axum::response::IntoResponse;
     use axum::{Json, Router, routing::get};
-    use leptos::logging::log;
     use leptos::prelude::*;
     use leptos_axum::{LeptosRoutes, generate_route_list};
     use rn_site::app::*;
+    use rn_site::operations::{config::AppConfig, db, secrets, shutdown, telemetry};
+    use tracing::info;
 
-    let conf = get_configuration(None).unwrap();
+    telemetry::init();
+
+    // Durable session signing key: load from `.env`, or generate and write it.
+    let cookie_secret = secrets::ensure_cookie_secret_default()
+        .expect("ensure COOKIE_SECRET in .env");
+    // Held for session middleware once that lands; do not log the value.
+    let _cookie_secret = cookie_secret;
+
+    let app_config = AppConfig::load().expect("load config.toml / RN_SITE__*");
+    let db = db::open_and_migrate(&app_config)
+        .await
+        .expect("open database and migrate");
+
+    // `Some("Cargo.toml")` so plain `cargo run` works without cargo-leptos
+    // injecting LEPTOS_OUTPUT_NAME.
+    let conf = get_configuration(Some("Cargo.toml")).unwrap();
     let addr = conf.leptos_options.site_addr;
     let leptos_options = conf.leptos_options;
-    // Generate the list of routes in your Leptos App
     let routes = generate_route_list(App);
 
     let app = Router::new()
@@ -57,19 +72,19 @@ async fn main() {
         })
         .fallback(leptos_axum::file_and_error_handler(shell))
         .with_state(leptos_options);
+    let app = telemetry::layer_http_trace(app);
 
-    // run our app with hyper
-    // `axum::Server` is a re-export of `hyper::Server`
-    log!("listening on http://{}", &addr);
+    info!(%addr, mode = app_config.mode.as_str(), "listening");
     let listener = tokio::net::TcpListener::bind(&addr).await.unwrap();
     axum::serve(listener, app.into_make_service())
+        .with_graceful_shutdown(shutdown::graceful_shutdown(db))
         .await
         .unwrap();
 }
 
 #[cfg(not(feature = "ssr"))]
 pub fn main() {
-    // no client-side main function
-    // unless we want this to work with e.g., Trunk for pure client-side testing
-    // see lib.rs for hydration function instead
+    // Binary requires `--features ssr` (the package default). Hydrate builds
+    // use the `hydrate` wasm entrypoint in lib.rs instead.
+    eprintln!("rn-site binary requires the `ssr` feature (enabled by default)");
 }
