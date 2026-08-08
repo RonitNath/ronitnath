@@ -91,12 +91,13 @@ jobs:
           # ansible.cfg (inventory, roles_path) is only honored from the
           # directory that contains it — run from ansible/, not the repo root.
           #
-          # delenda is reached through a ProxyJump on nexus: this runner's host
-          # (alien) has no path to it at all, because alien's netbird config
-          # disables the manager that builds the eBPF wgproxy every *relayed*
-          # connection routes through. That flag is deliberate hardening and
-          # stays; nexus relays instead, which costs one hop and no security.
-          # See resources/networks.md.
+          # delenda is reached through a ProxyJump on nexus. That was mandatory
+          # when this shipped — alien had no path to it at all — but the relay
+          # defect was root-caused and fixed the same day (resources/networks.md:
+          # NOTRACK rules for the eBPF wgproxy), and alien→delenda is now direct
+          # at ~24ms. The hop is retained because it works and is proven; it can
+          # be dropped from the fleet inventory whenever delivery should stop
+          # depending on nexus.
           cd "$fleet/ansible"
           ansible-playbook \
             -i inventory.yml \
