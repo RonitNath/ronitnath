@@ -1,0 +1,96 @@
+[package]
+name = "rn-site"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+leptos = { version = "0.9.0-beta", features = ["islands"] }
+leptos_router = { version = "0.9.0-beta1" }
+leptos_meta = { version = "0.9.0-beta" }
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = { version = "1.0.145", optional = true }
+axum = { version = "0.8.9", optional = true }
+console_error_panic_hook = { version = "0.1.7", optional = true }
+leptos_axum = { version = "0.9.0-beta", optional = true }
+tokio = { version = "1.53.1", features = ["rt-multi-thread"], optional = true }
+wasm-bindgen = { version = "0.2.126", optional = true }
+wasm-bindgen-futures = { version = "0.4.76", optional = true }
+js-sys = { version = "0.3.103", optional = true }
+web-sys = { version = "0.3.103", optional = true, features = [
+    "HtmlCanvasElement",
+    "HtmlElement",
+    "HtmlDivElement",
+    "HtmlScriptElement",
+    "HtmlHeadElement",
+    "WebGl2RenderingContext",
+    "WebGlProgram",
+    "WebGlShader",
+    "WebGlBuffer",
+    "WebGlTexture",
+    "WebGlUniformLocation",
+    "Blob",
+    "ImageBitmap",
+    "Response",
+    "Request",
+    "RequestInit",
+    "RequestMode",
+    "ReadableStream",
+    "ReadableStreamDefaultReader",
+    "ReadableStreamReadResult",
+    "Window",
+    "Document",
+    "Element",
+    "DomTokenList",
+    "Event",
+    "EventTarget",
+    "MediaQueryList",
+    "Storage",
+    "console",
+] }
+
+[features]
+hydrate = [
+    "leptos/hydrate",
+    "dep:console_error_panic_hook",
+    "dep:wasm-bindgen",
+    "dep:wasm-bindgen-futures",
+    "dep:js-sys",
+    "dep:web-sys",
+]
+ssr = [
+    "dep:axum",
+    "dep:serde_json",
+    "dep:tokio",
+    "dep:leptos_axum",
+    "leptos/ssr",
+    "leptos_meta/ssr",
+    "leptos_router/ssr",
+]
+
+[profile.wasm-release]
+inherits = "release"
+opt-level = 'z'
+lto = true
+codegen-units = 1
+panic = "abort"
+
+[package.metadata.leptos]
+output-name = "rn-site"
+site-root = "target/site"
+site-pkg-dir = "pkg"
+tailwind-input-file = "style/tailwind.css"
+assets-dir = "public"
+site-addr = "127.0.0.1:3000"
+reload-port = 3001
+end2end-cmd = "npx playwright test"
+end2end-dir = "end2end"
+browserquery = "defaults"
+bin-features = ["ssr"]
+bin-default-features = false
+lib-features = ["hydrate"]
+lib-default-features = false
+lib-profile-release = "wasm-release"
+js-dir = "public/js"

@@ -1,0 +1,312 @@
+use leptos::prelude::*;
+use leptos_meta::{MetaTags, Stylesheet, Title, provide_meta_context};
+use leptos_router::{
+    StaticSegment,
+    components::{Route, Router, Routes},
+};
+
+use crate::starscape::{CityLabel, MiniGlobe, Starscape};
+
+const THEME_CSS: &str = r#"
+:root { color-scheme: dark; --bg: oklch(0.06 0.005 240); --fg: oklch(0.96 0.002 80); --hero-fg: oklch(0.63 0.235 27); }
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) { color-scheme: light; --bg: oklch(0.97 0.003 240); --fg: oklch(0.15 0.010 240); --hero-fg: oklch(0.80 0.135 80); }
+}
+:root[data-theme="light"] { color-scheme: light; --bg: oklch(0.97 0.003 240); --fg: oklch(0.15 0.010 240); --hero-fg: oklch(0.80 0.135 80); }
+:root[data-theme="dark"] { color-scheme: dark; --bg: oklch(0.06 0.005 240); --fg: oklch(0.96 0.002 80); --hero-fg: oklch(0.63 0.235 27); }
+html { background: var(--bg); color: var(--fg); }
+"#;
+
+const THEME_JS: &str = r#"
+(function () {
+  try {
+    var saved = localStorage.getItem("theme");
+    var theme = saved === "light" || saved === "dark"
+      ? saved
+      : matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+    document.documentElement.setAttribute("data-theme", theme);
+  } catch (e) {
+    document.documentElement.setAttribute("data-theme", "dark");
+  }
+})();
+"#;
+
+fn server_now_ms() -> f64 {
+    #[cfg(feature = "ssr")]
+    {
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("clock after 1970")
+            .as_millis() as f64
+    }
+    #[cfg(not(feature = "ssr"))]
+    {
+        0.0
+    }
+}
+
+pub fn shell(options: LeptosOptions) -> impl IntoView {
+    view! {
+        <!DOCTYPE html>
+        <html lang="en">
+            <head>
+                <meta charset="utf-8"/>
+                <meta name="viewport" content="width=device-width, initial-scale=1"/>
+                <style>{THEME_CSS}</style>
+                <script>{THEME_JS}</script>
+                <AutoReload options=options.clone() />
+                <HydrationScripts options islands=true/>
+                <MetaTags/>
+            </head>
+            <body>
+                <App/>
+            </body>
+        </html>
+    }
+}
+
+#[component]
+pub fn App() -> impl IntoView {
+    provide_meta_context();
+    let epoch_ms = server_now_ms();
+
+    view! {
+        <Stylesheet id="leptos" href="/pkg/rn-site.css"/>
+        <Stylesheet href="/css/atmosphere.css"/>
+        <Stylesheet href="/css/starscape.css"/>
+        <Stylesheet href="/css/site.css"/>
+        <Title text="Ronit Nath"/>
+
+        <Atmosphere/>
+        <Starscape epoch_ms=epoch_ms/>
+        <div class="sky-chrome">
+            <MiniGlobe epoch_ms=epoch_ms/>
+            <CityLabel epoch_ms=epoch_ms/>
+        </div>
+
+        <header class="topbar">
+            <div class="auth">
+                <ThemeToggle/>
+                <a href="/auth" class="auth-link">
+                    "Authenticate"
+                </a>
+            </div>
+        </header>
+
+        <Router>
+            <main class="site-main">
+                <Routes fallback=|| "Page not found.".into_view()>
+                    <Route path=StaticSegment("") view=HomePage/>
+                    <Route path=StaticSegment("auth") view=AuthPage/>
+                </Routes>
+            </main>
+        </Router>
+    }
+}
+
+#[component]
+fn Atmosphere() -> impl IntoView {
+    view! {
+        <div class="starfield" aria-hidden="true">
+            <div class="stars-dim"></div>
+            <div class="stars-med"></div>
+            <div class="stars-bright"></div>
+        </div>
+        <div class="nebula" aria-hidden="true"></div>
+    }
+}
+
+/// Flip `data-theme` on <html>, persist the choice, and ask the sky for a
+/// frame — under reduced motion the starscape does not repaint on its own.
+fn flip_theme() {
+    let Some(root) = document().document_element() else {
+        return;
+    };
+    let current = root.get_attribute("data-theme").unwrap_or_default();
+    let next = if current == "light" { "dark" } else { "light" };
+    let _ = root.set_attribute("data-theme", next);
+    #[cfg(feature = "hydrate")]
+    if let Ok(event) = web_sys::Event::new("starscape-redraw") {
+        let _ = window().dispatch_event(&event);
+    }
+    #[cfg(feature = "hydrate")]
+    if let Ok(Some(storage)) = window().local_storage() {
+        let _ = storage.set_item("theme", next);
+    }
+}
+
+#[island]
+fn ThemeToggle() -> impl IntoView {
+    let toggle = move |_| flip_theme();
+
+    view! {
+        <button class="theme-toggle" aria-label="Toggle color theme" on:click=toggle>
+            <span class="theme-toggle-icon" aria-hidden="true">
+                <svg
+                    class="theme-icon-sun"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                >
+                    <circle cx="12" cy="12" r="4"></circle>
+                    <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"></path>
+                </svg>
+                <svg
+                    class="theme-icon-moon"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                >
+                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                </svg>
+            </span>
+        </button>
+    }
+}
+
+#[component]
+fn HomePage() -> impl IntoView {
+    view! {
+        <section class="home-hero">
+            <div class="home-card">
+                <h1>"Ronit Nath"</h1>
+                <p class="tagline">
+                    "My company: "
+                    <a
+                        class="company-link"
+                        href="https://isoastra.com"
+                        rel="noopener"
+                        target="_blank"
+                    >
+                        "Isoastra"
+                    </a>
+                </p>
+                <ul class="social-links">
+                    <li>
+                        <a
+                            href="https://github.com/RonitNath"
+                            rel="me noopener"
+                            target="_blank"
+                        >
+                            "GitHub"
+                        </a>
+                    </li>
+                    <li>
+                        <a
+                            href="https://instagram.com/ronit_nath"
+                            rel="me noopener"
+                            target="_blank"
+                        >
+                            "Instagram"
+                        </a>
+                    </li>
+                    <li>
+                        <a
+                            href="https://linkedin.com/in/ronitn"
+                            rel="me noopener"
+                            target="_blank"
+                        >
+                            "LinkedIn"
+                        </a>
+                    </li>
+                    <li>
+                        <a href="mailto:ronit@isoastra.com">"Email"</a>
+                    </li>
+                </ul>
+            </div>
+        </section>
+    }
+}
+
+#[component]
+fn AuthPage() -> impl IntoView {
+    view! {
+        <div class="flex min-h-screen flex-col items-center justify-center gap-8 px-4">
+            <h1 class="home-title text-2xl font-semibold">"Authenticate"</h1>
+            <LoginForm/>
+        </div>
+    }
+}
+
+/// The only thing this endpoint ever says.
+///
+/// There is no identity backend behind `/auth`, so every submission is declined
+/// with the same words: no field-level hint, no distinction between an address
+/// that is unknown and a password that is wrong, nothing to enumerate and
+/// nothing to infer about what does or does not exist on the other side.
+const AUTH_REJECTED: &str = "Authentication failed.";
+
+/// Always declines.
+///
+/// It takes the credentials so a submission costs and looks like a real sign-in
+/// attempt, and then deliberately does nothing with them — they are not logged,
+/// stored, hashed, compared, or branched on. Every input follows the identical
+/// path to the identical answer.
+///
+/// The decline is the *content*, not a transport error: this returns `Ok` and
+/// HTTP 200 rather than a `ServerFnError`, which the framework would render as
+/// a 500. A 500 would break the page for anyone without JS, get counted as a
+/// server fault by anything watching, and — the point of all this — announce
+/// that the route is broken rather than that it declined you. Nothing is
+/// granted either way: no session, no cookie, no redirect.
+///
+/// The endpoint is pinned so the URL is stable across builds; the generated
+/// default appends a hash of the function signature.
+#[server(endpoint = "authenticate")]
+async fn authenticate(email: String, password: String) -> Result<(), ServerFnError> {
+    drop((email, password));
+    Ok(())
+}
+
+#[island]
+fn LoginForm() -> impl IntoView {
+    let submit = ServerAction::<Authenticate>::new();
+    // Any settled outcome renders the same constant — deliberately including a
+    // network or decoding failure. Rendering the error's own `Display` would
+    // leak the framework's "error running server function: ..." wrapper and
+    // would let a failed request be told apart from a declined one.
+    let declined = move || submit.value().get().is_some();
+
+    view! {
+        <ActionForm action=submit attr:class="flex w-full max-w-sm flex-col gap-4">
+            <label class="flex flex-col gap-1 text-sm" style="color: var(--fg)">
+                "Email"
+                <input
+                    type="email"
+                    name="email"
+                    required
+                    class="rounded border px-3 py-2"
+                    style="border-color: color-mix(in oklab, var(--fg) 25%, transparent); background: color-mix(in oklab, var(--bg) 70%, transparent); color: var(--fg)"
+                />
+            </label>
+            <label class="flex flex-col gap-1 text-sm" style="color: var(--fg)">
+                "Password"
+                <input
+                    type="password"
+                    name="password"
+                    required
+                    class="rounded border px-3 py-2"
+                    style="border-color: color-mix(in oklab, var(--fg) 25%, transparent); background: color-mix(in oklab, var(--bg) 70%, transparent); color: var(--fg)"
+                />
+            </label>
+            <button
+                type="submit"
+                class="rounded px-4 py-2 text-sm font-medium"
+                style="background: var(--fg); color: var(--bg)"
+                disabled=move || submit.pending().get()
+            >
+                "Log in"
+            </button>
+            <Show when=declined>
+                <p class="text-sm" role="alert" style="color: var(--fg-subtle)">
+                    {AUTH_REJECTED}
+                </p>
+            </Show>
+        </ActionForm>
+    }
+}

@@ -1,0 +1,105 @@
+name: rn-site-deploy
+
+# Push-to-deploy: a push to `deploy` runs gates, publishes an immutable digest,
+# and rolls it across nexus, nyc and delenda. `main` is where work lands;
+# `deploy` is where it ships, so shipping is an explicit act.
+on:
+  push:
+    branches: [deploy]
+
+# A publisher and a rolling cutover are serialized on purpose. Never cancel an
+# in-progress run: it may be mid-rollout, with one node on each digest.
+concurrency:
+  group: rn-site-deploy
+  cancel-in-progress: false
+
+jobs:
+  gates:
+    # The zero-secret host-native runner (procedures/ci.md). It proves source
+    # and locked inputs; it cannot publish or deploy, and holds no credential.
+    runs-on: [self-hosted, native]
+    steps:
+      - name: Check out the exact revision
+        uses: https://code.forgejo.org/actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+          clean: true
+      - name: Verify locked source with warm per-repository caches
+        run: |
+          set -euo pipefail
+          repo_cache=/data/apps/forgejo-runner/cache/repos/${GITHUB_REPOSITORY:?}
+          export CARGO_HOME="$repo_cache/cargo-home"
+          export CARGO_TARGET_DIR="$repo_cache/cargo-target"
+          mkdir -p "$CARGO_HOME" "$CARGO_TARGET_DIR"
+
+          # The crate has no default features: `ssr` is the server build and
+          # `hydrate` is the wasm one, so every gate names the feature set it
+          # means rather than relying on a default that does not exist.
+          nix develop --command bash -euo pipefail -c '
+            cargo fmt --check
+            cargo clippy --no-default-features --features ssr --all-targets -- -D warnings
+            cargo test --locked --no-default-features --features ssr
+          '
+      - name: Controlled red-build proof gate
+        # Harmless in normal operation; adding .ci-red-proof forces one red run,
+        # which is how adoption is proven (procedures/ci.md).
+        run: test ! -e .ci-red-proof
+
+  release:
+    needs: gates
+    # The deliberately separate privileged CD runner (procedures/cd.md): runs as
+    # `deployer`, holds the publisher credential, the SSH key and a fleet
+    # checkout. This is a different trust contract, not a widening of the CI one.
+    runs-on: [self-hosted, deploy]
+    steps:
+      - name: Check out the exact revision
+        uses: https://code.forgejo.org/actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+          clean: true
+
+      - name: Build and publish the immutable image
+        run: |
+          set -euo pipefail
+          secrets=/data/apps/deployer/secrets
+          test -r "$secrets/registry-push.token"
+
+          image=git.isoastra.com/ronitnath/rn-site:${GITHUB_SHA:?}
+          podman build \
+            --build-arg SOURCE_GIT_HASH="${GITHUB_SHA:?}" \
+            --file Containerfile \
+            --tag "$image" \
+            .
+          podman login --username ronitnath --password-stdin git.isoastra.com \
+            < "$secrets/registry-push.token"
+          podman push --digestfile image.digest "$image"
+
+          digest=$(tr -d '\r\n' < image.digest)
+          # A tag is a locator. Everything downstream — the pull, the pin, the
+          # rollback target — is this digest, so refuse anything else.
+          if [[ ! "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+            echo "registry did not return an exact sha256 digest" >&2
+            exit 1
+          fi
+          printf 'RN_SITE_IMAGE_DIGEST=%s\n' "$digest" >> "$GITHUB_ENV"
+
+      - name: Roll the digest across nexus, nyc and delenda
+        run: |
+          set -euo pipefail
+          fleet=/data/apps/deployer/fleet
+          git -C "$fleet" pull --ff-only
+          # ansible.cfg (inventory, roles_path) is only honored from the
+          # directory that contains it — run from ansible/, not the repo root.
+          #
+          # delenda is reached through a ProxyJump on nexus: this runner's host
+          # (alien) has no path to it at all, because alien's netbird config
+          # disables the manager that builds the eBPF wgproxy every *relayed*
+          # connection routes through. That flag is deliberate hardening and
+          # stays; nexus relays instead, which costs one hop and no security.
+          # See resources/networks.md.
+          cd "$fleet/ansible"
+          ansible-playbook \
+            -i inventory.yml \
+            playbooks/rn-site-deploy.yml \
+            -e "rn_site_image_digest=${RN_SITE_IMAGE_DIGEST:?}" \
+            -e "rn_site_source_git_hash=${GITHUB_SHA:?}"

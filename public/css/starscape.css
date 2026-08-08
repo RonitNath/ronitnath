@@ -1,0 +1,221 @@
+/* Theme tokens + starscape chrome (from universe base.css / site.css). */
+
+@font-face {
+    font-family: "Agency Bold";
+    src: url("/fonts/agency-bold.ttf") format("truetype");
+    font-weight: 400 700;
+    font-style: normal;
+    font-display: swap;
+}
+
+:root {
+    color-scheme: dark;
+
+    --bg: oklch(0.06 0.005 240);
+    --bg-muted: oklch(0.10 0.008 240);
+    --bg-subtle: oklch(0.14 0.010 240);
+    --fg: oklch(0.96 0.002 80);
+    --fg-muted: oklch(0.75 0.005 80);
+    --fg-subtle: oklch(0.55 0.005 80);
+    --border: oklch(0.22 0.010 240);
+
+    --hero-fg: oklch(0.63 0.235 27);
+    --hero-shadow: none;
+    --hero-muted: oklch(0.97 0.005 255);
+    --hero-muted-shadow:
+        0 1px 2px oklch(0.18 0.04 265 / 0.6),
+        0 0 16px oklch(0.16 0.03 265 / 0.5);
+
+    /* Gold in night so Isoastra contrasts the red name. */
+    --company-fg: oklch(0.80 0.135 80);
+
+    --surface-glass: color-mix(in oklab, var(--bg) 33%, transparent);
+    --surface-glass-hover: color-mix(in oklab, var(--bg-subtle) 55%, transparent);
+
+    --topbar-height: 4.45rem;
+    --hero-lift: calc(100dvh / 6);
+
+    --accent: oklch(0.65 0.15 210);
+    --accent-hover: oklch(0.72 0.15 210);
+
+    --font-display: "Agency Bold", system-ui, sans-serif;
+    --font-body:
+        system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+        sans-serif;
+
+    --radius: 0.25rem;
+    --col-narrow: 500px;
+    --text-3xl: clamp(2.25rem, 1.4rem + 3.5vw, 3.25rem);
+    --weight-semibold: 600;
+
+    --dusk-gradient: linear-gradient(
+        180deg,
+        oklch(0.26 0.070 265) 0%,
+        oklch(0.36 0.090 264) 14%,
+        oklch(0.52 0.090 258) 32%,
+        oklch(0.70 0.070 252) 50%,
+        oklch(0.78 0.060 246) 70%,
+        oklch(0.82 0.050 242) 86%,
+        oklch(0.88 0.030 238) 94%,
+        oklch(0.95 0.012 235) 100%
+    );
+}
+
+@media (prefers-color-scheme: light) {
+    :root:not([data-theme="dark"]) {
+        color-scheme: light;
+        --bg: oklch(0.97 0.003 240);
+        --bg-muted: oklch(0.93 0.005 240);
+        --bg-subtle: oklch(0.89 0.007 240);
+        --fg: oklch(0.15 0.010 240);
+        --fg-muted: oklch(0.30 0.012 255);
+        --fg-subtle: oklch(0.40 0.012 255);
+        --border: oklch(0.50 0.030 255);
+        --accent: oklch(0.34 0.14 215);
+        --accent-hover: oklch(0.24 0.12 215);
+        --dusk: var(--dusk-gradient);
+        --on-dusk-fg: oklch(0.97 0.005 255);
+        --on-dusk-muted: oklch(0.86 0.012 255);
+        --on-dusk-border: oklch(0.97 0.005 255 / 0.3);
+        --on-dusk-bg: oklch(0.97 0.005 255 / 0.12);
+        --on-dusk-accent: oklch(0.84 0.09 215);
+        --on-dusk-glass: oklch(0.42 0.095 262 / 0.42);
+        --on-dusk-glass-hover: oklch(0.52 0.100 260 / 0.55);
+        --hero-fg: oklch(0.80 0.135 80);
+        --hero-shadow:
+            0 1px 2px oklch(0.18 0.04 265 / 0.6),
+            0 0 16px oklch(0.16 0.03 265 / 0.5);
+        /* Red in twilight so Isoastra contrasts the gold name. */
+        --company-fg: oklch(0.63 0.235 27);
+    }
+}
+
+:root[data-theme="light"] {
+    color-scheme: light;
+    --bg: oklch(0.97 0.003 240);
+    --bg-muted: oklch(0.93 0.005 240);
+    --bg-subtle: oklch(0.89 0.007 240);
+    --fg: oklch(0.15 0.010 240);
+    --fg-muted: oklch(0.30 0.012 255);
+    --fg-subtle: oklch(0.40 0.012 255);
+    --border: oklch(0.50 0.030 255);
+    --accent: oklch(0.34 0.14 215);
+    --accent-hover: oklch(0.24 0.12 215);
+    --dusk: var(--dusk-gradient);
+    --on-dusk-fg: oklch(0.97 0.005 255);
+    --on-dusk-muted: oklch(0.86 0.012 255);
+    --on-dusk-border: oklch(0.97 0.005 255 / 0.3);
+    --on-dusk-bg: oklch(0.97 0.005 255 / 0.12);
+    --on-dusk-accent: oklch(0.84 0.09 215);
+    --on-dusk-glass: oklch(0.42 0.095 262 / 0.42);
+    --on-dusk-glass-hover: oklch(0.52 0.100 260 / 0.55);
+    --hero-fg: oklch(0.80 0.135 80);
+    --hero-shadow:
+        0 1px 2px oklch(0.18 0.04 265 / 0.6),
+        0 0 16px oklch(0.16 0.03 265 / 0.5);
+    --company-fg: oklch(0.63 0.235 27);
+}
+
+:root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg: oklch(0.06 0.005 240);
+    --bg-muted: oklch(0.10 0.008 240);
+    --bg-subtle: oklch(0.14 0.010 240);
+    --fg: oklch(0.96 0.002 80);
+    --fg-muted: oklch(0.75 0.005 80);
+    --fg-subtle: oklch(0.55 0.005 80);
+    --border: oklch(0.22 0.010 240);
+    --accent: oklch(0.65 0.15 210);
+    --accent-hover: oklch(0.72 0.15 210);
+    --hero-fg: oklch(0.63 0.235 27);
+    --hero-shadow: none;
+    --company-fg: oklch(0.80 0.135 80);
+}
+
+html {
+    background: var(--bg);
+    color: var(--fg);
+}
+
+body {
+    margin: 0;
+    min-height: 100dvh;
+    font-family: var(--font-body);
+}
+
+/* Starscape canvas behind page content. */
+.starscape {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 0;
+}
+
+:root.starscape-active .starfield {
+    display: none;
+}
+
+/* Corner chrome: globe above grounding, fluid size, no width breakpoints. */
+.sky-chrome {
+    position: fixed;
+    z-index: 3;
+    left: clamp(0.5rem, 2vw, 1rem);
+    bottom: clamp(0.75rem, 2vh, 1rem);
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+    max-width: calc(100% - 2 * clamp(0.5rem, 2vw, 1rem));
+    pointer-events: none;
+}
+
+.mini-globe {
+    position: relative;
+    width: clamp(120px, 22vmin, 160px);
+    height: clamp(120px, 22vmin, 160px);
+    opacity: 0;
+    transition: opacity 0.6s ease;
+    pointer-events: none;
+}
+
+.mini-globe.is-ready {
+    opacity: 1;
+}
+
+.grounding {
+    position: relative;
+    margin: 0;
+    max-width: 100%;
+    font-size: 0.85rem;
+    color: var(--fg-subtle);
+    pointer-events: none;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-variant-numeric: tabular-nums;
+}
+
+/* Page content sits above the sky. */
+.site-main {
+    position: relative;
+    z-index: 1;
+}
+
+.home-title {
+    color: var(--hero-fg);
+    font-family: var(--font-display);
+}
+
+.auth-link {
+    color: var(--fg);
+    text-decoration: none;
+    font-size: 0.875rem;
+    font-weight: 500;
+    opacity: 0.85;
+}
+
+.auth-link:hover {
+    opacity: 1;
+}

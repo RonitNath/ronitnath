@@ -1,0 +1,23 @@
+Earth textures for the mini-globe
+
+Day map (day.jpg):
+  Source: Solar System Scope — 2k_earth_daymap.jpg
+  https://www.solarsystemscope.com/textures/
+  License: Creative Commons Attribution 4.0 International (CC BY 4.0)
+  https://creativecommons.org/licenses/by/4.0/
+
+Normal map (normal.jpg):
+  Source: Solar System Scope — 2k_earth_normal_map
+  License: CC BY 4.0 (same as above)
+
+Specular map (specular.jpg):
+  Source: Solar System Scope — 2k_earth_specular_map
+  License: CC BY 4.0 (same as above)
+
+Underlying imagery for many Solar System Scope Earth maps is derived from
+NASA Blue Marble / Visible Earth data, which is in the public domain
+(NASA imagery generally may be used for educational and commercial purposes
+with attribution requested where practical).
+
+When redistributing these assets, retain this NOTICE and credit
+Solar System Scope (and NASA where applicable) per CC BY 4.0.

@@ -1,0 +1,62 @@
+name: rn-site
+
+# One identical Compose model on all three hosts. Everything host-specific is in
+# the root-owned env files beside it:
+#
+#   image.env    RN_SITE_IMAGE=<digest>            (rewritten by the deploy role)
+#   node.env     RN_SITE_NODE, MESH_IP             (identity, not secret)
+#
+# There are no secrets: the site is stateless and holds no credential of its own.
+# Keeping the model identical is what makes a digest cutover reviewable — the
+# only thing that changes between hosts is the identity, and the only thing that
+# changes between releases is the digest.
+#
+# `env_file:` injects variables into the *container* and is invisible to Compose
+# interpolation, so resolving ${RN_SITE_IMAGE} and ${MESH_IP} in the model below
+# needs `--env-file` on the command line as well. Both are required and they are
+# deliberately not the same mechanism.
+
+services:
+  site:
+    image: ${RN_SITE_IMAGE:?Set RN_SITE_IMAGE to an immutable forge registry digest}
+    user: "9751:9751"
+    restart: unless-stopped
+    init: true
+    # Nothing here is durable. The site serves a compiled bundle and keeps no
+    # state at all, so the root filesystem is read-only and /tmp is the only
+    # writable path in the container — there is no bind mount to get wrong.
+    read_only: true
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 256
+    mem_limit: 512m
+    cpus: 1.5
+    stop_grace_period: 10s
+    tmpfs:
+      - /tmp:size=32m,mode=1777
+    env_file:
+      - ./image.env
+      - ./node.env
+    environment:
+      PUBLIC_URL: https://ronitnath.com
+      RUST_LOG: info
+    ports:
+      # Public HTTP, reachable only from nanode's Caddy over the mesh. Bound to
+      # the node's mesh IP, never 0.0.0.0 — which is also why every health gate
+      # must curl ${MESH_IP} and not 127.0.0.1.
+      - target: 3160
+        published: "3160"
+        host_ip: ${MESH_IP:?Set MESH_IP in node.env}
+        protocol: tcp
+    healthcheck:
+      # Liveness, not readiness: Compose must not restart a container for a
+      # reason readiness would merely report. The deploy role gates on /readyz
+      # separately. This one curls loopback *inside* the container, where the
+      # listener is bound to 0.0.0.0 — the mesh-IP caveat above is about gates
+      # running on the host.
+      test: [CMD, curl, -fsS, -o, /dev/null, "http://127.0.0.1:3160/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+      start_period: 10s
