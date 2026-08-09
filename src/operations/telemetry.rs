@@ -2,13 +2,7 @@
 
 use std::time::Duration;
 
-use axum::{
-    Router,
-    body::Body,
-    extract::MatchedPath,
-    http::Request,
-    response::Response,
-};
+use axum::{Router, body::Body, extract::MatchedPath, http::Request, response::Response};
 use tower_http::{classify::ServerErrorsFailureClass, trace::TraceLayer};
 use tracing::{Span, info_span};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};

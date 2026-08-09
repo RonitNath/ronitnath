@@ -36,7 +36,10 @@ CREATE INDEX identity_emails_identity_id_idx ON identity_emails (identity_id);
 CREATE TABLE identity_passwords
 (
     identity_id INTEGER PRIMARY KEY NOT NULL REFERENCES identities (id),
-    argon2_phc  TEXT    NOT NULL,
+    -- Complete PHC string: algorithm, version, cost parameters, salt, and output.
+    -- Keep this representation intact so old credentials remain verifiable after
+    -- changing the current password-hashing policy or its implementation library.
+    password_hash TEXT    NOT NULL,
     created_at  INTEGER NOT NULL,
     rotated_at  INTEGER NOT NULL,
     updated_at  INTEGER NOT NULL
@@ -85,18 +88,36 @@ CREATE TABLE membership_capabilities
         REFERENCES account_memberships (account_id, identity_id)
 );
 
+-- A session belongs to a *membership*, not to an identity alone: the same
+-- person signed into two accounts holds two sessions with different
+-- capabilities. The composite foreign key is what makes that structural — a
+-- session can only name a pair that `account_memberships` already joins, which
+-- is the same pair `membership_capabilities` is keyed by.
+--
+-- There is no `revoked_at`. Revocation deletes the row; a session that does not
+-- exist is invalid, and that is the only rule the resolver needs.
 CREATE TABLE sessions
 (
     id          INTEGER PRIMARY KEY NOT NULL,
+    -- SHA-256 of the high-entropy opaque bearer token. The plaintext exists
+    -- only in the browser cookie and transient request memory.
     token_hash  TEXT    NOT NULL UNIQUE,
-    identity_id INTEGER NOT NULL REFERENCES identities (id),
-    account_id  INTEGER NOT NULL REFERENCES accounts (id),
+    identity_id INTEGER NOT NULL,
+    account_id  INTEGER NOT NULL,
     created_at  INTEGER NOT NULL,
     expires_at  INTEGER NOT NULL,
     last_seen_at INTEGER NOT NULL,
-    revoked_at  INTEGER,
-    user_agent  TEXT
+    user_agent  TEXT,
+    FOREIGN KEY (account_id, identity_id)
+        REFERENCES account_memberships (account_id, identity_id)
 );
 
-CREATE INDEX sessions_identity_id_idx ON sessions (identity_id);
-CREATE INDEX sessions_account_id_idx ON sessions (account_id);
+-- Membership key: every "sessions of this identity on this account" query, and
+-- — because `identity_id` leads — every "all sessions of this identity" query
+-- for a sign-out-everywhere or a password change.
+CREATE INDEX sessions_membership_idx ON sessions (identity_id, account_id);
+-- Account-first, for revoking a whole account's sessions when it is disabled.
+CREATE INDEX sessions_account_id_idx ON sessions (account_id, identity_id);
+-- Now that expiry is the only way a row goes stale on its own, a sweep needs
+-- to find expired rows without scanning the table.
+CREATE INDEX sessions_expires_at_idx ON sessions (expires_at);

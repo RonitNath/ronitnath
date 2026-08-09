@@ -32,6 +32,7 @@ ENV LEPTOS_TAILWIND_VERSION=v4.2.1 \
 
 COPY Cargo.toml Cargo.lock ./
 COPY src src
+COPY migrations migrations
 COPY style style
 COPY public public
 

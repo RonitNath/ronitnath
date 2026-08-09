@@ -26,7 +26,8 @@ impl Mode {
 #[derive(Debug, Clone, Deserialize)]
 pub struct AppConfig {
     pub mode: Mode,
-    /// Path to the SQLite state-machine file (parent dir is the hiqlite data dir).
+    /// Logical SQLite filename whose parent is Hiqlite's complete data dir.
+    /// Hiqlite places the actual state-machine file beneath that directory.
     pub db_path: PathBuf,
 }
 

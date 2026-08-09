@@ -8,17 +8,12 @@ The landing page is ronitnath.com. Options:
 
 ## `/auth`
 
-`/auth` is the login/register page, and **it declines every submission.**
-
-There is no identity backend behind it yet, so `POST /api/authenticate` reads
-nothing from what it is given and answers every input identically:
-`Authentication failed.` — no field-level hint, no distinction between an
-unknown address and a wrong password, no session, no cookie, no redirect. The
-decline is content rather than a transport error (HTTP 200), so the page keeps
-working and the route reads as a gate that declined you rather than one that is
-broken. The route stays visible on purpose.
-
-The auth model below is the shape this will grow into; none of it is built.
+`/auth` registers and signs identities in against the replicated Hiqlite store.
+The browser receives a high-entropy opaque bearer token; only its SHA-256 digest
+is persisted. Session identity, capabilities, expiry, and revocation remain
+server-side, so every replica observes the same session and sign-out is
+immediate. Auth responses are `no-store`; production cookies are `Secure`,
+`HttpOnly`, and `SameSite=Lax`.
 
 Auth model (schema in `migrations/1_auth.sql`, types in `src/auth/`):
 - Identifiers
@@ -60,20 +55,18 @@ ship that feature on the public edge.
 
 ```sh
 nix develop            # pins rust, the wasm target and cargo-leptos
-cargo run              # self-contained: config.toml → ensure data/db.sqlite → migrate → serve
+cargo run              # self-contained: create data/ → Hiqlite → migrate → serve
 cargo leptos watch     # same app with hydrate rebuilds; http://127.0.0.1:3000
 ```
 
 `config.toml` defaults to `mode = "dev"` and `db_path = "data/db.sqlite"`.
 Override with `RN_SITE__MODE` / `RN_SITE__DB_PATH`, or point at another file with
-`RN_SITE_CONFIG`. On boot the process creates the db directory/file if missing,
-starts embedded hiqlite, and applies `migrations/`. Ctrl+C / SIGTERM runs the
+`RN_SITE_CONFIG`. In dev the process creates the data directory if missing;
+Hiqlite owns and creates its nested SQLite state-machine file. Production
+requires the data directory to be provisioned and mounted before startup. The
+process then applies `migrations/`. Ctrl+C / SIGTERM runs the
 axum graceful-shutdown path in `src/operations/shutdown.rs` (hiqlite teardown
 lives in the same `select!`).
-
-`COOKIE_SECRET` is read from `.env` at startup. If it is missing, the process
-generates one and appends it to `.env` so session cookies stay valid across
-restarts. `.env` is gitignored.
 
 The gates that CI enforces, runnable locally:
 
@@ -94,5 +87,18 @@ digest to the forge registry, and rolls it across **nexus, nyc and delenda** wit
 the fleet `rn-site-deploy` playbook. `deploy/provision.sh` prepares the hosts and
 is deliberately *not* part of CD — an operator provisions, the pipeline only ever
 rewrites a digest.
+
+The production service is one three-voter Hiqlite cluster, not three independent
+SQLite files. `deploy/provision.sh` creates each node's persistent `state/`
+directory, installs the shared Raft/API secrets, and writes stable node IDs plus
+the full mesh peer map. Run it before the first stateful release or after a
+topology/Compose change. Routine CD requires all three voters ready, rolls one
+node at a time through the fleet playbook, then proves every node reports the
+released revision. The first bootstrap is an operator action: provision all
+hosts, then start nodes 1, 2, and 3 in that order before enabling traffic.
+
+Raft/API ports 8100/8200 are bound only to each host's mesh IP and must be
+restricted by host/mesh ACLs to the rn-site peers. The complete `state/`
+directory—not merely the nested SQLite file—is the backup and recovery unit.
 
 See `procedures/{cd,deployment,ha-service}.md` in the context repo.

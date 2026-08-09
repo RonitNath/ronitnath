@@ -168,7 +168,6 @@ pub struct Session {
     pub created_at: i64,
     pub expires_at: i64,
     pub last_seen_at: i64,
-    pub revoked_at: Option<i64>,
     pub user_agent: Option<String>,
 }
 

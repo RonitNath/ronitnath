@@ -4,12 +4,12 @@ name: rn-site
 # the root-owned env files beside it:
 #
 #   image.env    RN_SITE_IMAGE=<digest>            (rewritten by the deploy role)
-#   node.env     RN_SITE_NODE, MESH_IP             (identity, not secret)
+#   node.env     node identity, mesh IP, full Hiqlite peer map
+#   ../secrets/  shared Hiqlite Raft/API secrets (provisioned, never by CD)
 #
-# There are no secrets: the site is stateless and holds no credential of its own.
-# Keeping the model identical is what makes a digest cutover reviewable — the
-# only thing that changes between hosts is the identity, and the only thing that
-# changes between releases is the digest.
+# The complete Hiqlite state directory is a persistent host bind. The model is
+# still identical on every host: only stable node identity differs, and only the
+# immutable image digest changes during a routine rollout.
 #
 # `env_file:` injects variables into the *container* and is invisible to Compose
 # interpolation, so resolving ${RN_SITE_IMAGE} and ${MESH_IP} in the model below
@@ -22,9 +22,6 @@ services:
     user: "9751:9751"
     restart: unless-stopped
     init: true
-    # Nothing here is durable. The site serves a compiled bundle and keeps no
-    # state at all, so the root filesystem is read-only and /tmp is the only
-    # writable path in the container — there is no bind mount to get wrong.
     read_only: true
     cap_drop: [ALL]
     security_opt:
@@ -32,7 +29,9 @@ services:
     pids_limit: 256
     mem_limit: 512m
     cpus: 1.5
-    stop_grace_period: 10s
+    # Hiqlite deliberately drains a multi-node voter before stopping. Ten
+    # seconds races that drain and turns normal deploys into auto-heal boots.
+    stop_grace_period: 30s
     tmpfs:
       - /tmp:size=32m,mode=1777
     env_file:
@@ -41,12 +40,36 @@ services:
     environment:
       PUBLIC_URL: https://ronitnath.com
       RUST_LOG: info
+      RN_SITE__MODE: prod
+      RN_SITE__DB_PATH: /var/lib/rn-site/db.sqlite
+      RN_SITE_HQL_SECRET_RAFT_FILE: /run/secrets/hiqlite_raft
+      RN_SITE_HQL_SECRET_API_FILE: /run/secrets/hiqlite_api
+    volumes:
+      - type: bind
+        source: ../state
+        target: /var/lib/rn-site
+        bind:
+          create_host_path: false
+    secrets:
+      - hiqlite_raft
+      - hiqlite_api
     ports:
       # Public HTTP, reachable only from nanode's Caddy over the mesh. Bound to
       # the node's mesh IP, never 0.0.0.0 — which is also why every health gate
       # must curl ${MESH_IP} and not 127.0.0.1.
       - target: 3160
         published: "3160"
+        host_ip: ${MESH_IP:?Set MESH_IP in node.env}
+        protocol: tcp
+      # Raft and the Hiqlite API are peer-only. Binding to the mesh address
+      # keeps them off every public/LAN interface; host ACLs still restrict the
+      # callers to the other two rn-site nodes.
+      - target: 8100
+        published: "8100"
+        host_ip: ${MESH_IP:?Set MESH_IP in node.env}
+        protocol: tcp
+      - target: 8200
+        published: "8200"
         host_ip: ${MESH_IP:?Set MESH_IP in node.env}
         protocol: tcp
     healthcheck:
@@ -59,4 +82,10 @@ services:
       interval: 10s
       timeout: 3s
       retries: 6
-      start_period: 10s
+      start_period: 30s
+
+secrets:
+  hiqlite_raft:
+    file: ../secrets/hiqlite-raft
+  hiqlite_api:
+    file: ../secrets/hiqlite-api

@@ -9,10 +9,9 @@
 # immutable digest into image.env (procedures/deployment.md: an operator
 # provisions, a pipeline cuts over). Running it twice is safe.
 #
-# The site is stateless and holds no secret of its own, so there is nothing here
-# to decrypt and no state directory to create. The one credential involved is the
-# registry *pull* identity, which nexus already holds and which delenda alone is
-# missing — see provision_delenda_registry_client below.
+# Hiqlite state and its two cluster secrets are provisioned here, never by the
+# release pipeline. Nexus holds the canonical secret copies; every voter gets
+# the same values and its own durable state directory.
 set -euo pipefail
 
 if [[ "$(hostname -s)" != "nexus" ]]; then
@@ -27,17 +26,33 @@ APP_DIR=/data/apps/rn-site
 RUNTIME_UID=9751
 RUNTIME_GID=9751
 REGISTRY_CLIENT=forgejo-registry-pull
+CLUSTER_SECRET_DIR=/etc/rn-site/cluster-secrets
+HQL_NODES='1@100.88.31.199:8100@100.88.31.199:8200,2@100.88.223.144:8100@100.88.223.144:8200,3@100.88.252.202:8100@100.88.252.202:8200'
 
 # short name : mesh ip : ssh target ("" means this host)
 #
 # Order is the rolling order used by the fleet playbook: nexus, nyc, delenda.
 NODES=(
-    "nexus:100.88.31.199:"
-    "nyc:100.88.223.144:nyc"
-    "delenda:100.88.252.202:del"
+    "1:nexus:100.88.31.199:"
+    "2:nyc:100.88.223.144:nyc"
+    "3:delenda:100.88.252.202:del"
 )
 
 log() { echo "==> $*"; }
+
+# Generate once on nexus. Re-running provisioning copies the existing values;
+# silently rotating either secret would partition every node not changed in the
+# same instant and is therefore never an automatic operation.
+ensure_cluster_secrets() {
+    sudo install -d -o root -g root -m 0700 "$CLUSTER_SECRET_DIR"
+    for name in hiqlite-raft hiqlite-api; do
+        if ! sudo test -s "$CLUSTER_SECRET_DIR/$name"; then
+            log "generating $name cluster secret"
+            openssl rand -hex 32 \
+                | sudo install -o root -g root -m 0400 /dev/stdin "$CLUSTER_SECRET_DIR/$name"
+        fi
+    done
+}
 
 # --- delenda only: the registry pull identity -------------------------------
 # nexus and nyc are Debian hosts provisioned with the forge credential helper
@@ -76,7 +91,7 @@ provision_delenda_registry_client() {
 
 # --- per-host runtime layout -------------------------------------------------
 provision_node() {
-    local name="$1" mesh_ip="$2" target="$3"
+    local node_id="$1" name="$2" mesh_ip="$3" target="$4"
     log "provisioning $name ($mesh_ip)"
 
     # Everything below runs as one root shell on the target so a partially
@@ -92,6 +107,8 @@ set -euo pipefail
 test -d /data/apps || { echo "/data/apps missing on \$(hostname -s)" >&2; exit 1; }
 
 install -d -o root -g root -m 0755 $APP_DIR $APP_DIR/oci
+install -d -o $RUNTIME_UID -g $RUNTIME_GID -m 0700 $APP_DIR/state
+install -d -o root -g root -m 0700 $APP_DIR/secrets
 
 # Identity, not secret: kept in the clear so a reviewer can read which node a
 # host believes it is without decrypting anything. The app reports RN_SITE_NODE
@@ -99,6 +116,8 @@ install -d -o root -g root -m 0755 $APP_DIR $APP_DIR/oci
 cat > $APP_DIR/oci/node.env <<'ENV'
 RN_SITE_NODE=$name
 MESH_IP=$mesh_ip
+RN_SITE_HQL_NODE_ID=$node_id
+RN_SITE_HQL_NODES=$HQL_NODES
 ENV
 chown root:root $APP_DIR/oci/node.env
 chmod 0644 $APP_DIR/oci/node.env
@@ -137,7 +156,7 @@ REMOTE
     # command line, so nothing ever lands in a process listing or shell history.
     local run=(sudo bash -s)
     local put_compose=(sudo install -o root -g root -m 0644 /dev/stdin "$APP_DIR/oci/compose.yaml")
-    local check=(sudo stat -c '%n=%U:%G=mode.%a' "$APP_DIR/oci/node.env" "$APP_DIR/oci/compose.yaml")
+    local check=(sudo stat -c '%n=%U:%G=mode.%a' "$APP_DIR/oci/node.env" "$APP_DIR/oci/compose.yaml" "$APP_DIR/state" "$APP_DIR/secrets/hiqlite-raft" "$APP_DIR/secrets/hiqlite-api")
 
     if [[ -n "$target" ]]; then
         [[ "$name" == "delenda" ]] && provision_delenda_registry_client "$target"
@@ -148,16 +167,29 @@ REMOTE
 
     printf '%s\n' "$script" | "${run[@]}"
     "${put_compose[@]}" < "$REPO_ROOT/deploy/compose.yaml"
+
+    # Compose file-backed secrets retain the source file's numeric ownership.
+    # UID 9751 can read them inside the container; no unrelated host account can.
+    for secret in hiqlite-raft hiqlite-api; do
+        if [[ -n "$target" ]]; then
+            sudo cat "$CLUSTER_SECRET_DIR/$secret" \
+                | ssh "$target" sudo install -o "$RUNTIME_UID" -g "$RUNTIME_GID" -m 0400 /dev/stdin "$APP_DIR/secrets/$secret"
+        else
+            sudo install -o "$RUNTIME_UID" -g "$RUNTIME_GID" -m 0400 \
+                "$CLUSTER_SECRET_DIR/$secret" "$APP_DIR/secrets/$secret"
+        fi
+    done
     "${check[@]}"
 }
 
+ensure_cluster_secrets
 selected=("$@")
 for entry in "${NODES[@]}"; do
-    IFS=: read -r name mesh_ip target <<<"$entry"
+    IFS=: read -r node_id name mesh_ip target <<<"$entry"
     if [[ ${#selected[@]} -gt 0 ]]; then
         printf '%s\n' "${selected[@]}" | grep -qx "$name" || continue
     fi
-    provision_node "$name" "$mesh_ip" "$target"
+    provision_node "$node_id" "$name" "$mesh_ip" "$target"
 done
 
 log "done. Deploy a digest with the fleet playbook, never by editing image.env by hand."

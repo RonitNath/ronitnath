@@ -2,6 +2,5 @@
 
 pub mod config;
 pub mod db;
-pub mod secrets;
 pub mod shutdown;
 pub mod telemetry;

@@ -39,6 +39,7 @@ jobs:
             cargo fmt --check
             cargo clippy --no-default-features --features ssr --all-targets -- -D warnings
             cargo test --locked --no-default-features --features ssr
+            bash -n deploy/provision.sh deploy/verify-cluster.sh
           '
       - name: Controlled red-build proof gate
         # Harmless in normal operation; adding .ci-red-proof forces one red run,
@@ -83,6 +84,12 @@ jobs:
           fi
           printf 'RN_SITE_IMAGE_DIGEST=%s\n' "$digest" >> "$GITHUB_ENV"
 
+      # Kept after publication so a first-time bootstrap can obtain the exact
+      # artifact even though the ordinary rollout correctly refuses a fleet
+      # that is not healthy yet.
+      - name: Require all three voters healthy before disrupting one
+        run: deploy/verify-cluster.sh
+
       - name: Roll the digest across nexus, nyc and delenda
         run: |
           set -euo pipefail
@@ -104,3 +111,6 @@ jobs:
             playbooks/rn-site-deploy.yml \
             -e "rn_site_image_digest=${RN_SITE_IMAGE_DIGEST:?}" \
             -e "rn_site_source_git_hash=${GITHUB_SHA:?}"
+
+      - name: Prove every voter is ready on the released revision
+        run: deploy/verify-cluster.sh "${GITHUB_SHA:?}"

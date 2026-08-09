@@ -87,6 +87,15 @@ pub fn App() -> impl IntoView {
         <header class="topbar">
             <div class="auth">
                 <ThemeToggle/>
+                // Server-rendered pages behind capability guards, not Leptos
+                // routes — plain anchors so the browser does a full navigation
+                // and the guard actually runs.
+                <a href="/protected" class="auth-link">
+                    "Protected"
+                </a>
+                <a href="/manage" class="auth-link">
+                    "Manage"
+                </a>
                 <a href="/auth" class="auth-link">
                     "Authenticate"
                 </a>

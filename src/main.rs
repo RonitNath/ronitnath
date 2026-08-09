@@ -14,29 +14,43 @@ fn node_name() -> String {
     std::env::var("RN_SITE_NODE").unwrap_or_else(|_| "unknown".to_string())
 }
 
+/// Expected voter count from the configured peer map (one in local dev).
+#[cfg(feature = "ssr")]
+fn expected_voters() -> usize {
+    std::env::var("RN_SITE_HQL_NODES")
+        .ok()
+        .map(|nodes| {
+            nodes
+                .split(',')
+                .filter(|node| !node.trim().is_empty())
+                .count()
+        })
+        .unwrap_or(1)
+}
+
 #[cfg(feature = "ssr")]
 #[tokio::main]
 async fn main() {
+    use axum::http::StatusCode;
     use axum::response::IntoResponse;
     use axum::{Json, Router, routing::get};
     use leptos::prelude::*;
     use leptos_axum::{LeptosRoutes, generate_route_list};
     use rn_site::app::*;
-    use rn_site::operations::{config::AppConfig, db, secrets, shutdown, telemetry};
+    use rn_site::auth::AuthState;
+    use rn_site::operations::{config::AppConfig, db, shutdown, telemetry};
     use tracing::info;
 
     telemetry::init();
-
-    // Durable session signing key: load from `.env`, or generate and write it.
-    let cookie_secret = secrets::ensure_cookie_secret_default()
-        .expect("ensure COOKIE_SECRET in .env");
-    // Held for session middleware once that lands; do not log the value.
-    let _cookie_secret = cookie_secret;
 
     let app_config = AppConfig::load().expect("load config.toml / RN_SITE__*");
     let db = db::open_and_migrate(&app_config)
         .await
         .expect("open database and migrate");
+
+    // `Secure` on the session cookie follows the runtime mode: prod sits behind
+    // the TLS-terminating edge, dev does not.
+    let auth_state = AuthState::for_mode(db.clone(), app_config.mode);
 
     // `Some("Cargo.toml")` so plain `cargo run` works without cargo-leptos
     // injecting LEPTOS_OUTPUT_NAME.
@@ -45,6 +59,7 @@ async fn main() {
     let leptos_options = conf.leptos_options;
     let routes = generate_route_list(App);
 
+    let readiness_db = db.clone();
     let app = Router::new()
         // Liveness: no dependencies, no allocation of consequence, no reason to
         // ever fail while the process is up. This is what the edge's active
@@ -56,13 +71,45 @@ async fn main() {
         // an ssh. The rollout asserts every replica reports the same version.
         .route(
             "/readyz",
-            get(|| async {
-                Json(serde_json::json!({
-                    "status": "ok",
-                    "node": node_name(),
-                    "version": release_version(),
-                }))
-                .into_response()
+            get(move || {
+                let db = readiness_db.clone();
+                async move {
+                    let expected = expected_voters();
+                    let db_metrics = db.metrics_db().await.ok();
+                    let cache_metrics = db.metrics_cache().await.ok();
+                    let voters = db_metrics
+                        .as_ref()
+                        .map(|metrics| metrics.membership_config.voter_ids().count())
+                        .unwrap_or(0);
+                    let cache_voters = cache_metrics
+                        .as_ref()
+                        .map(|metrics| metrics.membership_config.voter_ids().count())
+                        .unwrap_or(0);
+                    let leader = db_metrics
+                        .as_ref()
+                        .and_then(|metrics| metrics.current_leader);
+                    let healthy = db.is_healthy_db().await.is_ok()
+                        && db.is_healthy_cache().await.is_ok()
+                        && voters == expected
+                        && cache_voters == expected;
+                    let status = if healthy {
+                        StatusCode::OK
+                    } else {
+                        StatusCode::SERVICE_UNAVAILABLE
+                    };
+                    (
+                        status,
+                        Json(serde_json::json!({
+                            "status": if healthy { "ok" } else { "unavailable" },
+                            "node": node_name(),
+                            "version": release_version(),
+                            "leader": leader,
+                            "voters": voters,
+                            "expected_voters": expected,
+                        })),
+                    )
+                        .into_response()
+                }
             }),
         )
         .route("/version", get(|| async { release_version() }))
@@ -71,7 +118,11 @@ async fn main() {
             move || shell(leptos_options.clone())
         })
         .fallback(leptos_axum::file_and_error_handler(shell))
-        .with_state(leptos_options);
+        .with_state(leptos_options)
+        // Merged after `with_state` because the auth routes carry their own
+        // `AuthState`; both sides are `Router<()>` by this point. Only this
+        // side has a fallback, which is what keeps `merge` from panicking.
+        .merge(rn_site::auth::router(auth_state));
     let app = telemetry::layer_http_trace(app);
 
     info!(%addr, mode = app_config.mode.as_str(), "listening");
