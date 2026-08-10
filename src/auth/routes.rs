@@ -68,10 +68,18 @@ pub fn router(state: AuthState) -> Router {
             require_capability(Capability::Manage, st, req, next)
         }));
 
-    Router::new()
+    let router = Router::new()
         .route("/api/auth/register", post(register))
         .route("/api/auth/signin", post(signin))
-        .route("/api/auth/signout", post(signout))
+        .route("/api/auth/signout", post(signout));
+
+    // The dev bypass exists only in debug builds: a release binary contains
+    // no route, no handler, and no reference to it — negative proof, not a
+    // disabled flag. The handler re-checks the runtime mode on top.
+    #[cfg(debug_assertions)]
+    let router = router.route("/api/auth/dev-bypass", post(dev_bypass));
+
+    router
         .merge(protected)
         .merge(manage)
         .with_state(state)
@@ -265,6 +273,88 @@ async fn signout(State(state): State<AuthState>, headers: HeaderMap) -> Response
         Json(StatusBody::plain("signed-out")),
     )
         .into_response()
+}
+
+/// Address of the identity the dev bypass signs in as. Debug builds only.
+#[cfg(debug_assertions)]
+const DEV_BYPASS_EMAIL: &str = "dev-admin@local.test";
+
+/// Mint a `manage`-capable session with no credential. Debug builds only.
+///
+/// Defense in depth on top of the `#[cfg(debug_assertions)]` compile gate:
+/// unless the runtime mode is explicitly `dev`, this answers 404 — the same
+/// as if the route had never been compiled in, which in a release binary it
+/// isn't. First use creates the `dev-admin@local.test` identity with a
+/// random, never-revealed password, so the bypass session is a real session
+/// over a real membership and every downstream invariant still holds.
+#[cfg(debug_assertions)]
+#[instrument(name = "route.dev_bypass", skip(state, headers), fields(status))]
+async fn dev_bypass(State(state): State<AuthState>, headers: HeaderMap) -> Response {
+    use crate::operations::config::Mode;
+
+    if state.mode != Mode::Dev {
+        tracing::Span::current().record("status", "hidden");
+        return StatusCode::NOT_FOUND.into_response();
+    }
+
+    let registration = match store::registration_for_email(&state.db, DEV_BYPASS_EMAIL).await {
+        Ok(Some(registration)) => registration,
+        Ok(None) => {
+            // A throwaway credential nobody ever sees: the bypass *is* the
+            // sign-in path for this identity.
+            let password = super::session::mint_token();
+            match store::register(&state.db, DEV_BYPASS_EMAIL, &password).await {
+                Ok(registration) => registration,
+                Err(err) => {
+                    warn!(%err, "dev bypass could not create its identity");
+                    return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+                }
+            }
+        }
+        Err(err) => {
+            warn!(%err, "dev bypass lookup failed");
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+        }
+    };
+
+    // Idempotent (`INSERT OR IGNORE`), so it also repairs a wiped grant.
+    if let Err(err) = store::grant_capability(
+        &state.db,
+        registration.account_id,
+        registration.identity_id,
+        Capability::Manage,
+    )
+    .await
+    {
+        warn!(%err, "dev bypass could not grant manage");
+        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+    }
+
+    let user_agent = headers
+        .get(header::USER_AGENT)
+        .and_then(|v| v.to_str().ok())
+        .map(str::to_string);
+    match store::create_session(&state.db, &registration, user_agent).await {
+        Ok(token) => {
+            tracing::Span::current().record("status", "minted");
+            info!("dev bypass session minted");
+            (
+                StatusCode::SEE_OTHER,
+                [
+                    (
+                        header::SET_COOKIE,
+                        set_cookie_header(&token, state.cookie_security),
+                    ),
+                    (header::LOCATION, "/manage".to_string()),
+                ],
+            )
+                .into_response()
+        }
+        Err(err) => {
+            warn!(%err, "dev bypass session creation failed");
+            StatusCode::INTERNAL_SERVER_ERROR.into_response()
+        }
+    }
 }
 
 /// Behind the `test-auth` guard: reachable by any registered account.

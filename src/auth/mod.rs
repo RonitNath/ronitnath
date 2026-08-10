@@ -39,26 +39,34 @@ pub struct AuthState {
     pub db: hiqlite::Client,
     /// Whether session cookies are marked `Secure`. See [`CookieSecurity`].
     pub cookie_security: CookieSecurity,
+    /// Runtime mode. Auth behavior that must never exist in prod — the dev
+    /// bypass — checks this at request time, on top of its compile-time gate.
+    pub mode: crate::operations::config::Mode,
 }
 
 impl AuthState {
-    /// Build with an explicit cookie policy.
+    /// Build with an explicit cookie policy and mode.
     ///
     /// The policy is a parameter and not a default because the failure mode of
     /// getting it wrong is invisible: an insecure cookie in prod works fine
     /// right up until it is sent over plaintext. Prefer [`Self::for_mode`].
     #[must_use]
-    pub fn new(db: hiqlite::Client, cookie_security: CookieSecurity) -> Self {
+    pub fn new(
+        db: hiqlite::Client,
+        cookie_security: CookieSecurity,
+        mode: crate::operations::config::Mode,
+    ) -> Self {
         Self {
             db,
             cookie_security,
+            mode,
         }
     }
 
     /// Build with the cookie policy the runtime mode implies: `Secure` in prod.
     #[must_use]
     pub fn for_mode(db: hiqlite::Client, mode: crate::operations::config::Mode) -> Self {
-        Self::new(db, CookieSecurity::for_mode(mode))
+        Self::new(db, CookieSecurity::for_mode(mode), mode)
     }
 }
 
@@ -67,6 +75,7 @@ impl std::fmt::Debug for AuthState {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("AuthState")
             .field("cookie_security", &self.cookie_security)
+            .field("mode", &self.mode)
             .finish_non_exhaustive()
     }
 }

@@ -238,8 +238,52 @@ fn AuthPage() -> impl IntoView {
         <div class="flex min-h-screen flex-col items-center justify-center gap-8 px-4">
             <h1 class="home-title text-2xl font-semibold">"Authenticate"</h1>
             <LoginForm/>
+            {dev_bypass_form()}
         </div>
     }
+}
+
+/// The dev-bypass button, or nothing.
+///
+/// Two gates, mirroring the route in `auth::routes`: the form only exists in
+/// a debug-`ssr` build (`cfg`), and only renders when the process runs in
+/// explicit `dev` mode (runtime). A release binary contains neither this form
+/// nor the endpoint it posts to. Not an island — it is server-rendered or it
+/// is absent, so the wasm bundle carries no trace of it either.
+#[cfg(all(feature = "ssr", debug_assertions))]
+fn dev_bypass_form() -> Option<leptos::prelude::AnyView> {
+    use crate::operations::config::Mode;
+
+    use_context::<crate::auth::AuthState>()
+        .filter(|state| state.mode == Mode::Dev)
+        .map(|_| {
+            view! {
+                <form
+                    method="post"
+                    action="/api/auth/dev-bypass"
+                    class="flex w-full max-w-sm flex-col gap-1"
+                >
+                    <button
+                        type="submit"
+                        class="rounded border px-4 py-2 text-sm"
+                        style="border-color: color-mix(in oklab, var(--fg) 25%, transparent); background: transparent; color: var(--fg-muted); cursor: pointer"
+                    >
+                        "Enter as dev admin"
+                    </button>
+                    <p class="text-sm" style="color: var(--fg-subtle)">
+                        "Debug build in dev mode only — mints a "
+                        <code>"manage"</code>
+                        "-capable session without a credential."
+                    </p>
+                </form>
+            }
+            .into_any()
+        })
+}
+
+#[cfg(not(all(feature = "ssr", debug_assertions)))]
+fn dev_bypass_form() -> Option<leptos::prelude::AnyView> {
+    None
 }
 
 /// The only thing this endpoint says on any failure.

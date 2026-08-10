@@ -566,6 +566,48 @@ pub async fn revoke_sessions_for_membership(
     Ok(affected)
 }
 
+/// The sign-in triple for an address, without checking any credential.
+///
+/// This is the *credential-free* variant of [`authenticate`]: it exists for
+/// callers that have already earned the right to a session some other way —
+/// today that is only the debug-build dev bypass. Nothing on the normal
+/// request path may call this.
+#[instrument(name = "auth.registration_for_email", skip(db))]
+pub async fn registration_for_email(
+    db: &Client,
+    email: &str,
+) -> Result<Option<Registration>, StoreError> {
+    #[derive(serde::Deserialize)]
+    struct TripleRow {
+        identity_id: i64,
+        account_id: i64,
+        identity_public_id: String,
+    }
+    let row: Option<TripleRow> = db
+        .query_as_optional(
+            "SELECT e.identity_id, a.id AS account_id,
+                    i.public_id AS identity_public_id
+             FROM identity_emails e
+             JOIN identities i ON i.id = e.identity_id
+             JOIN accounts a ON a.primary_for_identity_id = e.identity_id
+             WHERE e.email_normalized = $1
+               AND i.status = 'active' AND a.status = 'active'",
+            params!(normalize_email(email)),
+        )
+        .await?;
+    row.map(|r| {
+        Ok(Registration {
+            identity_id: InternalId::new(r.identity_id),
+            account_id: InternalId::new(r.account_id),
+            identity_public_id: r
+                .identity_public_id
+                .parse()
+                .map_err(|_| StoreError::Corrupt("identity public_id is not a uuid"))?,
+        })
+    })
+    .transpose()
+}
+
 /// The membership joining an email's identity to its primary account.
 ///
 /// This is how operator tooling names a membership: by the address a person

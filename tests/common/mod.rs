@@ -76,6 +76,15 @@ pub struct TestApp {
 impl TestApp {
     /// Boot a fresh node and build the real auth router in front of it.
     pub async fn boot() -> Self {
+        Self::boot_in_mode(Mode::Dev).await
+    }
+
+    /// [`Self::boot`] with an explicit runtime mode on the *auth state* —
+    /// which is what the dev-bypass gate reads. `Mode::Prod` here is the
+    /// negative test's configuration: same debug binary, prod-mode auth. The
+    /// hiqlite node itself always boots in dev configuration, because prod
+    /// db boot requires cluster env vars a unit-of-test node has no use for.
+    pub async fn boot_in_mode(mode: Mode) -> Self {
         init_tracing();
 
         let data_dir = tempfile::tempdir().expect("temp dir for hiqlite data");
@@ -93,10 +102,11 @@ impl TestApp {
         .await
         .expect("boot hiqlite and migrate");
 
-        // `Insecure` deliberately: the mock transport is not HTTPS, so a
-        // `Secure` cookie would be set and then never sent back, and every
-        // signed-in leg of the golden flow would read as a broken sign-in.
-        let state = AuthState::new(db.clone(), CookieSecurity::Insecure);
+        // `Insecure` deliberately, whatever the mode says: the mock transport
+        // is not HTTPS, so a `Secure` cookie would be set and then never sent
+        // back, and every signed-in leg of the golden flow would read as a
+        // broken sign-in.
+        let state = AuthState::new(db.clone(), CookieSecurity::Insecure, mode);
 
         // The same `layer_http_trace` the binary applies, so the aggregate
         // report includes end-to-end request latency and not just the spans
@@ -154,7 +164,7 @@ impl TestApp {
         )
         .await
         .expect("reopen hiqlite after restart");
-        let state = AuthState::new(db.clone(), CookieSecurity::Insecure);
+        let state = AuthState::new(db.clone(), CookieSecurity::Insecure, Mode::Dev);
         let app = telemetry::layer_http_trace(rn_site::auth::router(state.clone()));
         let server = TestServer::builder().save_cookies().build(app);
 
