@@ -20,12 +20,39 @@
 //!
 //! 403 in the middle row rather than 401 is the whole result: the session was
 //! real and was read, and the capability was still missing.
+//!
+//! Capabilities have two sources, and each has a test that isolates it:
+//! the role bundle (`role_change_takes_effect_on_the_next_request` — no rows,
+//! effective immediately) and the exception row
+//! (`manage_opens_once_the_capability_is_granted` — exactly one row, with a
+//! `granted_at`). The golden flow itself asserts registration writes *no*
+//! capability rows: the owner role is the grant.
 
 mod common;
 
 use axum::http::StatusCode;
 use common::{TEST_PASSWORD, TestApp, timing};
 use rn_site::auth::Capability;
+
+/// How many explicit capability rows exist. Zero for every account whose
+/// capabilities come purely from its role bundle.
+async fn capability_rows(app: &TestApp) -> i64 {
+    use hiqlite::params;
+
+    #[derive(serde::Deserialize)]
+    struct Count {
+        n: i64,
+    }
+
+    app.db
+        .query_as_one::<Count, _>(
+            "SELECT COUNT(*) AS n FROM membership_capabilities",
+            params!(),
+        )
+        .await
+        .expect("count capability rows")
+        .n
+}
 
 /// What one "interact" leg observed.
 #[derive(Debug, PartialEq, Eq)]
@@ -89,6 +116,15 @@ async fn golden_flow_register_signin_signout() {
             .maybe_cookie(rn_site::auth::routes::COOKIE_NAME)
             .is_none(),
         "register must not establish a session"
+    );
+
+    // …and must not have written any capability rows either. `test-auth` in
+    // leg 4 comes from the owner role's bundle; if a row appears here, the
+    // registration path has regressed to direct grants.
+    assert_eq!(
+        capability_rows(&app).await,
+        0,
+        "registration must not write capability rows — the role is the grant"
     );
     let still_out = interact(&app, "2.after-register").await;
     assert_eq!(
@@ -351,6 +387,9 @@ async fn auth_responses_are_not_cacheable() {
 
 /// `/manage` opens once `manage` is granted — proving the 403 in the golden
 /// flow is the capability check and not a permanently broken route.
+///
+/// This is the *exception-row* path: the owner role's bundle does not carry
+/// `manage`, so the grant must land as an auditable row.
 #[tokio::test]
 async fn manage_opens_once_the_capability_is_granted() {
     let app = TestApp::boot().await;
@@ -384,8 +423,78 @@ async fn manage_opens_once_the_capability_is_granted() {
     .await
     .expect("grant manage");
 
-    // Same cookie, same route: only the grant changed.
+    // Same cookie, same route: only the grant changed — and it is a row,
+    // because it deviates from the role and must carry a `granted_at`.
     app.server.get("/manage").await.assert_status_ok();
+    assert_eq!(
+        capability_rows(&app).await,
+        1,
+        "an exception grant is exactly one auditable row"
+    );
+
+    app.shutdown().await;
+}
+
+/// Changing a membership's role re-derives its capabilities on the very next
+/// request — no capability rows written, no session invalidated, no backfill.
+///
+/// This is the *bundle* path, and the reason the role is joined at resolve
+/// time rather than copied into the session: promotion takes effect while the
+/// session cookie stays exactly the same.
+#[tokio::test]
+async fn role_change_takes_effect_on_the_next_request() {
+    use hiqlite::params;
+
+    let app = TestApp::boot().await;
+    let email = "promoted@example.test";
+
+    app.server
+        .post("/api/auth/register")
+        .form(&[("email", email), ("password", TEST_PASSWORD)])
+        .await
+        .assert_status(StatusCode::CREATED);
+    app.server
+        .post("/api/auth/signin")
+        .form(&[("email", email), ("password", TEST_PASSWORD)])
+        .await
+        .assert_status_ok();
+
+    // Owner: bundle carries `test-auth` only.
+    app.server.get("/protected").await.assert_status_ok();
+    app.server.get("/manage").await.assert_status_forbidden();
+
+    // Promote the membership to admin, whose bundle carries `manage`. There is
+    // no store function for this yet — an admin surface would own it — so the
+    // test speaks SQL, exactly as that surface would.
+    let updated = app
+        .db
+        .execute(
+            "UPDATE account_memberships SET role = 'admin'",
+            params!(),
+        )
+        .await
+        .expect("promote membership");
+    assert_eq!(updated, 1, "exactly one membership to promote");
+
+    // Same cookie: the bundle applies immediately, and no rows were involved.
+    app.server.get("/manage").await.assert_status_ok();
+    assert_eq!(
+        capability_rows(&app).await,
+        0,
+        "a role bundle grants without writing capability rows"
+    );
+
+    // Demotion is the same lever in reverse — access ends with the role, which
+    // is what makes the bundle a policy and not a one-time backfill.
+    app.db
+        .execute(
+            "UPDATE account_memberships SET role = 'member'",
+            params!(),
+        )
+        .await
+        .expect("demote membership");
+    app.server.get("/manage").await.assert_status_forbidden();
+    app.server.get("/protected").await.assert_status_ok();
 
     app.shutdown().await;
 }
