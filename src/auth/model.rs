@@ -114,6 +114,22 @@ impl MembershipRole {
     }
 }
 
+impl std::str::FromStr for MembershipRole {
+    type Err = ();
+
+    /// Parse the stored form. The schema `CHECK`s the column to these three
+    /// values, so an `Err` here means the row and the code disagree about the
+    /// schema — the caller should treat it as corruption, not as a default.
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "owner" => Ok(Self::Owner),
+            "admin" => Ok(Self::Admin),
+            "member" => Ok(Self::Member),
+            _ => Err(()),
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct Identity {
     pub id: InternalId,

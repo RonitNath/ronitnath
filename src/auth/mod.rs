@@ -18,7 +18,7 @@ pub mod routes;
 pub mod session;
 pub mod store;
 
-pub use capability::{CapabilitySet, DEFAULT_GRANTS, MANAGE, TEST_AUTH};
+pub use capability::{Capability, CapabilitySet};
 pub use email::{EmailVerifyError, ensure_email_verified};
 pub use ids::{InternalId, PublicId, PublicIdIndex, PublicIdKind};
 pub use login::run_auth_gates;

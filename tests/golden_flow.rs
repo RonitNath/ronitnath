@@ -7,7 +7,7 @@
 //!
 //! `/manage` rides along in every interaction and must fail all three times,
 //! including the middle one where `/protected` succeeds. That is the assertion
-//! that a session is not a blank cheque: `test-auth` is a default grant and
+//! that a session is not a blank cheque: `test-auth` is implied by every role and
 //! `manage` is not, so a signed-in account clears one guard and not the other.
 //!
 //! The failure *codes* carry the distinction that matters:
@@ -25,7 +25,7 @@ mod common;
 
 use axum::http::StatusCode;
 use common::{TEST_PASSWORD, TestApp, timing};
-use rn_site::auth::{MANAGE, TEST_AUTH};
+use rn_site::auth::Capability;
 
 /// What one "interact" leg observed.
 #[derive(Debug, PartialEq, Eq)]
@@ -71,8 +71,9 @@ async fn golden_flow_register_signin_signout() {
         "an anonymous caller must be turned away from both guarded pages"
     );
 
-    // ── 2. register ── creates identity, primary account, membership, and the
-    // default grants. Explicitly does not sign anyone in.
+    // ── 2. register ── creates identity, primary account, and the owner
+    // membership whose role implies `test-auth`. Explicitly does not sign
+    // anyone in.
     let registered = timing::step("2.register", async {
         app.server
             .post("/api/auth/register")
@@ -113,13 +114,13 @@ async fn golden_flow_register_signin_signout() {
     assert_eq!(
         during.protected,
         StatusCode::OK,
-        "`{TEST_AUTH}` is a default grant, so /protected must open"
+        "`test-auth` is implied by every role, so /protected must open"
     );
     assert_eq!(
         during.manage,
         StatusCode::FORBIDDEN,
-        "`{MANAGE}` is not a default grant: /manage must be 403 (session read, capability absent) \
-         and not 401 (no session)"
+        "`manage` is implied by no role registration creates: /manage must be 403 (session read, \
+         capability absent) and not 401 (no session)"
     );
 
     // ── 5. signout ── revokes the row and clears the cookie.
@@ -378,7 +379,7 @@ async fn manage_opens_once_the_capability_is_granted() {
         &app.db,
         registration.account_id,
         registration.identity_id,
-        MANAGE,
+        Capability::Manage,
     )
     .await
     .expect("grant manage");

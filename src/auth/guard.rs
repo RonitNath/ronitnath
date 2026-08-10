@@ -21,6 +21,7 @@ use axum::{
 };
 use tracing::{debug, instrument, warn};
 
+use super::capability::Capability;
 use super::session::token_from_cookie_header;
 use super::store::{SessionContext, resolve_session};
 use crate::auth::AuthState;
@@ -35,14 +36,14 @@ use crate::auth::AuthState;
     fields(capability, outcome)
 )]
 pub async fn require_capability(
-    capability: &'static str,
+    capability: Capability,
     State(state): State<AuthState>,
     mut request: Request,
     next: Next,
 ) -> Response {
     let started = Instant::now();
     let span = tracing::Span::current();
-    span.record("capability", capability);
+    span.record("capability", capability.as_str());
 
     let token = request
         .headers()
@@ -118,7 +119,7 @@ fn unauthorized() -> Response {
         .into_response()
 }
 
-fn forbidden(capability: &str) -> Response {
+fn forbidden(capability: Capability) -> Response {
     (
         StatusCode::FORBIDDEN,
         Html(page(

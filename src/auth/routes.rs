@@ -17,7 +17,7 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use tracing::{debug, info, instrument, warn};
 
-use super::capability::{MANAGE, TEST_AUTH};
+use super::capability::Capability;
 use super::guard::{require_capability, session_of};
 use super::session::{
     SESSION_COOKIE, clear_cookie_header, set_cookie_header, token_from_cookie_header,
@@ -51,19 +51,20 @@ impl StatusBody {
 /// Every auth route, with the guards already attached.
 ///
 /// `/protected` and `/manage` differ only in the capability they demand, which
-/// is the entire experiment: `test-auth` is a default grant and `manage` is not,
-/// so the same signed-in session passes one and fails the other.
+/// is the entire experiment: `test-auth` is implied by every role, `manage` by
+/// no role registration creates, so the same signed-in session passes one
+/// guard and fails the other.
 pub fn router(state: AuthState) -> Router {
     let protected = Router::new()
         .route("/protected", get(protected_page))
         .route_layer(from_fn_with_state(state.clone(), |st, req, next| {
-            require_capability(TEST_AUTH, st, req, next)
+            require_capability(Capability::TestAuth, st, req, next)
         }));
 
     let manage = Router::new()
         .route("/manage", get(manage_page))
         .route_layer(from_fn_with_state(state.clone(), |st, req, next| {
-            require_capability(MANAGE, st, req, next)
+            require_capability(Capability::Manage, st, req, next)
         }));
 
     Router::new()

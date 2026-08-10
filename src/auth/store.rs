@@ -10,7 +10,7 @@ use std::time::Instant;
 use hiqlite::{Client, Error as HiqliteError, Row, params};
 use tracing::{debug, info, instrument, warn};
 
-use super::capability::{CapabilitySet, DEFAULT_GRANTS};
+use super::capability::{Capability, CapabilitySet};
 use super::ids::{InternalId, PublicId};
 use super::login::run_auth_gates;
 use super::model::{
@@ -47,8 +47,9 @@ pub struct Registration {
     pub identity_public_id: PublicId,
 }
 
-/// Register an identity, its primary account, the membership joining them, and
-/// the [`DEFAULT_GRANTS`] for that membership.
+/// Register an identity, its primary account, and the `owner` membership
+/// joining them. Default capabilities are not rows — they are implied by the
+/// role via [`MembershipRole::implied`].
 ///
 /// Not a transaction: hiqlite serializes writes through raft, and a partial
 /// registration would need compensating deletes that do not exist yet. The
@@ -162,25 +163,14 @@ pub async fn register(
     )
     .await?;
 
-    for capability in DEFAULT_GRANTS {
-        db.execute(
-            "INSERT INTO membership_capabilities (account_id, identity_id, capability, granted_at)
-             VALUES ($1, $2, $3, $4)",
-            params!(
-                account_id.get(),
-                identity_id.get(),
-                (*capability).to_string(),
-                now
-            ),
-        )
-        .await?;
-        debug!(capability = %capability, "default capability granted");
-    }
-
+    // No capability rows are written here. The membership's role *is* the
+    // grant: `resolve_session` unions `MembershipRole::implied()` with the
+    // exception rows, so default capabilities cost nothing at registration and
+    // follow the role bundle when it changes.
     info!(
         identity_id = identity_id.get(),
         account_id = account_id.get(),
-        granted = DEFAULT_GRANTS.len(),
+        role = MembershipRole::Owner.as_str(),
         latency_ms = started.elapsed().as_secs_f64() * 1000.0,
         "registration complete"
     );
@@ -383,6 +373,7 @@ struct SessionRow {
     expires_at: i64,
     identity_public_id: String,
     account_public_id: String,
+    role: String,
 }
 
 #[derive(serde::Deserialize)]
@@ -405,14 +396,20 @@ pub async fn resolve_session(
     let started = Instant::now();
     let hash = token_hash(token);
 
+    // The membership join is what ties the session to a role: an inner join,
+    // so a session whose membership was deleted stops resolving in the same
+    // breath — access revocation and session revocation cannot drift apart.
     let row: Option<SessionRow> = db
         .query_as_optional(
             "SELECT s.identity_id, s.account_id, s.expires_at,
                     i.public_id AS identity_public_id,
-                    a.public_id AS account_public_id
+                    a.public_id AS account_public_id,
+                    m.role
              FROM sessions s
              JOIN identities i ON i.id = s.identity_id
              JOIN accounts   a ON a.id = s.account_id
+             JOIN account_memberships m
+               ON m.account_id = s.account_id AND m.identity_id = s.identity_id
              WHERE s.token_hash = $1
                AND i.status = 'active'
                AND a.status = 'active'",
@@ -449,7 +446,15 @@ pub async fn resolve_session(
         return Ok(None);
     }
 
-    let capabilities: CapabilitySet = db
+    let role: MembershipRole = row
+        .role
+        .parse()
+        .map_err(|()| StoreError::Corrupt("membership role is not a known role"))?;
+
+    // Role bundle ∪ exception rows. Unknown capability strings are dropped by
+    // `resolve` — log them here so a retired capability's leftover rows are
+    // visible rather than silently dead weight.
+    let explicit: Vec<String> = db
         .query_as::<CapabilityRow, _>(
             "SELECT capability FROM membership_capabilities
              WHERE account_id = $1 AND identity_id = $2",
@@ -459,6 +464,10 @@ pub async fn resolve_session(
         .into_iter()
         .map(|r| r.capability)
         .collect();
+    for unknown in explicit.iter().filter(|c| Capability::parse(c).is_none()) {
+        warn!(capability = %unknown, "ignoring unknown capability row");
+    }
+    let capabilities = CapabilitySet::resolve(role, explicit.iter().map(String::as_str));
 
     // Best-effort liveness stamp; a failure here must not fail the request.
     if let Err(err) = db
@@ -567,7 +576,7 @@ pub async fn grant_capability(
     db: &Client,
     account_id: InternalId,
     identity_id: InternalId,
-    capability: &str,
+    capability: Capability,
 ) -> Result<(), StoreError> {
     db.execute(
         "INSERT OR IGNORE INTO membership_capabilities
@@ -576,12 +585,12 @@ pub async fn grant_capability(
         params!(
             account_id.get(),
             identity_id.get(),
-            capability.to_string(),
+            capability.as_str().to_string(),
             now_ms()
         ),
     )
     .await?;
-    info!(capability, "capability granted");
+    info!(capability = capability.as_str(), "capability granted");
     Ok(())
 }
 
