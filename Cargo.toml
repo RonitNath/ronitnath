@@ -74,6 +74,7 @@ tracing = { version = "0.1", optional = true, features = ["attributes"] }
 tracing-subscriber = { version = "0.3", optional = true, features = ["env-filter"] }
 tower-http = { version = "0.6", optional = true, features = ["trace"] }
 config = { version = "0.15", optional = true }
+clap = { version = "4", optional = true, features = ["derive"] }
 thiserror = { version = "2", optional = true }
 rusqlite = { version = "0.40", optional = true, features = ["bundled"] }
 hex = { version = "0.4", optional = true }
@@ -102,6 +103,7 @@ ssr = [
     "dep:tracing-subscriber",
     "dep:tower-http",
     "dep:config",
+    "dep:clap",
     "dep:thiserror",
     "dep:rusqlite",
     "dep:hex",

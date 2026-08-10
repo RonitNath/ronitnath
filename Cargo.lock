@@ -3729,6 +3729,7 @@ dependencies = [
  "argon2",
  "axum",
  "axum-test",
+ "clap",
  "config",
  "console_error_panic_hook",
  "hex",

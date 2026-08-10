@@ -566,6 +566,35 @@ pub async fn revoke_sessions_for_membership(
     Ok(affected)
 }
 
+/// The membership joining an email's identity to its primary account.
+///
+/// This is how operator tooling names a membership: by the address a person
+/// signs in with, not by internal ids. `None` when the address is unknown or
+/// the identity has no primary account.
+#[instrument(name = "auth.membership_for_email", skip(db))]
+pub async fn membership_for_email(
+    db: &Client,
+    email: &str,
+) -> Result<Option<(InternalId, InternalId)>, StoreError> {
+    #[derive(serde::Deserialize)]
+    struct MembershipRow {
+        account_id: i64,
+        identity_id: i64,
+    }
+    let row: Option<MembershipRow> = db
+        .query_as_optional(
+            "SELECT m.account_id, m.identity_id
+             FROM identity_emails e
+             JOIN accounts a ON a.primary_for_identity_id = e.identity_id
+             JOIN account_memberships m
+               ON m.account_id = a.id AND m.identity_id = e.identity_id
+             WHERE e.email_normalized = $1",
+            params!(normalize_email(email)),
+        )
+        .await?;
+    Ok(row.map(|r| (InternalId::new(r.account_id), InternalId::new(r.identity_id))))
+}
+
 /// Grant a capability to an existing membership.
 ///
 /// Nothing on the request path calls this — it is the seam an admin surface

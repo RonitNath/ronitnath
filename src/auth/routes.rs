@@ -50,10 +50,10 @@ impl StatusBody {
 
 /// Every auth route, with the guards already attached.
 ///
-/// `/protected` and `/manage` differ only in the capability they demand, which
-/// is the entire experiment: `test-auth` is implied by every role, `manage` by
-/// no role registration creates, so the same signed-in session passes one
-/// guard and fails the other.
+/// `/protected` demands `test-auth`, which every role implies; `/manage` — the
+/// data browser in [`crate::manage`] — demands `manage`, which no role
+/// registration creates. The same signed-in session passes one guard and
+/// fails the other until `manage` is granted (role change or explicit row).
 pub fn router(state: AuthState) -> Router {
     let protected = Router::new()
         .route("/protected", get(protected_page))
@@ -62,7 +62,8 @@ pub fn router(state: AuthState) -> Router {
         }));
 
     let manage = Router::new()
-        .route("/manage", get(manage_page))
+        .route("/manage", get(crate::manage::index))
+        .route("/manage/{model}", get(crate::manage::model_page))
         .route_layer(from_fn_with_state(state.clone(), |st, req, next| {
             require_capability(Capability::Manage, st, req, next)
         }));
@@ -278,19 +279,6 @@ async fn protected_page(request: Request) -> Html<String> {
             session.identity_public_id,
             session.account_public_id,
             session.capabilities.to_log_string()
-        ),
-    ))
-}
-
-/// Behind the `manage` guard: unreachable without an explicit grant.
-#[instrument(name = "route.manage", skip(request))]
-async fn manage_page(request: Request) -> Html<String> {
-    let session = session_of(&request).expect("guard attaches the session before the handler");
-    Html(super::guard::page(
-        "Manage",
-        &format!(
-            "Management surface for account <code>{}</code>.",
-            session.account_public_id
         ),
     ))
 }

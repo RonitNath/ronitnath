@@ -242,34 +242,74 @@ fn AuthPage() -> impl IntoView {
     }
 }
 
-/// The only thing this endpoint ever says.
+/// The only thing this endpoint says on any failure.
 ///
-/// There is no identity backend behind `/auth`, so every submission is declined
-/// with the same words: no field-level hint, no distinction between an address
-/// that is unknown and a password that is wrong, nothing to enumerate and
-/// nothing to infer about what does or does not exist on the other side.
+/// Every decline uses the same words: no field-level hint, no distinction
+/// between an address that is unknown and a password that is wrong, nothing to
+/// enumerate and nothing to infer about what does or does not exist on the
+/// other side.
 const AUTH_REJECTED: &str = "Authentication failed.";
 
-/// Always declines until the identity backend is connected.
+/// Verify a credential, install a session cookie, and redirect to `/protected`.
 ///
-/// The decline is the *content*, not a transport error: this returns `Ok` and
-/// HTTP 200 rather than a `ServerFnError`, which the framework would render as
-/// a 500. A 500 would break the page for anyone without JS, get counted as a
-/// server fault by anything watching, and — the point of all this — announce
-/// that the route is broken rather than that it declined you. Nothing is
-/// granted either way: no session, no cookie, no redirect.
+/// A decline is *content*, not a transport error: this returns `Ok` and HTTP
+/// 200 rather than a `ServerFnError`, which the framework would render as a
+/// 500. A 500 would break the page for anyone without JS, get counted as a
+/// server fault by anything watching, and announce that the route is broken
+/// rather than that it declined you. A database fault is deliberately folded
+/// into the same decline — the alternative is an error branch whose wording
+/// distinguishes it. On success nothing renders: the `Set-Cookie` and the
+/// redirect are the whole response.
 ///
-/// When a row exists, the email-verification gate runs here (currently warns
-/// and skips). Unknown addresses take the same dummy password path so timing
-/// does not enumerate. The endpoint is pinned so the URL is stable across
-/// builds; the generated default appends a hash of the function signature.
+/// The store runs the email-verification gate and spends an argon2 verify on
+/// unknown addresses, so failures are indistinguishable by timing too. The
+/// endpoint is pinned so the URL is stable across builds; the generated
+/// default appends a hash of the function signature.
 #[server(endpoint = "authenticate")]
 async fn authenticate(email: String, password: String) -> Result<(), ServerFnError> {
     #[cfg(feature = "ssr")]
     {
-        // No DB lookup yet — treat every submission as an unknown address.
-        let _email = email;
-        crate::auth::run_auth_gates(None, &password, None);
+        use axum::http::header;
+
+        use crate::auth::{AuthState, session, store};
+
+        // Provided by `main` to both the server-fn handler and the SSR
+        // renderer; absence is a wiring bug, not a runtime condition.
+        let state = expect_context::<AuthState>();
+
+        let user_agent = use_context::<axum::http::request::Parts>().and_then(|parts| {
+            parts
+                .headers
+                .get(header::USER_AGENT)
+                .and_then(|v| v.to_str().ok())
+                .map(str::to_string)
+        });
+
+        match store::authenticate(&state.db, &email, &password).await {
+            Ok(Some(registration)) => {
+                match store::create_session(&state.db, &registration, user_agent).await {
+                    Ok(token) => {
+                        let response = expect_context::<leptos_axum::ResponseOptions>();
+                        let cookie =
+                            session::set_cookie_header(&token, state.cookie_security);
+                        response.insert_header(
+                            header::SET_COOKIE,
+                            cookie.parse().expect("cookie header is ascii"),
+                        );
+                        leptos_axum::redirect("/protected", false);
+                    }
+                    Err(err) => {
+                        tracing::warn!(%err, "session creation failed after a valid credential");
+                    }
+                }
+            }
+            Ok(None) => {
+                tracing::debug!("authenticate declined");
+            }
+            Err(err) => {
+                tracing::warn!(%err, "authenticate errored; declining");
+            }
+        }
     }
     #[cfg(not(feature = "ssr"))]
     {

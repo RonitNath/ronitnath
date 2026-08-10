@@ -28,22 +28,54 @@ fn expected_voters() -> usize {
         .unwrap_or(1)
 }
 
+/// `rn-site` — serve the site, or run an operator command and exit.
+#[cfg(feature = "ssr")]
+#[derive(clap::Parser)]
+#[command(name = "rn-site")]
+struct Cli {
+    #[command(subcommand)]
+    command: Option<Command>,
+}
+
+#[cfg(feature = "ssr")]
+#[derive(clap::Subcommand)]
+enum Command {
+    /// Operator commands against the local database. These open the same
+    /// hiqlite directory the server uses — run them while the server is
+    /// stopped.
+    Admin {
+        #[command(subcommand)]
+        command: rn_site::operations::admin::AdminCommand,
+    },
+}
+
 #[cfg(feature = "ssr")]
 #[tokio::main]
 async fn main() {
     use axum::http::StatusCode;
     use axum::response::IntoResponse;
-    use axum::{Json, Router, routing::get};
+    use axum::{Json, Router, routing::get, routing::post};
+    use clap::Parser;
     use leptos::prelude::*;
     use leptos_axum::{LeptosRoutes, generate_route_list};
     use rn_site::app::*;
     use rn_site::auth::AuthState;
-    use rn_site::operations::{config::AppConfig, db, shutdown, telemetry};
+    use rn_site::operations::{admin, config::AppConfig, db, shutdown, telemetry};
     use tracing::info;
 
+    let cli = Cli::parse();
     telemetry::init();
 
     let app_config = AppConfig::load().expect("load config.toml / RN_SITE__*");
+
+    if let Some(Command::Admin { command }) = cli.command {
+        if let Err(err) = admin::run(&app_config, command).await {
+            eprintln!("error: {err}");
+            std::process::exit(1);
+        }
+        return;
+    }
+
     let db = db::open_and_migrate(&app_config)
         .await
         .expect("open database and migrate");
@@ -113,10 +145,33 @@ async fn main() {
             }),
         )
         .route("/version", get(|| async { release_version() }))
-        .leptos_routes(&leptos_options, routes, {
-            let leptos_options = leptos_options.clone();
-            move || shell(leptos_options.clone())
+        // Server functions (the `/auth` sign-in) need `AuthState` in context.
+        // The same closure is provided here and to `leptos_routes_with_context`
+        // below: SSR calls server fns through the renderer, the browser calls
+        // them through this route, and both must see the same context. The
+        // wildcard coexists with the explicit `/api/auth/*` routes merged
+        // later — static routes win over the wildcard.
+        .route("/api/{*fn_name}", {
+            let additional_context = {
+                let auth_state = auth_state.clone();
+                move || provide_context(auth_state.clone())
+            };
+            post(move |request| {
+                leptos_axum::handle_server_fns_with_context(additional_context.clone(), request)
+            })
         })
+        .leptos_routes_with_context(
+            &leptos_options,
+            routes,
+            {
+                let auth_state = auth_state.clone();
+                move || provide_context(auth_state.clone())
+            },
+            {
+                let leptos_options = leptos_options.clone();
+                move || shell(leptos_options.clone())
+            },
+        )
         .fallback(leptos_axum::file_and_error_handler(shell))
         .with_state(leptos_options)
         // Merged after `with_state` because the auth routes carry their own
