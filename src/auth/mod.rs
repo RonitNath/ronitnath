@@ -9,6 +9,7 @@
 
 pub mod capability;
 mod email;
+pub mod grants;
 pub mod guard;
 mod ids;
 mod login;
@@ -20,6 +21,7 @@ pub mod store;
 
 pub use capability::{Capability, CapabilitySet};
 pub use email::{EmailVerifyError, ensure_email_verified};
+pub use grants::{Access, GrantSubject, ResourceAction, ResourceKind, ShareRole};
 pub use ids::{InternalId, PublicId, PublicIdIndex, PublicIdKind};
 pub use login::run_auth_gates;
 pub use model::{

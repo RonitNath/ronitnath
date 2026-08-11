@@ -71,7 +71,8 @@ pub fn router(state: AuthState) -> Router {
     let router = Router::new()
         .route("/api/auth/register", post(register))
         .route("/api/auth/signin", post(signin))
-        .route("/api/auth/signout", post(signout));
+        .route("/api/auth/signout", post(signout))
+        .route("/api/whoami", get(whoami));
 
     // The dev bypass exists only in debug builds: a release binary contains
     // no route, no handler, and no reference to it — negative proof, not a
@@ -355,6 +356,99 @@ async fn dev_bypass(State(state): State<AuthState>, headers: HeaderMap) -> Respo
             StatusCode::INTERNAL_SERVER_ERROR.into_response()
         }
     }
+}
+
+/// The narrow session picture the client chrome may hold.
+///
+/// This is the *entire* contract between the server's session state and any
+/// user-facing chrome ("signed in as…", nav visibility): public ids and
+/// display names only — no emails, no internal ids, no membership role, no
+/// session identifier. Widening it is an API decision, not a convenience.
+#[derive(Debug, Serialize)]
+struct WhoamiBody {
+    identity: WhoamiIdentity,
+    account: WhoamiAccount,
+    /// Wire names of every capability the session holds. A closed set the
+    /// server resolved; the client draws chrome from it and proves nothing
+    /// with it — the guard re-checks on every request.
+    capabilities: Vec<&'static str>,
+    /// Unix millis when the session stops resolving.
+    expires_at: i64,
+}
+
+#[derive(Debug, Serialize)]
+struct WhoamiIdentity {
+    public_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    display_name: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+struct WhoamiAccount {
+    public_id: String,
+    name: String,
+    kind: &'static str,
+}
+
+/// `GET /api/whoami`: the session context, for user chrome.
+///
+/// Not behind a capability guard on purpose: it reports *whether and as whom*
+/// the caller is signed in, which every session may ask regardless of what it
+/// can do. Anonymous callers get a stable 401 JSON shape so signed-out chrome
+/// renders from the same call. The router-wide `no_store` layer covers both
+/// answers.
+#[instrument(name = "route.whoami", skip(state, headers), fields(status))]
+async fn whoami(State(state): State<AuthState>, headers: HeaderMap) -> Response {
+    let span = tracing::Span::current();
+
+    let token = headers
+        .get(header::COOKIE)
+        .and_then(|v| v.to_str().ok())
+        .and_then(token_from_cookie_header);
+
+    let session = match token {
+        Some(token) => match store::resolve_session(&state.db, &token).await {
+            Ok(session) => session,
+            Err(err) => {
+                span.record("status", "error");
+                warn!(%err, "whoami session lookup errored");
+                return (
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    Json(StatusBody::plain("unavailable")),
+                )
+                    .into_response();
+            }
+        },
+        None => None,
+    };
+
+    let Some(session) = session else {
+        span.record("status", "anonymous");
+        return (
+            StatusCode::UNAUTHORIZED,
+            Json(StatusBody::plain("anonymous")),
+        )
+            .into_response();
+    };
+
+    span.record("status", "ok");
+    (
+        StatusCode::OK,
+        Json(WhoamiBody {
+            identity: WhoamiIdentity {
+                public_id: session.identity_public_id.to_string_lossy(),
+                display_name: session.identity_display_name,
+            },
+            account: WhoamiAccount {
+                public_id: session.account_public_id.to_string_lossy(),
+                name: session.account_name,
+                kind: session.account_kind.as_str(),
+            },
+            capabilities: session.capabilities.iter().map(|c| c.as_str()).collect(),
+            expires_at: session.expires_at,
+        }),
+    )
+        .into_response()
 }
 
 /// Behind the `test-auth` guard: reachable by any registered account.

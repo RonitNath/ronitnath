@@ -30,13 +30,23 @@ impl From<&mut Row<'_>> for RowId {
 }
 
 /// Who a resolved session belongs to, and what it may do.
+///
+/// Carries the display fields (`identity_display_name`, `account_name`,
+/// `account_kind`) and `expires_at` alongside the ids because they come from
+/// the same joined rows the resolver already reads — `/api/whoami` and any
+/// signed-in chrome answer from here without a second query.
 #[derive(Clone, Debug)]
 pub struct SessionContext {
     pub identity_id: InternalId,
     pub account_id: InternalId,
     pub identity_public_id: PublicId,
     pub account_public_id: PublicId,
+    pub identity_display_name: Option<String>,
+    pub account_name: String,
+    pub account_kind: AccountKind,
     pub capabilities: CapabilitySet,
+    /// Unix millis when the session stops resolving.
+    pub expires_at: i64,
 }
 
 /// The identity/account pair created by registration.
@@ -373,6 +383,9 @@ struct SessionRow {
     expires_at: i64,
     identity_public_id: String,
     account_public_id: String,
+    identity_display_name: Option<String>,
+    account_name: String,
+    account_kind: String,
     role: String,
 }
 
@@ -404,6 +417,9 @@ pub async fn resolve_session(
             "SELECT s.identity_id, s.account_id, s.expires_at,
                     i.public_id AS identity_public_id,
                     a.public_id AS account_public_id,
+                    i.display_name AS identity_display_name,
+                    a.name AS account_name,
+                    a.kind AS account_kind,
                     m.role
              FROM sessions s
              JOIN identities i ON i.id = s.identity_id
@@ -499,7 +515,14 @@ pub async fn resolve_session(
             .account_public_id
             .parse()
             .map_err(|_| StoreError::Corrupt("account public_id is not a uuid"))?,
+        identity_display_name: row.identity_display_name,
+        account_name: row.account_name,
+        account_kind: row
+            .account_kind
+            .parse()
+            .map_err(|()| StoreError::Corrupt("account kind is not a known kind"))?,
         capabilities,
+        expires_at: row.expires_at,
     }))
 }
 
@@ -634,7 +657,12 @@ pub async fn membership_for_email(
             params!(normalize_email(email)),
         )
         .await?;
-    Ok(row.map(|r| (InternalId::new(r.account_id), InternalId::new(r.identity_id))))
+    Ok(row.map(|r| {
+        (
+            InternalId::new(r.account_id),
+            InternalId::new(r.identity_id),
+        )
+    }))
 }
 
 /// Grant a capability to an existing membership.

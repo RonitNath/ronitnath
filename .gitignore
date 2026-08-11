@@ -6,10 +6,11 @@ target/
 # Local hiqlite / SQLite state from `cargo run` (see config.toml db_path)
 data/
 
-# Local secrets (COOKIE_SECRET is created on first boot if missing)
+# Local secrets (e.g. .env.claude holds the local admin credential). The app
+# itself reads no .env: sessions are opaque DB-backed tokens, so there is no
+# cookie-signing secret to keep.
 .env
 .env.*
-!.env.example
 
 # Cargo.lock is deliberately COMMITTED: this is a deployed application, and both
 # the `cargo test --locked` gate and the release image build have nothing to lock

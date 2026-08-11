@@ -63,12 +63,18 @@ async fn every_manage_route_carries_the_guard() {
     // holds `test-auth` only, so this is the default state of every new user.
     app.server
         .post("/api/auth/register")
-        .form(&[("email", "viewer@example.test"), ("password", TEST_PASSWORD)])
+        .form(&[
+            ("email", "viewer@example.test"),
+            ("password", TEST_PASSWORD),
+        ])
         .await
         .assert_status(StatusCode::CREATED);
     app.server
         .post("/api/auth/signin")
-        .form(&[("email", "viewer@example.test"), ("password", TEST_PASSWORD)])
+        .form(&[
+            ("email", "viewer@example.test"),
+            ("password", TEST_PASSWORD),
+        ])
         .await
         .assert_status_ok();
     app.server.get("/manage").await.assert_status_forbidden();
@@ -272,6 +278,46 @@ async fn membership_lookup_finds_the_primary_membership() {
             .expect("lookup query")
             .is_none()
     );
+
+    app.shutdown().await;
+}
+
+#[tokio::test]
+async fn references_render_as_labels_with_the_public_id_on_hover() {
+    let app = TestApp::boot().await;
+    let email = "operator@example.test";
+    let registration = signed_in_manager(&app, email).await;
+    let ipid = registration.identity_public_id.to_string_lossy();
+
+    // Reference columns resolve server-side: the cell text is a human label
+    // (here the primary email — no display name exists), and the full public
+    // id rides in the title attribute for hover. No bare-uuid reference cells.
+    for slug in ["identity-emails", "account-memberships", "sessions"] {
+        let page = app.server.get(&format!("/manage/{slug}")).await.text();
+        assert!(
+            page.contains(&format!("title=\"{ipid}\"")),
+            "{slug}: identity reference must carry its public id on hover"
+        );
+        assert!(
+            page.contains(&format!("title=\"{ipid}\">{email}</span>")),
+            "{slug}: identity reference must read as its label, not a uuid"
+        );
+    }
+
+    // A resource grant's subject resolves the same way.
+    rn_site::auth::grants::grant(
+        &app.db,
+        rn_site::auth::ResourceKind::Document,
+        "11111111-2222-4333-8444-555555555555",
+        rn_site::auth::GrantSubject::Identity(registration.identity_id),
+        rn_site::auth::ShareRole::Viewer,
+        registration.identity_id,
+    )
+    .await
+    .expect("grant");
+    let page = app.server.get("/manage/resource-grants").await.text();
+    assert!(page.contains(&format!("title=\"{ipid}\">{email}</span>")));
+    assert!(page.contains("viewer"));
 
     app.shutdown().await;
 }

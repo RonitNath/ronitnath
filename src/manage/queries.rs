@@ -26,6 +26,7 @@ pub enum DataModel {
     AccountMemberships,
     MembershipCapabilities,
     Sessions,
+    ResourceGrants,
 }
 
 impl DataModel {
@@ -37,6 +38,7 @@ impl DataModel {
         Self::AccountMemberships,
         Self::MembershipCapabilities,
         Self::Sessions,
+        Self::ResourceGrants,
     ];
 
     /// URL path segment under `/manage/`.
@@ -50,6 +52,7 @@ impl DataModel {
             Self::AccountMemberships => "account-memberships",
             Self::MembershipCapabilities => "membership-capabilities",
             Self::Sessions => "sessions",
+            Self::ResourceGrants => "resource-grants",
         }
     }
 
@@ -68,6 +71,7 @@ impl DataModel {
             Self::AccountMemberships => "Account memberships",
             Self::MembershipCapabilities => "Membership capabilities",
             Self::Sessions => "Sessions",
+            Self::ResourceGrants => "Resource grants",
         }
     }
 
@@ -75,12 +79,27 @@ impl DataModel {
     pub const fn description(self) -> &'static str {
         match self {
             Self::Identities => "People and services that can hold credentials and sessions.",
-            Self::IdentityEmails => "Addresses attached to identities; the normalized form is the unique login key.",
-            Self::IdentityPasswords => "One credential per identity. Only the hash algorithm is shown here.",
-            Self::Accounts => "Ownership boundaries. Every identity gets a primary account at registration.",
-            Self::AccountMemberships => "Who belongs to which account, and the role whose bundle grants their default capabilities.",
-            Self::MembershipCapabilities => "Explicit capability grants — the auditable exceptions on top of role bundles.",
-            Self::Sessions => "Live sign-ins. A revoked session has no row; only a digest prefix of the token is stored or shown.",
+            Self::IdentityEmails => {
+                "Addresses attached to identities; the normalized form is the unique login key."
+            }
+            Self::IdentityPasswords => {
+                "One credential per identity. Only the hash algorithm is shown here."
+            }
+            Self::Accounts => {
+                "Ownership boundaries. Every identity gets a primary account at registration."
+            }
+            Self::AccountMemberships => {
+                "Who belongs to which account, and the role whose bundle grants their default capabilities."
+            }
+            Self::MembershipCapabilities => {
+                "Explicit capability grants — the auditable exceptions on top of role bundles."
+            }
+            Self::Sessions => {
+                "Live sign-ins. A revoked session has no row; only a digest prefix of the token is stored or shown."
+            }
+            Self::ResourceGrants => {
+                "Per-resource shares: the exceptions on top of account ownership. Roles are bundles expanded in code."
+            }
         }
     }
 
@@ -95,6 +114,7 @@ impl DataModel {
             Self::AccountMemberships => "SELECT COUNT(*) AS n FROM account_memberships",
             Self::MembershipCapabilities => "SELECT COUNT(*) AS n FROM membership_capabilities",
             Self::Sessions => "SELECT COUNT(*) AS n FROM sessions",
+            Self::ResourceGrants => "SELECT COUNT(*) AS n FROM resource_grants",
         }
     }
 }
@@ -115,6 +135,10 @@ pub enum Cell {
     Text(String),
     /// Enum-ish value rendered quietly: kind, status, role.
     Tag(String),
+    /// Reference to another entity: the human label shows, the full public id
+    /// rides on hover. Resolved server-side in the same query as the row —
+    /// the client never makes lookup requests to name a reference.
+    Ref { label: String, public_id: String },
     /// Unix-millis timestamp.
     Time(i64),
     /// Column is nullable and this row has no value.
@@ -135,6 +159,7 @@ impl Cell {
     pub fn plain(&self) -> String {
         match self {
             Self::Mono(v) | Self::Text(v) | Self::Tag(v) => v.clone(),
+            Self::Ref { label, public_id } => format!("{label} <{public_id}>"),
             Self::Time(ms) => fmt_utc(*ms),
             Self::None => "—".to_string(),
         }
@@ -193,7 +218,27 @@ pub async fn rows(db: &Client, model: DataModel) -> Result<TableData, HiqliteErr
         DataModel::AccountMemberships => account_memberships(db).await,
         DataModel::MembershipCapabilities => membership_capabilities(db).await,
         DataModel::Sessions => sessions(db).await,
+        DataModel::ResourceGrants => resource_grants(db).await,
     }
+}
+
+/// SQL for a human label of the identity aliased `i`: display name, else the
+/// primary email, else a public-id prefix. Every reference column resolves
+/// through this so the browser shows names, with the full public id on hover.
+macro_rules! identity_label {
+    ($alias:literal) => {
+        concat!(
+            "COALESCE(",
+            $alias,
+            ".display_name, ",
+            "(SELECT e2.email FROM identity_emails e2 WHERE e2.identity_id = ",
+            $alias,
+            ".id AND e2.is_primary = 1), ",
+            "substr(",
+            $alias,
+            ".public_id, 1, 8))"
+        )
+    };
 }
 
 async fn identities(db: &Client) -> Result<TableData, HiqliteError> {
@@ -214,7 +259,14 @@ async fn identities(db: &Client) -> Result<TableData, HiqliteError> {
         )
         .await?;
     Ok(TableData {
-        columns: &["Public id", "Kind", "Display name", "Status", "Created", "Updated"],
+        columns: &[
+            "Public id",
+            "Kind",
+            "Display name",
+            "Status",
+            "Created",
+            "Updated",
+        ],
         rows: rows
             .into_iter()
             .map(|r| {
@@ -237,31 +289,53 @@ async fn identity_emails(db: &Client) -> Result<TableData, HiqliteError> {
         email: String,
         email_normalized: String,
         identity_public_id: String,
+        identity_label: String,
         verified_at: Option<i64>,
         is_primary: i64,
         created_at: i64,
     }
     let rows: Vec<R> = db
         .query_as(
-            "SELECT e.email, e.email_normalized, i.public_id AS identity_public_id,
+            concat!(
+                "SELECT e.email, e.email_normalized, i.public_id AS identity_public_id, ",
+                identity_label!("i"),
+                " AS identity_label,
                     e.verified_at, e.is_primary, e.created_at
              FROM identity_emails e
              JOIN identities i ON i.id = e.identity_id
-             ORDER BY e.id DESC LIMIT $1",
+             ORDER BY e.id DESC LIMIT $1"
+            ),
             params!(ROW_LIMIT),
         )
         .await?;
     Ok(TableData {
-        columns: &["Email", "Normalized", "Identity", "Verified", "Primary", "Created"],
+        columns: &[
+            "Email",
+            "Normalized",
+            "Identity",
+            "Verified",
+            "Primary",
+            "Created",
+        ],
         rows: rows
             .into_iter()
             .map(|r| {
                 vec![
                     Cell::Text(r.email),
                     Cell::Text(r.email_normalized),
-                    Cell::Mono(r.identity_public_id),
+                    Cell::Ref {
+                        label: r.identity_label,
+                        public_id: r.identity_public_id,
+                    },
                     Cell::opt_time(r.verified_at),
-                    Cell::Tag(if r.is_primary != 0 { "primary" } else { "secondary" }.into()),
+                    Cell::Tag(
+                        if r.is_primary != 0 {
+                            "primary"
+                        } else {
+                            "secondary"
+                        }
+                        .into(),
+                    ),
                     Cell::Time(r.created_at),
                 ]
             })
@@ -273,17 +347,22 @@ async fn identity_passwords(db: &Client) -> Result<TableData, HiqliteError> {
     #[derive(serde::Deserialize)]
     struct R {
         identity_public_id: String,
+        identity_label: String,
         password_hash: String,
         created_at: i64,
         rotated_at: i64,
     }
     let rows: Vec<R> = db
         .query_as(
-            "SELECT i.public_id AS identity_public_id, p.password_hash,
+            concat!(
+                "SELECT i.public_id AS identity_public_id, ",
+                identity_label!("i"),
+                " AS identity_label, p.password_hash,
                     p.created_at, p.rotated_at
              FROM identity_passwords p
              JOIN identities i ON i.id = p.identity_id
-             ORDER BY p.identity_id DESC LIMIT $1",
+             ORDER BY p.identity_id DESC LIMIT $1"
+            ),
             params!(ROW_LIMIT),
         )
         .await?;
@@ -293,7 +372,10 @@ async fn identity_passwords(db: &Client) -> Result<TableData, HiqliteError> {
             .into_iter()
             .map(|r| {
                 vec![
-                    Cell::Mono(r.identity_public_id),
+                    Cell::Ref {
+                        label: r.identity_label,
+                        public_id: r.identity_public_id,
+                    },
                     // The hash dies here: only the PHC algorithm name survives
                     // into display data.
                     Cell::Tag(phc_algorithm(&r.password_hash).to_string()),
@@ -307,7 +389,10 @@ async fn identity_passwords(db: &Client) -> Result<TableData, HiqliteError> {
 
 /// Algorithm name out of a PHC string (`$argon2id$...` → `argon2id`).
 fn phc_algorithm(phc: &str) -> &str {
-    phc.split('$').nth(1).filter(|a| !a.is_empty()).unwrap_or("unknown")
+    phc.split('$')
+        .nth(1)
+        .filter(|a| !a.is_empty())
+        .unwrap_or("unknown")
 }
 
 async fn accounts(db: &Client) -> Result<TableData, HiqliteError> {
@@ -318,20 +403,32 @@ async fn accounts(db: &Client) -> Result<TableData, HiqliteError> {
         name: String,
         status: String,
         primary_for: Option<String>,
+        primary_for_label: Option<String>,
         created_at: i64,
     }
     let rows: Vec<R> = db
         .query_as(
-            "SELECT a.public_id, a.kind, a.name, a.status,
-                    i.public_id AS primary_for, a.created_at
+            concat!(
+                "SELECT a.public_id, a.kind, a.name, a.status,
+                    i.public_id AS primary_for, ",
+                identity_label!("i"),
+                " AS primary_for_label, a.created_at
              FROM accounts a
              LEFT JOIN identities i ON i.id = a.primary_for_identity_id
-             ORDER BY a.id DESC LIMIT $1",
+             ORDER BY a.id DESC LIMIT $1"
+            ),
             params!(ROW_LIMIT),
         )
         .await?;
     Ok(TableData {
-        columns: &["Public id", "Kind", "Name", "Status", "Primary for", "Created"],
+        columns: &[
+            "Public id",
+            "Kind",
+            "Name",
+            "Status",
+            "Primary for",
+            "Created",
+        ],
         rows: rows
             .into_iter()
             .map(|r| {
@@ -340,7 +437,10 @@ async fn accounts(db: &Client) -> Result<TableData, HiqliteError> {
                     Cell::Tag(r.kind),
                     Cell::Text(r.name),
                     Cell::Tag(r.status),
-                    r.primary_for.map_or(Cell::None, Cell::Mono),
+                    match (r.primary_for, r.primary_for_label) {
+                        (Some(public_id), Some(label)) => Cell::Ref { label, public_id },
+                        _ => Cell::None,
+                    },
                     Cell::Time(r.created_at),
                 ]
             })
@@ -354,34 +454,40 @@ async fn account_memberships(db: &Client) -> Result<TableData, HiqliteError> {
         account_name: String,
         account_public_id: String,
         identity_public_id: String,
-        email: Option<String>,
+        identity_label: String,
         role: String,
         created_at: i64,
     }
     let rows: Vec<R> = db
         .query_as(
-            "SELECT a.name AS account_name, a.public_id AS account_public_id,
-                    i.public_id AS identity_public_id,
-                    (SELECT e.email FROM identity_emails e
-                     WHERE e.identity_id = m.identity_id AND e.is_primary = 1) AS email,
+            concat!(
+                "SELECT a.name AS account_name, a.public_id AS account_public_id,
+                    i.public_id AS identity_public_id, ",
+                identity_label!("i"),
+                " AS identity_label,
                     m.role, m.created_at
              FROM account_memberships m
              JOIN accounts a ON a.id = m.account_id
              JOIN identities i ON i.id = m.identity_id
-             ORDER BY m.created_at DESC LIMIT $1",
+             ORDER BY m.created_at DESC LIMIT $1"
+            ),
             params!(ROW_LIMIT),
         )
         .await?;
     Ok(TableData {
-        columns: &["Account", "Account id", "Member", "Identity", "Role", "Created"],
+        columns: &["Account", "Member", "Role", "Created"],
         rows: rows
             .into_iter()
             .map(|r| {
                 vec![
-                    Cell::Text(r.account_name),
-                    Cell::Mono(r.account_public_id),
-                    Cell::opt_text(r.email),
-                    Cell::Mono(r.identity_public_id),
+                    Cell::Ref {
+                        label: r.account_name,
+                        public_id: r.account_public_id,
+                    },
+                    Cell::Ref {
+                        label: r.identity_label,
+                        public_id: r.identity_public_id,
+                    },
                     Cell::Tag(r.role),
                     Cell::Time(r.created_at),
                 ]
@@ -397,30 +503,40 @@ async fn membership_capabilities(db: &Client) -> Result<TableData, HiqliteError>
         account_name: String,
         account_public_id: String,
         identity_public_id: String,
+        identity_label: String,
         granted_at: i64,
     }
     let rows: Vec<R> = db
         .query_as(
-            "SELECT c.capability, a.name AS account_name,
+            concat!(
+                "SELECT c.capability, a.name AS account_name,
                     a.public_id AS account_public_id,
-                    i.public_id AS identity_public_id, c.granted_at
+                    i.public_id AS identity_public_id, ",
+                identity_label!("i"),
+                " AS identity_label, c.granted_at
              FROM membership_capabilities c
              JOIN accounts a ON a.id = c.account_id
              JOIN identities i ON i.id = c.identity_id
-             ORDER BY c.granted_at DESC LIMIT $1",
+             ORDER BY c.granted_at DESC LIMIT $1"
+            ),
             params!(ROW_LIMIT),
         )
         .await?;
     Ok(TableData {
-        columns: &["Capability", "Account", "Account id", "Identity", "Granted"],
+        columns: &["Capability", "Account", "Member", "Granted"],
         rows: rows
             .into_iter()
             .map(|r| {
                 vec![
                     Cell::Mono(r.capability),
-                    Cell::Text(r.account_name),
-                    Cell::Mono(r.account_public_id),
-                    Cell::Mono(r.identity_public_id),
+                    Cell::Ref {
+                        label: r.account_name,
+                        public_id: r.account_public_id,
+                    },
+                    Cell::Ref {
+                        label: r.identity_label,
+                        public_id: r.identity_public_id,
+                    },
                     Cell::Time(r.granted_at),
                 ]
             })
@@ -433,7 +549,9 @@ async fn sessions(db: &Client) -> Result<TableData, HiqliteError> {
     struct R {
         token_hash: String,
         identity_public_id: String,
+        identity_label: String,
         account_public_id: String,
+        account_name: String,
         created_at: i64,
         expires_at: i64,
         last_seen_at: i64,
@@ -441,18 +559,30 @@ async fn sessions(db: &Client) -> Result<TableData, HiqliteError> {
     }
     let rows: Vec<R> = db
         .query_as(
-            "SELECT s.token_hash, i.public_id AS identity_public_id,
-                    a.public_id AS account_public_id,
+            concat!(
+                "SELECT s.token_hash, i.public_id AS identity_public_id, ",
+                identity_label!("i"),
+                " AS identity_label,
+                    a.public_id AS account_public_id, a.name AS account_name,
                     s.created_at, s.expires_at, s.last_seen_at, s.user_agent
              FROM sessions s
              JOIN identities i ON i.id = s.identity_id
              JOIN accounts a ON a.id = s.account_id
-             ORDER BY s.id DESC LIMIT $1",
+             ORDER BY s.id DESC LIMIT $1"
+            ),
             params!(ROW_LIMIT),
         )
         .await?;
     Ok(TableData {
-        columns: &["Digest", "Identity", "Account", "Created", "Expires", "Last seen", "User agent"],
+        columns: &[
+            "Digest",
+            "Identity",
+            "Account",
+            "Created",
+            "Expires",
+            "Last seen",
+            "User agent",
+        ],
         rows: rows
             .into_iter()
             .map(|r| {
@@ -461,12 +591,87 @@ async fn sessions(db: &Client) -> Result<TableData, HiqliteError> {
                     // token — but even the digest is cut to a prefix so the
                     // page cannot be used as a lookup table against a dump.
                     Cell::Mono(format!("{}…", &r.token_hash[..r.token_hash.len().min(8)])),
-                    Cell::Mono(r.identity_public_id),
-                    Cell::Mono(r.account_public_id),
+                    Cell::Ref {
+                        label: r.identity_label,
+                        public_id: r.identity_public_id,
+                    },
+                    Cell::Ref {
+                        label: r.account_name,
+                        public_id: r.account_public_id,
+                    },
                     Cell::Time(r.created_at),
                     Cell::Time(r.expires_at),
                     Cell::Time(r.last_seen_at),
                     Cell::opt_text(r.user_agent),
+                ]
+            })
+            .collect(),
+    })
+}
+
+async fn resource_grants(db: &Client) -> Result<TableData, HiqliteError> {
+    #[derive(serde::Deserialize)]
+    struct R {
+        resource_kind: String,
+        resource_public_id: String,
+        subject_kind: String,
+        subject_public_id: Option<String>,
+        subject_label: Option<String>,
+        role: String,
+        granted_by_public_id: Option<String>,
+        granted_by_label: Option<String>,
+        granted_at: i64,
+    }
+    // The subject is polymorphic; each arm of the join can only match its own
+    // kind, so exactly one label survives per row. A `link` subject has no
+    // table yet and renders as its kind alone.
+    let rows: Vec<R> = db
+        .query_as(
+            concat!(
+                "SELECT g.resource_kind, g.resource_public_id, g.subject_kind,
+                    COALESCE(si.public_id, sa.public_id) AS subject_public_id,
+                    COALESCE(",
+                identity_label!("si"),
+                ", sa.name) AS subject_label,
+                    g.role,
+                    gi.public_id AS granted_by_public_id, ",
+                identity_label!("gi"),
+                " AS granted_by_label,
+                    g.granted_at
+             FROM resource_grants g
+             LEFT JOIN identities si ON g.subject_kind = 'identity' AND si.id = g.subject_id
+             LEFT JOIN accounts   sa ON g.subject_kind = 'account'  AND sa.id = g.subject_id
+             LEFT JOIN identities gi ON gi.id = g.granted_by_identity_id
+             ORDER BY g.granted_at DESC LIMIT $1"
+            ),
+            params!(ROW_LIMIT),
+        )
+        .await?;
+    Ok(TableData {
+        columns: &[
+            "Resource",
+            "Kind",
+            "Subject",
+            "Role",
+            "Granted by",
+            "Granted",
+        ],
+        rows: rows
+            .into_iter()
+            .map(|r| {
+                vec![
+                    Cell::Mono(r.resource_public_id),
+                    Cell::Tag(r.resource_kind),
+                    match (r.subject_public_id, r.subject_label) {
+                        (Some(public_id), Some(label)) => Cell::Ref { label, public_id },
+                        _ => Cell::Tag(r.subject_kind),
+                    },
+                    Cell::Tag(r.role),
+                    match (r.granted_by_public_id, r.granted_by_label) {
+                        (Some(public_id), Some(label)) => Cell::Ref { label, public_id },
+                        _ => Cell::None,
+                    },
+                    Cell::Time(r.granted_at),
                 ]
             })
             .collect(),
@@ -483,7 +688,11 @@ mod tests {
             assert_eq!(DataModel::parse(model.slug()), Some(*model));
         }
         assert_eq!(DataModel::parse("nope"), None);
-        assert_eq!(DataModel::parse("Identities"), None, "slugs are exact, not case-folded");
+        assert_eq!(
+            DataModel::parse("Identities"),
+            None,
+            "slugs are exact, not case-folded"
+        );
     }
 
     #[test]

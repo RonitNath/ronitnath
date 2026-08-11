@@ -29,6 +29,13 @@ fn escape(s: &str) -> String {
 fn cell_html(cell: &Cell) -> String {
     match cell {
         Cell::Mono(v) => format!("<code>{}</code>", escape(v)),
+        // The label reads; the uuid is there on hover for anyone who needs to
+        // correlate rows. Resolution happened server-side, in the row's query.
+        Cell::Ref { label, public_id } => format!(
+            "<span class=\"ref\" title=\"{}\">{}</span>",
+            escape(public_id),
+            escape(label)
+        ),
         Cell::Text(v) => escape(v),
         Cell::Tag(v) => format!("<span class=\"tag\">{}</span>", escape(v)),
         Cell::Time(ms) => format!("<span class=\"time\">{}</span>", fmt_utc(*ms)),
@@ -326,6 +333,7 @@ tbody tr:hover td { background: var(--bg-muted); }
 .time { font-family: var(--font-mono); font-variant-numeric: tabular-nums; color: var(--fg-muted); }
 .tag { color: var(--fg-muted); }
 .none { color: var(--fg-subtle); }
+.ref { border-bottom: 1px dotted var(--fg-subtle); cursor: help; }
 
 .empty {
   border: 1px dashed var(--border);

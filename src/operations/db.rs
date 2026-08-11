@@ -753,7 +753,10 @@ mod tests {
         let n: i64 = conn
             .query_row("SELECT COUNT(*) FROM _migrations", [], |row| row.get(0))
             .unwrap();
-        assert_eq!(n, 1);
+        // One row per embedded migration file, however many exist — the point
+        // here is idempotence, not the current count.
+        let embedded = i64::try_from(embedded_migrations().unwrap().len()).unwrap();
+        assert_eq!(n, embedded);
     }
 
     #[test]
