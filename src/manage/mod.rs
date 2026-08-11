@@ -47,11 +47,7 @@ pub async fn index(State(state): State<AuthState>) -> Response {
 #[instrument(name = "manage.model", skip(state))]
 pub async fn model_page(State(state): State<AuthState>, Path(slug): Path<String>) -> Response {
     let Some(model) = DataModel::parse(&slug) else {
-        return (
-            StatusCode::NOT_FOUND,
-            Html(render::not_found_page(&slug)),
-        )
-            .into_response();
+        return (StatusCode::NOT_FOUND, Html(render::not_found_page(&slug))).into_response();
     };
 
     let total = match queries::count(&state.db, model).await {

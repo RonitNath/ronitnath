@@ -334,8 +334,7 @@ async fn authenticate(email: String, password: String) -> Result<(), ServerFnErr
                 match store::create_session(&state.db, &registration, user_agent).await {
                     Ok(token) => {
                         let response = expect_context::<leptos_axum::ResponseOptions>();
-                        let cookie =
-                            session::set_cookie_header(&token, state.cookie_security);
+                        let cookie = session::set_cookie_header(&token, state.cookie_security);
                         response.insert_header(
                             header::SET_COOKIE,
                             cookie.parse().expect("cookie header is ascii"),

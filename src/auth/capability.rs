@@ -169,8 +169,16 @@ mod tests {
     fn no_role_registration_can_produce_implies_manage() {
         // Registration creates Owner memberships; /manage's tests depend on a
         // fresh registrant not holding `manage`.
-        assert!(!MembershipRole::Owner.implied().contains(&Capability::Manage));
-        assert!(MembershipRole::Owner.implied().contains(&Capability::TestAuth));
+        assert!(
+            !MembershipRole::Owner
+                .implied()
+                .contains(&Capability::Manage)
+        );
+        assert!(
+            MembershipRole::Owner
+                .implied()
+                .contains(&Capability::TestAuth)
+        );
     }
 
     #[test]

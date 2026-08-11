@@ -468,10 +468,7 @@ async fn role_change_takes_effect_on_the_next_request() {
     // test speaks SQL, exactly as that surface would.
     let updated = app
         .db
-        .execute(
-            "UPDATE account_memberships SET role = 'admin'",
-            params!(),
-        )
+        .execute("UPDATE account_memberships SET role = 'admin'", params!())
         .await
         .expect("promote membership");
     assert_eq!(updated, 1, "exactly one membership to promote");
@@ -487,10 +484,7 @@ async fn role_change_takes_effect_on_the_next_request() {
     // Demotion is the same lever in reverse — access ends with the role, which
     // is what makes the bundle a policy and not a one-time backfill.
     app.db
-        .execute(
-            "UPDATE account_memberships SET role = 'member'",
-            params!(),
-        )
+        .execute("UPDATE account_memberships SET role = 'member'", params!())
         .await
         .expect("demote membership");
     app.server.get("/manage").await.assert_status_forbidden();
