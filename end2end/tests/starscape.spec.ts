@@ -164,6 +164,11 @@ test("hidden tabs pause both render loops and resume without object growth", asy
 test("StarScape is home-only and its heavy module is interaction-gated", async ({ page }) => {
   await page.goto(`${site}/?debug=telemetry`);
   await expect(page.getByRole("button", { name: "Load StarScape" })).toBeVisible();
+  await expect(page.locator(".starscape-controls")).toHaveAttribute(
+    "data-annotations-ready",
+    "true",
+  );
+  await expect.poll(() => page.locator(".star-callout").count()).toBeGreaterThan(0);
   expect(
     await page.evaluate(() =>
       performance
@@ -216,6 +221,14 @@ test("StarScape is home-only and its heavy module is interaction-gated", async (
 
   await page.goto(`${site}/auth`);
   await expect(page.getByRole("button", { name: "Load StarScape" })).toHaveCount(0);
+});
+
+test("the mini-globe opens StarScape before it becomes an observer control", async ({ page }) => {
+  await page.goto(`${site}/?debug=telemetry`);
+  const globe = page.getByRole("button", { name: "Open StarScape from the globe" });
+  await expect(globe).toBeVisible();
+  await globe.dispatchEvent("pointerdown");
+  await expect(page.getByRole("dialog", { name: "StarScape celestial atlas" })).toBeVisible();
 });
 
 test("manual observer state is shared and resume orbit clears it", async ({ page }) => {

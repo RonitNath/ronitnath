@@ -26,6 +26,35 @@ fn cache_policy(path: &str) -> &'static str {
 }
 
 #[cfg(feature = "ssr")]
+fn require_site_bundle(site_root: &std::path::Path) -> Result<(), String> {
+    const REQUIRED: &[&str] = &[
+        "pkg/rn-site.css",
+        "pkg/rn-site.js",
+        "pkg/rn-site.wasm",
+        "css/site.css",
+        "css/starscape.css",
+        "js/starscape-ui.js",
+        "js/starscape-explorer.js",
+        "js/mini-globe.js",
+        "stars/bright.bin",
+    ];
+    let missing = REQUIRED
+        .iter()
+        .filter(|relative| !site_root.join(relative).is_file())
+        .copied()
+        .collect::<Vec<_>>();
+    if missing.is_empty() {
+        Ok(())
+    } else {
+        Err(format!(
+            "site bundle is incomplete under {} (missing {}); run `cargo leptos build` or `cargo leptos watch`",
+            site_root.display(),
+            missing.join(", ")
+        ))
+    }
+}
+
+#[cfg(feature = "ssr")]
 async fn cache_and_version_headers(
     request: axum::extract::Request,
     next: axum::middleware::Next,
@@ -194,14 +223,6 @@ async fn main() {
         return;
     }
 
-    let db = db::open_and_migrate(&app_config)
-        .await
-        .expect("open database and migrate");
-
-    // `Secure` on the session cookie follows the runtime mode: prod sits behind
-    // the TLS-terminating edge, dev does not.
-    let auth_state = AuthState::for_mode(db.clone(), app_config.mode);
-
     // `Some("Cargo.toml")` so plain `cargo run` works without cargo-leptos
     // injecting LEPTOS_OUTPUT_NAME. The runtime image ships no Cargo.toml —
     // there, configuration is environment-only, exactly like the container's
@@ -214,6 +235,17 @@ async fn main() {
     .expect("leptos configuration");
     let addr = conf.leptos_options.site_addr;
     let leptos_options = conf.leptos_options;
+    require_site_bundle(std::path::Path::new(leptos_options.site_root.as_ref()))
+        .expect("complete Leptos site bundle");
+
+    let db = db::open_and_migrate(&app_config)
+        .await
+        .expect("open database and migrate");
+
+    // `Secure` on the session cookie follows the runtime mode: prod sits behind
+    // the TLS-terminating edge, dev does not.
+    let auth_state = AuthState::for_mode(db.clone(), app_config.mode);
+
     let star_lod_path =
         std::path::PathBuf::from(leptos_options.site_root.as_ref()).join("stars/lod/g12.bin");
     let routes = generate_route_list(App);
@@ -422,7 +454,7 @@ pub fn main() {
 
 #[cfg(all(test, feature = "ssr"))]
 mod tests {
-    use super::cache_policy;
+    use super::{cache_policy, require_site_bundle};
 
     #[test]
     fn static_assets_revalidate_while_documents_and_apis_do_not_store() {
@@ -434,5 +466,29 @@ mod tests {
         assert_eq!(cache_policy("/manage"), "no-store");
         assert_eq!(cache_policy("/api/whoami"), "no-store");
         assert_eq!(cache_policy("/version"), "no-store");
+    }
+
+    #[test]
+    fn incomplete_site_bundle_is_rejected_before_serving_broken_html() {
+        let root = tempfile::tempdir().unwrap();
+        let error = require_site_bundle(root.path()).unwrap_err();
+        assert!(error.contains("pkg/rn-site.css"));
+
+        for relative in [
+            "pkg/rn-site.css",
+            "pkg/rn-site.js",
+            "pkg/rn-site.wasm",
+            "css/site.css",
+            "css/starscape.css",
+            "js/starscape-ui.js",
+            "js/starscape-explorer.js",
+            "js/mini-globe.js",
+            "stars/bright.bin",
+        ] {
+            let path = root.path().join(relative);
+            std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+            std::fs::write(path, b"fixture").unwrap();
+        }
+        require_site_bundle(root.path()).unwrap();
     }
 }

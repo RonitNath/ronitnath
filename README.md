@@ -65,7 +65,9 @@ stream is not a durable change log: SQLite remains authoritative, Hiqlite's
 replicated notification bus fans invalidations to every server, and hydrated
 views refetch their current state. Bounded queues request a full resync if a
 consumer falls behind. The server sends a heartbeat every 25 seconds; clients
-use full-jitter reconnects and also check `/version` when a tab becomes visible.
+use full-jitter reconnects, request an authoritative view resync after reconnect,
+and also check `/version` when a suspended tab becomes visible. There is no
+background HTTP polling for admin data.
 
 Release mismatches reload clean pages after a short jitter. Editors can use
 `realtime::register_reload_guard` to flush autosaved state before that reload;
@@ -75,7 +77,7 @@ reload. Targeted access revocations reload immediately and deliberately do not
 restore protected view state.
 
 `/manage` is server-rendered and hydrated. Its tables subscribe to model-level
-invalidations, reconcile while visible, preserve viewport/table scroll during
+invalidations, reconcile after WebSocket reconnects, preserve viewport/table scroll during
 refetches, and carry only public IDs and redacted display values to the browser.
 There is no generic draft store yet; that belongs with the first editable data
 model so its conflict and autosave semantics can be designed around real data.
@@ -83,9 +85,10 @@ model so its conflict and autosave semantics can be designed around real data.
 ## Development
 
 ```sh
-nix develop            # pins rust, the wasm target and cargo-leptos
-cargo run              # self-contained: create data/ → Hiqlite → migrate → serve
-cargo leptos watch     # same app with hydrate rebuilds; http://127.0.0.1:3000
+nix develop          # pins rust, the wasm target and cargo-leptos
+cargo leptos watch   # build assets + hydrate + server; http://127.0.0.1:3004
+cargo leptos build   # create target/site before a server-only `cargo run`
+cargo run            # server-only; create data/ → Hiqlite → migrate → serve
 ```
 
 `config.toml` defaults to `mode = "dev"` and `db_path = "data/db.sqlite"`.

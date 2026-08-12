@@ -115,6 +115,8 @@ function overlaps(a, b, pad = 12) {
 }
 
 export async function mountStarScapeControls(root, epochMs) {
+  if (root.dataset.starscapeControlsMounted === "true") return;
+  root.dataset.starscapeControlsMounted = "true";
   const mountMs = Date.now();
   const layer = root.querySelector(".star-annotations");
   const launch = root.querySelector(".starscape-launch");
@@ -122,7 +124,6 @@ export async function mountStarScapeControls(root, epochMs) {
   svg.classList.add("star-leaders");
   svg.setAttribute("aria-hidden", "true");
   layer.append(svg);
-  const stars = await loadNamedStars();
   const labels = new Map();
   let disposed = false, lastLayout = 0, lastSignature = "";
 
@@ -146,6 +147,22 @@ export async function mountStarScapeControls(root, epochMs) {
     }
   };
   launch.addEventListener("click", () => open());
+  const openRequested = () => open();
+  window.addEventListener("starscape-open-request", openRequested);
+  // The mini-globe can mount after these controls. Keeping a direct entry
+  // point avoids losing the first gesture if module scheduling is delayed.
+  window.__rnOpenStarScape = open;
+
+  let stars = [];
+  try {
+    stars = await loadNamedStars();
+    root.dataset.annotationsReady = "true";
+  } catch (error) {
+    // Catalog annotations are progressive enhancement. A failed annotation
+    // fetch must never disable the primary explorer launcher.
+    root.dataset.annotationsReady = "false";
+    console.warn("Named-star annotations unavailable", error);
+  }
 
   const layout = now => {
     if (disposed) return;
@@ -201,5 +218,9 @@ export async function mountStarScapeControls(root, epochMs) {
     }
   };
   requestAnimationFrame(layout);
-  window.addEventListener("pagehide", () => { disposed = true; }, {once:true});
+  window.addEventListener("pagehide", () => {
+    disposed = true;
+    window.removeEventListener("starscape-open-request", openRequested);
+    if (window.__rnOpenStarScape === open) delete window.__rnOpenStarScape;
+  }, {once:true});
 }

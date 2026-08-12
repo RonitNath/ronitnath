@@ -167,6 +167,25 @@ export async function mountMiniGlobe(el, epochMs) {
   el.innerHTML = "";
   el.classList.remove("is-ready");
 
+  const requestStarScape = () => {
+    if (document.documentElement.classList.contains("starscape-explorer-open")) return;
+    if (typeof window.__rnOpenStarScape === "function") window.__rnOpenStarScape();
+    else window.dispatchEvent(new Event("starscape-open-request"));
+  };
+  const activateFromGlobe = event => {
+    if (document.documentElement.classList.contains("starscape-explorer-open")) return;
+    event.preventDefault();
+    requestStarScape();
+  };
+  el.setAttribute("aria-hidden", "false");
+  el.setAttribute("role", "button");
+  el.setAttribute("tabindex", "0");
+  el.setAttribute("aria-label", "Open StarScape from the globe");
+  el.addEventListener("pointerdown", activateFromGlobe);
+  el.addEventListener("keydown", event => {
+    if (event.key === "Enter" || event.key === " ") activateFromGlobe(event);
+  });
+
   await loadScript("/js/vendor/globe.gl.min.js");
   if (!window.Globe) {
     throw new Error("Globe global missing after script load");
@@ -320,6 +339,7 @@ export async function mountMiniGlobe(el, epochMs) {
       controls?.removeEventListener?.("end", selectGlobeCenter);
       window.removeEventListener("pageshow", pageShown);
       window.removeEventListener("pagehide", pageHidden);
+      el.removeEventListener("pointerdown", activateFromGlobe);
       globe._destructor?.();
       telemetryEvent("globe-disposed");
     }

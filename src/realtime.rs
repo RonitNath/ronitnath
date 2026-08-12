@@ -544,6 +544,7 @@ mod client {
         install_visibility_version_check(update_available);
         spawn_local(async move {
             let mut attempt = 0_u32;
+            let mut connected_once = false;
             loop {
                 let Some(url) = websocket_url() else { return };
                 match WebSocket::open(&url) {
@@ -565,6 +566,15 @@ mod client {
                             let Ok(message) = serde_json::from_str::<ServerMessage>(&text) else {
                                 continue;
                             };
+                            if matches!(message, ServerMessage::Hello { .. }) {
+                                if connected_once {
+                                    // The invalidation stream is intentionally not
+                                    // durable. A fresh authoritative read closes the
+                                    // gap left by any events missed while disconnected.
+                                    dispatch("rn-resync-required", &[]);
+                                }
+                                connected_once = true;
+                            }
                             handle(message, update_available);
                         }
                     }

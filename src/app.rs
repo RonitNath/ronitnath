@@ -469,17 +469,6 @@ where
             callback.as_ref().unchecked_ref(),
         );
         callback.forget();
-
-        let reconcile = Closure::<dyn FnMut()>::new(move || {
-            if document().visibility_state() == web_sys::VisibilityState::Visible {
-                refetch_manage(resource);
-            }
-        });
-        let _ = window().set_interval_with_callback_and_timeout_and_arguments_0(
-            reconcile.as_ref().unchecked_ref(),
-            90_000,
-        );
-        reconcile.forget();
     }
     #[cfg(not(feature = "hydrate"))]
     drop((resource, model));
