@@ -144,6 +144,11 @@ async fn main() {
                             "version": release_version(),
                             "leader": leader,
                             "voters": voters,
+                            // The cache raft is a separate group with its own
+                            // membership; a readiness 503 with voters=3 and no
+                            // cache count was exactly the blind spot that made
+                            // the first formation failure unreadable.
+                            "cache_voters": cache_voters,
                             "expected_voters": expected,
                         })),
                     )
