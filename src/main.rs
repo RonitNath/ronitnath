@@ -85,8 +85,15 @@ async fn main() {
     let auth_state = AuthState::for_mode(db.clone(), app_config.mode);
 
     // `Some("Cargo.toml")` so plain `cargo run` works without cargo-leptos
-    // injecting LEPTOS_OUTPUT_NAME.
-    let conf = get_configuration(Some("Cargo.toml")).unwrap();
+    // injecting LEPTOS_OUTPUT_NAME. The runtime image ships no Cargo.toml —
+    // there, configuration is environment-only, exactly like the container's
+    // LEPTOS_* variables define it.
+    let conf = if std::path::Path::new("Cargo.toml").exists() {
+        get_configuration(Some("Cargo.toml"))
+    } else {
+        get_configuration(None)
+    }
+    .expect("leptos configuration");
     let addr = conf.leptos_options.site_addr;
     let leptos_options = conf.leptos_options;
     let routes = generate_route_list(App);
