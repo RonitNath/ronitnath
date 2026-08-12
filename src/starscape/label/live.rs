@@ -10,7 +10,7 @@ use wasm_bindgen::closure::Closure;
 use wasm_bindgen_futures::JsFuture;
 use web_sys::Response;
 
-use super::{CityCatalog, UPDATE_INTERVAL_MS, label_text};
+use super::{CityCatalog, UPDATE_INTERVAL_MS};
 use crate::starscape::{sim_time_ms, synced_sim_time_ms};
 
 pub fn start(text: RwSignal<String>, server_epoch_ms: f64) {
@@ -99,7 +99,10 @@ fn refresh(
     let sim_ms = frozen_at.unwrap_or_else(|| {
         synced_sim_time_ms(server_epoch_ms, client_mount_ms, js_sys::Date::now())
     });
-    let next = label_text(catalog, sim_ms);
+    let sim_ms = crate::starscape::bridge::displayed_sim_time(sim_ms);
+    let (lat_deg, lon_deg) = crate::starscape::bridge::observer_for(sim_ms);
+    let next =
+        super::format_grounding(lat_deg, lon_deg, catalog.nearest(lat_deg, lon_deg).as_ref());
     if text.get_untracked() != next {
         text.set(next);
     }

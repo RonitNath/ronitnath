@@ -8,7 +8,7 @@ use leptos_router::{
 // The nav table is decided from capabilities, which only the server build has.
 #[cfg(feature = "ssr")]
 use crate::auth::{Capability, CapabilitySet};
-use crate::starscape::{CityLabel, MiniGlobe, Starscape};
+use crate::starscape::{CityLabel, MiniGlobe, StarScapeControls, Starscape};
 
 const THEME_CSS: &str = r#"
 :root { color-scheme: dark; --bg: oklch(0.06 0.005 240); --fg: oklch(0.96 0.002 80); --hero-fg: oklch(0.63 0.235 27); }
@@ -280,6 +280,7 @@ fn ThemeToggle() -> impl IntoView {
 #[component]
 fn HomePage() -> impl IntoView {
     view! {
+        <StarScapeControls epoch_ms=server_now_ms()/>
         <section class="viewport-center home-hero">
             <div class="home-card">
                 <h1>"Ronit Nath"</h1>

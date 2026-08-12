@@ -8,6 +8,68 @@ fn release_version() -> String {
     std::env::var("SOURCE_GIT_HASH").unwrap_or_else(|_| "dev".to_string())
 }
 
+#[cfg(feature = "ssr")]
+async fn serve_star_lod_range(
+    path: std::path::PathBuf,
+    headers: axum::http::HeaderMap,
+) -> axum::response::Response {
+    use axum::body::Body;
+    use axum::http::{StatusCode, header};
+    use axum::response::IntoResponse;
+    use std::io::{Read, Seek};
+
+    let Some(range) = headers
+        .get(header::RANGE)
+        .and_then(|value| value.to_str().ok())
+        .and_then(|value| value.strip_prefix("bytes="))
+        .filter(|value| !value.contains(','))
+        .and_then(|value| value.split_once('-'))
+        .and_then(|(start, end)| Some((start.parse::<u64>().ok()?, end.parse::<u64>().ok()?)))
+    else {
+        return (StatusCode::BAD_REQUEST, "a single byte range is required").into_response();
+    };
+
+    let result = tokio::task::spawn_blocking(move || -> std::io::Result<(u64, Vec<u8>)> {
+        let mut file = std::fs::File::open(path)?;
+        let file_len = file.metadata()?.len();
+        let (start, end) = range;
+        let requested = end.checked_sub(start).and_then(|size| size.checked_add(1));
+        let Some(length) = requested.filter(|length| *length <= 2 * 1024 * 1024) else {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "invalid or excessive range",
+            ));
+        };
+        if end >= file_len {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "range outside file",
+            ));
+        }
+        file.seek(std::io::SeekFrom::Start(start))?;
+        let mut bytes = vec![0; length as usize];
+        file.read_exact(&mut bytes)?;
+        Ok((file_len, bytes))
+    })
+    .await;
+
+    let Ok(Ok((file_len, bytes))) = result else {
+        return StatusCode::RANGE_NOT_SATISFIABLE.into_response();
+    };
+    let end = range.1;
+    axum::response::Response::builder()
+        .status(StatusCode::PARTIAL_CONTENT)
+        .header(header::CONTENT_TYPE, "application/octet-stream")
+        .header(header::ACCEPT_RANGES, "bytes")
+        .header(
+            header::CONTENT_RANGE,
+            format!("bytes {}-{end}/{file_len}", range.0),
+        )
+        .header(header::CONTENT_LENGTH, bytes.len())
+        .body(Body::from(bytes))
+        .expect("valid star LOD range response")
+}
+
 /// Which replica this process is, from the node's `node.env`.
 #[cfg(feature = "ssr")]
 fn node_name() -> String {
@@ -96,6 +158,8 @@ async fn main() {
     .expect("leptos configuration");
     let addr = conf.leptos_options.site_addr;
     let leptos_options = conf.leptos_options;
+    let star_lod_path =
+        std::path::PathBuf::from(leptos_options.site_root.as_ref()).join("stars/lod/g12.bin");
     let routes = generate_route_list(App);
 
     let readiness_db = db.clone();
@@ -157,6 +221,13 @@ async fn main() {
             }),
         )
         .route("/version", get(|| async { release_version() }))
+        .route(
+            "/stars/lod/g12.bin",
+            get({
+                let path = star_lod_path.clone();
+                move |headers: axum::http::HeaderMap| serve_star_lod_range(path.clone(), headers)
+            }),
+        )
         // Server functions (the `/auth` sign-in) need `AuthState` in context.
         // The same closure is provided here and to `leptos_routes_with_context`
         // below: SSR calls server fns through the renderer, the browser calls

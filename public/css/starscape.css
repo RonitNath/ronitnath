@@ -224,6 +224,225 @@ body {
     font-variant-numeric: tabular-nums;
 }
 
+/* Lightweight named-star broadcast callouts. */
+.starscape-controls,
+.star-annotations,
+.star-leaders {
+    position: fixed;
+    inset: 0;
+    z-index: 4;
+    pointer-events: none;
+}
+
+.star-leaders {
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+}
+
+.star-leaders path {
+    fill: none;
+    stroke: color-mix(in oklab, var(--fg) 72%, transparent);
+    stroke-width: 1;
+    vector-effect: non-scaling-stroke;
+    animation: star-callout-in 0.45s ease both;
+}
+
+.star-callout {
+    position: fixed;
+    min-height: 44px;
+    padding: 0 0 10px;
+    border: 0;
+    background: transparent;
+    color: var(--fg);
+    text-align: left;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    cursor: pointer;
+    pointer-events: auto;
+    animation: star-callout-in 0.45s ease both;
+}
+
+.star-callout strong,
+.star-callout span {
+    display: block;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.star-callout strong {
+    font-family: var(--font-display);
+    font-size: 0.78rem;
+    font-weight: 600;
+}
+
+.star-callout span {
+    margin-top: 0.18rem;
+    color: var(--fg-subtle);
+    font-size: 0.61rem;
+}
+
+.star-callout:hover strong,
+.star-callout:focus-visible strong {
+    color: var(--accent);
+}
+
+.starscape-launch {
+    position: fixed;
+    right: clamp(0.75rem, 2vw, 1.25rem);
+    bottom: clamp(0.75rem, 2vh, 1rem);
+    z-index: 5;
+    min-height: 44px;
+    padding: 0.65rem 0.9rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface-glass);
+    color: var(--fg);
+    font: 600 0.72rem var(--font-body);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    cursor: pointer;
+    pointer-events: auto;
+    backdrop-filter: blur(12px);
+}
+
+.starscape-launch:hover,
+.starscape-launch:focus-visible {
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+@keyframes star-callout-in {
+    from { opacity: 0; transform: translateY(5px); }
+    to { opacity: 1; transform: none; }
+}
+
+/* Lazily loaded immersive explorer. */
+.starscape-explorer {
+    position: fixed;
+    inset: 0;
+    z-index: 20;
+    color: oklch(0.96 0.008 240);
+    background: #030509;
+    opacity: 0;
+    animation: explorer-in 0.45s ease forwards;
+}
+
+.starscape-explorer canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    cursor: grab;
+    touch-action: none;
+}
+
+.starscape-explorer canvas:active { cursor: grabbing; }
+
+.explorer-loading {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    color: oklch(0.78 0.02 240);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.explorer-bar,
+.explorer-links {
+    position: absolute;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    border: 1px solid rgb(255 255 255 / 0.16);
+    border-radius: var(--radius);
+    background: rgb(5 8 14 / 0.72);
+    backdrop-filter: blur(14px);
+}
+
+.explorer-bar {
+    top: 0.75rem;
+    left: 0.75rem;
+    right: 0.75rem;
+    min-height: 48px;
+    padding: 0.35rem 0.45rem 0.35rem 0.8rem;
+}
+
+.explorer-spacer { flex: 1; }
+.explorer-target { color: rgb(255 255 255 / 0.62); font-size: 0.78rem; }
+.explorer-fov { min-width: 3.3rem; text-align: center; font-variant-numeric: tabular-nums; }
+
+.explorer-bar button,
+.resume-orbit {
+    min-width: 42px;
+    min-height: 38px;
+    border: 1px solid rgb(255 255 255 / 0.18);
+    border-radius: calc(var(--radius) * 0.75);
+    background: rgb(255 255 255 / 0.06);
+    color: inherit;
+    cursor: pointer;
+}
+
+.explorer-links {
+    top: 4.8rem;
+    right: 0.75rem;
+    padding: 0.6rem 0.8rem;
+    font-size: 0.72rem;
+}
+
+.explorer-links a { color: inherit; text-decoration: none; opacity: 0.72; }
+.explorer-links a:hover { opacity: 1; }
+
+.explorer-help {
+    position: absolute;
+    right: 0.85rem;
+    bottom: 4.4rem;
+    margin: 0;
+    color: rgb(255 255 255 / 0.5);
+    font-size: 0.7rem;
+}
+
+:root.starscape-explorer-open .home-card,
+:root.starscape-explorer-open .star-annotations,
+:root.starscape-explorer-open .starscape-launch { visibility: hidden; }
+
+:root.starscape-explorer-open .sky-chrome {
+    z-index: 23;
+    pointer-events: auto;
+}
+
+:root.starscape-explorer-open .mini-globe {
+    pointer-events: auto;
+}
+
+.resume-orbit {
+    display: block;
+    padding: 0 0.75rem;
+    color: var(--fg);
+    font-size: 0.7rem;
+    pointer-events: auto;
+}
+
+.resume-orbit[hidden] { display: none; }
+
+@keyframes explorer-in { to { opacity: 1; } }
+
+@media (max-width: 768px) {
+    .explorer-target,
+    .explorer-help { display: none; }
+    .explorer-bar { overflow-x: auto; }
+    .explorer-links { left: 0.75rem; right: auto; max-width: calc(100% - 1.5rem); overflow-x: auto; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .star-callout,
+    .star-leaders path,
+    .starscape-explorer { animation: none; opacity: 1; }
+}
+
 /* Page content sits above the sky. */
 .site-main {
     position: relative;

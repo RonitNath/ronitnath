@@ -33,6 +33,7 @@ test("bright stars stream first and reveal on the first GPU batch", async ({ pag
       transitionDuration: getComputedStyle(
         document.querySelector("canvas.starscape")!,
       ).transitionDuration,
+      retainedCatalogBytes: window.__rnBrightCatalog?.byteLength,
     };
   });
 
@@ -41,6 +42,7 @@ test("bright stars stream first and reveal on the first GPU batch", async ({ pag
     magnitudeSorted: true,
     uploaded: 12_191,
     active: true,
+    retainedCatalogBytes: 243_828,
   });
   expect(result.batchToRevealMs).toBeLessThan(100);
   expect(result.canvasOpacity).toBeLessThan(1);
@@ -159,8 +161,102 @@ test("hidden tabs pause both render loops and resume without object growth", asy
   });
 });
 
+test("StarScape is home-only and its heavy module is interaction-gated", async ({ page }) => {
+  await page.goto(`${site}/?debug=telemetry`);
+  await expect(page.getByRole("button", { name: "Load StarScape" })).toBeVisible();
+  expect(
+    await page.evaluate(() =>
+      performance
+        .getEntriesByType("resource")
+        .some((entry) => entry.name.includes("starscape-explorer.js")),
+    ),
+  ).toBe(false);
+  expect(
+    await page.evaluate(() =>
+      performance
+        .getEntriesByType("resource")
+        .some((entry) => entry.name.includes("/stars/lod/")),
+    ),
+  ).toBe(false);
+
+  await page.getByRole("button", { name: "Load StarScape" }).click();
+  await expect(page.getByRole("dialog", { name: "StarScape celestial atlas" })).toBeVisible();
+  await page.waitForFunction(() => window.__rnTelemetry?.explorer?.firstFrameAtMs > 0);
+  expect(await page.evaluate(() => window.__rnTelemetry.starscape.pausedForExplorer)).toBe(true);
+  expect(
+    await page.evaluate(() =>
+      performance
+        .getEntriesByType("resource")
+        .some((entry) => entry.name.includes("starscape-explorer.js")),
+    ),
+  ).toBe(true);
+
+  // Button-open starts wide, so zoom into the regional threshold and prove
+  // the range-backed cache receives tiles without downloading the 47 MB file.
+  for (let index = 0; index < 5; index += 1) {
+    await page.getByRole("button", { name: "Zoom in" }).click();
+  }
+  await page.waitForFunction(() => window.__rnTelemetry?.explorer?.residentTiles > 0);
+  const deepTransfers = await page.evaluate(() =>
+    performance
+      .getEntriesByType("resource")
+      .filter((entry) => entry.name.endsWith("/stars/lod/g12.bin"))
+      .map((entry) => (entry as PerformanceResourceTiming).decodedBodySize),
+  );
+  expect(deepTransfers.length).toBeGreaterThan(0);
+  expect(Math.max(...deepTransfers)).toBeLessThan(2 * 1024 * 1024);
+
+  await page.getByRole("button", { name: "Pause" }).click();
+  const pausedAt = await page.evaluate(() => window.__rnTrack.viewerState.simMs);
+  await page.waitForTimeout(250);
+  expect(await page.evaluate(() => window.__rnTrack.viewerState.simMs)).toBe(pausedAt);
+  await page.getByRole("button", { name: "Close StarScape" }).click();
+  await expect(page.getByRole("dialog", { name: "StarScape celestial atlas" })).toHaveCount(0);
+  expect(await page.evaluate(() => window.__rnTrack.viewerState)).toBeUndefined();
+
+  await page.goto(`${site}/auth`);
+  await expect(page.getByRole("button", { name: "Load StarScape" })).toHaveCount(0);
+});
+
+test("manual observer state is shared and resume orbit clears it", async ({ page }) => {
+  await page.goto(`${site}/?debug=telemetry`);
+  await page.waitForFunction(
+    () =>
+      typeof window.__rnTrack?.setManualObserver === "function" &&
+      window.__rnTelemetry?.globe?.ticks >= 1,
+  );
+  await page.getByRole("button", { name: "Load StarScape" }).click();
+  const globe = page.locator(".mini-globe canvas");
+  await expect(globe).toBeVisible();
+  const box = await globe.boundingBox();
+  expect(box).not.toBeNull();
+  await page.mouse.move(box!.x + box!.width / 2, box!.y + box!.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box!.x + box!.width * 0.75, box!.y + box!.height * 0.35, {
+    steps: 8,
+  });
+  await page.mouse.up();
+  await expect
+    .poll(() => page.evaluate(() => window.__rnTrack.manualObserver != null))
+    .toBe(true);
+
+  await page.evaluate(() => window.__rnTrack.setManualObserver(-33.8688, 151.2093));
+  await expect
+    .poll(() => page.evaluate(() => window.__rnTrack.manualObserver?.lat))
+    .toBeCloseTo(-33.8688, 3);
+  await expect
+    .poll(() => page.locator(".grounding").textContent())
+    .toContain("33.87° S, 151.21° E");
+  await page.evaluate(() => window.__rnTrack.resumeOrbit());
+  await expect
+    .poll(() => page.evaluate(() => window.__rnTrack.manualObserver))
+    .toBeNull();
+});
+
 declare global {
   interface Window {
     __rnTelemetry: any;
+    __rnTrack: any;
+    __rnBrightCatalog: Uint8Array;
   }
 }

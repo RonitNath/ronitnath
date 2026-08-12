@@ -99,7 +99,7 @@ fn format_km(km: f64) -> String {
     grouped.chars().rev().collect()
 }
 
-#[cfg(any(feature = "hydrate", test))]
+#[cfg(test)]
 fn label_text(catalog: &CityCatalog, sim_ms: f64) -> String {
     let (lat_deg, lon_deg) = super::observer_at(sim_ms);
     format_grounding(lat_deg, lon_deg, catalog.nearest(lat_deg, lon_deg).as_ref())

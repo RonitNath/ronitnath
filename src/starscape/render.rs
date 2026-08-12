@@ -22,7 +22,7 @@ use super::shaders::{SKY_FRAG, SKY_VERT, STAR_FRAG, STAR_VERT};
 use super::star_asset::{HEADER_LEN, STRIDE, validate_header};
 use super::telemetry;
 use super::tuning;
-use super::{observer_at, sim_time_ms, synced_sim_time_ms, view_matrix};
+use super::{sim_time_ms, synced_sim_time_ms, view_matrix};
 
 const GL_STRIDE: i32 = STRIDE as i32;
 const STAR_BATCH: usize = 512;
@@ -252,6 +252,15 @@ async fn stream_stars(
         telemetry::event("star-stream-incomplete");
         return Err("incomplete star catalog stream".into());
     }
+    // Keep one bounded CPU copy (244 KB today) so annotations and the
+    // interaction-gated explorer can start without refetching/reassembling the
+    // catalog. This replaces, rather than appends to, the prior generation.
+    let shared = js_sys::Uint8Array::from(pending.as_slice());
+    let _ = js_sys::Reflect::set(
+        &js_sys::global(),
+        &JsValue::from_str("__rnBrightCatalog"),
+        &shared,
+    );
     telemetry::set_bool_in("stars", "complete", true);
     telemetry::set_number_in("stars", "pendingBytes", 0.0);
     telemetry::set_number_in("stars", "completedAtMs", js_sys::Date::now());
@@ -443,9 +452,34 @@ fn install_listeners(controller: &Rc<Controller>, media: Option<MediaQueryList>)
         redraw_event.forget();
     }
 
+    let explorer_controller = Rc::clone(controller);
+    let explorer_changed = Closure::<dyn FnMut()>::new(move || {
+        let explorer_open = document()
+            .document_element()
+            .is_some_and(|root| root.class_list().contains("starscape-explorer-open"));
+        let visible =
+            !explorer_open && document().visibility_state() == web_sys::VisibilityState::Visible;
+        explorer_controller.visible.set(visible);
+        telemetry::set_bool_in("starscape", "pausedForExplorer", explorer_open);
+        if visible && !explorer_controller.reduced.get() {
+            ensure_animation(Rc::clone(&explorer_controller));
+        } else {
+            stop_animation(&explorer_controller);
+        }
+    });
+    let _ = window().add_event_listener_with_callback(
+        "starscape-explorer-state",
+        explorer_changed.as_ref().unchecked_ref(),
+    );
+    explorer_changed.forget();
+
     let visibility_controller = Rc::clone(controller);
     let visibility_changed = Closure::<dyn FnMut()>::new(move || {
-        let visible = document().visibility_state() == web_sys::VisibilityState::Visible;
+        let explorer_open = document()
+            .document_element()
+            .is_some_and(|root| root.class_list().contains("starscape-explorer-open"));
+        let visible =
+            !explorer_open && document().visibility_state() == web_sys::VisibilityState::Visible;
         visibility_controller.visible.set(visible);
         if visible && !visibility_controller.reduced.get() {
             if let Some(scene) = visibility_controller.scene.borrow().as_ref()
@@ -613,7 +647,7 @@ fn draw(scene: &Scene, sim_ms: f64) -> bool {
     gl.clear_color(0.0, 0.0, 0.0, 0.0);
     gl.clear(Gl::COLOR_BUFFER_BIT);
 
-    let (lat_deg, lon_deg) = observer_at(sim_ms);
+    let (lat_deg, lon_deg) = super::bridge::observer_for(sim_ms);
     let view = view_matrix(sim_ms, lat_deg, lon_deg);
     let aspect = w as f32 / h as f32;
     let theme = if light { 1.0 } else { 0.0 };

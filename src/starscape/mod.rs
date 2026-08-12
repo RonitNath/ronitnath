@@ -24,7 +24,8 @@
 //!
 //! This slice: traveling viewpoint, separately fetched GeoNames nearest-city
 //! lookup, single bright-star asset, Milky Way map, WebGL points, and
-//! grounding label. Deferred (docs/contract.md): clickable stars, LOD tiles.
+//! grounding label, named-star callouts, and an interaction-gated atlas with
+//! regional Gaia LOD assets.
 
 use leptos::prelude::*;
 
@@ -33,6 +34,8 @@ mod bridge;
 mod cities;
 mod globe;
 mod label;
+#[cfg(test)]
+mod lod_asset;
 #[cfg(feature = "hydrate")]
 mod render;
 #[cfg(any(feature = "hydrate", test))]
@@ -52,6 +55,51 @@ pub use cities::{City, CityCatalog, EARTH_MEAN_RADIUS_KM};
 pub use globe::MiniGlobe;
 pub use label::CityLabel;
 pub use track::{TRACK_INCLINATION_DEG, TRACK_PERIOD_MS, observer_at};
+
+/// Lightweight home-page controls. The initial module owns annotations and
+/// the launcher; the substantially larger explorer is dynamically imported
+/// only after the user activates either one.
+#[island]
+pub fn StarScapeControls(epoch_ms: f64) -> impl IntoView {
+    let root_ref = NodeRef::<leptos::html::Div>::new();
+    Effect::new(move |_| {
+        #[cfg(feature = "hydrate")]
+        if let Some(root) = root_ref.get() {
+            leptos::task::spawn_local(async move {
+                if let Err(error) = mount_controls(root, epoch_ms).await {
+                    web_sys::console::warn_2(&"starscape controls unavailable:".into(), &error);
+                }
+            });
+        }
+        #[cfg(not(feature = "hydrate"))]
+        let _ = epoch_ms;
+    });
+    view! {
+        <div class="starscape-controls" node_ref=root_ref>
+            <div class="star-annotations" aria-label="Notable stars"></div>
+            <button class="starscape-launch" type="button">"Load StarScape"</button>
+        </div>
+    }
+}
+
+#[cfg(feature = "hydrate")]
+async fn mount_controls(
+    root: web_sys::HtmlDivElement,
+    epoch_ms: f64,
+) -> Result<(), wasm_bindgen::JsValue> {
+    use wasm_bindgen::{JsCast, JsValue};
+    use wasm_bindgen_futures::JsFuture;
+    let importer = js_sys::Function::new_with_args("u", "return import(u);");
+    let module = JsFuture::from(js_sys::Promise::resolve(
+        &importer.call1(&js_sys::global(), &JsValue::from_str("/js/starscape-ui.js"))?,
+    ))
+    .await?;
+    let mount: js_sys::Function =
+        js_sys::Reflect::get(&module, &"mountStarScapeControls".into())?.dyn_into()?;
+    let result = mount.call2(&JsValue::NULL, root.as_ref(), &JsValue::from_f64(epoch_ms))?;
+    JsFuture::from(js_sys::Promise::resolve(&result)).await?;
+    Ok(())
+}
 
 /// Fixed simulation epoch: 2026-01-01T00:00:00Z. Sky state is a pure
 /// function of (server time, this constant, SPEED) — nothing else.
