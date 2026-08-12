@@ -39,6 +39,15 @@ jobs:
             cargo fmt --check
             cargo clippy --no-default-features --features ssr --all-targets -- -D warnings
             cargo test --locked --no-default-features --features ssr
+            # The browser half must at least compile. Without this the gates
+            # pass on code that only builds server-side and the failure
+            # surfaces minutes later inside the release image build — which is
+            # what happened on 2026-08-11, when an `ssr`-only import reached
+            # `deploy` green. Errors only, deliberately: the wasm target still
+            # carries older warnings, and blocking releases on those is a
+            # different decision from proving the target builds.
+            cargo check --no-default-features --features hydrate \
+              --target wasm32-unknown-unknown
             bash -n deploy/provision.sh deploy/verify-cluster.sh
           '
       - name: Controlled red-build proof gate

@@ -79,6 +79,15 @@ cargo test --locked --no-default-features --features ssr
 Package `default = ["ssr"]` so `cargo run` works; `hydrate` is the wasm feature
 set and is selected by cargo-leptos (`lib-default-features = false`).
 
+### Starscape telemetry
+
+Open `/?debug=telemetry` to enable bounded, in-memory diagnostics for a
+long-running tab. Inspect `window.__rnTelemetry` in the browser console. It
+reports star-stream progress/completion, starscape frame gaps and WebGL context
+loss, plus globe tick gaps, heap usage (where the browser exposes it), and
+renderer geometry/texture/program counts. The telemetry is absent on ordinary
+page loads and retains at most 100 lifecycle events.
+
 ## Deployment
 
 Push to `deploy` runs Forgejo Actions: gates on the zero-secret native runner,

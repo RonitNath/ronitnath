@@ -34,6 +34,23 @@ const THEME_JS: &str = r#"
 })();
 "#;
 
+/// Cache key for the stylesheets, baked in when the image is built.
+///
+/// The edge holds `/css/*.css` for four hours and browsers keep their own copy
+/// just as long, so although markup and stylesheet ship in the same image they
+/// arrive hours apart: a release that changes both renders the new page
+/// against the old CSS until every cache expires — which it did, visibly, on
+/// 2026-08-11. A per-build URL removes the failure rather than papering over
+/// it with a purge, since a purge cannot reach a browser's disk cache at all.
+///
+/// `option_env!`, not a runtime lookup: the Containerfile exports
+/// `SOURCE_GIT_HASH` to the build stage, so the server binary and the wasm
+/// bundle bake the same constant and cannot disagree about an href.
+const ASSET_VERSION: &str = match option_env!("SOURCE_GIT_HASH") {
+    Some(hash) => hash,
+    None => "dev",
+};
+
 fn server_now_ms() -> f64 {
     #[cfg(feature = "ssr")]
     {
@@ -74,10 +91,10 @@ pub fn App() -> impl IntoView {
     let epoch_ms = server_now_ms();
 
     view! {
-        <Stylesheet id="leptos" href="/pkg/rn-site.css"/>
-        <Stylesheet href="/css/atmosphere.css"/>
-        <Stylesheet href="/css/starscape.css"/>
-        <Stylesheet href="/css/site.css"/>
+        <Stylesheet id="leptos" href=format!("/pkg/rn-site.css?v={ASSET_VERSION}")/>
+        <Stylesheet href=format!("/css/atmosphere.css?v={ASSET_VERSION}")/>
+        <Stylesheet href=format!("/css/starscape.css?v={ASSET_VERSION}")/>
+        <Stylesheet href=format!("/css/site.css?v={ASSET_VERSION}")/>
         <Title text="Ronit Nath"/>
 
         <Atmosphere/>

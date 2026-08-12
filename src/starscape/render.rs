@@ -20,6 +20,7 @@ use web_sys::{
 
 use super::shaders::{SKY_FRAG, SKY_VERT, STAR_FRAG, STAR_VERT};
 use super::star_asset::{HEADER_LEN, STRIDE, validate_header};
+use super::telemetry;
 use super::tuning;
 use super::{observer_at, sim_time_ms, synced_sim_time_ms, view_matrix};
 
@@ -61,8 +62,10 @@ struct Controller {
     canvas: HtmlCanvasElement,
     scene: RefCell<Option<Rc<Scene>>>,
     running: Cell<bool>,
+    animation_generation: Cell<u32>,
     generation: Cell<u32>,
     reduced: Cell<bool>,
+    visible: Cell<bool>,
     frozen_at: Cell<Option<f64>>,
     server_epoch_ms: f64,
     client_mount_ms: f64,
@@ -79,8 +82,10 @@ pub fn start_deferred(canvas: HtmlCanvasElement, server_epoch_ms: f64) {
         canvas,
         scene: RefCell::new(None),
         running: Cell::new(false),
+        animation_generation: Cell::new(0),
         generation: Cell::new(0),
         reduced: Cell::new(reduced),
+        visible: Cell::new(document().visibility_state() == web_sys::VisibilityState::Visible),
         frozen_at: Cell::new(reduced.then(|| sim_time_ms(server_epoch_ms))),
         server_epoch_ms,
         client_mount_ms,
@@ -155,6 +160,7 @@ async fn stream_stars(
     let mut pending = Vec::<u8>::new();
     let mut total_count: Option<usize> = None;
     let mut uploaded = 0usize;
+    telemetry::event("star-stream-started");
 
     loop {
         let result = JsFuture::from(reader.read()).await?;
@@ -167,6 +173,9 @@ async fn stream_stars(
             let mut bytes = vec![0u8; chunk.length() as usize];
             chunk.copy_to(&mut bytes);
             pending.extend_from_slice(&bytes);
+            telemetry::increment("stars", "chunks", 1.0);
+            telemetry::increment("stars", "bytesReceived", bytes.len() as f64);
+            telemetry::set_number_in("stars", "pendingBytes", pending.len() as f64);
         }
 
         if total_count.is_none() {
@@ -178,9 +187,11 @@ async fn stream_stars(
             }
             let (count, _) = validate_header(&pending).map_err(JsValue::from_str)?;
             total_count = Some(count);
+            telemetry::set_number_in("stars", "expected", count as f64);
             let payload = count
                 .checked_mul(STRIDE)
                 .ok_or_else(|| JsValue::from_str("star length overflow"))?;
+            telemetry::set_number_in("stars", "gpuBufferBytes", payload as f64);
             gl.bind_buffer(Gl::ARRAY_BUFFER, Some(buffer));
             gl.buffer_data_with_i32(Gl::ARRAY_BUFFER, payload as i32, Gl::DYNAMIC_DRAW);
         }
@@ -215,6 +226,8 @@ async fn stream_stars(
             );
             uploaded = end;
             count_cell.set(uploaded as i32);
+            telemetry::increment("stars", "uploadBatches", 1.0);
+            telemetry::set_number_in("stars", "uploaded", uploaded as f64);
             on_batch();
             if !done {
                 break;
@@ -228,8 +241,13 @@ async fn stream_stars(
 
     let count = total_count.ok_or("missing star header")?;
     if uploaded != count {
+        telemetry::event("star-stream-incomplete");
         return Err("incomplete star catalog stream".into());
     }
+    telemetry::set_bool_in("stars", "complete", true);
+    telemetry::set_number_in("stars", "pendingBytes", 0.0);
+    telemetry::set_number_in("stars", "completedAtMs", js_sys::Date::now());
+    telemetry::event("star-stream-complete");
     Ok(count as i32)
 }
 
@@ -255,6 +273,7 @@ async fn fetch_sky_map(url: &str) -> Result<ImageBitmap, JsValue> {
 }
 
 async fn init(canvas: HtmlCanvasElement, controller: Rc<Controller>) -> Result<(), JsValue> {
+    telemetry::event("starscape-init");
     let gl: Gl = canvas
         .get_context("webgl2")?
         .ok_or_else(|| JsValue::from_str("webgl2 unavailable"))?
@@ -326,7 +345,7 @@ async fn init(canvas: HtmlCanvasElement, controller: Rc<Controller>) -> Result<(
     controller.scene.replace(Some(Rc::clone(&scene)));
     if controller.reduced.get() {
         redraw_until_drawn(Rc::clone(&controller));
-    } else {
+    } else if controller.visible.get() {
         ensure_animation(Rc::clone(&controller));
     }
 
@@ -363,6 +382,9 @@ fn install_listeners(controller: &Rc<Controller>, media: Option<MediaQueryList>)
     let lost_controller = Rc::clone(controller);
     let lost = Closure::<dyn FnMut(Event)>::new(move |event: Event| {
         event.prevent_default();
+        telemetry::increment("starscape", "contextLost", 1.0);
+        telemetry::event("webgl-context-lost");
+        stop_animation(&lost_controller);
         lost_controller
             .generation
             .set(lost_controller.generation.get().wrapping_add(1));
@@ -375,7 +397,11 @@ fn install_listeners(controller: &Rc<Controller>, media: Option<MediaQueryList>)
     lost.forget();
 
     let restored_controller = Rc::clone(controller);
-    let restored = Closure::<dyn FnMut()>::new(move || initialize(Rc::clone(&restored_controller)));
+    let restored = Closure::<dyn FnMut()>::new(move || {
+        telemetry::increment("starscape", "contextRestored", 1.0);
+        telemetry::event("webgl-context-restored");
+        initialize(Rc::clone(&restored_controller));
+    });
     let _ = controller.canvas.add_event_listener_with_callback(
         "webglcontextrestored",
         restored.as_ref().unchecked_ref(),
@@ -394,6 +420,22 @@ fn install_listeners(controller: &Rc<Controller>, media: Option<MediaQueryList>)
         redraw_event.forget();
     }
 
+    let visibility_controller = Rc::clone(controller);
+    let visibility_changed = Closure::<dyn FnMut()>::new(move || {
+        let visible = document().visibility_state() == web_sys::VisibilityState::Visible;
+        visibility_controller.visible.set(visible);
+        if visible && !visibility_controller.reduced.get() {
+            ensure_animation(Rc::clone(&visibility_controller));
+        } else {
+            stop_animation(&visibility_controller);
+        }
+    });
+    let _ = document().add_event_listener_with_callback(
+        "visibilitychange",
+        visibility_changed.as_ref().unchecked_ref(),
+    );
+    visibility_changed.forget();
+
     if let Some(media) = media {
         let media_controller = Rc::clone(controller);
         let query = media.clone();
@@ -404,10 +446,13 @@ fn install_listeners(controller: &Rc<Controller>, media: Option<MediaQueryList>)
                 freeze_on_motion_change(reduced, current_sim(&media_controller))
             {
                 media_controller.frozen_at.set(Some(frozen_at));
+                stop_animation(&media_controller);
                 let _ = redraw(&media_controller);
             } else {
                 media_controller.frozen_at.set(None);
-                ensure_animation(Rc::clone(&media_controller));
+                if media_controller.visible.get() {
+                    ensure_animation(Rc::clone(&media_controller));
+                }
             }
         });
         let _ = media.add_event_listener_with_callback("change", changed.as_ref().unchecked_ref());
@@ -419,8 +464,8 @@ fn freeze_on_motion_change(reduced: bool, current_sim_ms: f64) -> Option<f64> {
     reduced.then_some(current_sim_ms)
 }
 
-fn should_animate(reduced: bool, scene_ready: bool) -> bool {
-    !reduced && scene_ready
+fn should_animate(reduced: bool, scene_ready: bool, visible: bool) -> bool {
+    !reduced && scene_ready && visible
 }
 
 fn current_sim(controller: &Controller) -> f64 {
@@ -437,19 +482,33 @@ fn ensure_animation(controller: Rc<Controller>) {
     if controller.running.replace(true) {
         return;
     }
-    let _ = request_animation_frame(move || animation_frame(controller));
+    let generation = controller.animation_generation.get();
+    let _ = request_animation_frame(move || animation_frame(controller, generation));
 }
 
-fn animation_frame(controller: Rc<Controller>) {
+fn stop_animation(controller: &Controller) {
+    controller.running.set(false);
+    controller
+        .animation_generation
+        .set(controller.animation_generation.get().wrapping_add(1));
+}
+
+fn animation_frame(controller: Rc<Controller>, generation: u32) {
+    if !controller.running.get() || controller.animation_generation.get() != generation {
+        return;
+    }
     if !should_animate(
         controller.reduced.get(),
         controller.scene.borrow().is_some(),
+        controller.visible.get(),
     ) {
-        controller.running.set(false);
+        stop_animation(&controller);
         return;
     }
+    telemetry::increment("starscape", "animationFrames", 1.0);
+    telemetry::observe_now("starscape", "lastFrameAtMs", "maxFrameGapMs");
     let _ = redraw(&controller);
-    let _ = request_animation_frame(move || animation_frame(controller));
+    let _ = request_animation_frame(move || animation_frame(controller, generation));
 }
 
 fn redraw(controller: &Controller) -> bool {
@@ -459,10 +518,18 @@ fn redraw(controller: &Controller) -> bool {
     if !draw(&scene, current_sim(controller)) {
         return false;
     }
-    if let Some(root) = document().document_element() {
-        let _ = root.class_list().add_1("starscape-active");
+    telemetry::increment("starscape", "draws", 1.0);
+    telemetry::set_number_in("starscape", "starCount", f64::from(scene.stars.count.get()));
+    if should_reveal(scene.stars.count.get()) {
+        if let Some(root) = document().document_element() {
+            let _ = root.class_list().add_1("starscape-active");
+        }
     }
     true
+}
+
+fn should_reveal(star_count: i32) -> bool {
+    star_count > 0
 }
 
 fn redraw_until_drawn(controller: Rc<Controller>) {
@@ -590,13 +657,20 @@ fn compile(gl: &Gl, kind: u32, src: &str) -> Result<WebGlShader, JsValue> {
 
 #[cfg(test)]
 mod tests {
-    use super::{freeze_on_motion_change, should_animate};
+    use super::{freeze_on_motion_change, should_animate, should_reveal};
 
     #[test]
     fn reduced_motion_freezes_time_and_disables_continuous_animation() {
         assert_eq!(freeze_on_motion_change(true, 42.0), Some(42.0));
-        assert!(!should_animate(true, true));
-        assert!(should_animate(false, true));
-        assert!(!should_animate(false, false));
+        assert!(!should_animate(true, true, true));
+        assert!(should_animate(false, true, true));
+        assert!(!should_animate(false, false, true));
+        assert!(!should_animate(false, true, false));
+    }
+
+    #[test]
+    fn css_fallback_stays_visible_until_the_first_star_batch() {
+        assert!(!should_reveal(0));
+        assert!(should_reveal(1));
     }
 }

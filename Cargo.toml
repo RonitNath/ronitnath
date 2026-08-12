@@ -48,6 +48,8 @@ web-sys = { version = "0.3.103", optional = true, features = [
     "ReadableStreamReadResult",
     "Window",
     "Document",
+    "Location",
+    "VisibilityState",
     "Element",
     "DomTokenList",
     "Event",

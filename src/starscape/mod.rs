@@ -39,6 +39,8 @@ mod render;
 mod shaders;
 #[cfg(any(feature = "hydrate", test))]
 mod star_asset;
+#[cfg(feature = "hydrate")]
+mod telemetry;
 mod track;
 // Only `render` reads this, and `render` is browser-only, so compiling it into
 // the `ssr` test build leaves every item in it dead — five warnings that the
@@ -185,6 +187,7 @@ pub fn Starscape(epoch_ms: f64) -> impl IntoView {
     Effect::new(move |_| {
         #[cfg(feature = "hydrate")]
         if let Some(canvas) = canvas_ref.get() {
+            telemetry::install();
             bridge::install_track_api(epoch_ms);
             // Defer the heavy WebGL + catalog work until after first paint.
             render::start_deferred(canvas, epoch_ms);

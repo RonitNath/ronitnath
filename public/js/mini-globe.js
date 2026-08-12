@@ -8,6 +8,57 @@ const DAY = "/textures/earth/day.jpg";
 const BUMP = "/textures/earth/normal.jpg";
 const SPECULAR = "/textures/earth/specular.jpg";
 
+function telemetry() {
+  const root = window.__rnTelemetry;
+  return root && root.enabled ? root : null;
+}
+
+function telemetryEvent(name) {
+  const root = telemetry();
+  if (!root) return;
+  root.events ||= [];
+  root.events.push({ atMs: Date.now(), name });
+  if (root.events.length > 100) root.events.splice(0, root.events.length - 100);
+}
+
+function telemetrySet(field, value) {
+  const root = telemetry();
+  if (!root) return;
+  root.globe ||= {};
+  root.globe[field] = value;
+}
+
+function telemetryIncrement(field) {
+  const root = telemetry();
+  if (!root) return;
+  root.globe ||= {};
+  root.globe[field] = (root.globe[field] || 0) + 1;
+}
+
+function sampleRuntime(globe) {
+  const root = telemetry();
+  if (!root) return;
+  const now = Date.now();
+  const previous = root.globe.lastTickAtMs;
+  if (previous) {
+    root.globe.maxTickGapMs = Math.max(root.globe.maxTickGapMs || 0, now - previous);
+  }
+  root.globe.lastTickAtMs = now;
+
+  const info = globe.renderer?.().info;
+  if (info) {
+    root.globe.geometries = info.memory?.geometries;
+    root.globe.textures = info.memory?.textures;
+    root.globe.programs = info.programs?.length;
+    root.globe.renderCalls = info.render?.calls;
+    root.globe.triangles = info.render?.triangles;
+  }
+  if (performance.memory) {
+    root.globe.usedJSHeapBytes = performance.memory.usedJSHeapSize;
+    root.globe.totalJSHeapBytes = performance.memory.totalJSHeapSize;
+  }
+}
+
 function loadScript(src) {
   return new Promise((resolve, reject) => {
     if (window.Globe) {
@@ -47,20 +98,19 @@ function observerAt(simMs) {
 }
 
 /** Sample the recent track as consecutive arc segments on the surface. */
-function buildArcs(simMs, periodMs) {
+function buildArcs(simMs, periodMs, arcs = []) {
   const trail = periodMs * 0.2; // ~1/5 lap — readable on a 160px globe
   const steps = 48;
-  const arcs = [];
   let prev = observerAt(simMs - trail);
   for (let i = 1; i <= steps; i++) {
     const t = simMs - trail + (trail * i) / steps;
     const next = observerAt(t);
-    arcs.push({
-      startLat: prev.lat,
-      startLng: prev.lng,
-      endLat: next.lat,
-      endLng: next.lng,
-    });
+    const arc = arcs[i - 1] || {};
+    arc.startLat = prev.lat;
+    arc.startLng = prev.lng;
+    arc.endLat = next.lat;
+    arc.endLng = next.lng;
+    arcs[i - 1] = arc;
     prev = next;
   }
   return arcs;
@@ -96,12 +146,20 @@ function observeSize(el, globe) {
   if (typeof ResizeObserver === "function") {
     const ro = new ResizeObserver(schedule);
     ro.observe(el);
-    return;
+    return () => {
+      ro.disconnect();
+      if (raf) cancelAnimationFrame(raf);
+    };
   }
   window.addEventListener("resize", schedule);
+  return () => {
+    window.removeEventListener("resize", schedule);
+    if (raf) cancelAnimationFrame(raf);
+  };
 }
 
 export async function mountMiniGlobe(el, epochMs) {
+  telemetryEvent("globe-mount-started");
   const clientMountMs = Date.now();
   el.innerHTML = "";
   el.classList.remove("is-ready");
@@ -111,19 +169,13 @@ export async function mountMiniGlobe(el, epochMs) {
     throw new Error("Globe global missing after script load");
   }
 
-  await Promise.all(
-    [DAY, BUMP, SPECULAR].map((url) =>
-      fetch(url, { priority: "low" }).then((r) => {
-        if (!r.ok) throw new Error(`${url} HTTP ${r.status}`);
-        return r.blob();
-      })
-    )
-  );
-
   const api = trackApi();
   const periodMs = (api && api.trackPeriodMs) || 43_082_045;
   let simMs = currentSimMs(epochMs, clientMountMs);
   let here = observerAt(simMs);
+  const arcs = buildArcs(simMs, periodMs);
+  const point = { lat: here.lat, lng: here.lng };
+  const ring = { lat: here.lat, lng: here.lng };
 
   const globe = window
     .Globe()(el)
@@ -142,44 +194,100 @@ export async function mountMiniGlobe(el, epochMs) {
   }
 
   globe
-    .arcsData(buildArcs(simMs, periodMs))
+    .arcsData(arcs)
     .arcColor(() => "rgba(255, 214, 110, 0.95)")
     .arcAltitude(0.04)
     .arcStroke(1.15)
     .arcDashLength(1)
     .arcDashGap(0)
     .arcAltitudeAutoScale(0.3)
-    .pointsData([{ lat: here.lat, lng: here.lng }])
+    .arcsTransitionDuration(0)
+    .pointsData([point])
     .pointColor(() => "#ffe08a")
     .pointAltitude(0.02)
     .pointRadius(2.2)
+    .pointsTransitionDuration(0)
     .pointsMerge(false)
     .enablePointerInteraction(false);
 
   if (typeof globe.ringsData === "function") {
     globe
-      .ringsData([{ lat: here.lat, lng: here.lng }])
+      .ringsData([ring])
       .ringColor(() => (t) => `rgba(255, 220, 120, ${1 - t})`)
       .ringMaxRadius(4)
       .ringPropagationSpeed(1.4)
       .ringRepeatPeriod(1400);
   }
+  telemetryEvent("globe-textures-requested");
 
   globe.pointOfView({ lat: here.lat, lng: here.lng, altitude: 1.85 }, 0);
-  observeSize(el, globe);
+  const stopObservingSize = observeSize(el, globe);
   reveal(el);
+  telemetrySet("arcCount", 48);
+  telemetrySet("pointCount", 1);
+  telemetrySet("ringCount", 1);
+  telemetrySet("tickIntervalMs", 500);
+  telemetrySet("trailFractionOfLap", 0.2);
+  telemetryEvent("globe-ready");
+  sampleRuntime(globe);
 
   const tick = () => {
+    telemetryIncrement("ticks");
+    if (document.hidden) telemetryIncrement("ticksWhileHidden");
+    sampleRuntime(globe);
     simMs = currentSimMs(epochMs, clientMountMs);
     here = observerAt(simMs);
-    globe.arcsData(buildArcs(simMs, periodMs));
-    globe.pointsData([{ lat: here.lat, lng: here.lng }]);
+    buildArcs(simMs, periodMs, arcs);
+    point.lat = here.lat;
+    point.lng = here.lng;
+    ring.lat = here.lat;
+    ring.lng = here.lng;
+    globe.arcsData(arcs);
+    globe.pointsData([point]);
     if (typeof globe.ringsData === "function") {
-      globe.ringsData([{ lat: here.lat, lng: here.lng }]);
+      globe.ringsData([ring]);
     }
     globe.pointOfView({ lat: here.lat, lng: here.lng, altitude: 1.85 }, 400);
   };
-  setInterval(tick, 500);
+
+  let intervalId = 0;
+  let disposed = false;
+  const pause = () => {
+    if (intervalId) clearInterval(intervalId);
+    intervalId = 0;
+    globe.pauseAnimation();
+    telemetrySet("intervalId", 0);
+    telemetrySet("paused", true);
+  };
+  const resume = (updateNow = true) => {
+    if (disposed || document.hidden || intervalId) return;
+    globe.resumeAnimation();
+    if (updateNow) tick();
+    intervalId = setInterval(tick, 500);
+    telemetrySet("intervalId", intervalId);
+    telemetrySet("paused", false);
+  };
+  const visibilityChanged = () => (document.hidden ? pause() : resume());
+  const pageShown = (event) => {
+    if (event.persisted) resume();
+  };
+  const pageHidden = (event) => {
+    pause();
+    if (!event.persisted) {
+      disposed = true;
+      stopObservingSize();
+      document.removeEventListener("visibilitychange", visibilityChanged);
+      window.removeEventListener("pageshow", pageShown);
+      window.removeEventListener("pagehide", pageHidden);
+      globe._destructor?.();
+      telemetryEvent("globe-disposed");
+    }
+  };
+  document.addEventListener("visibilitychange", visibilityChanged);
+  window.addEventListener("pageshow", pageShown);
+  window.addEventListener("pagehide", pageHidden);
+  if (document.hidden) pause();
+  else resume(false);
 
   return globe;
 }
