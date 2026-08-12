@@ -28,5 +28,56 @@ for entry in "${nodes[@]}"; do
         echo "$name has not converged on the three-voter topology: $body" >&2
         exit 1
     fi
+    if [[ -n "$expected_revision" && "$body" != *'"realtime_listener":true'* ]]; then
+        echo "$name realtime listener is not healthy: $body" >&2
+        exit 1
+    fi
     echo "$name ready: $body"
 done
+
+if [[ -n "$expected_revision" ]]; then
+    asset_headers=$(curl --fail --silent --show-error --head --max-time 10 \
+        https://ronitnath.com/css/site.css)
+    if [[ "$asset_headers" != *'cache-control: no-cache, must-revalidate'* ]]; then
+        echo "public assets do not require revalidation: $asset_headers" >&2
+        exit 1
+    fi
+    if [[ "$asset_headers" != *"x-rn-app-version: $expected_revision"* ]]; then
+        echo "public asset version header does not match $expected_revision" >&2
+        exit 1
+    fi
+
+    html=$(curl --fail --silent --show-error --max-time 10 https://ronitnath.com/)
+    if [[ "$html" == *'?v='* ]]; then
+        echo "public HTML still contains query-string asset cache busting" >&2
+        exit 1
+    fi
+    if [[ "$html" != *'/pkg/rn-site.wasm'* || "$html" == *'/pkg/rn-site_bg.wasm'* ]]; then
+        echo "public HTML does not reference the packaged hydration module" >&2
+        exit 1
+    fi
+
+    wasm_headers=$(curl --fail --silent --show-error --head --max-time 10 \
+        https://ronitnath.com/pkg/rn-site.wasm)
+    if [[ "$wasm_headers" != *'content-type: application/wasm'* ]]; then
+        echo "public hydration module is unavailable or has the wrong content type" >&2
+        exit 1
+    fi
+    if [[ "$wasm_headers" != *'cache-control: no-cache, must-revalidate'* ]]; then
+        echo "public hydration module does not require revalidation" >&2
+        exit 1
+    fi
+
+    ws_headers=$(curl --silent --show-error --http1.1 --max-time 2 \
+        --output /dev/null --dump-header - \
+        -H 'Origin: https://ronitnath.com' \
+        -H 'Connection: Upgrade' \
+        -H 'Upgrade: websocket' \
+        -H 'Sec-WebSocket-Version: 13' \
+        -H 'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==' \
+        https://ronitnath.com/api/realtime || true)
+    if [[ "$ws_headers" != *' 101 '* ]]; then
+        echo "public realtime endpoint did not upgrade: $ws_headers" >&2
+        exit 1
+    fi
+fi

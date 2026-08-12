@@ -29,7 +29,7 @@ pub use model::{
     IdentityStatus, MembershipRole, Session, normalize_email,
 };
 pub use password::{PasswordError, dummy_phc, hash_password, verify_password};
-pub use routes::router;
+pub use routes::{api_router, router};
 pub use session::CookieSecurity;
 pub use store::{Registration, SessionContext, StoreError};
 

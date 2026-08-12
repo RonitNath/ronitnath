@@ -5,6 +5,7 @@ pub mod auth;
 pub mod manage;
 #[cfg(feature = "ssr")]
 pub mod operations;
+pub mod realtime;
 pub mod starscape;
 
 #[cfg(feature = "hydrate")]

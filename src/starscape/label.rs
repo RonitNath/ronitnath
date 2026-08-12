@@ -109,7 +109,10 @@ fn label_text(catalog: &CityCatalog, sim_ms: f64) -> String {
 /// `Starscape`) and cancels client clock skew after the city asset arrives.
 #[island]
 pub fn CityLabel(epoch_ms: f64) -> impl IntoView {
-    let text = RwSignal::new(String::new());
+    // A non-empty initial text node hydrates reliably across streamed island
+    // boundaries; an empty dynamic child can be normalized into whitespace by
+    // the browser before Tachys finds its placeholder marker.
+    let text = RwSignal::new("Locating…".to_string());
 
     Effect::new(move |_| {
         #[cfg(feature = "hydrate")]

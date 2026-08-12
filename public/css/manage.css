@@ -1,0 +1,81 @@
+.manage-page {
+  position: relative;
+  z-index: 2;
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--fg);
+  font: 15px/1.5 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+/* The decorative globe is useful on the presence pages but obscures admin
+   cards and table controls, especially on narrow viewports. */
+body:has(.manage-page) .sky-chrome {
+    display: none;
+}
+
+.manage-page a { color: var(--accent); text-decoration: none; }
+.manage-page a:hover { color: var(--accent-hover); text-decoration: underline; }
+.manage-page code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .86em; }
+
+.manage-bar {
+  display: flex;
+  align-items: baseline;
+  gap: 1rem;
+  padding: .85rem 1.25rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-glass);
+}
+.manage-brand { font-family: var(--font-display); font-size: 1.35rem; letter-spacing: .04em; color: var(--fg) !important; }
+.manage-note { color: var(--fg-subtle); font-size: .8rem; }
+.manage-bar-links { margin-left: auto; display: flex; gap: 1rem; font-size: .9rem; }
+
+.manage-frame {
+  display: grid;
+  grid-template-columns: 15rem minmax(0, 1fr);
+  gap: 2rem;
+  max-width: 76rem;
+  margin: 0 auto;
+  padding: 2rem 1.25rem 4rem;
+}
+.manage-rail { display: flex; flex-direction: column; gap: .15rem; align-self: start; }
+.manage-rail a { color: var(--fg-muted); padding: .4rem .6rem; border-left: 2px solid transparent; }
+.manage-rail a:hover { color: var(--fg); background: var(--bg-muted); text-decoration: none; }
+.manage-rail a.active { color: var(--fg); border-left-color: var(--accent); background: var(--bg-muted); }
+.manage-main { min-width: 0; }
+.manage-main h1 { font-family: var(--font-display); font-size: 1.9rem; letter-spacing: .03em; margin: 0 0 .35rem; }
+.manage-lede { color: var(--fg-muted); margin: 0 0 1.5rem; max-width: 46rem; }
+.manage-count-line { color: var(--fg-subtle); font-size: .85rem; margin: 0 0 .75rem; }
+
+.manage-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(19rem, 1fr)); gap: 1rem; }
+.manage-card {
+  display: flex;
+  flex-direction: column;
+  gap: .4rem;
+  padding: 1rem 1.1rem;
+  border: 1px solid var(--border);
+  background: var(--surface-glass);
+  color: var(--fg) !important;
+}
+.manage-card:hover { border-color: var(--accent); text-decoration: none !important; }
+.manage-card-head { display: flex; align-items: baseline; justify-content: space-between; gap: .75rem; font-weight: 600; }
+.manage-card-desc { color: var(--fg-muted); font-size: .85rem; }
+.manage-count { font-family: ui-monospace, monospace; color: var(--accent); }
+
+.manage-table-scroll { overflow: auto; border: 1px solid var(--border); background: var(--surface-glass); }
+.manage-table-scroll table { border-collapse: collapse; width: 100%; font-size: .86rem; }
+.manage-table-scroll th,
+.manage-table-scroll td { text-align: left; padding: .5rem .75rem; border-bottom: 1px solid var(--border); white-space: nowrap; }
+.manage-table-scroll th { color: var(--fg-subtle); font-size: .78rem; text-transform: uppercase; letter-spacing: .06em; background: var(--bg-muted); }
+.manage-table-scroll tbody tr:hover td { background: var(--bg-muted); }
+.manage-time { font-family: ui-monospace, monospace; color: var(--fg-muted); }
+.manage-tag { color: var(--fg-muted); }
+.manage-none { color: var(--fg-subtle); }
+.manage-ref { border-bottom: 1px dotted var(--fg-subtle); cursor: help; }
+
+@media (max-width: 768px) {
+  .manage-frame { grid-template-columns: minmax(0, 1fr); gap: 1.25rem; padding-top: 1.25rem; }
+  .manage-rail { flex-direction: row; overflow-x: auto; gap: .35rem; padding-bottom: .25rem; }
+  .manage-rail a { border-left: 0; border-bottom: 2px solid transparent; white-space: nowrap; }
+  .manage-rail a.active { border-left: 0; border-bottom-color: var(--accent); }
+  .manage-note { display: none; }
+}

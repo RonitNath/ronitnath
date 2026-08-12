@@ -184,6 +184,17 @@ pub async fn register(
         latency_ms = started.elapsed().as_secs_f64() * 1000.0,
         "registration complete"
     );
+    crate::realtime::publish_data_change(
+        db,
+        [
+            "identities",
+            "identity-emails",
+            "identity-passwords",
+            "accounts",
+            "account-memberships",
+        ],
+    )
+    .await;
 
     Ok(Registration {
         identity_id,
@@ -373,6 +384,7 @@ pub async fn create_session(
         latency_ms = started.elapsed().as_secs_f64() * 1000.0,
         "session created"
     );
+    crate::realtime::publish_data_change(db, ["sessions"]).await;
     Ok(token)
 }
 
@@ -406,8 +418,20 @@ pub async fn resolve_session(
     db: &Client,
     token: &str,
 ) -> Result<Option<SessionContext>, StoreError> {
-    let started = Instant::now();
     let hash = token_hash(token);
+    resolve_session_hash(db, &hash).await
+}
+
+/// Resolve the stored SHA-256 session digest without retaining the bearer
+/// token. Long-lived transports use this after the HTTP upgrade so plaintext
+/// credentials do not remain in connection state.
+#[instrument(name = "auth.resolve_session_hash", skip(db, hash))]
+pub async fn resolve_session_hash(
+    db: &Client,
+    hash: &str,
+) -> Result<Option<SessionContext>, StoreError> {
+    let started = Instant::now();
+    let hash = hash.to_string();
 
     // The membership join is what ties the session to a role: an inner join,
     // so a session whose membership was deleted stops resolving in the same
@@ -454,6 +478,17 @@ pub async fn resolve_session(
             .await
         {
             warn!(%err, "could not delete an expired session; declining anyway");
+        } else {
+            crate::realtime::publish_data_change(db, ["sessions"]).await;
+            crate::realtime::publish_authorization_change(
+                db,
+                crate::realtime::AuthorizationTarget {
+                    session_hash: Some(hash),
+                    reload_required: true,
+                    ..Default::default()
+                },
+            )
+            .await;
         }
         debug!(
             expires_at = row.expires_at,
@@ -539,13 +574,28 @@ pub async fn revoke_session(db: &Client, token: &str) -> Result<bool, StoreError
     let started = Instant::now();
     let hash = token_hash(token);
     let affected = db
-        .execute("DELETE FROM sessions WHERE token_hash = $1", params!(hash))
+        .execute(
+            "DELETE FROM sessions WHERE token_hash = $1",
+            params!(hash.clone()),
+        )
         .await?;
     info!(
         revoked = affected,
         latency_ms = started.elapsed().as_secs_f64() * 1000.0,
         "session revoke finished"
     );
+    if affected > 0 {
+        crate::realtime::publish_data_change(db, ["sessions"]).await;
+        crate::realtime::publish_authorization_change(
+            db,
+            crate::realtime::AuthorizationTarget {
+                session_hash: Some(hash),
+                reload_required: true,
+                ..Default::default()
+            },
+        )
+        .await;
+    }
     Ok(affected > 0)
 }
 
@@ -566,6 +616,18 @@ pub async fn revoke_sessions_for_identity(
         )
         .await?;
     info!(revoked = affected, "revoked every session for identity");
+    if affected > 0 {
+        crate::realtime::publish_data_change(db, ["sessions"]).await;
+        crate::realtime::publish_authorization_change(
+            db,
+            crate::realtime::AuthorizationTarget {
+                identity_id: Some(identity_id.get()),
+                reload_required: true,
+                ..Default::default()
+            },
+        )
+        .await;
+    }
     Ok(affected)
 }
 
@@ -586,6 +648,19 @@ pub async fn revoke_sessions_for_membership(
         )
         .await?;
     info!(revoked = affected, "revoked every session for membership");
+    if affected > 0 {
+        crate::realtime::publish_data_change(db, ["sessions"]).await;
+        crate::realtime::publish_authorization_change(
+            db,
+            crate::realtime::AuthorizationTarget {
+                identity_id: Some(identity_id.get()),
+                account_id: Some(account_id.get()),
+                reload_required: true,
+                ..Default::default()
+            },
+        )
+        .await;
+    }
     Ok(affected)
 }
 
@@ -690,6 +765,17 @@ pub async fn grant_capability(
     )
     .await?;
     info!(capability = capability.as_str(), "capability granted");
+    crate::realtime::publish_data_change(db, ["membership-capabilities"]).await;
+    crate::realtime::publish_authorization_change(
+        db,
+        crate::realtime::AuthorizationTarget {
+            identity_id: Some(identity_id.get()),
+            account_id: Some(account_id.get()),
+            reload_required: false,
+            ..Default::default()
+        },
+    )
+    .await;
     Ok(())
 }
 

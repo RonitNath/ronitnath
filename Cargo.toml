@@ -17,14 +17,16 @@ leptos = { version = "0.9.0-beta", features = ["islands"] }
 leptos_router = { version = "0.9.0-beta1" }
 leptos_meta = { version = "0.9.0-beta" }
 serde = { version = "1.0.229", features = ["derive"] }
-serde_json = { version = "1.0.145", optional = true }
-axum = { version = "0.8.9", optional = true }
+serde_json = { version = "1.0.145" }
+axum = { version = "0.8.9", optional = true, features = ["ws"] }
 console_error_panic_hook = { version = "0.1.7", optional = true }
 leptos_axum = { version = "0.9.0-beta", optional = true }
-tokio = { version = "1.53.1", features = ["rt-multi-thread", "signal", "macros"], optional = true }
+tokio = { version = "1.53.1", features = ["rt-multi-thread", "signal", "macros", "sync", "time"], optional = true }
 wasm-bindgen = { version = "0.2.126", optional = true }
 wasm-bindgen-futures = { version = "0.4.76", optional = true }
 js-sys = { version = "0.3.103", optional = true }
+gloo-net = { version = "0.7.0", optional = true, features = ["websocket"] }
+futures-util = { version = "0.3", optional = true, features = ["sink"] }
 web-sys = { version = "0.3.103", optional = true, features = [
     "HtmlCanvasElement",
     "HtmlElement",
@@ -54,6 +56,10 @@ web-sys = { version = "0.3.103", optional = true, features = [
     "DomTokenList",
     "Event",
     "EventTarget",
+    "CustomEvent",
+    "CustomEventInit",
+    "Node",
+    "NodeList",
     "MediaQueryList",
     "Storage",
     "console",
@@ -66,6 +72,7 @@ hiqlite = { version = "0.14", optional = true, default-features = false, feature
     "cache",
     "macros",
     "toml",
+    "listen_notify_local",
     # backup omitted for self-contained `cargo run` (needs S3 + EncKeys).
     # shutdown-handle omitted — we own Ctrl+C / SIGTERM in operations::shutdown.
 ] }
@@ -91,11 +98,13 @@ hydrate = [
     "dep:wasm-bindgen-futures",
     "dep:js-sys",
     "dep:web-sys",
+    "dep:gloo-net",
+    "dep:futures-util",
 ]
 ssr = [
     "dep:axum",
-    "dep:serde_json",
     "dep:tokio",
+    "dep:futures-util",
     "dep:leptos_axum",
     "dep:hiqlite",
     "dep:argon2",
@@ -119,6 +128,7 @@ dev-dashboard = ["ssr", "hiqlite/dashboard"]
 
 [dev-dependencies]
 axum-test = "21.0.0"
+bincode = { version = "2.0.1", features = ["serde"] }
 libc = "0.2.189"
 tempfile = "3"
 

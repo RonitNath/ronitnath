@@ -9,6 +9,43 @@ fn release_version() -> String {
 }
 
 #[cfg(feature = "ssr")]
+fn cache_policy(path: &str) -> &'static str {
+    if path.starts_with("/pkg/")
+        || path.starts_with("/css/")
+        || path.starts_with("/js/")
+        || path.starts_with("/fonts/")
+        || path.starts_with("/stars/")
+        || path.starts_with("/sky/")
+        || path.starts_with("/cities/")
+        || path.starts_with("/images/")
+    {
+        "no-cache, must-revalidate"
+    } else {
+        "no-store"
+    }
+}
+
+#[cfg(feature = "ssr")]
+async fn cache_and_version_headers(
+    request: axum::extract::Request,
+    next: axum::middleware::Next,
+) -> axum::response::Response {
+    use axum::http::{HeaderName, HeaderValue, header};
+
+    let path = request.uri().path().to_string();
+    let mut response = next.run(request).await;
+    let cache = cache_policy(&path);
+    response
+        .headers_mut()
+        .insert(header::CACHE_CONTROL, HeaderValue::from_static(cache));
+    response.headers_mut().insert(
+        HeaderName::from_static("x-rn-app-version"),
+        HeaderValue::from_str(&release_version()).expect("git revision is a valid header value"),
+    );
+    response
+}
+
+#[cfg(feature = "ssr")]
 async fn serve_star_lod_range(
     path: std::path::PathBuf,
     headers: axum::http::HeaderMap,
@@ -68,6 +105,25 @@ async fn serve_star_lod_range(
         .header(header::CONTENT_LENGTH, bytes.len())
         .body(Body::from(bytes))
         .expect("valid star LOD range response")
+}
+
+#[cfg(feature = "ssr")]
+async fn validate_manage_route(
+    request: axum::extract::Request,
+    next: axum::middleware::Next,
+) -> axum::response::Response {
+    use axum::response::IntoResponse;
+
+    if let Some(slug) = request.uri().path().strip_prefix("/manage/")
+        && (slug.contains('/') || rn_site::manage::DataModel::parse(slug).is_none())
+    {
+        return (
+            axum::http::StatusCode::NOT_FOUND,
+            "The requested data model does not exist.",
+        )
+            .into_response();
+    }
+    next.run(request).await
 }
 
 /// Which replica this process is, from the node's `node.env`.
@@ -161,8 +217,82 @@ async fn main() {
     let star_lod_path =
         std::path::PathBuf::from(leptos_options.site_root.as_ref()).join("stars/lod/g12.bin");
     let routes = generate_route_list(App);
+    let manage_routes = routes
+        .iter()
+        .filter(|route| route.path().starts_with("/manage"))
+        .cloned()
+        .collect::<Vec<_>>();
+    let protected_routes = routes
+        .iter()
+        .filter(|route| route.path() == "/protected")
+        .cloned()
+        .collect::<Vec<_>>();
+    let public_routes = routes
+        .into_iter()
+        .filter(|route| route.path() != "/protected" && !route.path().starts_with("/manage"))
+        .collect::<Vec<_>>();
+
+    let realtime_hub = rn_site::realtime::RealtimeHub::new(node_name());
+    let _realtime_listener = realtime_hub.start(db.clone());
+    let realtime_state = rn_site::realtime::RealtimeState::new(
+        db.clone(),
+        realtime_hub.clone(),
+        release_version(),
+        std::env::var("PUBLIC_URL").unwrap_or_else(|_| format!("http://{addr}")),
+    );
+
+    let render_context = {
+        let auth_state = auth_state.clone();
+        move || provide_context(auth_state.clone())
+    };
+    let render_shell = {
+        let leptos_options = leptos_options.clone();
+        move || shell(leptos_options.clone())
+    };
+    let protected_pages = Router::new()
+        .leptos_routes_with_handler(
+            protected_routes,
+            leptos_axum::render_app_to_stream_with_context(
+                render_context.clone(),
+                render_shell.clone(),
+            ),
+        )
+        .route_layer(axum::middleware::from_fn_with_state(
+            auth_state.clone(),
+            |st, req, next| {
+                rn_site::auth::guard::require_capability(
+                    rn_site::auth::Capability::TestAuth,
+                    st,
+                    req,
+                    next,
+                )
+            },
+        ))
+        .with_state::<()>(leptos_options.clone());
+    let manage_pages = Router::new()
+        .leptos_routes_with_handler(
+            manage_routes,
+            leptos_axum::render_app_to_stream_with_context(
+                render_context.clone(),
+                render_shell.clone(),
+            ),
+        )
+        .route_layer(axum::middleware::from_fn(validate_manage_route))
+        .route_layer(axum::middleware::from_fn_with_state(
+            auth_state.clone(),
+            |st, req, next| {
+                rn_site::auth::guard::require_capability(
+                    rn_site::auth::Capability::Manage,
+                    st,
+                    req,
+                    next,
+                )
+            },
+        ))
+        .with_state::<()>(leptos_options.clone());
 
     let readiness_db = db.clone();
+    let readiness_realtime = realtime_hub.clone();
     let app = Router::new()
         // Liveness: no dependencies, no allocation of consequence, no reason to
         // ever fail while the process is up. This is what the edge's active
@@ -176,6 +306,7 @@ async fn main() {
             "/readyz",
             get(move || {
                 let db = readiness_db.clone();
+                let realtime = readiness_realtime.clone();
                 async move {
                     let expected = expected_voters();
                     let db_metrics = db.metrics_db().await.ok();
@@ -191,10 +322,12 @@ async fn main() {
                     let leader = db_metrics
                         .as_ref()
                         .and_then(|metrics| metrics.current_leader);
+                    let realtime_listener = realtime.listener_healthy();
                     let healthy = db.is_healthy_db().await.is_ok()
                         && db.is_healthy_cache().await.is_ok()
                         && voters == expected
-                        && cache_voters == expected;
+                        && cache_voters == expected
+                        && realtime_listener;
                     let status = if healthy {
                         StatusCode::OK
                     } else {
@@ -213,6 +346,7 @@ async fn main() {
                             // cache count was exactly the blind spot that made
                             // the first formation failure unreadable.
                             "cache_voters": cache_voters,
+                            "realtime_listener": realtime_listener,
                             "expected_voters": expected,
                         })),
                     )
@@ -243,20 +377,9 @@ async fn main() {
                 leptos_axum::handle_server_fns_with_context(additional_context.clone(), request)
             })
         })
-        .leptos_routes_with_context(
-            &leptos_options,
-            routes,
-            {
-                let auth_state = auth_state.clone();
-                move || provide_context(auth_state.clone())
-            },
-            {
-                let leptos_options = leptos_options.clone();
-                move || shell(leptos_options.clone())
-            },
-        )
+        .leptos_routes_with_context(&leptos_options, public_routes, render_context, render_shell)
         .fallback(leptos_axum::file_and_error_handler(shell))
-        .with_state(leptos_options)
+        .with_state::<()>(leptos_options)
         // Resolve the session for everything above — the SSR pages — so the
         // top-bar nav can offer only what this caller may open. It attaches a
         // session and never refuses, so `/healthz`, `/readyz` and an anonymous
@@ -271,13 +394,21 @@ async fn main() {
         // Merged after `with_state` because the auth routes carry their own
         // `AuthState`; both sides are `Router<()>` by this point. Only this
         // side has a fallback, which is what keeps `merge` from panicking.
-        .merge(rn_site::auth::router(auth_state));
+        .merge(protected_pages)
+        .merge(manage_pages)
+        .merge(rn_site::auth::api_router(auth_state))
+        .merge(
+            Router::new()
+                .route("/api/realtime", get(rn_site::realtime::upgrade))
+                .with_state(realtime_state),
+        )
+        .layer(axum::middleware::from_fn(cache_and_version_headers));
     let app = telemetry::layer_http_trace(app);
 
     info!(%addr, mode = app_config.mode.as_str(), "listening");
     let listener = tokio::net::TcpListener::bind(&addr).await.unwrap();
     axum::serve(listener, app.into_make_service())
-        .with_graceful_shutdown(shutdown::graceful_shutdown(db))
+        .with_graceful_shutdown(shutdown::graceful_shutdown(db, realtime_hub))
         .await
         .unwrap();
 }
@@ -287,4 +418,21 @@ pub fn main() {
     // Binary requires `--features ssr` (the package default). Hydrate builds
     // use the `hydrate` wasm entrypoint in lib.rs instead.
     eprintln!("rn-site binary requires the `ssr` feature (enabled by default)");
+}
+
+#[cfg(all(test, feature = "ssr"))]
+mod tests {
+    use super::cache_policy;
+
+    #[test]
+    fn static_assets_revalidate_while_documents_and_apis_do_not_store() {
+        assert_eq!(cache_policy("/css/site.css"), "no-cache, must-revalidate");
+        assert_eq!(
+            cache_policy("/pkg/rn-site.wasm"),
+            "no-cache, must-revalidate"
+        );
+        assert_eq!(cache_policy("/manage"), "no-store");
+        assert_eq!(cache_policy("/api/whoami"), "no-store");
+        assert_eq!(cache_policy("/version"), "no-store");
+    }
 }

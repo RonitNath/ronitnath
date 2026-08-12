@@ -197,6 +197,8 @@ pub async fn grant(
         role = role.as_str(),
         "resource grant written"
     );
+    crate::realtime::publish_data_change(db, ["resource-grants"]).await;
+    crate::realtime::publish_authorization_change(db, authorization_target(subject, false)).await;
     Ok(())
 }
 
@@ -223,7 +225,27 @@ pub async fn revoke(
         )
         .await?;
     info!(revoked = affected, "resource grant revoke finished");
+    if affected > 0 {
+        crate::realtime::publish_data_change(db, ["resource-grants"]).await;
+        crate::realtime::publish_authorization_change(db, authorization_target(subject, true))
+            .await;
+    }
     Ok(affected > 0)
+}
+
+fn authorization_target(
+    subject: GrantSubject,
+    reload_required: bool,
+) -> crate::realtime::AuthorizationTarget {
+    let mut target = crate::realtime::AuthorizationTarget {
+        reload_required,
+        ..Default::default()
+    };
+    match subject {
+        GrantSubject::Identity(id) => target.identity_id = Some(id.get()),
+        GrantSubject::Account(id) => target.account_id = Some(id.get()),
+    }
+    target
 }
 
 /// Resolve what `session` may do to one resource.

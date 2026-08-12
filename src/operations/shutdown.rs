@@ -15,8 +15,9 @@ use tracing::{error, info, instrument};
 /// Future suitable for [`axum::serve::Serve::with_graceful_shutdown`].
 ///
 /// Waits for a shutdown signal, then runs [`teardown`] (hiqlite + future work).
-pub async fn graceful_shutdown(db: Client) {
+pub async fn graceful_shutdown(db: Client, realtime: crate::realtime::RealtimeHub) {
     shutdown_signal().await;
+    realtime.shutdown();
     teardown(db).await;
 }
 

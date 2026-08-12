@@ -1,8 +1,5 @@
-//! The auth HTTP surface: credential endpoints and the two guarded pages.
-//!
-//! [`router`] is the single definition of these routes, shared by `main` and by
-//! the integration tests. The tests exercise the same router the server serves;
-//! there is no test-only wiring that could drift from production.
+//! The auth HTTP surface: credential endpoints plus a compact guarded-page
+//! harness retained for focused integration tests.
 
 use std::time::Instant;
 
@@ -60,7 +57,6 @@ pub fn router(state: AuthState) -> Router {
         .route_layer(from_fn_with_state(state.clone(), |st, req, next| {
             require_capability(Capability::TestAuth, st, req, next)
         }));
-
     let manage = Router::new()
         .route("/manage", get(crate::manage::index))
         .route("/manage/{model}", get(crate::manage::model_page))
@@ -68,6 +64,16 @@ pub fn router(state: AuthState) -> Router {
             require_capability(Capability::Manage, st, req, next)
         }));
 
+    api_router(state.clone())
+        .merge(protected.with_state(state.clone()))
+        .merge(manage.with_state(state))
+        .layer(from_fn(no_store))
+}
+
+/// Authentication APIs without the legacy standalone guarded page renderers.
+/// The production application mounts guarded Leptos renderers for those URLs;
+/// integration tests may continue using [`router`] as a compact auth harness.
+pub fn api_router(state: AuthState) -> Router {
     let router = Router::new()
         .route("/api/auth/register", post(register))
         .route("/api/auth/signin", post(signin))
@@ -80,11 +86,23 @@ pub fn router(state: AuthState) -> Router {
     #[cfg(debug_assertions)]
     let router = router.route("/api/auth/dev-bypass", post(dev_bypass));
 
-    router
-        .merge(protected)
-        .merge(manage)
-        .with_state(state)
-        .layer(from_fn(no_store))
+    router.with_state(state).layer(from_fn(no_store))
+}
+
+/// Behind the `test-auth` guard: reachable by any registered account.
+#[instrument(name = "route.protected", skip(request))]
+async fn protected_page(request: Request) -> Html<String> {
+    let session = session_of(&request).expect("guard attaches the session before the handler");
+    Html(super::guard::page(
+        "Protected",
+        &format!(
+            "Signed in as <code>{}</code> on account <code>{}</code>.<br/>\
+             Capabilities held: <code>{}</code>.",
+            session.identity_public_id,
+            session.account_public_id,
+            session.capabilities.to_log_string()
+        ),
+    ))
 }
 
 /// Authentication responses must never be retained by a browser or shared
@@ -449,22 +467,6 @@ async fn whoami(State(state): State<AuthState>, headers: HeaderMap) -> Response 
         }),
     )
         .into_response()
-}
-
-/// Behind the `test-auth` guard: reachable by any registered account.
-#[instrument(name = "route.protected", skip(request))]
-async fn protected_page(request: Request) -> Html<String> {
-    let session = session_of(&request).expect("guard attaches the session before the handler");
-    Html(super::guard::page(
-        "Protected",
-        &format!(
-            "Signed in as <code>{}</code> on account <code>{}</code>.<br/>\
-             Capabilities held: <code>{}</code>.",
-            session.identity_public_id,
-            session.account_public_id,
-            session.capabilities.to_log_string()
-        ),
-    ))
 }
 
 /// Name of the cookie these routes set, re-exported for tests and the shell.

@@ -1,0 +1,6 @@
+[env]
+# `cargo-leptos` emits `rn-site.wasm`. Leptos checks this marker when it is
+# compiled to decide whether HydrationScripts should request that file or the
+# raw wasm-bindgen name (`rn-site_bg.wasm`). Keep plain Cargo and cargo-leptos
+# builds consistent.
+LEPTOS_OUTPUT_NAME = "rn-site"

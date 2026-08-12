@@ -103,12 +103,12 @@ async fn load_and_mount(
     use wasm_bindgen::{JsCast, JsValue};
     use wasm_bindgen_futures::JsFuture;
 
-    // Dynamically import the ES module (never preloaded). Bust caches so
-    // a prior broken module cannot stick across deploys/dev edits.
+    // Dynamically import the ES module (never preloaded). The origin marks
+    // stable asset URLs `no-cache`, so the browser revalidates this module.
     let importer = js_sys::Function::new_with_args("u", "return import(u);");
-    let url = format!("/js/mini-globe.js?v={}", js_sys::Date::now() as u64);
+    let url = "/js/mini-globe.js";
     let module = JsFuture::from(js_sys::Promise::resolve(
-        &importer.call1(&js_sys::global(), &JsValue::from_str(&url))?,
+        &importer.call1(&js_sys::global(), &JsValue::from_str(url))?,
     ))
     .await?;
 

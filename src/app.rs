@@ -1,9 +1,11 @@
 use leptos::prelude::*;
-use leptos_meta::{MetaTags, Stylesheet, Title, provide_meta_context};
+use leptos_meta::{Meta, MetaTags, Stylesheet, Title, provide_meta_context};
 use leptos_router::{
-    StaticSegment,
+    ParamSegment, StaticSegment,
     components::{Route, Router, Routes},
+    hooks::use_params_map,
 };
+use serde::{Deserialize, Serialize};
 
 // The nav table is decided from capabilities, which only the server build has.
 #[cfg(feature = "ssr")]
@@ -34,19 +36,12 @@ const THEME_JS: &str = r#"
 })();
 "#;
 
-/// Cache key for the stylesheets, baked in when the image is built.
+/// Release identity shared by the server-rendered page and hydrated client.
 ///
-/// The edge holds `/css/*.css` for four hours and browsers keep their own copy
-/// just as long, so although markup and stylesheet ship in the same image they
-/// arrive hours apart: a release that changes both renders the new page
-/// against the old CSS until every cache expires — which it did, visibly, on
-/// 2026-08-11. A per-build URL removes the failure rather than papering over
-/// it with a purge, since a purge cannot reach a browser's disk cache at all.
-///
-/// `option_env!`, not a runtime lookup: the Containerfile exports
-/// `SOURCE_GIT_HASH` to the build stage, so the server binary and the wasm
-/// bundle bake the same constant and cannot disagree about an href.
-const ASSET_VERSION: &str = match option_env!("SOURCE_GIT_HASH") {
+/// Assets keep stable URLs and explicitly revalidate. This build-time value is
+/// instead used by the realtime release watcher, so a browser can safely
+/// reload when it is running an older client than the connected server.
+pub const APP_VERSION: &str = match option_env!("SOURCE_GIT_HASH") {
     Some(hash) => hash,
     None => "dev",
 };
@@ -91,11 +86,15 @@ pub fn App() -> impl IntoView {
     let epoch_ms = server_now_ms();
 
     view! {
-        <Stylesheet id="leptos" href=format!("/pkg/rn-site.css?v={ASSET_VERSION}")/>
-        <Stylesheet href=format!("/css/atmosphere.css?v={ASSET_VERSION}")/>
-        <Stylesheet href=format!("/css/starscape.css?v={ASSET_VERSION}")/>
-        <Stylesheet href=format!("/css/site.css?v={ASSET_VERSION}")/>
+        <Meta name="rn-app-version" content=APP_VERSION/>
+        <Stylesheet id="leptos" href="/pkg/rn-site.css"/>
+        <Stylesheet href="/css/atmosphere.css"/>
+        <Stylesheet href="/css/starscape.css"/>
+        <Stylesheet href="/css/site.css"/>
+        <Stylesheet href="/css/manage.css"/>
         <Title text="Ronit Nath"/>
+
+        <crate::realtime::RealtimeWatcher/>
 
         <Atmosphere/>
         <Starscape epoch_ms=epoch_ms/>
@@ -131,9 +130,408 @@ pub fn App() -> impl IntoView {
                 <Routes fallback=|| "Page not found.".into_view()>
                     <Route path=StaticSegment("") view=HomePage/>
                     <Route path=StaticSegment("auth") view=AuthPage/>
+                    <Route path=StaticSegment("protected") view=ProtectedPage/>
+                    <Route path=StaticSegment("manage") view=ManageIndexPage/>
+                    <Route
+                        path=(StaticSegment("manage"), ParamSegment("model"))
+                        view=ManageModelPage
+                    />
                 </Routes>
             </main>
         </Router>
+    }
+}
+
+#[component]
+fn ProtectedPage() -> impl IntoView {
+    #[cfg(feature = "ssr")]
+    let summary = {
+        use crate::auth::SessionContext;
+        use_context::<axum::http::request::Parts>()
+            .and_then(|parts| parts.extensions.get::<SessionContext>().cloned())
+            .map(|session| {
+                format!(
+                    "identity={} account={} capabilities={}",
+                    session.identity_public_id,
+                    session.account_public_id,
+                    session.capabilities.to_log_string()
+                )
+            })
+            .unwrap_or_else(|| "session unavailable".to_string())
+    };
+    #[cfg(not(feature = "ssr"))]
+    let summary = String::new();
+
+    view! {
+        <section class="viewport-center viewport-center-stack">
+            <h1 class="home-title text-2xl font-semibold">"Protected"</h1>
+            <p>{summary}</p>
+        </section>
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct ManageCard {
+    pub slug: String,
+    pub title: String,
+    pub description: String,
+    pub count: i64,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub enum ManageCell {
+    Mono(String),
+    Text(String),
+    Tag(String),
+    Reference { label: String, public_id: String },
+    Time(String),
+    None,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct ManageTable {
+    pub slug: String,
+    pub title: String,
+    pub description: String,
+    pub total: i64,
+    pub columns: Vec<String>,
+    pub rows: Vec<Vec<ManageCell>>,
+}
+
+#[server(endpoint = "manage-index-data")]
+async fn manage_index_data() -> Result<Vec<ManageCard>, ServerFnError> {
+    #[cfg(feature = "ssr")]
+    {
+        require_manage_server_fn().await?;
+        let state = expect_context::<crate::auth::AuthState>();
+        let mut cards = Vec::with_capacity(crate::manage::DataModel::ALL.len());
+        for model in crate::manage::DataModel::ALL {
+            cards.push(ManageCard {
+                slug: model.slug().to_string(),
+                title: model.title().to_string(),
+                description: model.description().to_string(),
+                count: crate::manage::queries::count(&state.db, *model)
+                    .await
+                    .map_err(server_error)?,
+            });
+        }
+        Ok(cards)
+    }
+    #[cfg(not(feature = "ssr"))]
+    unreachable!()
+}
+
+#[server(endpoint = "manage-model-data")]
+async fn manage_model_data(slug: String) -> Result<ManageTable, ServerFnError> {
+    #[cfg(feature = "ssr")]
+    {
+        require_manage_server_fn().await?;
+        let state = expect_context::<crate::auth::AuthState>();
+        let Some(model) = crate::manage::DataModel::parse(&slug) else {
+            if let Some(response) = use_context::<leptos_axum::ResponseOptions>() {
+                response.set_status(axum::http::StatusCode::NOT_FOUND);
+            }
+            return Err(server_error("no such model"));
+        };
+        let total = crate::manage::queries::count(&state.db, model)
+            .await
+            .map_err(server_error)?;
+        let table = crate::manage::queries::rows(&state.db, model)
+            .await
+            .map_err(server_error)?;
+        Ok(ManageTable {
+            slug: model.slug().to_string(),
+            title: model.title().to_string(),
+            description: model.description().to_string(),
+            total,
+            columns: table
+                .columns
+                .iter()
+                .map(|column| (*column).to_string())
+                .collect(),
+            rows: table
+                .rows
+                .into_iter()
+                .map(|row| row.into_iter().map(ManageCell::from).collect())
+                .collect(),
+        })
+    }
+    #[cfg(not(feature = "ssr"))]
+    unreachable!()
+}
+
+#[cfg(feature = "ssr")]
+impl From<crate::manage::queries::Cell> for ManageCell {
+    fn from(cell: crate::manage::queries::Cell) -> Self {
+        use crate::manage::queries::Cell;
+        match cell {
+            Cell::Mono(value) => Self::Mono(value),
+            Cell::Text(value) => Self::Text(value),
+            Cell::Tag(value) => Self::Tag(value),
+            Cell::Ref { label, public_id } => Self::Reference { label, public_id },
+            Cell::Time(value) => Self::Time(crate::manage::queries::fmt_utc(value)),
+            Cell::None => Self::None,
+        }
+    }
+}
+
+#[cfg(feature = "ssr")]
+async fn require_manage_server_fn() -> Result<(), ServerFnError> {
+    use crate::auth::{Capability, session, store};
+    use axum::http::header;
+
+    let state = expect_context::<crate::auth::AuthState>();
+    let token = use_context::<axum::http::request::Parts>()
+        .and_then(|parts| parts.headers.get(header::COOKIE).cloned())
+        .and_then(|value| value.to_str().ok().map(str::to_string))
+        .and_then(|cookies| session::token_from_cookie_header(&cookies));
+    let Some(token) = token else {
+        return Err(server_error("not authenticated"));
+    };
+    let allowed = store::resolve_session(&state.db, &token)
+        .await
+        .map_err(server_error)?
+        .is_some_and(|session| session.capabilities.has(Capability::Manage));
+    if allowed {
+        Ok(())
+    } else {
+        Err(server_error("not permitted"))
+    }
+}
+
+#[cfg(feature = "ssr")]
+fn server_error(message: impl ToString) -> ServerFnError {
+    ServerFnError::ServerError(message.to_string())
+}
+
+fn manage_shell(active: Option<String>, content: impl IntoView) -> impl IntoView {
+    let models = [
+        ("identities", "Identities"),
+        ("identity-emails", "Identity emails"),
+        ("identity-passwords", "Identity passwords"),
+        ("accounts", "Accounts"),
+        ("account-memberships", "Account memberships"),
+        ("membership-capabilities", "Membership capabilities"),
+        ("sessions", "Sessions"),
+        ("resource-grants", "Resource grants"),
+    ];
+    view! {
+        <section class="manage-page">
+            <header class="manage-bar">
+                <a class="manage-brand" href="/manage">"Manage"</a>
+                <span class="manage-note">"times UTC · latest 200 rows per model"</span>
+                <nav class="manage-bar-links">
+                    <a href="/protected">"Session"</a>
+                    <a href="/">"ronitnath.com"</a>
+                </nav>
+            </header>
+            <div class="manage-frame">
+                <nav class="manage-rail" aria-label="Data models">
+                    {models.into_iter().map(|(slug, title)| {
+                        let class = (active.as_deref() == Some(slug)).then_some("active");
+                        view! { <a href=format!("/manage/{slug}") class=class>{title}</a> }
+                    }).collect_view()}
+                </nav>
+                <div class="manage-main">{content.into_any()}</div>
+            </div>
+        </section>
+    }
+}
+
+#[island]
+fn ManageIndexIsland() -> impl IntoView {
+    let data = Resource::new(|| (), |_| manage_index_data());
+    install_manage_refetch(data, None);
+    manage_shell(
+        None,
+        view! {
+            <Suspense fallback=|| view! { <p>"Loading data models…"</p> }>
+                {move || Suspend::new(async move {
+                    match data.await {
+                        Ok(cards) => view! {
+                            <h1>"Data models"</h1>
+                            <p class="manage-lede">"Every durable table in the application, read-only. Select a model to inspect its rows."</p>
+                            <div class="manage-cards">
+                                {cards.into_iter().map(|card| view! {
+                                    <a class="manage-card" href=format!("/manage/{}", card.slug)>
+                                        <span class="manage-card-head">
+                                            <span>{card.title}</span>
+                                            <span class="manage-count">{card.count}</span>
+                                        </span>
+                                        <span class="manage-card-desc">{card.description}</span>
+                                    </a>
+                                }).collect_view()}
+                            </div>
+                        }.into_any(),
+                        Err(_) => view! { <p>"The data store could not be reached."</p> }.into_any(),
+                    }
+                })}
+            </Suspense>
+        },
+    )
+}
+
+#[component]
+fn ManageIndexPage() -> impl IntoView {
+    view! { <ManageIndexIsland/> }
+}
+
+#[island]
+fn ManageModelIsland(slug: String) -> impl IntoView {
+    let requested = slug.clone();
+    let data = Resource::new(move || requested.clone(), manage_model_data);
+    install_manage_refetch(data, Some(slug.clone()));
+    manage_shell(
+        Some(slug),
+        view! {
+            <Suspense fallback=|| view! { <p>"Loading rows…"</p> }>
+                {move || Suspend::new(async move {
+                    match data.await {
+                        Ok(table) => render_manage_table(table).into_any(),
+                        Err(_) => view! { <h1>"No such model"</h1><p>"The model is unavailable or does not exist."</p> }.into_any(),
+                    }
+                })}
+            </Suspense>
+        },
+    )
+}
+
+#[component]
+fn ManageModelPage() -> impl IntoView {
+    let params = use_params_map();
+    let slug = move || params.read().get("model").unwrap_or_default();
+    view! { <ManageModelIsland slug=slug()/> }
+}
+
+fn render_manage_table(table: ManageTable) -> impl IntoView {
+    let shown = table.rows.len() as i64;
+    let count = if table.total > shown {
+        format!("Showing the latest {shown} of {} rows", table.total)
+    } else {
+        format!("{} rows", table.total)
+    };
+    view! {
+        <h1>{table.title}</h1>
+        <p class="manage-lede">{table.description}</p>
+        <p class="manage-count-line">{count}</p>
+        <div class="manage-table-scroll" data-reload-state="manage-table">
+            <table>
+                <thead><tr>{table.columns.into_iter().map(|column| view! { <th>{column}</th> }).collect_view()}</tr></thead>
+                <tbody>{table.rows.into_iter().map(|row| view! {
+                    <tr>{row.into_iter().map(|cell| view! { <td>{render_manage_cell(cell)}</td> }).collect_view()}</tr>
+                }).collect_view()}</tbody>
+            </table>
+        </div>
+    }
+}
+
+fn render_manage_cell(cell: ManageCell) -> AnyView {
+    match cell {
+        ManageCell::Mono(value) => view! { <code>{value}</code> }.into_any(),
+        ManageCell::Text(value) => value.into_any(),
+        ManageCell::Tag(value) => view! { <span class="manage-tag">{value}</span> }.into_any(),
+        ManageCell::Reference { label, public_id } => {
+            view! { <span class="manage-ref" title=public_id>{label}</span> }.into_any()
+        }
+        ManageCell::Time(value) => view! { <span class="manage-time">{value}</span> }.into_any(),
+        ManageCell::None => view! { <span class="manage-none">"—"</span> }.into_any(),
+    }
+}
+
+fn install_manage_refetch<T>(resource: Resource<T>, model: Option<String>)
+where
+    T: Clone + Send + Sync + Serialize + for<'de> Deserialize<'de> + 'static,
+{
+    #[cfg(feature = "hydrate")]
+    {
+        use wasm_bindgen::{JsCast, closure::Closure};
+        let model_for_event = model.clone();
+        let callback = Closure::<dyn FnMut(web_sys::Event)>::new(move |event: web_sys::Event| {
+            let should_refetch = event
+                .dyn_into::<web_sys::CustomEvent>()
+                .ok()
+                .map(|event| js_sys::Array::from(&event.detail()))
+                .is_none_or(|models| {
+                    model_for_event.as_ref().is_none_or(|wanted| {
+                        models
+                            .iter()
+                            .any(|value| value.as_string().as_deref() == Some(wanted))
+                    })
+                });
+            if should_refetch {
+                refetch_manage(resource);
+            }
+        });
+        let _ = window()
+            .add_event_listener_with_callback("rn-data-changed", callback.as_ref().unchecked_ref());
+        let _ = window().add_event_listener_with_callback(
+            "rn-resync-required",
+            callback.as_ref().unchecked_ref(),
+        );
+        callback.forget();
+
+        let reconcile = Closure::<dyn FnMut()>::new(move || {
+            if document().visibility_state() == web_sys::VisibilityState::Visible {
+                refetch_manage(resource);
+            }
+        });
+        let _ = window().set_interval_with_callback_and_timeout_and_arguments_0(
+            reconcile.as_ref().unchecked_ref(),
+            90_000,
+        );
+        reconcile.forget();
+    }
+    #[cfg(not(feature = "hydrate"))]
+    drop((resource, model));
+}
+
+#[cfg(feature = "hydrate")]
+fn refetch_manage<T>(resource: Resource<T>)
+where
+    T: Clone + Send + Sync + Serialize + for<'de> Deserialize<'de> + 'static,
+{
+    use wasm_bindgen::{JsCast, JsValue, closure::Closure};
+    use wasm_bindgen_futures::{JsFuture, spawn_local};
+
+    let x = window().scroll_x().unwrap_or(0.0);
+    let y = window().scroll_y().unwrap_or(0.0);
+    let table = document()
+        .query_selector("[data-reload-state=manage-table]")
+        .ok()
+        .flatten();
+    let table_x = table.as_ref().map(web_sys::Element::scroll_left);
+    let table_y = table.as_ref().map(web_sys::Element::scroll_top);
+    resource.refetch();
+
+    spawn_local(async move {
+        // A resource refresh can patch the existing element instead of replacing
+        // it, so node identity is not a useful completion signal. Wait for the
+        // new resource value and then yield once for Leptos to commit its DOM.
+        let _ = resource.await;
+        browser_delay(0).await;
+        window().scroll_to_with_x_and_y(x, y);
+        let current = document()
+            .query_selector("[data-reload-state=manage-table]")
+            .ok()
+            .flatten();
+        if let (Some(table_x), Some(table_y), Some(element)) = (table_x, table_y, current) {
+            element.set_scroll_left(table_x);
+            element.set_scroll_top(table_y);
+        }
+    });
+
+    async fn browser_delay(ms: i32) {
+        let promise = js_sys::Promise::new(&mut |resolve, _| {
+            let callback = Closure::<dyn FnMut()>::once(move || {
+                let _ = resolve.call0(&JsValue::UNDEFINED);
+            });
+            let _ = window().set_timeout_with_callback_and_timeout_and_arguments_0(
+                callback.as_ref().unchecked_ref(),
+                ms,
+            );
+            callback.forget();
+        });
+        let _ = JsFuture::from(promise).await;
     }
 }
 
