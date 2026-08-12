@@ -24,6 +24,7 @@ uniform mat3 u_view;
 uniform float u_f;
 uniform float u_aspect;
 uniform float u_light;
+uniform float u_reveal;
 uniform sampler2D u_map;
 // Driven by the `d` tuning panel; see starscape::tuning.
 uniform float u_extinction_k;
@@ -71,6 +72,7 @@ void main() {
     // it is still deep blue; near the bottom of the frame the page is nearly
     // white and any band there would read as a smudge behind the links.
     band *= mix(1.0, 1.15 * smoothstep(0.10, 0.75, ray.z), u_light);
+    band *= u_reveal;
 
     // Alpha must cover the colour it carries — see the module docs.
     frag = vec4(band, max(max(band.r, band.g), band.b));
@@ -209,5 +211,11 @@ mod tests {
                 "literal zero alpha is undefined premultiplied output: {assignment}"
             );
         }
+    }
+
+    #[test]
+    fn galaxy_pass_has_an_explicit_reveal_uniform() {
+        assert!(SKY_FRAG.contains("uniform float u_reveal;"));
+        assert!(SKY_FRAG.contains("band *= u_reveal;"));
     }
 }

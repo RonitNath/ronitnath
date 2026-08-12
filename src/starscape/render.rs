@@ -26,6 +26,7 @@ use super::{observer_at, sim_time_ms, synced_sim_time_ms, view_matrix};
 
 const GL_STRIDE: i32 = STRIDE as i32;
 const STAR_BATCH: usize = 512;
+const GALAXY_FADE_MS: f64 = 1_600.0;
 
 struct SkyPass {
     program: WebGlProgram,
@@ -35,7 +36,11 @@ struct SkyPass {
     u_f: Option<WebGlUniformLocation>,
     u_aspect: Option<WebGlUniformLocation>,
     u_light: Option<WebGlUniformLocation>,
+    u_reveal: Option<WebGlUniformLocation>,
     u_map: Option<WebGlUniformLocation>,
+    map_ready: Cell<bool>,
+    fade_started_at: Cell<Option<f64>>,
+    fade_complete: Cell<bool>,
     tuned: Vec<Option<WebGlUniformLocation>>,
 }
 
@@ -224,6 +229,9 @@ async fn stream_stars(
                 (uploaded * STRIDE) as i32,
                 slice,
             );
+            if uploaded == 0 {
+                telemetry::set_number_in("stars", "firstBatchAtMs", js_sys::Date::now());
+            }
             uploaded = end;
             count_cell.set(uploaded as i32);
             telemetry::increment("stars", "uploadBatches", 1.0);
@@ -321,7 +329,11 @@ async fn init(canvas: HtmlCanvasElement, controller: Rc<Controller>) -> Result<(
             u_f: gl.get_uniform_location(&sky_program, "u_f"),
             u_aspect: gl.get_uniform_location(&sky_program, "u_aspect"),
             u_light: gl.get_uniform_location(&sky_program, "u_light"),
+            u_reveal: gl.get_uniform_location(&sky_program, "u_reveal"),
             u_map: gl.get_uniform_location(&sky_program, "u_map"),
+            map_ready: Cell::new(false),
+            fade_started_at: Cell::new(None),
+            fade_complete: Cell::new(false),
             tuned: tuned_locations(&gl, &sky_program),
             program: sky_program,
             triangle,
@@ -368,6 +380,17 @@ async fn init(canvas: HtmlCanvasElement, controller: Rc<Controller>) -> Result<(
                 Gl::UNSIGNED_BYTE,
                 &bitmap,
             )?;
+            scene.sky.map_ready.set(true);
+            if controller.reduced.get() {
+                scene
+                    .sky
+                    .fade_started_at
+                    .set(Some(js_sys::Date::now() - GALAXY_FADE_MS));
+            } else if controller.visible.get() {
+                scene.sky.fade_started_at.set(Some(js_sys::Date::now()));
+            }
+            telemetry::set_number_in("stars", "galaxyLoadedAtMs", js_sys::Date::now());
+            telemetry::event("galaxy-fade-started");
             let _ = redraw(&controller);
         }
         Err(error) => {
@@ -425,6 +448,12 @@ fn install_listeners(controller: &Rc<Controller>, media: Option<MediaQueryList>)
         let visible = document().visibility_state() == web_sys::VisibilityState::Visible;
         visibility_controller.visible.set(visible);
         if visible && !visibility_controller.reduced.get() {
+            if let Some(scene) = visibility_controller.scene.borrow().as_ref()
+                && scene.sky.map_ready.get()
+                && scene.sky.fade_started_at.get().is_none()
+            {
+                scene.sky.fade_started_at.set(Some(js_sys::Date::now()));
+            }
             ensure_animation(Rc::clone(&visibility_controller));
         } else {
             stop_animation(&visibility_controller);
@@ -446,6 +475,14 @@ fn install_listeners(controller: &Rc<Controller>, media: Option<MediaQueryList>)
                 freeze_on_motion_change(reduced, current_sim(&media_controller))
             {
                 media_controller.frozen_at.set(Some(frozen_at));
+                if let Some(scene) = media_controller.scene.borrow().as_ref()
+                    && scene.sky.map_ready.get()
+                {
+                    scene
+                        .sky
+                        .fade_started_at
+                        .set(Some(js_sys::Date::now() - GALAXY_FADE_MS));
+                }
                 stop_animation(&media_controller);
                 let _ = redraw(&media_controller);
             } else {
@@ -522,7 +559,12 @@ fn redraw(controller: &Controller) -> bool {
     telemetry::set_number_in("starscape", "starCount", f64::from(scene.stars.count.get()));
     if should_reveal(scene.stars.count.get()) {
         if let Some(root) = document().document_element() {
+            let first_reveal = !root.class_list().contains("starscape-active");
             let _ = root.class_list().add_1("starscape-active");
+            if first_reveal {
+                telemetry::set_number_in("stars", "revealedAtMs", js_sys::Date::now());
+                telemetry::event("first-star-batch-revealed");
+            }
         }
     }
     true
@@ -530,6 +572,10 @@ fn redraw(controller: &Controller) -> bool {
 
 fn should_reveal(star_count: i32) -> bool {
     star_count > 0
+}
+
+fn fade_progress(started_at_ms: f64, now_ms: f64, duration_ms: f64) -> f32 {
+    ((now_ms - started_at_ms) / duration_ms).clamp(0.0, 1.0) as f32
 }
 
 fn redraw_until_drawn(controller: Rc<Controller>) {
@@ -584,6 +630,14 @@ fn draw(scene: &Scene, sim_ms: f64) -> bool {
     gl.uniform1f(scene.sky.u_f.as_ref(), FOCAL);
     gl.uniform1f(scene.sky.u_aspect.as_ref(), aspect);
     gl.uniform1f(scene.sky.u_light.as_ref(), theme);
+    let galaxy_reveal = scene.sky.fade_started_at.get().map_or(0.0, |started| {
+        fade_progress(started, js_sys::Date::now(), GALAXY_FADE_MS)
+    });
+    gl.uniform1f(scene.sky.u_reveal.as_ref(), galaxy_reveal);
+    if galaxy_reveal >= 1.0 && !scene.sky.fade_complete.replace(true) {
+        telemetry::set_number_in("stars", "galaxyRevealedAtMs", js_sys::Date::now());
+        telemetry::event("galaxy-fade-complete");
+    }
     apply_tuning(gl, &scene.sky.tuned, &tuning);
     gl.active_texture(Gl::TEXTURE0);
     gl.bind_texture(Gl::TEXTURE_2D, Some(&scene.sky.map));
@@ -657,7 +711,7 @@ fn compile(gl: &Gl, kind: u32, src: &str) -> Result<WebGlShader, JsValue> {
 
 #[cfg(test)]
 mod tests {
-    use super::{freeze_on_motion_change, should_animate, should_reveal};
+    use super::{fade_progress, freeze_on_motion_change, should_animate, should_reveal};
 
     #[test]
     fn reduced_motion_freezes_time_and_disables_continuous_animation() {
@@ -672,5 +726,12 @@ mod tests {
     fn css_fallback_stays_visible_until_the_first_star_batch() {
         assert!(!should_reveal(0));
         assert!(should_reveal(1));
+    }
+
+    #[test]
+    fn galaxy_fade_progress_is_clamped() {
+        assert_eq!(fade_progress(1_000.0, 500.0, 1_600.0), 0.0);
+        assert_eq!(fade_progress(1_000.0, 1_800.0, 1_600.0), 0.5);
+        assert_eq!(fade_progress(1_000.0, 3_000.0, 1_600.0), 1.0);
     }
 }

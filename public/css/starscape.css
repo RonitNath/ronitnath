@@ -150,10 +150,38 @@ body {
     height: 100%;
     pointer-events: none;
     z-index: 0;
+    opacity: 0;
+    transition: opacity 1.2s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+:root.starscape-active .starscape {
+    opacity: 1;
+}
+
+.starfield {
+    opacity: 1;
+    visibility: visible;
+    transition: opacity 1.2s ease;
 }
 
 :root.starscape-active .starfield {
-    display: none;
+    opacity: 0;
+    visibility: hidden;
+    transition:
+        opacity 1.2s ease,
+        visibility 0s linear 1.2s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .starscape,
+    .starfield,
+    :root.starscape-active .starfield {
+        transition: none;
+    }
+
+    :root.starscape-active .starfield {
+        visibility: hidden;
+    }
 }
 
 /* Corner chrome: globe above grounding, fluid size, no width breakpoints. */
