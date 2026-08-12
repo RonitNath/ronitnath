@@ -102,6 +102,56 @@ pub async fn require_capability(
     next.run(request).await
 }
 
+/// Resolve the session cookie if there is one, attach it, and serve either way.
+///
+/// The counterpart to [`require_capability`] for pages that everyone may see
+/// but that draw themselves differently once signed in — the top-bar nav being
+/// the reason it exists. It never refuses: no cookie, an expired one, or a
+/// session store that will not answer all mean the same thing here, an
+/// anonymous request, because the page is still perfectly servable signed-out.
+/// Nothing behind this layer may treat the attached session as permission; it
+/// decides what is *offered*, and [`require_capability`] still decides what is
+/// allowed when the offer is taken up.
+#[instrument(
+    name = "auth.attach_session",
+    skip(state, request, next),
+    fields(outcome)
+)]
+pub async fn attach_session(
+    State(state): State<AuthState>,
+    mut request: Request,
+    next: Next,
+) -> Response {
+    let span = tracing::Span::current();
+
+    let token = request
+        .headers()
+        .get(header::COOKIE)
+        .and_then(|value| value.to_str().ok())
+        .and_then(token_from_cookie_header);
+
+    match token {
+        None => {
+            span.record("outcome", "anonymous");
+        }
+        Some(token) => match resolve_session(&state.db, &token).await {
+            Ok(Some(session)) => {
+                span.record("outcome", "signed-in");
+                request.extensions_mut().insert(session);
+            }
+            Ok(None) => {
+                span.record("outcome", "unresolved");
+            }
+            Err(err) => {
+                span.record("outcome", "error");
+                warn!(%err, "session lookup errored; rendering as anonymous");
+            }
+        },
+    }
+
+    next.run(request).await
+}
+
 /// The [`SessionContext`] the guard attached. Only present behind a guard.
 #[must_use]
 pub fn session_of(request: &Request) -> Option<&SessionContext> {

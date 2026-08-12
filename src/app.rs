@@ -5,6 +5,9 @@ use leptos_router::{
     components::{Route, Router, Routes},
 };
 
+// The nav table is decided from capabilities, which only the server build has.
+#[cfg(feature = "ssr")]
+use crate::auth::{Capability, CapabilitySet};
 use crate::starscape::{CityLabel, MiniGlobe, Starscape};
 
 const THEME_CSS: &str = r#"
@@ -85,20 +88,24 @@ pub fn App() -> impl IntoView {
         </div>
 
         <header class="topbar">
+            <a href="/" class="icon-button home-button" aria-label="Home">
+                <span class="icon-button-glyph" aria-hidden="true">
+                    <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                    >
+                        <path d="M3 10.5 12 3l9 7.5"></path>
+                        <path d="M5.5 9.5V20h13V9.5"></path>
+                    </svg>
+                </span>
+            </a>
             <div class="auth">
                 <ThemeToggle/>
-                // Server-rendered pages behind capability guards, not Leptos
-                // routes — plain anchors so the browser does a full navigation
-                // and the guard actually runs.
-                <a href="/protected" class="auth-link">
-                    "Protected"
-                </a>
-                <a href="/manage" class="auth-link">
-                    "Manage"
-                </a>
-                <a href="/auth" class="auth-link">
-                    "Authenticate"
-                </a>
+                {nav_links()}
             </div>
         </header>
 
@@ -111,6 +118,81 @@ pub fn App() -> impl IntoView {
             </main>
         </Router>
     }
+}
+
+/// A top-bar destination and what a session must hold to be offered it.
+///
+/// `requires: None` is a page open to everyone. These are server-rendered pages
+/// behind real guards, not Leptos routes, so this table decides only what is
+/// *offered*: [`crate::auth::guard::require_capability`] re-checks on every
+/// request, and no amount of wrong here can widen what a session may reach.
+#[cfg(feature = "ssr")]
+struct NavLink {
+    href: &'static str,
+    label: &'static str,
+    requires: Option<Capability>,
+}
+
+#[cfg(feature = "ssr")]
+const NAV_LINKS: &[NavLink] = &[
+    NavLink {
+        href: "/protected",
+        label: "Protected",
+        requires: Some(Capability::TestAuth),
+    },
+    NavLink {
+        href: "/manage",
+        label: "Manage",
+        requires: Some(Capability::Manage),
+    },
+    NavLink {
+        href: "/auth",
+        label: "Authenticate",
+        requires: None,
+    },
+];
+
+/// The nav entries a holder of `capabilities` may open. `None` is anonymous.
+///
+/// A link the caller cannot follow is not hidden with CSS or dropped on the
+/// client — it is never rendered, so the markup carries no evidence that
+/// `/manage` exists. Absent capabilities mean absent links, so a missing
+/// session layer degrades to the signed-out nav rather than to an open one.
+#[cfg(feature = "ssr")]
+fn visible_nav(capabilities: Option<&CapabilitySet>) -> impl Iterator<Item = &'static NavLink> {
+    NAV_LINKS.iter().filter(move |link| match link.requires {
+        None => true,
+        Some(capability) => capabilities.is_some_and(|held| held.has(capability)),
+    })
+}
+
+/// The nav for this request, from the session
+/// [`crate::auth::guard::attach_session`] resolved before the render.
+#[cfg(feature = "ssr")]
+fn nav_links() -> leptos::prelude::AnyView {
+    use crate::auth::SessionContext;
+
+    let session = use_context::<axum::http::request::Parts>()
+        .and_then(|parts| parts.extensions.get::<SessionContext>().cloned());
+
+    visible_nav(session.as_ref().map(|session| &session.capabilities))
+        .map(|link| {
+            view! {
+                // Plain anchors, not <A>: a full navigation is what puts the
+                // request through the guard middleware.
+                <a href=link.href class="auth-link">
+                    {link.label}
+                </a>
+            }
+        })
+        .collect_view()
+        .into_any()
+}
+
+/// The nav is server-rendered chrome; the wasm bundle never builds it.
+#[cfg(not(feature = "ssr"))]
+fn nav_links() -> leptos::prelude::AnyView {
+    ().into_any()
 }
 
 #[component]
@@ -181,7 +263,7 @@ fn ThemeToggle() -> impl IntoView {
 #[component]
 fn HomePage() -> impl IntoView {
     view! {
-        <section class="home-hero">
+        <section class="viewport-center home-hero">
             <div class="home-card">
                 <h1>"Ronit Nath"</h1>
                 <p class="tagline">
@@ -235,11 +317,61 @@ fn HomePage() -> impl IntoView {
 #[component]
 fn AuthPage() -> impl IntoView {
     view! {
-        <div class="flex min-h-screen flex-col items-center justify-center gap-8 px-4">
+        <div class="viewport-center viewport-center-stack">
             <h1 class="home-title text-2xl font-semibold">"Authenticate"</h1>
             <LoginForm/>
             {dev_bypass_form()}
         </div>
+    }
+}
+
+#[cfg(all(test, feature = "ssr"))]
+mod nav_tests {
+    use super::*;
+    use crate::auth::MembershipRole;
+
+    fn labels(capabilities: Option<&CapabilitySet>) -> Vec<&'static str> {
+        visible_nav(capabilities).map(|link| link.label).collect()
+    }
+
+    #[test]
+    fn anonymous_is_offered_only_the_open_pages() {
+        assert_eq!(labels(None), ["Authenticate"]);
+    }
+
+    #[test]
+    fn a_fresh_registrant_is_not_offered_manage() {
+        // Registration mints Owner, which implies `test-auth` and not `manage`,
+        // so the account that just signed up must not be shown a door it would
+        // be turned away from.
+        let owner = CapabilitySet::resolve(MembershipRole::Owner, std::iter::empty());
+        assert_eq!(labels(Some(&owner)), ["Protected", "Authenticate"]);
+    }
+
+    #[test]
+    fn granting_manage_adds_its_link_and_nothing_else() {
+        let admin = CapabilitySet::resolve(MembershipRole::Admin, std::iter::empty());
+        assert_eq!(
+            labels(Some(&admin)),
+            ["Protected", "Manage", "Authenticate"]
+        );
+    }
+
+    #[test]
+    fn every_gated_link_names_a_capability_a_role_can_actually_hold() {
+        // A link gated on a capability no role implies and no grant creates
+        // would be permanently invisible — dead chrome that reads as a bug in
+        // the guard rather than as a typo here.
+        for link in NAV_LINKS {
+            let Some(required) = link.requires else {
+                continue;
+            };
+            assert!(
+                Capability::ALL.contains(&required),
+                "{} requires a capability outside Capability::ALL",
+                link.href
+            );
+        }
     }
 }
 

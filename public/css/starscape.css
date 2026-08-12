@@ -33,7 +33,6 @@
     --surface-glass-hover: color-mix(in oklab, var(--bg-subtle) 55%, transparent);
 
     --topbar-height: 4.45rem;
-    --hero-lift: calc(100dvh / 6);
 
     --accent: oklch(0.65 0.15 210);
     --accent-hover: oklch(0.72 0.15 210);

@@ -186,6 +186,17 @@ async fn main() {
         )
         .fallback(leptos_axum::file_and_error_handler(shell))
         .with_state(leptos_options)
+        // Resolve the session for everything above — the SSR pages — so the
+        // top-bar nav can offer only what this caller may open. It attaches a
+        // session and never refuses, so `/healthz`, `/readyz` and an anonymous
+        // home page are unaffected. Applied here rather than to the whole app
+        // because `auth::router`'s own guarded routes resolve the session
+        // themselves; merging after this layer is what keeps them from paying
+        // for it twice.
+        .layer(axum::middleware::from_fn_with_state(
+            auth_state.clone(),
+            rn_site::auth::guard::attach_session,
+        ))
         // Merged after `with_state` because the auth routes carry their own
         // `AuthState`; both sides are `Router<()>` by this point. Only this
         // side has a fallback, which is what keeps `merge` from panicking.
