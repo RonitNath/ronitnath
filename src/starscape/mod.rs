@@ -250,6 +250,121 @@ pub fn Starscape(epoch_ms: f64) -> impl IntoView {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde::Deserialize;
+
+    #[derive(Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct NamedStar {
+        bright_index: usize,
+        name: String,
+        constellation: String,
+        classification: String,
+        distance_ly: f64,
+    }
+
+    #[derive(Deserialize)]
+    struct NamedCatalog {
+        version: u8,
+        sources: Vec<String>,
+        stars: Vec<NamedStar>,
+    }
+
+    fn named_vectors() -> (NamedCatalog, Vec<[f64; 3]>) {
+        let catalog: NamedCatalog =
+            serde_json::from_str(include_str!("../../public/stars/named.json")).unwrap();
+        let bytes = include_bytes!("../../public/stars/bright.bin");
+        let count = u32::from_le_bytes(bytes[4..8].try_into().unwrap()) as usize;
+        let vectors = catalog
+            .stars
+            .iter()
+            .map(|star| {
+                assert!(star.bright_index < count, "{} index is in range", star.name);
+                let offset = 8 + star.bright_index * 20;
+                std::array::from_fn(|axis| {
+                    let start = offset + axis * 4;
+                    f32::from_le_bytes(bytes[start..start + 4].try_into().unwrap()) as f64
+                })
+            })
+            .collect();
+        (catalog, vectors)
+    }
+
+    fn annotation_kind(
+        vectors: &[[f64; 3]],
+        matrix: [f32; 9],
+        width: f64,
+        height: f64,
+    ) -> Option<&'static str> {
+        let aspect = width / height;
+        let mut fallback = false;
+        for [x, y, z] in vectors {
+            let vx = f64::from(matrix[0]) * x + f64::from(matrix[3]) * y + f64::from(matrix[6]) * z;
+            let vy = f64::from(matrix[1]) * x + f64::from(matrix[4]) * y + f64::from(matrix[7]) * z;
+            let vz = f64::from(matrix[2]) * x + f64::from(matrix[5]) * y + f64::from(matrix[8]) * z;
+            if vz <= 0.12 {
+                continue;
+            }
+            fallback = true;
+            let nx = vx / vz * 0.8391 / aspect;
+            let ny = vy / vz * 0.8391;
+            if nx.abs() <= 0.88 && ny.abs() <= 0.82 {
+                return Some("normal");
+            }
+        }
+        fallback.then_some("forced")
+    }
+
+    #[test]
+    fn named_catalog_is_structured_and_source_attributed() {
+        let (catalog, _) = named_vectors();
+        assert_eq!(catalog.version, 1);
+        assert!(catalog.stars.len() >= 50);
+        assert!(catalog.sources.iter().any(|source| source.contains("IAU")));
+        assert!(
+            catalog
+                .sources
+                .iter()
+                .any(|source| source.contains("SIMBAD"))
+        );
+        for star in catalog.stars {
+            assert!(!star.name.is_empty());
+            assert!(!star.constellation.is_empty());
+            assert!(!star.classification.is_empty());
+            assert!(star.distance_ly.is_finite() && star.distance_ly > 0.0);
+        }
+    }
+
+    #[test]
+    fn every_orbit_and_global_grid_view_has_desktop_and_mobile_annotation() {
+        let (_, vectors) = named_vectors();
+        let mut mobile_forced = 0;
+        for sample in 0..10_000 {
+            let sim_ms = SIM_EPOCH_MS + TRACK_PERIOD_MS * f64::from(sample) / 10_000.0;
+            let (lat, lon) = observer_at(sim_ms);
+            let matrix = view_matrix(sim_ms, lat, lon);
+            assert!(annotation_kind(&vectors, matrix, 2048.0, 1186.0).is_some());
+            let mobile = annotation_kind(&vectors, matrix, 390.0, 844.0);
+            assert!(mobile.is_some(), "mobile orbit gap at sample {sample}");
+            mobile_forced += usize::from(mobile == Some("forced"));
+        }
+        assert!(
+            mobile_forced > 0,
+            "coverage test must exercise the forced-label path"
+        );
+
+        let sim_ms = SIM_EPOCH_MS + 123_456_789.0;
+        for lat in (-90..=90).step_by(5) {
+            for lon in (-180..180).step_by(5) {
+                let matrix = view_matrix(sim_ms, f64::from(lat), f64::from(lon));
+                for (width, height) in [(2048.0, 1186.0), (390.0, 844.0)] {
+                    assert!(
+                        annotation_kind(&vectors, matrix, width, height).is_some(),
+                        "annotation gap at {lat}, {lon} for {width}x{height}",
+                    );
+                }
+            }
+        }
+    }
 
     #[test]
     fn sidereal_day_constant_matches_the_published_value() {

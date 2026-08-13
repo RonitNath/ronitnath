@@ -120,11 +120,13 @@ loss, plus globe tick gaps, heap usage (where the browser exposes it), and
 renderer geometry/texture/program counts. The telemetry is absent on ordinary
 page loads and retains at most 100 lifecycle events.
 
-The home page's named-star callouts use a curated 50-star Hipparcos/SIMBAD
-cross-match. Activating a callout or **Load StarScape** dynamically imports the
-celestial-atlas module; neither that module nor its Gaia LOD manifest is fetched
-before interaction. The atlas progressively adds the checked-in Gaia DR3
-`G<=9` and region-addressable `G<=12` assets under `public/stars/lod/`.
+The home page's named-star callouts use the structured, checked-in 50-star
+IAU/SIMBAD/Hipparcos catalog at `public/stars/named.json`. Activating a callout,
+choosing an observer on the globe, or pressing **Load StarScape** uses one lazy
+launch coordinator; neither the celestial-atlas module nor its Gaia LOD
+manifest is fetched before interaction. The atlas progressively adds the
+checked-in Gaia DR3 `G<=9` and region-addressable `G<=12` assets under
+`public/stars/lod/`.
 
 Refresh those generated assets explicitly with `python3 tools/build_star_lod.py`.
 The generator queries the official Gaia DR3 archive in bounded, resumable sky

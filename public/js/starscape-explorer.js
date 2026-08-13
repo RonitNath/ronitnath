@@ -42,7 +42,7 @@ function anglesToVector(ra,dec) { const c=Math.cos(dec); return [c*Math.cos(ra),
 async function catalog() {
   let buffer;
   if(window.__rnBrightCatalog instanceof Uint8Array){buffer=window.__rnBrightCatalog.buffer.slice(window.__rnBrightCatalog.byteOffset,window.__rnBrightCatalog.byteOffset+window.__rnBrightCatalog.byteLength);}
-  else {const response=await fetch("/stars/bright.bin");buffer=await response.arrayBuffer();}
+  else {const response=await fetch("/stars/bright.bin");if(!response.ok)throw new Error(`bright stars HTTP ${response.status}`);buffer=await response.arrayBuffer();}
   const view = new DataView(buffer);
   const count=view.getUint32(4,true), stars=new Array(count);
   for(let i=0;i<count;i++){const o=HEADER+i*STRIDE;stars[i]={p:[view.getFloat32(o,true),view.getFloat32(o+4,true),view.getFloat32(o+8,true)],m:view.getFloat32(o+12,true),c:[view.getUint8(o+16),view.getUint8(o+17),view.getUint8(o+18)]};}
@@ -64,14 +64,22 @@ export async function openStarScape(options) {
   if(active) return; const openedAt=Date.now(), node=shell(), canvas=node.querySelector("canvas"), ctx=canvas.getContext("2d",{alpha:false});
   document.documentElement.classList.add("starscape-explorer-open"); document.body.style.overflow="hidden";
   window.dispatchEvent(new Event("starscape-explorer-state"));
-  const api=window.__rnTrack, selected=options.selected;
+  const api=window.__rnTrack, selected=options.selected, observer=options.observer;
   let viewerSim=api?.syncedSimTimeMs?.(options.epochMs,options.clientMountMs,Date.now())||Date.now(), lastFrame=performance.now(), lastPaint=0;
   const currentMatrix=api?.viewMatrix?Array.from(api.viewMatrix(viewerSim)):null;
-  let fov=selected?20:115, center=selected?vectorToAngles(selected.pos):currentMatrix?vectorToAngles([currentMatrix[2],currentMatrix[5],currentMatrix[8]]):{ra:0,dec:Math.PI/2}, tracking=!!selected, paused=false, dragging=false, lastPointer=null, pinch=null, raf=0, disposed=false;
+  const initialForward=selected?.pos || (currentMatrix?.length===9?[currentMatrix[2],currentMatrix[5],currentMatrix[8]]:null);
+  let fov=selected?20:115, center=initialForward?vectorToAngles(initialForward):{ra:0,dec:Math.PI/2}, tracking=!!selected, paused=false, dragging=false, lastPointer=null, pinch=null, raf=0, disposed=false;
   const pointers=new Map();
-  const state=api.viewerState={open:true,paused:false,simMs:viewerSim,rate:60};
-  active={node}; telemetry("starscape-explorer-loading",{chunkReadyAtMs:Date.now(),selected:selected?.meta?.[1]||null});
-  const stars=await catalog(); node.querySelector(".explorer-loading").remove(); node.querySelector(".explorer-target").textContent=selected?`Tracking ${selected.meta[1]}`:"Celestial atlas";
+  const state=api.viewerState={open:true,paused:false,simMs:viewerSim,initialSimMs:viewerSim,rate:60,source:observer?"globe":selected?"annotation":"button",initialForward};
+  active={node}; telemetry("starscape-explorer-loading",{chunkReadyAtMs:Date.now(),selected:selected?.meta?.name||null});
+  let stars;
+  try {
+    stars=await catalog();
+  } catch(error) {
+    node.remove(); document.documentElement.classList.remove("starscape-explorer-open"); document.body.style.overflow=""; delete api.viewerState; active=null; window.dispatchEvent(new Event("starscape-explorer-state"));
+    throw error;
+  }
+  node.querySelector(".explorer-loading").remove(); node.querySelector(".explorer-target").textContent=selected?`Tracking ${selected.meta.name}`:observer?"Local zenith":"Celestial atlas";
   let manifest=null, mid=null, midLoadedAt=0, loadingMid=false;
   const tileCache=new Map(), tileControllers=new Map(), tileFailures=new Map();
   fetch("/stars/lod/manifest.json").then(r=>r.ok?r.json():null).then(value=>{if(value?.version!==1||!Array.isArray(value.tiles))return;manifest=value;requestLod();telemetry("starscape-lod-manifest",{tileCount:value.tiles.length});}).catch(()=>{});
@@ -118,6 +126,6 @@ export async function openStarScape(options) {
     // Magnitude bands are disjoint, preventing Gaia/base cross-match stars
     // from drawing on top of themselves: base <=6.5, mid (6.5,9], deep >9.
     const reduced=matchMedia("(prefers-reduced-motion: reduce)").matches;if(fov<=60&&mid){ctx.globalAlpha=reduced?1:Math.min(1,(now-midLoadedAt)/350);paintLod(mid,6.5);ctx.globalAlpha=1;}if(fov<=25)for(const id of wantedTiles()){const tile=tileCache.get(id);if(tile){tile.used=now;ctx.globalAlpha=reduced?1:Math.min(1,(now-tile.loadedAt)/350);paintLod(tile.data,9);ctx.globalAlpha=1;}}
-    state.visibleStars=count;if(!state.firstFrameAtMs){state.firstFrameAtMs=Date.now();telemetry("starscape-explorer-first-frame",{firstFrameAtMs:state.firstFrameAtMs,visibleStars:count,fov,rate:state.rate,paused});}else if(window.__rnTelemetry?.enabled){Object.assign(window.__rnTelemetry.explorer,{visibleStars:count,fov,rate:state.rate,paused});}raf=requestAnimationFrame(draw);};
+    state.visibleStars=count;if(!state.firstFrameAtMs){state.firstFrameAtMs=Date.now();telemetry("starscape-explorer-first-frame",{firstFrameAtMs:state.firstFrameAtMs,visibleStars:count,fov,rate:state.rate,paused,initialForward});requestAnimationFrame(()=>{if(!disposed)options.onReady?.();});}else if(window.__rnTelemetry?.enabled){Object.assign(window.__rnTelemetry.explorer,{visibleStars:count,fov,rate:state.rate,paused});}raf=requestAnimationFrame(draw);};
   raf=requestAnimationFrame(draw); telemetry("starscape-explorer-ready",{readyAtMs:Date.now(),loadMs:Date.now()-openedAt,starCount:stars.length});
 }

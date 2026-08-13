@@ -66,6 +66,26 @@ async fn load_and_run(
     )?;
     tick.forget();
 
+    // Globe launches promise that the location label changes before the
+    // explorer import can complete. The periodic refresh remains the normal
+    // orbit cadence; this event is the synchronous manual-selection seam.
+    let selected_catalog = Rc::clone(&catalog);
+    let selected_frozen = Rc::clone(&frozen_at);
+    let selected = Closure::<dyn FnMut()>::new(move || {
+        refresh(
+            &selected_catalog,
+            text,
+            server_epoch_ms,
+            client_mount_ms,
+            selected_frozen.get(),
+        );
+    });
+    window().add_event_listener_with_callback(
+        "starscape-observer-changed",
+        selected.as_ref().unchecked_ref(),
+    )?;
+    selected.forget();
+
     if let Some(media) = media {
         let changed_catalog = Rc::clone(&catalog);
         let changed_frozen = Rc::clone(&frozen_at);

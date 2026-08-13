@@ -257,6 +257,42 @@ pub fn install_track_api(server_epoch_ms: f64) {
     );
     set_manual.forget();
 
+    // Launch-time globe selection is not a camera flourish: the observer,
+    // marker, grounding label, and sky must agree before the lazy explorer
+    // module starts downloading. Keep the animated setter above for ordinary
+    // navigation, and expose this explicit synchronous contract for launches.
+    let set_immediate = Closure::<dyn Fn(f64, f64)>::new(|lat: f64, lon: f64| {
+        let Ok(api) = js_sys::Reflect::get(&js_sys::global(), &JsValue::from_str("__rnTrack"))
+        else {
+            return;
+        };
+        let point = js_sys::Object::new();
+        let _ = js_sys::Reflect::set(
+            &point,
+            &"lat".into(),
+            &JsValue::from_f64(lat.clamp(-90.0, 90.0)),
+        );
+        let _ = js_sys::Reflect::set(
+            &point,
+            &"lon".into(),
+            &JsValue::from_f64((lon + 180.0).rem_euclid(360.0) - 180.0),
+        );
+        let _ = js_sys::Reflect::set(&api, &"manualObserver".into(), &point);
+        let _ = js_sys::Reflect::set(&api, &"observerTransition".into(), &JsValue::NULL);
+        if let Ok(event) = web_sys::CustomEvent::new("starscape-observer-changed") {
+            let _ = web_sys::window().unwrap().dispatch_event(&event);
+        }
+        if let Ok(event) = web_sys::Event::new("starscape-redraw") {
+            let _ = web_sys::window().unwrap().dispatch_event(&event);
+        }
+    });
+    let _ = js_sys::Reflect::set(
+        &api,
+        &JsValue::from_str("setObserverImmediate"),
+        set_immediate.as_ref(),
+    );
+    set_immediate.forget();
+
     let resume = Closure::<dyn Fn()>::new(|| {
         if let Ok(api) = js_sys::Reflect::get(&js_sys::global(), &JsValue::from_str("__rnTrack")) {
             let viewer_sim = js_sys::Reflect::get(&api, &"viewerState".into())

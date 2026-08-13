@@ -128,6 +128,7 @@ function observeSize(el, globe) {
   let lastW = 0;
   let lastH = 0;
   let raf = 0;
+  let settleRaf = 0;
 
   const apply = () => {
     raf = 0;
@@ -138,6 +139,17 @@ function observeSize(el, globe) {
     lastW = w;
     lastH = h;
     globe.width(w).height(h);
+    const renderer = globe.renderer?.();
+    renderer?.setSize?.(w, h, false);
+    if (renderer?.domElement) {
+      renderer.domElement.style.width = `${w}px`;
+      renderer.domElement.style.height = `${h}px`;
+    }
+    const camera = globe.camera?.();
+    if (camera) {
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix?.();
+    }
   };
 
   const schedule = () => {
@@ -146,18 +158,31 @@ function observeSize(el, globe) {
   };
 
   apply();
+  // globe.gl applies its window-sized defaults during its first render. Reapply
+  // the measured component box afterward so the real pointer surface remains
+  // the same 120–160 px globe the user sees.
+  settleRaf = requestAnimationFrame(() => {
+    settleRaf = requestAnimationFrame(() => {
+      settleRaf = 0;
+      lastW = 0;
+      lastH = 0;
+      apply();
+    });
+  });
   if (typeof ResizeObserver === "function") {
     const ro = new ResizeObserver(schedule);
     ro.observe(el);
     return () => {
       ro.disconnect();
       if (raf) cancelAnimationFrame(raf);
+      if (settleRaf) cancelAnimationFrame(settleRaf);
     };
   }
   window.addEventListener("resize", schedule);
   return () => {
     window.removeEventListener("resize", schedule);
     if (raf) cancelAnimationFrame(raf);
+    if (settleRaf) cancelAnimationFrame(settleRaf);
   };
 }
 
@@ -167,24 +192,19 @@ export async function mountMiniGlobe(el, epochMs) {
   el.innerHTML = "";
   el.classList.remove("is-ready");
 
-  const requestStarScape = () => {
+  const requestStarScape = observer => {
     if (document.documentElement.classList.contains("starscape-explorer-open")) return;
-    if (typeof window.__rnOpenStarScape === "function") window.__rnOpenStarScape();
-    else window.dispatchEvent(new Event("starscape-open-request"));
-  };
-  const activateFromGlobe = event => {
-    if (document.documentElement.classList.contains("starscape-explorer-open")) return;
-    event.preventDefault();
-    requestStarScape();
+    const request = { source: "globe", observer };
+    if (typeof window.__rnLaunchStarScape === "function") window.__rnLaunchStarScape(request);
+    else {
+      window.__rnPendingStarScapeRequest = request;
+      window.dispatchEvent(new CustomEvent("starscape-open-request", { detail: request }));
+    }
   };
   el.setAttribute("aria-hidden", "false");
-  el.setAttribute("role", "button");
+  el.setAttribute("role", "application");
   el.setAttribute("tabindex", "0");
-  el.setAttribute("aria-label", "Open StarScape from the globe");
-  el.addEventListener("pointerdown", activateFromGlobe);
-  el.addEventListener("keydown", event => {
-    if (event.key === "Enter" || event.key === " ") activateFromGlobe(event);
-  });
+  el.setAttribute("aria-label", "Choose an observer location on the globe");
 
   await loadScript("/js/vendor/globe.gl.min.js");
   if (!window.Globe) {
@@ -219,7 +239,8 @@ export async function mountMiniGlobe(el, epochMs) {
     .atmosphereColor("#9bb7ff")
     .atmosphereAltitude(0.15)
     .globeImageUrl(DAY)
-    .bumpImageUrl(BUMP);
+    .bumpImageUrl(BUMP)
+    .enablePointerInteraction(true);
 
   if (typeof globe.specularImageUrl === "function") {
     globe.specularImageUrl(SPECULAR);
@@ -239,8 +260,7 @@ export async function mountMiniGlobe(el, epochMs) {
     .pointAltitude(0.02)
     .pointRadius(2.2)
     .pointsTransitionDuration(0)
-    .pointsMerge(false)
-    .enablePointerInteraction(false);
+    .pointsMerge(false);
 
   if (typeof globe.ringsData === "function") {
     globe
@@ -279,29 +299,55 @@ export async function mountMiniGlobe(el, epochMs) {
     if (typeof globe.ringsData === "function") {
       globe.ringsData([ring]);
     }
-    if (!document.documentElement.classList.contains("starscape-explorer-open")) {
+    if (!controlsEngaged) {
       globe.pointOfView({ lat: here.lat, lng: here.lng, altitude: 1.85 }, 400);
     }
     const currentApi = trackApi();
     resumeButton.hidden = !currentApi?.manualObserver || currentApi?.observerTransition?.clearAtEnd;
   };
 
-  const setInteractive = () => {
-    const open = document.documentElement.classList.contains("starscape-explorer-open");
-    globe.enablePointerInteraction(open);
-    el.setAttribute("aria-hidden", open ? "false" : "true");
-    telemetrySet("interactive", open);
-  };
   const controls = globe.controls?.();
-  const selectGlobeCenter = () => {
-    if (!document.documentElement.classList.contains("starscape-explorer-open")) return;
-    const pov = globe.pointOfView();
-    trackApi()?.setManualObserver?.(Number(pov.lat), Number(pov.lng));
+  let controlsEngaged = false;
+  let controlsChanged = false;
+  let suppressClick = false;
+  const selectObserver = observer => {
+    const selected = { lat: Number(observer.lat), lon: Number(observer.lng ?? observer.lon) };
+    trackApi()?.setObserverImmediate?.(selected.lat, selected.lon);
     resumeButton.hidden = false;
     telemetryEvent("globe-manual-observer-selected");
+    requestStarScape(selected);
   };
-  controls?.addEventListener?.("end", selectGlobeCenter);
-  window.addEventListener("starscape-explorer-state", setInteractive);
+  const dragStarted = () => {
+    controlsEngaged = true;
+    controlsChanged = false;
+    telemetrySet("dragging", true);
+  };
+  const dragChanged = () => {
+    if (controlsEngaged) controlsChanged = true;
+  };
+  const dragEnded = () => {
+    controlsEngaged = false;
+    telemetrySet("dragging", false);
+    if (!controlsChanged) return;
+    suppressClick = true;
+    const pov = globe.pointOfView();
+    selectObserver({ lat: pov.lat, lon: pov.lng });
+  };
+  controls?.addEventListener?.("start", dragStarted);
+  controls?.addEventListener?.("change", dragChanged);
+  controls?.addEventListener?.("end", dragEnded);
+  globe.onGlobeClick?.(coords => {
+    if (suppressClick) { suppressClick = false; return; }
+    selectObserver({ lat: coords.lat, lon: coords.lng });
+  });
+  const keyboardSelect = event => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    event.preventDefault();
+    const pov = globe.pointOfView();
+    selectObserver({ lat: pov.lat, lon: pov.lng });
+  };
+  el.addEventListener("keydown", keyboardSelect);
+  telemetrySet("interactive", true);
   window.addEventListener("starscape-observer-changed", () => {
     const currentApi = trackApi();
     resumeButton.hidden = !currentApi?.manualObserver || currentApi?.observerTransition?.clearAtEnd;
@@ -335,11 +381,12 @@ export async function mountMiniGlobe(el, epochMs) {
       disposed = true;
       stopObservingSize();
       document.removeEventListener("visibilitychange", visibilityChanged);
-      window.removeEventListener("starscape-explorer-state", setInteractive);
-      controls?.removeEventListener?.("end", selectGlobeCenter);
+      controls?.removeEventListener?.("start", dragStarted);
+      controls?.removeEventListener?.("change", dragChanged);
+      controls?.removeEventListener?.("end", dragEnded);
       window.removeEventListener("pageshow", pageShown);
       window.removeEventListener("pagehide", pageHidden);
-      el.removeEventListener("pointerdown", activateFromGlobe);
+      el.removeEventListener("keydown", keyboardSelect);
       globe._destructor?.();
       telemetryEvent("globe-disposed");
     }
@@ -349,7 +396,6 @@ export async function mountMiniGlobe(el, epochMs) {
   window.addEventListener("pagehide", pageHidden);
   if (document.hidden) pause();
   else resume(false);
-  setInteractive();
 
   return globe;
 }

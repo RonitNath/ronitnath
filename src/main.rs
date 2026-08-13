@@ -37,6 +37,7 @@ fn require_site_bundle(site_root: &std::path::Path) -> Result<(), String> {
         "js/starscape-explorer.js",
         "js/mini-globe.js",
         "stars/bright.bin",
+        "stars/named.json",
     ];
     let missing = REQUIRED
         .iter()
@@ -50,6 +51,40 @@ fn require_site_bundle(site_root: &std::path::Path) -> Result<(), String> {
             "site bundle is incomplete under {} (missing {}); run `cargo leptos build` or `cargo leptos watch`",
             site_root.display(),
             missing.join(", ")
+        ))
+    }
+}
+
+#[cfg(feature = "ssr")]
+fn require_fresh_site_assets(
+    public_root: &std::path::Path,
+    site_root: &std::path::Path,
+) -> Result<(), String> {
+    const CRITICAL: &[&str] = &[
+        "css/site.css",
+        "css/starscape.css",
+        "js/starscape-ui.js",
+        "js/starscape-explorer.js",
+        "js/mini-globe.js",
+        "stars/bright.bin",
+        "stars/named.json",
+    ];
+    let stale = CRITICAL
+        .iter()
+        .filter(|relative| {
+            let source = public_root.join(relative);
+            let generated = site_root.join(relative);
+            std::fs::read(source).ok() != std::fs::read(generated).ok()
+        })
+        .copied()
+        .collect::<Vec<_>>();
+    if stale.is_empty() {
+        Ok(())
+    } else {
+        Err(format!(
+            "generated site assets are stale ({}) under {}; run `cargo leptos build` or `cargo leptos watch`",
+            stale.join(", "),
+            site_root.display(),
         ))
     }
 }
@@ -237,6 +272,15 @@ async fn main() {
     let leptos_options = conf.leptos_options;
     require_site_bundle(std::path::Path::new(leptos_options.site_root.as_ref()))
         .expect("complete Leptos site bundle");
+    if app_config.mode == rn_site::operations::config::Mode::Dev
+        && std::path::Path::new("public").is_dir()
+    {
+        require_fresh_site_assets(
+            std::path::Path::new("public"),
+            std::path::Path::new(leptos_options.site_root.as_ref()),
+        )
+        .expect("fresh generated site assets");
+    }
 
     let db = db::open_and_migrate(&app_config)
         .await
@@ -454,7 +498,7 @@ pub fn main() {
 
 #[cfg(all(test, feature = "ssr"))]
 mod tests {
-    use super::{cache_policy, require_site_bundle};
+    use super::{cache_policy, require_fresh_site_assets, require_site_bundle};
 
     #[test]
     fn static_assets_revalidate_while_documents_and_apis_do_not_store() {
@@ -484,11 +528,39 @@ mod tests {
             "js/starscape-explorer.js",
             "js/mini-globe.js",
             "stars/bright.bin",
+            "stars/named.json",
         ] {
             let path = root.path().join(relative);
             std::fs::create_dir_all(path.parent().unwrap()).unwrap();
             std::fs::write(path, b"fixture").unwrap();
         }
         require_site_bundle(root.path()).unwrap();
+    }
+
+    #[test]
+    fn source_tree_dev_rejects_stale_generated_assets() {
+        let public = tempfile::tempdir().unwrap();
+        let site = tempfile::tempdir().unwrap();
+        for relative in [
+            "css/site.css",
+            "css/starscape.css",
+            "js/starscape-ui.js",
+            "js/starscape-explorer.js",
+            "js/mini-globe.js",
+            "stars/bright.bin",
+            "stars/named.json",
+        ] {
+            let source = public.path().join(relative);
+            let generated = site.path().join(relative);
+            std::fs::create_dir_all(source.parent().unwrap()).unwrap();
+            std::fs::create_dir_all(generated.parent().unwrap()).unwrap();
+            std::fs::write(source, b"current").unwrap();
+            std::fs::write(generated, b"current").unwrap();
+        }
+        require_fresh_site_assets(public.path(), site.path()).unwrap();
+        std::fs::write(site.path().join("js/starscape-ui.js"), b"old").unwrap();
+        let error = require_fresh_site_assets(public.path(), site.path()).unwrap_err();
+        assert!(error.contains("js/starscape-ui.js"));
+        assert!(error.contains("cargo leptos build"));
     }
 }

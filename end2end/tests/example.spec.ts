@@ -1,7 +1,7 @@
 import { test, expect } from "@playwright/test";
 
 test("homepage has title and starscape chrome", async ({ page }) => {
-  await page.goto("http://localhost:3000/");
+  await page.goto("http://127.0.0.1:3004/");
 
   await expect(page).toHaveTitle("Ronit Nath");
   await expect(page.locator("h1")).toHaveText("Ronit Nath");
@@ -22,7 +22,7 @@ test("homepage has title and starscape chrome", async ({ page }) => {
 });
 
 test("auth page has login form island", async ({ page }) => {
-  await page.goto("http://localhost:3000/auth");
+  await page.goto("http://127.0.0.1:3004/auth");
 
   await expect(page.locator("h1")).toHaveText("Authenticate");
   await expect(page.locator('input[type="email"]')).toBeVisible();

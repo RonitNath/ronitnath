@@ -319,6 +319,11 @@ body {
     color: var(--accent);
 }
 
+.starscape-launch:disabled {
+    cursor: default;
+    opacity: 0.78;
+}
+
 @keyframes star-callout-in {
     from { opacity: 0; transform: translateY(5px); }
     to { opacity: 1; transform: none; }
@@ -411,9 +416,12 @@ body {
     font-size: 0.7rem;
 }
 
+:root.starscape-explorer-open .topbar,
 :root.starscape-explorer-open .home-card,
-:root.starscape-explorer-open .star-annotations,
-:root.starscape-explorer-open .starscape-launch { visibility: hidden; }
+:root.starscape-explorer-open .star-annotations { visibility: hidden; }
+
+:root.starscape-explorer-open .starscape-controls { z-index: 24; }
+:root.starscape-explorer-open .starscape-launch { visibility: visible; }
 
 :root.starscape-explorer-open .sky-chrome {
     z-index: 23;
@@ -439,7 +447,14 @@ body {
 @media (max-width: 768px) {
     .explorer-target,
     .explorer-help { display: none; }
-    .explorer-bar { overflow-x: auto; }
+    .explorer-bar {
+        gap: 0.25rem;
+        padding-inline: 0.3rem;
+        overflow-x: auto;
+    }
+    .explorer-bar > strong { font-size: 0.9rem; }
+    .explorer-bar button { min-width: 38px; padding-inline: 0.3rem; }
+    .explorer-fov { min-width: 2.7rem; }
     .explorer-links { left: 0.75rem; right: auto; max-width: calc(100% - 1.5rem); overflow-x: auto; }
 }
 
