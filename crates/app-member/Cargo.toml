@@ -11,4 +11,7 @@ name = "rn-app"
 path = "src/main.rs"
 
 [dependencies]
+rn-api = { workspace = true }
+rn-ui = { workspace = true }
 leptos = { workspace = true, features = ["csr"] }
+leptos_router = { workspace = true }

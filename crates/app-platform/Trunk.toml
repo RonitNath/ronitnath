@@ -1,0 +1,7 @@
+# The server mounts this bundle's assets under /platform/pkg/ and serves the tier
+# shell for every path beneath /platform, so trunk builds and serves the same shapes.
+[build]
+public_url = "/platform/pkg/"
+
+[serve]
+serve_base = "/platform"
