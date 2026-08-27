@@ -4,6 +4,7 @@
 //! merge is a story about seven tables, and the tests that tell it belong
 //! beside each other.
 
+mod operator;
 mod proofs;
 mod signals;
 mod steps;

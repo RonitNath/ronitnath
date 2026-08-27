@@ -23,7 +23,7 @@ use crate::error::{Invalid, Outcome, decline};
 use crate::event::Committed;
 use crate::feed::Feed;
 use crate::ids::{self, Id, Identity, MatchCandidate, Person};
-use crate::store::{Reads, Sql, Value};
+use crate::store::{Count, Reads, Sql, Value};
 
 /// How long a ruling's evidence may be. Long enough for the paragraph an
 /// operator should write, short enough that the column is not a document store.
@@ -160,19 +160,37 @@ fn merged(
     batch.one(sql, params);
 }
 
-/// The `platform:* #operator @person` row, for a test or an operator seeding
-/// the first one. Not a command: K2's `SetRole` writes it in the ordinary way,
-/// and this is the bootstrap that has to exist before there is anybody to run
-/// that command.
+/// The `platform:* #operator @person` row. Not a command: `SetRole` writes it
+/// in the ordinary way, and this is the bootstrap that has to exist before
+/// there is anybody to run that command.
 pub const OPERATOR_SQL: &str = "INSERT OR IGNORE INTO relation \
      (object_kind, object_id, relation, subject_kind, subject_id, granted_by, at) \
      VALUES ('platform', 0, 'operator', 'person', $1, NULL, $2)";
 
-/// Grant `platform:* #operator` to a person.
+/// Whether this deployment has an operator at all.
+const ANY_OPERATOR_SQL: &str = "SELECT count(*) AS n FROM relation \
+     WHERE object_kind = 'platform' AND object_id = 0 AND relation = 'operator'";
+
+/// Grant `platform:* #operator` to a person — once, for the *first* operator.
+///
+/// The server's CLI reaches this as [`bootstrap_operator`](crate::bootstrap_operator).
+/// It writes no audit row and authorises nobody, which is exactly why it must
+/// not be a second, quieter `SetRole`: an unaudited grant is defensible as the
+/// act that creates the first operator out of nothing and indefensible as the
+/// act that creates the second. So it declines the moment any operator row
+/// exists, and from there administration is a command with an actor on it.
+///
+/// The check and the insert are two statements rather than one guarded
+/// `INSERT … WHERE NOT EXISTS`, because the answer wanted here is a refusal
+/// the caller can print, not a silent no-op.
 pub async fn make_operator<S: Sql>(
     store: &crate::store::Store<S>,
     person: Id<Person>,
 ) -> Outcome<()> {
+    let existing = store.query::<Count>(ANY_OPERATOR_SQL, bind![]).await?;
+    if existing.first().is_some_and(|row| row.0 > 0) {
+        return decline();
+    }
     let now = store.clock().now();
     store.execute(OPERATOR_SQL, bind![person, now]).await?;
     Ok(())

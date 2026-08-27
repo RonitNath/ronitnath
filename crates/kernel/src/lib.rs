@@ -50,6 +50,13 @@ pub mod testing;
 pub use error::{Decline, Invalid, KernelError, Outcome};
 pub use event::{Committed, Event};
 pub use ids::{Id, IdKey};
+/// Seed a deployment's first platform operator.
+///
+/// The bootstrap the server's CLI calls once, on an empty deployment: it
+/// declines if any `platform:* #operator` row already exists, because after
+/// the first one administration is `SetRole`, which has an actor and an audit
+/// row. See [`merge::rule::make_operator`].
+pub use merge::rule::make_operator as bootstrap_operator;
 pub use principal::{Principal, SubjectSet};
 pub use relation::{Object, Relation, Subject, SubjectKind, check};
 pub use store::{Migrations, ReadStore, Sql, Store};
