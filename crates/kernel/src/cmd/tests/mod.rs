@@ -4,10 +4,14 @@
 //! in, because a command's contract is a story about several tables and the
 //! test that tells it belongs beside the others about the same story.
 
+mod documents;
 mod factors;
 mod identity;
+mod orgs;
 mod sessions;
+mod sharing;
 mod status;
+mod world;
 
 /// What every file here needs. A prelude rather than eight repeated import
 /// blocks: these tests all reach for the same dozen names.
