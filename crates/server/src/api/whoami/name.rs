@@ -25,7 +25,7 @@ impl FromRow for Address {
     }
 }
 
-pub(super) async fn address_of(
+pub(crate) async fn address_of(
     reads: &impl Reads,
     identity: Id<Identity>,
 ) -> Outcome<Option<String>> {
@@ -43,7 +43,7 @@ pub(super) async fn address_of(
 /// part of one or two characters reveals nothing, because there the first and
 /// the last *are* the address; an identity with no address at all is not
 /// described as having one.
-pub(super) fn masked(address: Option<&str>) -> String {
+pub(crate) fn masked(address: Option<&str>) -> String {
     let Some(local) = address.map(|address| address.split('@').next().unwrap_or_default()) else {
         return "…".to_owned();
     };

@@ -12,6 +12,7 @@
 
 #![forbid(unsafe_code)]
 
+pub mod cluster;
 pub mod command;
 pub mod commands;
 pub mod ids;
@@ -21,6 +22,7 @@ pub mod whoami;
 #[cfg(test)]
 mod testing;
 
+pub use cluster::{ClusterView, RaftView, RaftViews};
 pub use command::{Command, CommandEnvelope, CommandReply, Decline};
 pub use ids::{IdKind, PublicId, PublicIdError};
 pub use sub::{DiffOp, QueryRef, SubMessage, SubRequest};

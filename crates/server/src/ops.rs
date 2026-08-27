@@ -34,14 +34,13 @@ async fn version(State(state): State<AppState>) -> String {
     state.version.to_string()
 }
 
-/// One raft group's membership as this node currently sees it.
-#[derive(Debug, Serialize, PartialEq, Eq)]
-pub struct RaftGroup {
-    pub healthy: bool,
-    pub voters: usize,
-    pub expected_voters: usize,
-    pub leader: Option<u64>,
-}
+/// One raft group's membership, and both groups together.
+///
+/// The shapes are `rn_api::cluster`'s: `/readyz` and the operator console's
+/// `GET /api/q/cluster` report the same two groups, so they report them in the
+/// same words. This module owns the *probe* ([`raft_groups`]); the vocabulary
+/// is on the wire, where both readers of it can see it.
+pub use rn_api::cluster::{RaftView as RaftGroup, RaftViews as RaftGroups};
 
 #[derive(Debug, Serialize)]
 pub struct Readiness {
@@ -51,65 +50,51 @@ pub struct Readiness {
     pub raft: RaftGroups,
 }
 
-/// Both groups, separately. A 503 that reported only `voters: 3` and said
-/// nothing about the cache raft is exactly the blind spot that made the first
-/// formation failure unreadable — the two groups have independent membership.
-#[derive(Debug, Serialize)]
-pub struct RaftGroups {
-    pub sqlite: RaftGroup,
-    pub cache: RaftGroup,
-}
-
-impl RaftGroups {
-    #[must_use]
-    pub fn ready(&self) -> bool {
-        self.sqlite.ready() && self.cache.ready()
-    }
-}
-
-impl RaftGroup {
-    #[must_use]
-    pub fn ready(&self) -> bool {
-        self.healthy && self.voters == self.expected_voters
+/// Ask both raft groups where they stand.
+///
+/// One probe, two readers: readiness turns it into a status code, and the
+/// platform console renders it. A second implementation of this would be a
+/// second opinion about the same cluster.
+pub async fn raft_groups(state: &AppState) -> RaftGroups {
+    let expected = db::expected_voters();
+    RaftGroups {
+        sqlite: RaftGroup {
+            healthy: state.db.is_healthy_db().await.is_ok(),
+            voters: state
+                .db
+                .metrics_db()
+                .await
+                .map(|metrics| metrics.membership_config.voter_ids().count())
+                .unwrap_or(0),
+            expected_voters: expected,
+            leader: state
+                .db
+                .metrics_db()
+                .await
+                .ok()
+                .and_then(|metrics| metrics.current_leader),
+        },
+        cache: RaftGroup {
+            healthy: state.db.is_healthy_cache().await.is_ok(),
+            voters: state
+                .db
+                .metrics_cache()
+                .await
+                .map(|metrics| metrics.membership_config.voter_ids().count())
+                .unwrap_or(0),
+            expected_voters: expected,
+            leader: state
+                .db
+                .metrics_cache()
+                .await
+                .ok()
+                .and_then(|metrics| metrics.current_leader),
+        },
     }
 }
 
 async fn readyz(State(state): State<AppState>) -> impl IntoResponse {
-    let expected = db::expected_voters();
-    let sqlite = RaftGroup {
-        healthy: state.db.is_healthy_db().await.is_ok(),
-        voters: state
-            .db
-            .metrics_db()
-            .await
-            .map(|metrics| metrics.membership_config.voter_ids().count())
-            .unwrap_or(0),
-        expected_voters: expected,
-        leader: state
-            .db
-            .metrics_db()
-            .await
-            .ok()
-            .and_then(|metrics| metrics.current_leader),
-    };
-    let cache = RaftGroup {
-        healthy: state.db.is_healthy_cache().await.is_ok(),
-        voters: state
-            .db
-            .metrics_cache()
-            .await
-            .map(|metrics| metrics.membership_config.voter_ids().count())
-            .unwrap_or(0),
-        expected_voters: expected,
-        leader: state
-            .db
-            .metrics_cache()
-            .await
-            .ok()
-            .and_then(|metrics| metrics.current_leader),
-    };
-
-    let raft = RaftGroups { sqlite, cache };
+    let raft = raft_groups(&state).await;
     let ready = raft.ready();
     (
         if ready {

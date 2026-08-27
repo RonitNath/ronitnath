@@ -6,6 +6,12 @@ use rn_site::config::AppConfig;
 use rn_site::{AppState, db, shutdown, telemetry};
 use tracing::info;
 
+/// The argument after `name` on the command line, if `name` is the subcommand.
+fn subcommand(name: &str) -> Option<String> {
+    let mut args = std::env::args().skip(1);
+    (args.next().as_deref() == Some(name)).then(|| args.next().unwrap_or_default())
+}
+
 #[tokio::main]
 async fn main() {
     let config = match AppConfig::load() {
@@ -38,6 +44,22 @@ async fn main() {
 
     let addr = config.addr;
     let state = AppState::new(db.clone(), config);
+
+    // `rn-site bootstrap-operator <email>` — the first operator, and nothing
+    // else: the kernel refuses once one exists (`rn_site::bootstrap`).
+    if let Some(email) = subcommand("bootstrap-operator") {
+        let outcome = rn_site::bootstrap::operator(&state, &email).await;
+        shutdown::close(db).await;
+        match outcome {
+            Ok(person) => println!("rn-site: {email} is now a platform operator ({person:?})"),
+            Err(error) => {
+                eprintln!("rn-site: {error}");
+                std::process::exit(1);
+            }
+        }
+        return;
+    }
+
     let app = rn_site::router(state.clone());
 
     let listener = match tokio::net::TcpListener::bind(addr).await {

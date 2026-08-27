@@ -39,7 +39,7 @@ use super::party::public_of;
 use crate::auth::session::Session;
 use crate::state::AppState;
 
-mod name;
+pub(crate) mod name;
 
 use name::{address_of, masked};
 

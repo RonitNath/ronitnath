@@ -16,6 +16,7 @@
 //! `GET /api/whoami` is the fourth and is not a query: it is the chrome's DTO,
 //! it takes no parameters and it is not subscribable.
 
+pub mod cluster;
 pub mod cmd;
 pub mod decline;
 pub mod origin;
@@ -35,6 +36,10 @@ pub fn router() -> Router<AppState> {
     Router::new()
         .merge(whoami::router())
         .merge(cmd::router())
+        // The literal segment before the capture: axum prefers the static
+        // match, so `/api/q/cluster` is the node's own account of itself and
+        // every other name is a row query.
+        .merge(cluster::router())
         .route("/api/q/{name}", get(read))
         .merge(crate::sub::router())
 }

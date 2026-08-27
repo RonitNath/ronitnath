@@ -280,12 +280,10 @@ impl Connection {
         for committed in events {
             for index in 0..self.queries.len() {
                 let subscribed = &self.queries[index];
-                let touch = subscribed.named.touched(
-                    &committed.event,
-                    &self.principal,
-                    key,
-                    &subscribed.params,
-                );
+                let touch =
+                    subscribed
+                        .named
+                        .touched(&committed, &self.principal, key, &subscribed.params);
                 if touch == Touch::None {
                     continue;
                 }

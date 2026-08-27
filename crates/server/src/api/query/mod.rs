@@ -22,6 +22,14 @@
 pub mod org;
 pub mod org_feed;
 pub mod org_rows;
+pub mod platform;
+mod platform_audit;
+mod platform_identities;
+mod platform_matches;
+mod platform_parties;
+mod platform_resources;
+mod platform_sessions;
+mod platform_statements;
 mod rows;
 
 use std::collections::BTreeMap;
@@ -30,10 +38,11 @@ use rn_api::{DiffOp, PublicId};
 use rn_kernel::domain::{FactorKind, Vocabulary};
 use rn_kernel::ids::IdKey;
 use rn_kernel::store::Reads;
-use rn_kernel::{Event, Outcome, Principal};
+use rn_kernel::{Committed, Event, Outcome, Principal};
 use serde_json::Value;
 
 pub use org::Touch;
+pub use platform::Platform;
 
 /// How many audit rows one page carries.
 pub const AUDIT_PAGE: usize = 100;
@@ -50,11 +59,13 @@ pub struct Row {
     pub value: Value,
 }
 
-/// The queries this leg serves.
+/// The queries this build serves.
 ///
-/// A closed set, not a registry: every one of them is `mine`, and a query that
-/// took an owner parameter would need an authorisation this enum's shape makes
-/// unnecessary. U2–U4 add their own alongside their pages.
+/// A closed set, not a registry. The first three are `mine` — the result set
+/// is bounded by the caller's own behaviour, so they need no authorisation
+/// beyond a session. [`Named::Platform`] is the other kind: the whole
+/// deployment, guarded by the operator relation re-read per request
+/// ([`platform::guard`]).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Named {
     /// The sessions of the acting identity — the device list.
@@ -77,6 +88,8 @@ pub enum Named {
     OrgInvitations,
     /// Its audit tail, forward-paginated by offset.
     OrgAudit,
+    /// A `/platform` query: the deployment, for a platform operator.
+    Platform(Platform),
 }
 
 /// Every query name this build serves, for the route matrix.
@@ -91,6 +104,16 @@ pub const ALL: &[Named] = &[
     Named::OrgDocuments,
     Named::OrgInvitations,
     Named::OrgAudit,
+    Named::Platform(Platform::Parties),
+    Named::Platform(Platform::Party),
+    Named::Platform(Platform::Identities),
+    Named::Platform(Platform::Identity),
+    Named::Platform(Platform::Sessions),
+    Named::Platform(Platform::Audit),
+    Named::Platform(Platform::Matches),
+    Named::Platform(Platform::Match),
+    Named::Platform(Platform::Resources),
+    Named::Platform(Platform::Resource),
 ];
 
 impl Named {
@@ -108,6 +131,7 @@ impl Named {
             Self::OrgDocuments => "org-documents",
             Self::OrgInvitations => "org-invitations",
             Self::OrgAudit => "org-audit",
+            Self::Platform(platform) => platform.as_str(),
         }
     }
 
@@ -130,21 +154,22 @@ impl Named {
 
     /// What an event did to this query's rows, for the socket.
     ///
-    /// The member tier's queries name the keys that moved; the organization's
-    /// answer in whole sets where an event cannot say which of its rows is
-    /// ours ([`org::touched`]).
+    /// One entry point for all three tiers. The identity-scoped and platform
+    /// queries name the keys that moved ([`Named::changed`]); the
+    /// organization's answer in whole sets where an event cannot say which of
+    /// its rows is ours ([`org::touched`]).
     #[must_use]
     pub fn touched(
         self,
-        event: &Event,
+        committed: &Committed,
         principal: &Principal,
         key: &IdKey,
         params: &Params,
     ) -> Touch {
         if self.is_org() {
-            return org::touched(self, event, key, params);
+            return org::touched(self, &committed.event, key, params);
         }
-        match self.changed(event, principal, key) {
+        match self.changed(committed, principal, key) {
             keys if keys.is_empty() => Touch::None,
             keys => Touch::Keys(keys),
         }
@@ -164,7 +189,13 @@ impl Named {
     /// must never *miss* one, which is why the arms match on the event's
     /// subject rather than on its name alone.
     #[must_use]
-    pub fn changed(self, event: &Event, principal: &Principal, key: &IdKey) -> Vec<String> {
+    pub fn changed(self, committed: &Committed, principal: &Principal, key: &IdKey) -> Vec<String> {
+        // The platform queries are the deployment's, not the caller's, so the
+        // "is this event mine" test below does not apply to them.
+        if let Self::Platform(platform) = self {
+            return platform.changed(committed, key);
+        }
+        let event = &committed.event;
         let Some(mine) = principal.identity() else {
             return Vec::new();
         };
@@ -190,7 +221,9 @@ impl Named {
             (Self::Identities, _) => Vec::new(),
             (Self::Audit, _) => Vec::new(),
             // An organization's rows are not the acting identity's, so they
-            // are decided by `org::touched` and never reach here.
+            // are decided by `org::touched`; the platform's were answered
+            // above, before the caller's own identity was consulted. Neither
+            // reaches here.
             _ => Vec::new(),
         }
     }
@@ -209,6 +242,15 @@ pub struct Params {
     pub group: Option<PublicId>,
     /// `org-audit`: show only this command. Empty means all of them.
     pub command: Option<String>,
+    /// A `/platform` drill-in's subject: the public id of the row it opened.
+    ///
+    /// Text rather than an integer, and safe to take undecoded: a public id is
+    /// a prefix over base64url, which has nothing a percent-decoder would
+    /// change. It is validated by decryption before it reaches a statement
+    /// (`platform::subject`), so a forged one addresses nothing.
+    pub subject: Option<String>,
+    /// `platform-audit`: the offset to walk backwards from.
+    pub before: Option<u64>,
 }
 
 impl Params {
@@ -226,6 +268,8 @@ impl Params {
                 "org" => params.org = value.parse().ok(),
                 "group" => params.group = value.parse().ok(),
                 "command" => params.command = command_name(value),
+                "subject" => params.subject = Some(value.to_owned()),
+                "before" => params.before = value.parse().ok(),
                 _ => {}
             }
         }
@@ -260,6 +304,9 @@ pub async fn read(
     if query.is_org() {
         return org::read(reads, query, principal, params).await;
     }
+    if let Named::Platform(platform) = query {
+        return platform::read(reads, platform, principal, params).await;
+    }
     let Some(identity) = principal.identity() else {
         return Ok(Vec::new());
     };
@@ -268,7 +315,7 @@ pub async fn read(
         Named::Sessions => rows::sessions(reads, identity, principal, key).await,
         Named::Identities => rows::identities(reads, identity, principal, key).await,
         Named::Audit => rows::audit(reads, identity, params).await,
-        // Every organization query returned above.
+        // Every organization and platform query returned above.
         _ => Ok(Vec::new()),
     }
 }
@@ -427,29 +474,61 @@ mod tests {
             acting_as: Id::new(2),
             session: Id::new(3),
         };
-        let theirs = Event::SignedIn {
-            identity: Id::new(99),
-            session: Id::new(98),
+        let theirs = Committed {
+            offset: 9,
+            event: Event::SignedIn {
+                identity: Id::new(99),
+                session: Id::new(98),
+            },
         };
         assert!(Named::Sessions.changed(&theirs, &mine, &key).is_empty());
         assert!(Named::Identities.changed(&theirs, &mine, &key).is_empty());
 
-        let ours = Event::SignedIn {
-            identity: Id::new(1),
-            session: Id::new(4),
+        let ours = Committed {
+            offset: 10,
+            event: Event::SignedIn {
+                identity: Id::new(1),
+                session: Id::new(4),
+            },
         };
         assert_eq!(Named::Sessions.changed(&ours, &mine, &key).len(), 1);
         assert!(Named::Identities.changed(&ours, &mine, &key).is_empty());
     }
 
+    /// The member queries. The platform ones are the deployment's rather than
+    /// the caller's, so "whose event is it" does not narrow them.
+    const MINE: &[Named] = &[Named::Sessions, Named::Identities, Named::Audit];
+
+    #[test]
+    fn a_platform_query_is_guarded_on_the_read_and_not_in_the_diff() {
+        // `changed` names keys for anybody, because it cannot ask the database
+        // whether this principal holds the operator relation. `read` can, and
+        // does, on every request — which is what `platform::guard` is and what
+        // `platform_queries_decline_everyone_but_an_operator` proves over HTTP.
+        let key = IdKey::from_hex("000102030405060708090a0b0c0d0e0f").expect("a test key");
+        let event = Committed {
+            offset: 12,
+            event: Event::Registered {
+                identity: Id::new(1),
+                person: Id::new(2),
+                session: Id::new(3),
+            },
+        };
+        let named = Named::Platform(Platform::Parties);
+        assert_eq!(named.changed(&event, &Principal::Anonymous, &key).len(), 1);
+    }
+
     #[test]
     fn an_anonymous_principal_has_no_rows_to_move() {
         let key = IdKey::from_hex("000102030405060708090a0b0c0d0e0f").expect("a test key");
-        let event = Event::SignedIn {
-            identity: Id::new(1),
-            session: Id::new(2),
+        let event = Committed {
+            offset: 11,
+            event: Event::SignedIn {
+                identity: Id::new(1),
+                session: Id::new(2),
+            },
         };
-        for query in ALL {
+        for query in MINE {
             assert!(
                 query
                     .changed(&event, &Principal::Anonymous, &key)

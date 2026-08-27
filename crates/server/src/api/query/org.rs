@@ -119,8 +119,8 @@ pub async fn read(
         Named::OrgDocuments => org_feed::documents(reads, scope).await,
         Named::OrgInvitations => org_feed::invitations(reads, scope, params).await,
         Named::OrgAudit => org_feed::audit(reads, scope, params).await,
-        // The member tier's queries never reach here.
-        Named::Sessions | Named::Identities | Named::Audit => Ok(Vec::new()),
+        // The member and platform tiers' queries never reach here.
+        Named::Sessions | Named::Identities | Named::Audit | Named::Platform(_) => Ok(Vec::new()),
     }
 }
 
@@ -193,7 +193,7 @@ pub fn touched(query: Named, event: &Event, key: &IdKey, params: &Params) -> Tou
             Event::SignedIn { .. } | Event::SignedOut { .. } => Touch::None,
             _ => Touch::Set,
         },
-        Named::Sessions | Named::Identities | Named::Audit => Touch::None,
+        Named::Sessions | Named::Identities | Named::Audit | Named::Platform(_) => Touch::None,
     }
 }
 
