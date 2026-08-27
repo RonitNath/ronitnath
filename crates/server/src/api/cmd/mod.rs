@@ -46,15 +46,20 @@ use rn_kernel::Offset;
 /// The kind says what the function returns and therefore what the reply does
 /// with the secret it minted: `plain` nothing, `minting` a new session cookie,
 /// `ending` the caller's own, `linking` a bearer link handed back in the reply
-/// body because a link has no other name, and `quiet` a command that returns a
-/// secret this route deliberately drops.
+/// body because a link has no other name, `secreting` a client secret on the
+/// same terms, and `quiet` a command that returns a secret this route
+/// deliberately drops.
 ///
-/// `quiet` is the OpenID Provider's. `register-client` hands back a client
-/// secret, `authorize` a code, `exchange-code` and its neighbours a token
-/// pair — and every one of those is read only by the `/oidc/*` endpoint that
-/// called the kernel directly. Bound here, the reply is the event and nothing
-/// else, so the vocabulary stays one list without this route becoming a second
-/// way to mint an OpenID secret.
+/// The split between the last two is the whole rule. A **client secret** has
+/// no other name and no other moment: the operator who registered the relying
+/// party is the one who has to be handed it, the row keeps only its SHA-256,
+/// and there is nowhere else it exists — exactly the argument that puts an
+/// invitation's token in a reply. A **code** or a **token pair** is the
+/// opposite: it belongs to the relying party at the `/oidc/*` endpoint that
+/// called the kernel directly, and a caller reaching it through `/api/cmd`
+/// with a cookie has no business being handed one. So those are bound `quiet`
+/// — the vocabulary stays one list, and this route does not become a second
+/// way to mint an OpenID *protocol* secret.
 macro_rules! bindings {
     ($($kind:ident $args:ty => $run:path),+ $(,)?) => {
         /// The command names this build executes. Everything else in
@@ -92,6 +97,9 @@ macro_rules! bindings {
     };
     (@run linking $ctx:ident, $run:path, $args:expr) => {
         $run(&$ctx, &$args).await.map(Executed::linking).map_err(CommandError::Kernel)
+    };
+    (@run secreting $ctx:ident, $run:path, $args:expr) => {
+        $run(&$ctx, &$args).await.map(Executed::secreting).map_err(CommandError::Kernel)
     };
     (@run quiet $ctx:ident, $run:path, $args:expr) => {
         $run(&$ctx, &$args).await.map(|out| Executed::of(out.committed)).map_err(CommandError::Kernel)
@@ -132,9 +140,9 @@ bindings! {
     plain Enable => cmd::enable,
     // The OpenID Provider.
     plain SetHandle => cmd::set_handle,
-    quiet RegisterClient => cmd::register_client,
+    secreting RegisterClient => cmd::register_client,
     plain UpdateClient => cmd::update_client,
-    quiet RotateClientSecret => cmd::rotate_client_secret,
+    secreting RotateClientSecret => cmd::rotate_client_secret,
     plain DeleteClient => cmd::delete_client,
     plain RotateSigningKey => cmd::rotate_signing_key,
     quiet Authorize => cmd::authorize,

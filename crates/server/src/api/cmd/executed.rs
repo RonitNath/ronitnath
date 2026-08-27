@@ -41,6 +41,14 @@ pub struct Executed {
     /// A freshly minted *link* secret, on the same terms: `Invite` and nothing
     /// else, once, and never on a replay.
     pub link: Option<Token>,
+    /// A freshly minted *client* secret, on the same terms again.
+    ///
+    /// It rides back for the reason a link token does: it has no other name.
+    /// An operator who registers a relying party has to be handed its secret,
+    /// there is nowhere else it exists, and the row keeps only its SHA-256. It
+    /// is a *different field* from the link so that the reply cannot grow one
+    /// way to emit either by accident.
+    pub client_secret: Option<Token>,
     /// Whether the caller's own session is now gone.
     pub ended: bool,
 }
@@ -51,6 +59,18 @@ impl Executed {
             committed,
             token: None,
             link: None,
+            client_secret: None,
+            ended: false,
+        }
+    }
+
+    /// A command that registered or re-secreted a client.
+    pub(super) fn secreting(registered: rn_kernel::cmd::Registered) -> Self {
+        Self {
+            committed: registered.committed,
+            token: None,
+            link: None,
+            client_secret: registered.secret,
             ended: false,
         }
     }
@@ -60,6 +80,7 @@ impl Executed {
             committed: minted.committed,
             token: minted.token,
             link: None,
+            client_secret: None,
             ended: false,
         }
     }
@@ -72,6 +93,7 @@ impl Executed {
             committed: minted.committed,
             token: None,
             link: minted.token,
+            client_secret: None,
             ended: false,
         }
     }
@@ -81,6 +103,7 @@ impl Executed {
             committed,
             token: None,
             link: None,
+            client_secret: None,
             ended: true,
         }
     }
@@ -125,6 +148,9 @@ impl Executed {
         let mut result = result_of(&self.committed.event, key, party);
         if let (Some(link), Some(fields)) = (&self.link, result.as_object_mut()) {
             fields.insert("token".to_owned(), link.expose().into());
+        }
+        if let (Some(secret), Some(fields)) = (&self.client_secret, result.as_object_mut()) {
+            fields.insert("client_secret".to_owned(), secret.expose().into());
         }
         CommandReply {
             offset: self.committed.offset,

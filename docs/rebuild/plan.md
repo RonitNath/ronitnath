@@ -25,20 +25,31 @@ SignOut, RevokeSession, ActAs, AddFactor, RemoveFactor, VerifyEmail, CreateOrgan
 CreateGroup, Invite (mint link), RevokeLink, ClaimLink, SetRole, RemoveMember, Leave, Share, Revoke,
 Transfer, CreateDocument, EditDocument, PublishDocument, ProposeMatch,
 ConfirmMatch (self-link merge), RuleMatch (operator merge with evidence),
-Split, Disable, Enable. One transaction each, audit row inside, typed event
-appended to the change feed.
+Split, Disable, Enable — and the OpenID Provider's thirteen (leg O1):
+SetHandle, RegisterClient, UpdateClient, RotateClientSecret, DeleteClient,
+RotateSigningKey, Authorize, ExchangeCode, RefreshToken, ClientCredentials,
+RevokeToken, RevokeConsent, EndSession. Forty-one in all
+(`rn_api::commands::ALL_COMMAND_NAMES`). One transaction each, audit row
+inside, typed event appended to the change feed.
 
 Trust boundaries (engineering.md surface taxonomy): `public` (landing, public
 pages, `/auth`, `/links/<token>` claim page, ops routes, static assets);
 `browser-session` (cookie; `/app`, `/org`, `/platform` shells, `/api/*`);
 `recipient/embed` (bearer link — only the claim page and the public RSVP-shaped
-command); `service-principal` — none in this cut (the `service` party kind
-exists in the schema, no route accepts it). A bearer never enters `/api/*`; a
+command); `openid-provider` (`/oidc/*` and `/.well-known/*`, leg O1 — the
+cookie reaches its two decision pages, a bearer *access token* reaches
+`/oidc/userinfo` and `/oidc/revoke` and nothing under `/api/*`, and a client
+credential reaches its token endpoint); `service-principal` — one route now
+accepts one, `client_credentials` at `/oidc/token`, which mints a token whose
+principal is a client's own `service` party. What that party may *do* is
+whatever relations somebody granted it: being a service confers nothing. A bearer never enters `/api/*`; a
 cookie never satisfies a bearer route.
 
 Non-goals for this cut (backlog, absent from code): the hiqlite multi-raft
-fork, Zenoh, the commitlog state machine, Loro, zone migration, passkeys/OIDC
-factors beyond the schema column, events/calendar/photos products, `/metrics`.
+fork, Zenoh, the commitlog state machine, Loro, zone migration, passkeys and *inbound*
+OIDC factors beyond the schema column — this deployment is an OpenID
+*Provider* (leg O1, `docs/oidc.md`) and is nobody's relying party —
+events/calendar/photos products, `/metrics`.
 The fabric seam is a trait (`kernel::feed::Feed`) implemented on hiqlite
 listen/notify today so rung 6 swaps transport without touching callers. Email
 factors are unique deployment-wide (`factor_email_unique_idx`); source-scoped
@@ -106,16 +117,30 @@ at 600 without a written justification; no `utils`/`common` dumping grounds.
 Schema exactly as the report's §Schema; ids: internal `id` INTEGER never
 serialized, `public_id` = type-prefixed encrypted id (AES-128 of
 `table_tag ‖ rowid`, base64url, 22 chars, prefix `p_ i_ o_ g_ r_ …`) derived,
-no column, key from config; `link.token` and `session.token` are random
-256-bit bearer secrets stored as SHA-256. Relation vocabulary: `viewer <
+no column, key from config; `link.token`, `session.token`, an authorization code, a client secret and an
+access or refresh token are random 256-bit bearer secrets stored as SHA-256.
+Id prefixes: `p_ i_ o_ g_ v_ r_ s_ f_ m_ c_ l_` — `c_` is an `oidc_client`,
+and a client's public id *is* its `client_id`. Relation vocabulary: `viewer <
 commenter < editor` on documents; `member < admin < owner` on organizations and
 groups; `contact` (person #contact @group); `operator` (platform:* #operator
-@person). Nesting in code. `check()` is one indexed query over the expanded
+@person); `authorized` (oidc_client:X #authorized @person — OpenID consent, so
+"has this person agreed" is `check()` and not a second authorisation path).
+Nesting in code. `check()` is one indexed query over the expanded
 subject set. Groups never own; persons and organizations own; `Transfer` is
 the only *command* that changes an owner — a merge moves
 `resource.owner_party_id` and the `#owner` row onto the survivor, and `Split`
 moves them back, because there the owner is not changing, the person is. Product tables reference `identity_id`, never
-`person_id`.
+`person_id`. The Provider's five columns that name a person are kernel columns
+and say why, in `crates/kernel/tests/merge_properties.rs`: what an OpenID
+client is told about is a human, and merging stays cheap because a `sub`
+resolves through `person_alias` and a code and a token are bound to a session,
+which binds an identity.
+
+**`sub` is not an id.** It is 256 random bits, pairwise by the client's
+*owner*, minted once and never rotated — see `docs/oidc.md`. A person's
+`handle` (`preferred_username`) is the one human-chosen name in the model:
+unique deployment-wide, changeable, and never freed, because a handle that
+changed hands is an impersonation waiting to happen.
 
 Statuses are projections: `party.status ∈ active|disabled|merged`,
 `identity.status ∈ active`, `session` has no status (row = live),
@@ -140,6 +165,7 @@ rots.
 ## API (binding)
 
 - `GET /api/whoami` → `{ identity: {public_id, display}, person?: {public_id, display},
+  handle?: <preferred_username>,
   acting_as: {kind, public_id, display}, tiers: [member|org|platform],
   organizations: [{public_id, display, role}], session_expires_at }`. Never emails,
   never internal ids, never roles beyond what the chrome renders.
@@ -167,6 +193,22 @@ rots.
   change feed, plus `{ resync }` after a release mismatch; heartbeat 25 s.
 - Auth pages are askama forms posting to `/auth/register`, `/auth/sign-in`,
   `/auth/sign-out`; cookie `rn_session` HttpOnly, Secure in prod, SameSite=Lax.
+- **The OpenID Provider** (leg O1, `docs/oidc.md`) is its own surface and its
+  own router (`rn_site::oidc::router()`), mountable whole by a downstream
+  deployment: `GET /.well-known/openid-configuration` and
+  `/.well-known/oauth-authorization-server` (the same document);
+  `GET|POST /oidc/authorize` (the cookie, and a consent page); `POST
+  /oidc/token` (a client credential, never a cookie); `GET|POST
+  /oidc/userinfo` and `POST /oidc/revoke` (a bearer *access token* — the only
+  two routes in the deployment that take one, and it reaches nothing under
+  `/api/*`); `GET /oidc/jwks` (public, `public, max-age=300`, the only
+  cacheable responses on the surface besides assets); `GET|POST
+  /oidc/end_session`. Config: `RN_SITE__PUBLIC_ORIGIN` (the issuer, exactly),
+  `RN_SITE__OIDC_KEY[_FILE]` (seals the signing keys, and is *not* the id
+  key), `RN_SITE__PUBLIC_NAME` (what a page calls this deployment).
+- Queries the Provider adds: `oidc-clients` and `oidc-tokens` (a platform
+  operator's; the second is a drill-in on a session) and `authorizations` (the
+  reader's own).
 - Shells: `GET /app`, `/org`, `/platform` (+ any sub-path) serve the tier's
   askama shell only if the principal holds that tier; otherwise 404 for
   `/platform`, redirect to `/auth?next=` for the others when anonymous, 404 when
@@ -188,6 +230,8 @@ the reviewer's machine — why.
 | GET never writes | type-level (`ReadStore`) + `cargo test -p rn-site read_store_has_no_execute` | fast | review.md §Negative space |
 | bundles build | `trunk build --release` for each bundle; `cargo check --target wasm32-unknown-unknown -p rn-api -p rn-ui -p rn-app -p rn-org -p rn-platform -p rn-starscape` | fast | review.md §Acceptance |
 | size gates | `tools/size-gate.sh` (≤200 root, warn 350, fail 600) | fast | review.md §Size gates |
+| the OpenID Provider | `cargo test -p rn-site --test oidc` — an in-repo relying party through the whole flow (discovery → authorize → code → token → id token validated against the JWKS → userinfo → refresh → revoke → sign-out with a back-channel receipt), plus the negative space and a `private_key_jwt` replay | fast | review.md §OpenID Provider |
+| the Provider, against a real RP | `tools/oidc-rp.sh` — `oauth2-proxy` against `just run-dev`, clicked through by hand | release | `docs/review/o1/` |
 | golden flows | `end2end/` playwright, `--workers=1 --project=chromium` against a node seeded by `tools/seed.sh`: register → org → group → invite → claim (second browser) → share doc → live diff arrives; merge two self-registered identities; operator ruling; revoke session kills the other tab | release | review.md §Golden flows |
 | visual | agent-browser screenshots of every SPA route and askama page, both themes, 1440 and 390 wide, viewed | release | review.md §Visual conformance |
 | performance | `cargo bench -p rn-kernel` against budgets in the kernel report; `tools/perf/run.sh` (oha + samply on a 3-node local cluster) → `docs/perf/<date>.md` | release | `docs/perf/2026-08-27.md`, `docs/perf/2026-08-27-f5.md`; verified against their raw evidence in review.md §Performance |

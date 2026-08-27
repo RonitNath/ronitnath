@@ -132,6 +132,40 @@ a.commit:hover {
     font-size: var(--text-1);
 }
 
+/* The scopes a client is asking for. Rows, not a bulleted list: the reader is
+ * deciding about three things, and a bullet is a typographic claim that they
+ * are items in an argument. */
+.claim .scopes {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 0.35rem;
+    color: var(--fg);
+}
+
+/* Allow and Deny on one line, and not as peers. The commit is the button; the
+ * refusal is a word beside it, which is what "quiet" means everywhere else on
+ * this sheet. */
+.claim .decision {
+    display: flex;
+    align-items: center;
+    gap: 1.25rem;
+    margin-top: 0.5rem;
+}
+
+.claim .decision .quiet {
+    padding: 0.35rem 0;
+    font-size: var(--text-2);
+    color: var(--fg-muted);
+    cursor: pointer;
+    text-decoration: none;
+}
+
+.claim .decision .quiet:hover {
+    color: var(--fg);
+}
+
 @media (max-width: 30rem) {
     body {
         place-items: start center;
