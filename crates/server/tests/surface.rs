@@ -342,16 +342,19 @@ fn every_route_has_a_matrix_row() {
 /// Every `.route("…"` literal under `crates/server/src`.
 fn routes_in_source() -> BTreeSet<String> {
     let mut found = BTreeSet::new();
-    walk(std::path::Path::new("src"), &mut |source: &str| {
-        let source = code_only(source);
-        let mut rest = source.as_str();
-        while let Some(at) = rest.find(".route(\"") {
-            rest = &rest[at + ".route(\"".len()..];
-            if let Some(end) = rest.find('"') {
-                found.insert(rest[..end].to_owned());
+    walk(
+        std::path::Path::new("src"),
+        &mut |_path: &std::path::Path, source: &str| {
+            let source = code_only(source);
+            let mut rest = source.as_str();
+            while let Some(at) = rest.find(".route(\"") {
+                rest = &rest[at + ".route(\"".len()..];
+                if let Some(end) = rest.find('"') {
+                    found.insert(rest[..end].to_owned());
+                }
             }
-        }
-    });
+        },
+    );
     assert!(
         found.len() > 10,
         "the source scan found almost nothing ({found:?}); it is not reading the tree"
@@ -375,16 +378,40 @@ fn code_only(source: &str) -> String {
         .join("\n")
 }
 
-fn walk(dir: &std::path::Path, each: &mut impl FnMut(&str)) {
+fn walk(dir: &std::path::Path, each: &mut impl FnMut(&std::path::Path, &str)) {
     let entries = std::fs::read_dir(dir).unwrap_or_else(|error| panic!("{dir:?}: {error}"));
     for entry in entries.flatten() {
         let path = entry.path();
         if path.is_dir() {
             walk(&path, each);
         } else if path.extension().is_some_and(|ext| ext == "rs") {
-            each(&std::fs::read_to_string(&path).expect("a source file"));
+            let source = std::fs::read_to_string(&path).expect("a source file");
+            each(&path, &source);
         }
     }
+}
+
+/// Every crate's `src`, which is what "in the tree" means.
+///
+/// The suite runs with `crates/server` as its working directory, so the
+/// workspace's crates are one level up. Read from the filesystem rather than
+/// from a list: a crate added next leg is walked without anybody remembering
+/// to add it here.
+fn every_crate_src() -> Vec<std::path::PathBuf> {
+    let crates = std::path::Path::new("..");
+    let mut roots: Vec<_> = std::fs::read_dir(crates)
+        .expect("the workspace's crates directory")
+        .flatten()
+        .map(|entry| entry.path().join("src"))
+        .filter(|src| src.is_dir())
+        .collect();
+    roots.sort();
+    assert!(
+        roots.len() >= 8,
+        "only {} crate(s) found; the walk is looking in the wrong place",
+        roots.len()
+    );
+    roots
 }
 
 #[test]
@@ -601,24 +628,26 @@ fn negative_space() {
 #[test]
 fn the_deleted_vocabulary_is_gone_from_the_tree() {
     let mut found = Vec::new();
-    walk(std::path::Path::new("src"), &mut |source: &str| {
-        // Comments are stripped first. The deleted model is discussed in prose
-        // all over this tree — that is the record of the decision, and it is
-        // the *symbols* that must be gone.
-        let code = code_only(source);
-        for word in [
-            "capability",
-            "resource_grants",
-            "manage",
-            "dev_bypass",
-            "realtime",
-        ] {
-            if code.contains(word) {
-                found.push(word);
+    for root in every_crate_src() {
+        walk(&root, &mut |path: &std::path::Path, source: &str| {
+            // Comments are stripped first. The deleted model is discussed in
+            // prose all over this tree — that is the record of the decision,
+            // and it is the *symbols* that must be gone.
+            let code = code_only(source);
+            for word in [
+                "capability",
+                "resource_grants",
+                "manage",
+                "dev_bypass",
+                "realtime",
+            ] {
+                if code.contains(word) {
+                    found.push(format!("{} in {}", word, path.display()));
+                }
             }
-        }
-    });
-    assert!(found.is_empty(), "the tree still carries {found:?}");
+        });
+    }
+    assert!(found.is_empty(), "the tree still carries {found:#?}");
 }
 
 #[test]
@@ -631,7 +660,7 @@ fn read_store_has_no_execute() {
     let mut handed_a_read_store = false;
     walk(
         std::path::Path::new("src/api/query"),
-        &mut |source: &str| {
+        &mut |_path: &std::path::Path, source: &str| {
             let code = code_only(source);
             for mutation in [".execute(", ".commit(", "INSERT ", "UPDATE ", "DELETE "] {
                 if code.contains(mutation) {
