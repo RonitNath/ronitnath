@@ -9,6 +9,13 @@
 //! A `403` and a `404` are the same event here — [`ApiError::Declined`] — for
 //! the same reason the server sends the same bytes for both: telling them
 //! apart is how a caller enumerates what exists.
+//!
+//! A `422` is the opposite case and is kept whole. The server answers a
+//! validation failure with `{"invalid":[{"field":…,"message":…}]}` precisely so
+//! a form can put the complaint next to the control that produced it — owner
+//! ruling, "frontend messages should be in the appropriate location" — so this
+//! client decodes that body into [`ApiError::Invalid`] rather than dropping it
+//! on the floor as a status number.
 
 use gloo_net::http::Request;
 use serde::Serialize;
@@ -18,12 +25,24 @@ use web_sys::{RequestCredentials, RequestMode};
 
 use rn_api::{Command, CommandEnvelope, CommandReply, Whoami};
 
+/// One field the server would not accept, and what it said about it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Invalid {
+    /// The field the server named. A form matches on it.
+    pub field: String,
+    /// What was wrong with it, in the reader's terms.
+    pub message: String,
+}
+
 /// Why a call did not produce a value.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum ApiError {
     /// The server declined: no such thing, or not yours. Both, deliberately.
     #[error("declined")]
     Declined,
+    /// The request was understood and refused for its shape, field by field.
+    #[error("{}", one_line(.0))]
+    Invalid(Vec<Invalid>),
     /// The idempotency key was replayed with a different body. The caller
     /// changed its mind mid-retry; mint a new key.
     #[error("the idempotency key was replayed with a different body")]
@@ -37,6 +56,74 @@ pub enum ApiError {
     /// Any other status. Carried as-is so a caller can log it.
     #[error("unexpected status {0}")]
     Status(u16),
+}
+
+impl ApiError {
+    /// What the server said about one field, if it named one.
+    ///
+    /// This is what a field's note renders: a complaint about `email` belongs
+    /// beside the email input and nowhere else.
+    #[must_use]
+    pub fn about(&self, field: &str) -> Option<String> {
+        match self {
+            Self::Invalid(fields) => fields
+                .iter()
+                .find(|invalid| invalid.field == field)
+                .map(|invalid| invalid.message.clone()),
+            _ => None,
+        }
+    }
+
+    /// What to show when the refusal has no field of its own to sit beside.
+    #[must_use]
+    pub fn message(&self) -> String {
+        match self {
+            Self::Declined => "Declined.".to_owned(),
+            Self::Conflict => "That was already sent, differently.".to_owned(),
+            Self::Unreachable(_) => "The server did not answer.".to_owned(),
+            other => other.to_string(),
+        }
+    }
+}
+
+/// Every complaint, as one sentence — the fallback when there is no field to
+/// hang them on.
+fn one_line(fields: &[Invalid]) -> String {
+    if fields.is_empty() {
+        return "the request was refused".to_owned();
+    }
+    fields
+        .iter()
+        .map(|invalid| invalid.message.clone())
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+/// Read the server's per-field complaints out of a `422` body.
+///
+/// A body that is not the shape the contract promises is a decline rather than
+/// an empty complaint list: a form with nothing to say beside any field would
+/// otherwise silently show nothing at all.
+fn invalid(body: &str) -> ApiError {
+    let Ok(value) = serde_json::from_str::<serde_json::Value>(body) else {
+        return ApiError::Declined;
+    };
+    let Some(list) = value.get("invalid").and_then(serde_json::Value::as_array) else {
+        return ApiError::Declined;
+    };
+    let fields: Vec<Invalid> = list
+        .iter()
+        .filter_map(|item| {
+            Some(Invalid {
+                field: item.get("field")?.as_str()?.to_owned(),
+                message: item.get("message")?.as_str()?.to_owned(),
+            })
+        })
+        .collect();
+    if fields.is_empty() {
+        return ApiError::Declined;
+    }
+    ApiError::Invalid(fields)
 }
 
 /// A command's reply: the change-feed offset it landed at, and whatever it
@@ -126,6 +213,56 @@ async fn decode<T: DeserializeOwned>(response: gloo_net::http::Response) -> Resu
             .map_err(|e| ApiError::Malformed(e.to_string())),
         403 | 404 => Err(ApiError::Declined),
         409 => Err(ApiError::Conflict),
+        // The only status whose body a caller is allowed to read: it names
+        // fields the caller sent, and nothing about what else exists.
+        422 => Err(match response.text().await {
+            Ok(body) => invalid(&body),
+            Err(_) => ApiError::Declined,
+        }),
         other => Err(ApiError::Status(other)),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_422_body_becomes_a_complaint_per_field() {
+        let error = invalid(
+            r#"{"invalid":[{"field":"email","message":"That is not an address."},
+                           {"field":"password","message":"Too short."}]}"#,
+        );
+        assert_eq!(
+            error.about("email").as_deref(),
+            Some("That is not an address.")
+        );
+        assert_eq!(error.about("password").as_deref(), Some("Too short."));
+        assert_eq!(error.about("display_name"), None, "a field nobody named");
+        assert_eq!(error.message(), "That is not an address. Too short.");
+    }
+
+    #[test]
+    fn a_body_the_contract_does_not_promise_is_a_plain_decline() {
+        for body in [
+            "not json at all",
+            r#"{"error":"nope"}"#,
+            r#"{"invalid":[]}"#,
+            r#"{"invalid":[{"field":"email"}]}"#,
+        ] {
+            assert_eq!(invalid(body), ApiError::Declined, "{body}");
+        }
+    }
+
+    #[test]
+    fn a_refusal_with_no_field_still_has_something_to_say() {
+        assert_eq!(ApiError::Declined.message(), "Declined.");
+        assert_eq!(ApiError::Declined.about("email"), None);
+        assert_eq!(
+            ApiError::Unreachable("socket".into()).message(),
+            "The server did not answer.",
+            "the reader is not shown the transport's own words"
+        );
+        assert_eq!(ApiError::Status(500).message(), "unexpected status 500");
     }
 }

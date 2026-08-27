@@ -32,6 +32,10 @@ pub struct Live<T: Send + Sync + 'static> {
     store: RwSignal<Store<T>>,
     /// Bumped whenever a diff lands, so a `Memo` over the rows recomputes.
     revision: RwSignal<u64>,
+    /// Whether the reconnect loop should still be running. Cleared by
+    /// [`Live::disconnect`] and read at every point the loop could go round
+    /// again.
+    open: RwSignal<bool>,
 }
 
 impl<T: Send + Sync + 'static> Clone for Live<T> {
@@ -48,7 +52,28 @@ impl<T: Clone + DeserializeOwned + Send + Sync + 'static> Live<T> {
         Self {
             store: RwSignal::new(Store::new(query)),
             revision: RwSignal::new(0),
+            open: RwSignal::new(true),
         }
+    }
+
+    /// Stop following this query.
+    ///
+    /// A subscription lives as long as the page unless somebody says
+    /// otherwise, and the caller who says otherwise is the one that is about
+    /// to change what the page is *about*: switching organization abandons
+    /// every query scoped to the old one, and a loop that went on reconnecting
+    /// to it would hold a socket open for rows nothing will ever render.
+    ///
+    /// The rows already in hand are left where they are — this ends the feed,
+    /// it does not blank the screen — and it cannot be undone: reconnecting is
+    /// a fresh [`Live`], which is also what re-reads the snapshot.
+    pub fn disconnect(&self) {
+        self.open.set(false);
+    }
+
+    /// Whether the reconnect loop is still following this query.
+    pub fn connected(&self) -> bool {
+        self.open.get()
     }
 
     /// Open the subscription and keep it open: connect, resume by offset,
@@ -124,16 +149,19 @@ impl<T: Clone + DeserializeOwned + Send + Sync + 'static> Live<T> {
     }
 }
 
-/// The reconnect loop. It never returns: a bundle's subscription lives as long
-/// as the page does.
+/// The reconnect loop. It runs until the page goes or the caller disconnects:
+/// a bundle's subscription otherwise lives as long as the page does.
 async fn run<T: Clone + DeserializeOwned + Send + Sync + 'static>(
     live: Live<T>,
     request: QueryRef,
 ) {
     let mut backoff = Backoff::new();
-    loop {
+    while live.open.get_untracked() {
         if session(live, &request).await {
             backoff.succeeded();
+        }
+        if !live.open.get_untracked() {
+            return;
         }
         socket::sleep(backoff.next_delay(socket::random())).await;
     }
@@ -179,9 +207,62 @@ async fn session<T: Clone + DeserializeOwned + Send + Sync + 'static>(
             continue;
         };
         heard = true;
+        // A disconnect while the socket was quiet takes effect on the next
+        // thing it says, which is at worst one heartbeat away.
+        if !live.open.get_untracked() {
+            return heard;
+        }
         if live.apply(&message) == Applied::Resynced {
             // Our position is meaningless now; reopen from zero.
             return heard;
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rn_api::{DiffOp, SubMessage};
+    use serde::Deserialize;
+    use serde_json::json;
+
+    #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+    struct Row {
+        title: String,
+    }
+
+    fn diff(offset: u64) -> SubMessage {
+        SubMessage::Diff {
+            offset,
+            query: "documents".into(),
+            ops: vec![DiffOp::Put {
+                key: "r_a".into(),
+                row: json!({ "title": "one" }),
+            }],
+        }
+    }
+
+    #[test]
+    fn a_view_follows_its_query_until_it_is_disconnected() {
+        let live = Live::<Row>::new("documents");
+        assert!(live.connected());
+
+        live.disconnect();
+        assert!(!live.connected(), "the loop is told to stop going round");
+    }
+
+    #[test]
+    fn disconnecting_ends_the_feed_rather_than_blanking_the_screen() {
+        let live = Live::<Row>::new("documents");
+        live.apply(&diff(1));
+        assert_eq!(live.rows().len(), 1);
+
+        live.disconnect();
+        assert_eq!(
+            live.rows().len(),
+            1,
+            "the rows already read are still what the page is showing"
+        );
+        assert_eq!(live.offset(), 1);
     }
 }

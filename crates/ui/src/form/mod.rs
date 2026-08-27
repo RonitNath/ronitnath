@@ -137,6 +137,50 @@ pub fn TextField(
     }
 }
 
+/// A body of text that syncs itself.
+///
+/// [`TextField`] for something that is not one line, and deliberately not a
+/// second editing doctrine: same [`Engine`], same debounce, same rule about a
+/// diff that lands mid-edit. What it adds is a height and the one state a
+/// paragraph has that a line does not — a reader who may look and not write.
+#[component]
+pub fn TextArea(
+    /// The label. A human word for the thing.
+    #[prop(into)]
+    label: String,
+    /// The value the server holds.
+    #[prop(into)]
+    value: Signal<String>,
+    /// The command that carries an edit.
+    sync: SyncCommand,
+    /// How many lines tall. The caller knows what is being written into it.
+    #[prop(default = 8)]
+    rows: u32,
+    /// Whether this reader may change it. A read-only body is still shown:
+    /// the words are the page.
+    #[prop(optional, into)]
+    readonly: Signal<bool>,
+) -> impl IntoView {
+    let engine = Engine::new(value.get_untracked(), sync);
+    adopt(engine, value);
+    let id = next_id("words");
+    view! {
+        <div class="field words">
+            <label for=id.clone()>{label}</label>
+            <textarea
+                id=id
+                rows=rows
+                spellcheck="true"
+                readonly=move || readonly.get()
+                prop:value=move || engine.draft.get()
+                on:input=move |event| engine.edited(event_target_value(&event))
+                on:blur=move |_| engine.blurred()
+            ></textarea>
+            <Note engine=engine />
+        </div>
+    }
+}
+
 /// A choice from a fixed set, syncing on change.
 #[component]
 pub fn SelectField(

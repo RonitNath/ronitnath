@@ -14,6 +14,9 @@ use leptos::prelude::*;
 
 pub use arrange::{Arrangement, Dir, Sort, arrange};
 
+#[cfg(test)]
+mod tests;
+
 /// How long a column survives a narrowing viewport.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Priority {
@@ -35,12 +38,23 @@ impl Priority {
     }
 }
 
+/// How a cell is drawn, once the column has said what it says.
+///
+/// The text comes first and the view second, deliberately: sorting, filtering
+/// and the empty check are all decided on the string, so a renderer can change
+/// what a cell *looks* like without changing what the table knows.
+pub type Render = Arc<dyn Fn(&str) -> AnyView + Send + Sync>;
+
+/// Whether a row admits a control. Absent means every row does.
+pub type Offered<R> = Option<Arc<dyn Fn(&R) -> bool + Send + Sync>>;
+
 /// One column: its header, how it reads a row, and how it behaves.
 pub struct Column<R> {
     label: &'static str,
     value: Arc<dyn Fn(&R) -> String + Send + Sync>,
     priority: Priority,
     mono: bool,
+    render: Option<Render>,
 }
 
 impl<R> Clone for Column<R> {
@@ -50,6 +64,7 @@ impl<R> Clone for Column<R> {
             value: Arc::clone(&self.value),
             priority: self.priority,
             mono: self.mono,
+            render: self.render.clone(),
         }
     }
 }
@@ -64,6 +79,7 @@ impl<R> Column<R> {
             value: Arc::new(value),
             priority: Priority::Always,
             mono: false,
+            render: None,
         }
     }
 
@@ -77,6 +93,88 @@ impl<R> Column<R> {
     /// What this column gives up first.
     pub fn priority(mut self, priority: Priority) -> Self {
         self.priority = priority;
+        self
+    }
+
+    /// Draw this column's cells with `render` instead of as bare text.
+    ///
+    /// The string the column produced is still what the table sorts, filters
+    /// and searches on, so a rendered cell is never a cell the filter box
+    /// cannot find.
+    pub fn render(mut self, render: impl Fn(&str) -> AnyView + Send + Sync + 'static) -> Self {
+        self.render = Some(Arc::new(render));
+        self
+    }
+
+    /// A status column: the word the schema uses, in its own colour.
+    ///
+    /// Never a pill, never a dot, never a tint behind it — `active`,
+    /// `disabled`, `draft`, `published` are read as vocabulary, and the colour
+    /// is the ink (`tokens.css` `.state`). A reader who cannot separate the
+    /// hues still has the word.
+    pub fn state(self) -> Self {
+        self.render(|text| {
+            let word = text.to_owned();
+            view! {
+                <span class="state" data-state=text.to_owned()>
+                    {word}
+                </span>
+            }
+            .into_any()
+        })
+    }
+}
+
+/// One per-row control: the verb, what it runs, and when it is offered.
+///
+/// Rare and destructive verbs still belong behind a side affordance rather
+/// than in every row (`design/interface-taste.md`); these are for the ones the
+/// list exists to run — withdrawing a link, ending a session — where a panel
+/// per row would be a click each to reach the same button.
+pub struct RowAction<R: 'static> {
+    label: &'static str,
+    run: Callback<R>,
+    offered: Offered<R>,
+    undo: bool,
+}
+
+impl<R> Clone for RowAction<R> {
+    fn clone(&self) -> Self {
+        Self {
+            label: self.label,
+            run: self.run,
+            offered: self.offered.clone(),
+            undo: self.undo,
+        }
+    }
+}
+
+impl<R> RowAction<R>
+where
+    R: Send + Sync + 'static,
+{
+    /// A control called `label` that runs `run` on the row it sits in.
+    pub fn new(label: &'static str, run: impl Into<Callback<R>>) -> Self {
+        Self {
+            label,
+            run: run.into(),
+            offered: None,
+            undo: false,
+        }
+    }
+
+    /// Offer it only on the rows `offered` admits.
+    ///
+    /// Absent rather than present-and-refused: a control that lies until you
+    /// use it is worse than no control.
+    pub fn when(mut self, offered: impl Fn(&R) -> bool + Send + Sync + 'static) -> Self {
+        self.offered = Some(Arc::new(offered));
+        self
+    }
+
+    /// This one takes something away, which the ink says.
+    pub fn undo(mut self) -> Self {
+        self.undo = true;
         self
     }
 }
@@ -102,10 +200,16 @@ pub fn Table<R>(
     /// clickable and carry no affordance saying they are.
     #[prop(optional, into)]
     on_row: Option<Callback<R>>,
+    /// Per-row controls, in a trailing column of their own. It has no header
+    /// and does not sort: it holds verbs, not a value.
+    #[prop(optional)]
+    actions: Vec<RowAction<R>>,
 ) -> impl IntoView
 where
     R: Clone + Send + Sync + 'static,
 {
+    let has_actions = !actions.is_empty();
+    let actions = StoredValue::new(actions);
     let columns = StoredValue::new(columns);
     let filter = RwSignal::new(String::new());
     let sort = RwSignal::new(None::<Sort>);
@@ -166,7 +270,7 @@ where
     let body = move || {
         let arrangement = arranged.get();
         if arrangement.visible.is_empty() {
-            let span = columns.with_value(Vec::len);
+            let span = columns.with_value(Vec::len) + usize::from(has_actions);
             let empty = empty.clone();
             return view! {
                 <tr>
@@ -196,9 +300,44 @@ where
                                     } else {
                                         column.priority.class().to_owned()
                                     };
-                                    view! { <td class=class>{text.clone()}</td> }
+                                    let body = match &column.render {
+                                        Some(render) => render(text),
+                                        None => text.clone().into_any(),
+                                    };
+                                    view! { <td class=class>{body}</td> }
                                 })
                                 .collect_view()
+                        });
+                        let verbs = has_actions.then(|| {
+                            let row = source[index].clone();
+                            actions.with_value(|actions| {
+                                actions
+                                    .iter()
+                                    .filter(|action| {
+                                        action.offered.as_ref().is_none_or(|offered| offered(&row))
+                                    })
+                                    .cloned()
+                                    .map(|action| {
+                                        let row = row.clone();
+                                        view! {
+                                            <button
+                                                type="button"
+                                                class="act"
+                                                data-weight=action.undo.then_some("undo")
+                                                // The row is a drill-in; a verb
+                                                // inside it is not that verb's
+                                                // way of opening the row.
+                                                on:click=move |event| {
+                                                    event.stop_propagation();
+                                                    action.run.run(row.clone());
+                                                }
+                                            >
+                                                {action.label}
+                                            </button>
+                                        }
+                                    })
+                                    .collect_view()
+                            })
                         });
                         let tabindex = drill.is_some().then_some("0");
                         let on_click = drill.clone();
@@ -220,6 +359,7 @@ where
                                 }
                             >
                                 {cells}
+                                {verbs.map(|verbs| view! { <td class="p1 does">{verbs}</td> })}
                             </tr>
                         }
                     })
@@ -271,7 +411,9 @@ where
         </div>
         <table class="tbl">
             <thead>
-                <tr>{head}</tr>
+                <tr>
+                    {head} {has_actions.then(|| view! { <th class="p1 does" scope="col"></th> })}
+                </tr>
             </thead>
             <tbody>{body}</tbody>
         </table>

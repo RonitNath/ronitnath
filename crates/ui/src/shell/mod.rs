@@ -6,6 +6,7 @@
 //! `whoami` says this principal holds. Everything the chrome draws comes from
 //! that one DTO.
 
+mod acting;
 mod theme;
 
 use leptos::html::Button;
@@ -15,6 +16,7 @@ use leptos_router::components::{A, Router};
 
 use rn_api::{Tier, Whoami};
 
+pub use acting::ActingAs;
 pub use theme::{Mode, ThemeToggle};
 
 use crate::api;
@@ -59,6 +61,20 @@ pub fn use_whoami() -> RwSignal<Option<Whoami>> {
     use_context().expect("use_whoami outside a <Shell/>")
 }
 
+/// Read `whoami` again and put it back in the context.
+///
+/// The chrome is drawn from that one DTO, so anything that changes what the
+/// session *is* — acting as an organization, and nothing else so far — has to
+/// say so rather than wait for the next page load.
+pub fn refresh_whoami() {
+    let who = use_whoami();
+    spawn_local(async move {
+        if let Ok(whoami) = api::whoami().await {
+            who.set(Some(whoami));
+        }
+    });
+}
+
 /// The tier shell. Mount it once, at the root of a bundle, around that
 /// bundle's `<Routes/>`.
 #[component]
@@ -67,6 +83,12 @@ pub fn Shell(
     tier: Tier,
     /// The rail's entries, in order.
     nav: &'static [NavItem],
+    /// A control the bundle puts in the rail, above the nav — the one thing a
+    /// tier is allowed to add to the chrome. `/org` puts its organization
+    /// switcher here, because which organization you are looking at is
+    /// navigation and belongs where navigation is.
+    #[prop(optional)]
+    rail: Option<ChildrenFn>,
     /// The bundle's routes.
     children: Children,
 ) -> impl IntoView {
@@ -80,7 +102,7 @@ pub fn Shell(
 
     view! {
         <Router base=tier_base(tier)>
-            <Chrome tier=tier nav=nav>
+            <Chrome tier=tier nav=nav rail=rail>
                 {children()}
             </Chrome>
         </Router>
@@ -90,7 +112,12 @@ pub fn Shell(
 /// Everything inside the router: the rail, the narrow-viewport drawer, and the
 /// content column.
 #[component]
-fn Chrome(tier: Tier, nav: &'static [NavItem], children: Children) -> impl IntoView {
+fn Chrome(
+    tier: Tier,
+    nav: &'static [NavItem],
+    rail: Option<ChildrenFn>,
+    children: Children,
+) -> impl IntoView {
     let who = use_whoami();
     let open = RwSignal::new(false);
     let trigger = NodeRef::<Button>::new();
@@ -181,6 +208,8 @@ fn Chrome(tier: Tier, nav: &'static [NavItem], children: Children) -> impl IntoV
             <nav class="rail" aria-label="Sections">
                 <div class="rail-identity">{identity}</div>
                 <div class="rail-scope">{scopes}</div>
+                <ActingAs />
+                {rail.map(|rail| view! { <div class="rail-slot">{rail()}</div> })}
                 <div class="rail-nav" on:click=move |_| close()>
                     {links}
                 </div>

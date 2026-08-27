@@ -27,12 +27,12 @@ pub mod live;
 pub mod shell;
 pub mod table;
 
-pub use api::{ApiError, Committed, command, invoke, query, whoami};
+pub use api::{ApiError, Committed, Invalid, command, invoke, query, whoami};
 pub use decline::Decline;
-pub use form::{Commit, SelectField, TextField, ToggleField, sync_with};
+pub use form::{Commit, SelectField, TextArea, TextField, ToggleField, sync_with};
 pub use live::Live;
 pub use shell::{NavItem, PageHead, Shell, use_whoami};
-pub use table::{Column, Priority, Table};
+pub use table::{Column, Priority, RowAction, Table};
 
 /// Wire this bundle up to the browser: panics get a stack trace in the
 /// console instead of `unreachable executed`.

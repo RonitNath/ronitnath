@@ -58,6 +58,13 @@
   --text-4: 1.25rem;
   --text-5: 1.6rem;
 
+  /* State ink. A state is a word in its own colour — never a capsule, never a
+   * dot — so these are foreground values and nothing here has a fill. */
+  --state-live: light-dark(oklch(0.42 0.11 155), oklch(0.76 0.13 155));
+  --state-stopped: light-dark(oklch(0.48 0.16 27), oklch(0.72 0.16 27));
+  --state-open: light-dark(oklch(0.48 0.12 70), oklch(0.78 0.13 75));
+  --state-gone: light-dark(oklch(0.42 0.13 300), oklch(0.75 0.13 300));
+
   --radius: 0.25rem;
   --rail-width: 15rem;
   --cell-pad: 0.5rem;
@@ -211,6 +218,35 @@ textarea {
 .rail-scope a[aria-current="page"] {
   color: var(--fg);
   background: var(--bg-subtle);
+}
+
+/* The two controls that live above the nav: who the writes are by, and — where
+ * a tier puts one there — what the pages are about. Same shape, so the rail
+ * reads as one column rather than as a stack of unrelated widgets. */
+.rail-acting,
+.rail-slot {
+  display: grid;
+  gap: 0.15rem;
+  padding: 0 0.65rem 0.75rem;
+}
+.rail-acting label,
+.rail-slot label {
+  font-size: var(--text-1);
+  color: var(--fg-subtle);
+}
+.rail-acting select,
+.rail-slot select {
+  width: 100%;
+  padding: 0.25rem 0.35rem;
+  background: var(--bg-subtle);
+  font-size: var(--text-2);
+}
+.rail-acting .note {
+  font-size: var(--text-1);
+  color: var(--fg-muted);
+}
+.rail-acting .note[data-state="invalid"] {
+  color: var(--state-stopped);
 }
 
 .rail-nav {
@@ -420,6 +456,72 @@ textarea {
   white-space: normal;
 }
 
+/* The trailing column of verbs. It sizes to its contents, never wraps, and
+ * carries no header: it holds commands, not a value. */
+.tbl .does {
+  width: 1%;
+  white-space: nowrap;
+  text-align: right;
+}
+.tbl td.does .act + .act {
+  margin-left: 0.75rem;
+}
+
+/* A row-level verb is a word, not chrome. Destructive words take the warm ink,
+ * which is the whole of the warning: there is no confirmation dialog for a
+ * command the audit log records and an operator can undo. */
+.act {
+  cursor: pointer;
+  padding: 0;
+  color: var(--accent);
+  font-size: var(--text-2);
+}
+.act:hover {
+  color: var(--accent-hover);
+  text-decoration: underline;
+}
+.act[data-weight="undo"] {
+  color: var(--state-stopped);
+}
+.act:disabled {
+  color: var(--fg-subtle);
+  cursor: default;
+  text-decoration: none;
+}
+
+/* A state is a word in its own colour. Never a capsule, never a dot. */
+.state {
+  font-size: var(--text-1);
+  color: var(--fg-muted);
+}
+.state[data-state="active"],
+.state[data-state="published"],
+.state[data-state="confirmed"],
+.state[data-state="verified"],
+.state[data-state="proven"] {
+  color: var(--state-live);
+}
+.state[data-state="disabled"],
+.state[data-state="deleted"],
+.state[data-state="expired"],
+.state[data-state="rejected"] {
+  color: var(--state-stopped);
+}
+.state[data-state="draft"],
+.state[data-state="proposed"],
+.state[data-state="unclaimed"],
+.state[data-state="unverified"],
+.state[data-state="unproven"] {
+  color: var(--state-open);
+}
+.state[data-state="merged"],
+.state[data-state="operator"],
+.state[data-state="claimed"],
+.state[data-state="self"],
+.state[data-state="factor"] {
+  color: var(--state-gone);
+}
+
 /* Column priority: 1 always, 2 drops on tablet, 3 drops on phone. */
 @media (max-width: 64rem) {
   .tbl .p3 {
@@ -445,10 +547,23 @@ textarea {
   color: var(--fg-subtle);
 }
 .field input,
-.field select {
+.field select,
+.field textarea {
   padding: 0.3rem 0.45rem;
   background: var(--bg-muted);
   width: 100%;
+}
+/* A body of words wants the column it is written in, not a field's width. */
+.field.words {
+  max-width: none;
+}
+.field.words textarea {
+  font-family: var(--font-body);
+  line-height: 1.55;
+  resize: vertical;
+}
+.field.words textarea[readonly] {
+  color: var(--fg-muted);
 }
 .field .note {
   font-size: var(--text-1);
