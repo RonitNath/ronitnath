@@ -4056,8 +4056,6 @@ dependencies = [
  "rn-ui",
  "serde",
  "serde_json",
- "wasm-bindgen",
- "wasm-bindgen-futures",
  "web-sys",
 ]
 
@@ -4098,7 +4096,6 @@ dependencies = [
  "serde",
  "serde_json",
  "wasm-bindgen",
- "web-sys",
 ]
 
 [[package]]
@@ -4169,9 +4166,6 @@ dependencies = [
  "serde_json",
  "thiserror 2.0.20",
  "tokio",
- "uuid",
- "wasm-bindgen",
- "wasm-bindgen-futures",
  "web-sys",
 ]
 
