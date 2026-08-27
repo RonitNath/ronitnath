@@ -9,9 +9,17 @@
 # immutable digest into image.env (procedures/deployment.md: an operator
 # provisions, a pipeline cuts over). Running it twice is safe.
 #
-# Hiqlite state and its two cluster secrets are provisioned here, never by the
-# release pipeline. Nexus holds the canonical secret copies; every voter gets
-# the same values and its own durable state directory.
+# Hiqlite state and the three deployment secrets are provisioned here, never by
+# the release pipeline. Nexus holds the canonical copies; every voter gets the
+# same values and its own durable state directory.
+#
+# The third secret is the public-id key, and it is the one that is not like the
+# others: rotating a Hiqlite secret partitions a cluster until every node has
+# it, which is bad and recoverable. Rotating the id key renames every object in
+# the deployment — public ids are derived from it on read, not stored — so every
+# URL anyone ever saved, every invitation link and every id in anyone's notes
+# stops resolving. It is generated once and never rotated automatically. If it
+# ever must change, that is a migration with a redirect table, not a deploy.
 set -euo pipefail
 
 if [[ "$(hostname -s)" != "nexus" ]]; then
@@ -52,6 +60,15 @@ ensure_cluster_secrets() {
                 | sudo install -o root -g root -m 0400 /dev/stdin "$CLUSTER_SECRET_DIR/$name"
         fi
     done
+
+    # 16 bytes, lowercase hex: an AES-128 key, which is what the id scheme is.
+    # `-n` on the read-back so no trailing newline reaches the config parser.
+    if ! sudo test -s "$CLUSTER_SECRET_DIR/id-key"; then
+        log "generating the public-id key — this happens exactly once per deployment"
+        openssl rand -hex 16 \
+            | tr -d '\n' \
+            | sudo install -o root -g root -m 0400 /dev/stdin "$CLUSTER_SECRET_DIR/id-key"
+    fi
 }
 
 # --- delenda only: the registry pull identity -------------------------------
@@ -156,7 +173,7 @@ REMOTE
     # command line, so nothing ever lands in a process listing or shell history.
     local run=(sudo bash -s)
     local put_compose=(sudo install -o root -g root -m 0644 /dev/stdin "$APP_DIR/oci/compose.yaml")
-    local check=(sudo stat -c '%n=%U:%G=mode.%a' "$APP_DIR/oci/node.env" "$APP_DIR/oci/compose.yaml" "$APP_DIR/state" "$APP_DIR/secrets/hiqlite-raft" "$APP_DIR/secrets/hiqlite-api")
+    local check=(sudo stat -c '%n=%U:%G=mode.%a' "$APP_DIR/oci/node.env" "$APP_DIR/oci/compose.yaml" "$APP_DIR/state" "$APP_DIR/secrets/hiqlite-raft" "$APP_DIR/secrets/hiqlite-api" "$APP_DIR/secrets/id-key")
 
     if [[ -n "$target" ]]; then
         [[ "$name" == "delenda" ]] && provision_delenda_registry_client "$target"
@@ -170,7 +187,7 @@ REMOTE
 
     # Compose file-backed secrets retain the source file's numeric ownership.
     # UID 9751 can read them inside the container; no unrelated host account can.
-    for secret in hiqlite-raft hiqlite-api; do
+    for secret in hiqlite-raft hiqlite-api id-key; do
         if [[ -n "$target" ]]; then
             sudo cat "$CLUSTER_SECRET_DIR/$secret" \
                 | ssh "$target" sudo install -o "$RUNTIME_UID" -g "$RUNTIME_GID" -m 0400 /dev/stdin "$APP_DIR/secrets/$secret"
