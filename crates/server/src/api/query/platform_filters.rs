@@ -6,9 +6,10 @@
 //! is unusable, and it becomes unusable exactly on the deployment that has
 //! most need of it.
 //!
-//! There are five controls — actor, hat, object, command, time — and thirty-two
-//! ways to combine them. Thirty-two statements would be thirty-two chances to
-//! forget an index, so instead there are **six**: one per *lead*, and the lead
+//! There are five controls — actor, hat, object, command and a time range,
+//! whose two ends are two parameters — so sixty-four ways to combine them.
+//! Sixty-four statements would be sixty-four chances to forget an index, so
+//! instead there are **six**: one per *lead*, and the lead
 //! is whichever filter is present and most selective. The lead is the seek;
 //! everything else rides along as a predicate on the rows that seek already
 //! narrowed to, expressed as `$n IS NULL OR …` so one statement serves every
@@ -28,8 +29,8 @@
 //! command names every time anybody ran it, and a day names a day. A caller
 //! who names both gets the narrower seek and the other as a predicate.
 //!
-//! `tests/explain.rs` generates all thirty-two combinations from the control's
-//! own option lists and asserts every one of them plans as a seek, so a filter
+//! `tests/explain.rs` generates all sixty-four combinations from the screen's
+//! own control list and asserts every one of them plans as a seek, so a filter
 //! added without an index fails the build rather than review.
 
 use rn_api::PublicId;
@@ -139,6 +140,14 @@ pub const BY_OBJECT: &str = "SELECT a.id, a.command, a.actor_identity_id, a.acti
        AND ($7 IS NULL OR a.at >= $7) \
        AND ($8 IS NULL OR a.at < $8) \
      ORDER BY a.id DESC LIMIT $9";
+
+/// Every control the audit screen draws, by the parameter name it sends.
+///
+/// The list is the *screen's*, restated here so the generated index test can
+/// walk its powerset: sixty-four combinations, each planned and asserted to be
+/// a seek. `crates/app-platform/src/audit.rs` draws exactly these six and
+/// sends exactly these names.
+pub const CONTROLS: &[&str] = &["actor", "hat", "object", "command", "from", "to"];
 
 /// The end of time, for a range with no upper bound. `audit.at` is unix
 /// seconds, so this is not a value any row can hold.

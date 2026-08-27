@@ -238,7 +238,107 @@
   overflow-wrap: anywhere;
 }
 
-/* The cluster page is two dense tables and no chart.
+/* The deployment screen: readings, in newspaper order.
+ *
+ * The node table takes the width because it is the answer to "what is this
+ * deployment"; everything under it is a pair of narrow blocks, which is the
+ * shape four short readings want. A single column of them would be a tall
+ * scroll of two-word lines. */
+
+.deployment {
+  display: grid;
+  gap: var(--gap-section);
+}
+.readings-pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--gap-section);
+  align-items: start;
+}
+@media (max-width: 52rem) {
+  .readings-pair {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+/* Out here there is room, and "Observations pending" wrapping to two lines
+ * beside a one-character value is the label column being asked to be narrower
+ * than its labels. */
+.deployment .fact {
+  grid-template-columns: 11rem minmax(0, 1fr);
+  font-size: var(--text-2);
+}
+
+/* The audit's controls, and the one search box above the parties list. They
+ * are the same shape: fields on a line that wraps, and a verb at the end. */
+
+.filters,
+.find {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: var(--gap-section);
+}
+.filter {
+  background: var(--bg-subtle);
+  color: var(--fg);
+  padding: 0.25rem 0.4rem;
+  font-size: var(--text-1);
+  min-width: 0;
+}
+.find .filter {
+  flex: 1 1 18rem;
+}
+.filters .filter {
+  flex: 0 1 11rem;
+}
+.filters button.act,
+.find button.act {
+  cursor: pointer;
+  padding: 0.25rem 0.6rem;
+  font-size: var(--text-1);
+  color: var(--fg-muted);
+  background: var(--bg-subtle);
+}
+.filters button.act:hover,
+.find button.act:hover {
+  color: var(--fg);
+}
+
+/* The person page: nine lists, in two columns while there is room for two.
+ * The controls sit above them, because disabling somebody is a decision about
+ * the whole page and not about one of its lists. */
+
+.person {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--gap-section) 1.5rem;
+  align-items: start;
+}
+@media (max-width: 64rem) {
+  .person {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.page-head .handle {
+  color: var(--fg-subtle);
+  font-size: var(--text-1);
+}
+.controls {
+  margin-bottom: var(--gap-section);
+}
+.controls .actions {
+  grid-auto-flow: column;
+  justify-content: start;
+  align-items: center;
+  gap: 0.5rem;
+}
+.controls .reason {
+  width: 22rem;
+  max-width: 100%;
+}
+
+/* The cluster readings are two dense tables and no chart.
  *
  * They are narrow on purpose: label left and number right stops being the
  * right arrangement the moment the gap between them outgrows the content, and

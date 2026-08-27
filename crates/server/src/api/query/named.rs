@@ -131,6 +131,7 @@ pub const ALL: &[Named] = &[
     Named::Platform(Platform::Consents),
     Named::Platform(Platform::Cascade),
     Named::Platform(Platform::Find),
+    Named::Platform(Platform::Operators),
 ];
 
 impl Named {

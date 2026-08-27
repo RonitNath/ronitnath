@@ -4,6 +4,17 @@
 //! is the four answers that follow: the registrations that resolve to it, the
 //! containers it belongs to, what it owns, and what it has been granted.
 //!
+//! One box sits above the table and it is not a filter: the filter box in the
+//! table searches the page that arrived, and this searches the *deployment* —
+//! three exact seeks, on a handle, on an email factor and on a public id, with
+//! no prefix scan over `display_name`, which has no index. A miss is empty,
+//! because an operator searching for somebody who is not there is not being
+//! probed.
+//!
+//! A row opens the person's own page (`/platform/parties/<id>`, frame F3), not
+//! a panel: what the deployment knows about a human is nine lists, and nine
+//! lists in a twenty-four-rem column is a scroll.
+//!
 //! `Disable` and `Enable` act on any party. A person is theirs and an
 //! operator's; an organization is its owner's and an operator's; a group is
 //! whoever owns it. An operator may do any of it, which is what this page is,
@@ -12,21 +23,43 @@
 //! why every session that party held was deleted.
 
 use leptos::prelude::*;
+use leptos::task::spawn_local;
+use leptos_router::hooks::use_navigate;
 use rn_api::commands::{Disable, Enable};
 use rn_ui::{Column, PageHead, Priority, Table};
 
 use crate::panel::{Act, Facts, Group, Line, Panel, State, drill, refusal, run_with, when};
-use crate::rows::{Party, PartyDetail};
+use crate::rows::{Found, Party, PartyDetail};
 
 #[component]
 pub fn Parties() -> impl IntoView {
     let live = rn_ui::Live::<Party>::subscribe("platform-parties", &[]);
     let selected = RwSignal::new(None::<String>);
     let detail = drill::<PartyDetail>("platform-party", selected);
+    let found = RwSignal::new(None::<Vec<Found>>);
+    let navigate = use_navigate();
 
-    let rows = Signal::derive(move || live.rows());
+    // The deployment's own list, or what the one box found in it.
+    let rows = Signal::derive(move || match found.get() {
+        None => live.rows(),
+        Some(hits) => hits
+            .into_iter()
+            .map(|hit| Party {
+                public_id: hit.public_id,
+                kind: hit.kind,
+                display: hit.display,
+                handle: hit.handle,
+                status: hit.status,
+                created_at: hit.created_at,
+            })
+            .collect(),
+    });
     let columns = vec![
         Column::new("Name", |row: &Party| row.display.clone()),
+        Column::new("Handle", |row: &Party| {
+            row.handle.clone().unwrap_or_else(|| "\u{2014}".to_owned())
+        })
+        .mono(),
         Column::new("Kind", |row: &Party| row.kind.clone()),
         Column::new("Status", |row: &Party| row.status.clone()).state(),
         Column::new("Created", |row: &Party| when(row.created_at))
@@ -36,14 +69,22 @@ pub fn Parties() -> impl IntoView {
             .mono()
             .priority(Priority::Tertiary),
     ];
+    // A person has a page; every other kind is a panel, because an
+    // organization has no registrations, no factors and no merge history and
+    // its drill-in is the four lists that already fit in one.
     let open = Callback::new(move |row: Party| {
-        selected.set(Some(row.public_id.to_string()));
+        if row.kind == "person" {
+            navigate(&format!("/parties/{}", row.public_id), Default::default());
+        } else {
+            selected.set(Some(row.public_id.to_string()));
+        }
     });
 
     view! {
         <PageHead title="Parties">
             <span class="count num">{move || rows.get().len()}</span>
         </PageHead>
+        <Find found=found />
         <div class="split">
             <div class="split-main">
                 <Table
@@ -60,6 +101,55 @@ pub fn Parties() -> impl IntoView {
                         .map(|party| view! { <Detail party=party selected=selected then=detail.refresh() /> })
                 }}
             </Show>
+        </div>
+    }
+}
+
+/// The one box: a handle, an address or a public id, exactly.
+///
+/// Emptying it puts the deployment's own list back, which is why the found
+/// rows are an `Option` rather than a vector — no search and a search that
+/// found nothing are two different screens.
+#[component]
+fn Find(found: RwSignal<Option<Vec<Found>>>) -> impl IntoView {
+    let asked = RwSignal::new(String::new());
+    let ask = move || {
+        let q = asked.get_untracked().trim().to_owned();
+        spawn_local(async move {
+            if q.is_empty() {
+                found.set(None);
+                return;
+            }
+            found.set(
+                rn_ui::query::<Vec<Found>>("platform-find", &[("q", q.as_str())])
+                    .await
+                    .ok(),
+            );
+        });
+    };
+    view! {
+        <div class="find">
+            <input
+                type="search"
+                class="filter"
+                aria-label="Find a handle, an address or an id"
+                placeholder="Handle, address or id"
+                prop:value=move || asked.get()
+                on:input=move |event| {
+                    asked.set(event_target_value(&event));
+                    if asked.get_untracked().trim().is_empty() {
+                        found.set(None);
+                    }
+                }
+                on:keydown=move |event: leptos::ev::KeyboardEvent| {
+                    if event.key() == "Enter" {
+                        ask();
+                    }
+                }
+            />
+            <button type="button" class="act" on:click=move |_| ask()>
+                "Find"
+            </button>
         </div>
     }
 }

@@ -31,10 +31,13 @@
 use rn_api::PublicId;
 use rn_kernel::cmd::is_platform_operator;
 use rn_kernel::error::decline;
-use rn_kernel::ids::{self, Id, IdKey, MatchCandidate, Person, Public, Resource};
+use rn_kernel::ids::{self, Id, IdKey, Person, Public};
 use rn_kernel::store::Reads;
 use rn_kernel::{Committed, Event, Outcome, Principal};
 
+use super::platform_changed::{
+    identities_changed, matches_changed, parties_changed, resources_changed, sessions_changed,
+};
 use super::{Params, Row};
 
 /// How many rows a platform list returns by default.
@@ -93,6 +96,8 @@ pub enum Platform {
     Cascade,
     /// One box, three exact seeks.
     Find,
+    /// Who holds `platform:* #operator`, and who granted it.
+    Operators,
 }
 
 /// Every platform query this build serves.
@@ -117,6 +122,7 @@ pub const ALL: &[Platform] = &[
     Platform::Consents,
     Platform::Cascade,
     Platform::Find,
+    Platform::Operators,
 ];
 
 impl Platform {
@@ -144,6 +150,7 @@ impl Platform {
             Self::Consents => "platform-consents",
             Self::Cascade => "platform-cascade",
             Self::Find => "platform-find",
+            Self::Operators => "platform-operators",
         }
     }
 
@@ -190,6 +197,7 @@ impl Platform {
             // subject the socket does not carry, and the third is a search.
             Self::Links | Self::Consents => Vec::new(),
             Self::Keys | Self::Clients | Self::Cascade | Self::Find => Vec::new(),
+            Self::Operators => Vec::new(),
             // One row per command, keyed by the offset that command landed
             // at — which is the audit row's own id. This is the one query
             // whose key is the position rather than the subject, and the
@@ -231,6 +239,13 @@ impl Platform {
                         | Event::ConsentRevoked { .. }
                         | Event::ClientDeleted { .. }
                         | Event::PartyDisabled { .. }
+                )
+                | (
+                    Self::Operators,
+                    Event::OperatorGranted { .. }
+                        | Event::OperatorRevoked { .. }
+                        | Event::PartyDisabled { .. }
+                        | Event::PartyEnabled { .. }
                 )
                 | (
                     Self::Keys,
@@ -314,6 +329,7 @@ pub async fn read(
         Platform::Consents => super::platform_links::consents(reads, params).await,
         Platform::Cascade => super::platform_links::cascade(reads, params).await,
         Platform::Find => super::platform_find::find(reads, params).await,
+        Platform::Operators => super::platform_operators::list(reads, params).await,
     }
 }
 
@@ -331,175 +347,6 @@ pub fn subject<T: Public>(key: &IdKey, params: &Params) -> Option<Id<T>> {
 #[must_use]
 pub fn page(params: &Params) -> i64 {
     params.limit.unwrap_or(PAGE).clamp(1, MAX) as i64
-}
-
-fn parties_changed(event: &Event, key: &IdKey) -> Vec<String> {
-    match event {
-        Event::Registered { person, .. }
-        | Event::PartyDisabled { party: person, .. }
-        | Event::PartyEnabled { party: person }
-        | Event::PersonSplit { person, .. }
-        | Event::IdentityLinked { person, .. } => vec![person.public(key).as_str().to_owned()],
-        Event::PersonMerged {
-            survivor, absorbed, ..
-        } => vec![
-            survivor.public(key).as_str().to_owned(),
-            absorbed.public(key).as_str().to_owned(),
-        ],
-        Event::OrganizationCreated { organization, .. } => {
-            vec![organization.public(key).as_str().to_owned()]
-        }
-        Event::GroupCreated { group, .. } => vec![group.public(key).as_str().to_owned()],
-        // Nothing else writes a `party` row. Sharing, sessions, factors and
-        // documents all leave the party list exactly as it was.
-        Event::SignedIn { .. }
-        | Event::SignedOut { .. }
-        | Event::SessionRevoked { .. }
-        | Event::ActingAs { .. }
-        | Event::FactorAdded { .. }
-        | Event::FactorRemoved { .. }
-        | Event::EmailVerified { .. }
-        | Event::MatchProposed { .. }
-        | Event::MatchRejected { .. }
-        | Event::Invited { .. }
-        | Event::LinkRevoked { .. }
-        | Event::LinkClaimed { .. }
-        | Event::RoleSet { .. }
-        | Event::MemberRemoved { .. }
-        | Event::Left { .. }
-        | Event::Shared { .. }
-        | Event::Revoked { .. }
-        | Event::Transferred { .. }
-        | Event::DocumentCreated { .. }
-        | Event::DocumentEdited { .. }
-        | Event::DocumentPublished { .. }
-        // The OpenID Provider writes one `party` row and it is not a person:
-        // `register-client` creates the client's own service party, which no
-        // list on this tier renders.
-        | Event::SessionEnded { .. }
-        | Event::HandleSet { .. }
-        | Event::ClientRegistered { .. }
-        | Event::ClientUpdated { .. }
-        | Event::ClientSecretRotated { .. }
-        | Event::ClientDeleted { .. }
-        | Event::SigningKeyRotated { .. }
-        | Event::Authorized { .. }
-        | Event::CodeExchanged { .. }
-        | Event::TokenRefreshed { .. }
-        | Event::ServiceTokenIssued { .. }
-        | Event::TokenRevoked { .. }
-        // The platform operator's own. Granting or revoking the relation
-        // writes a `relation` row and not a `party` one; impersonation writes
-        // a session. What changes for a list of parties is nothing.
-        | Event::OperatorGranted { .. }
-        | Event::OperatorRevoked { .. }
-        | Event::ReAuthenticated { .. }
-        | Event::Impersonated { .. }
-        | Event::ImpersonationEnded { .. }
-        | Event::SigningKeyRetired { .. }
-        | Event::ConsentRevoked { .. } => Vec::new(),
-    }
-}
-
-fn identities_changed(event: &Event, key: &IdKey) -> Vec<String> {
-    match event {
-        Event::Registered { identity, .. }
-        | Event::FactorAdded { identity, .. }
-        | Event::FactorRemoved { identity, .. }
-        | Event::EmailVerified { identity, .. }
-        | Event::PersonSplit { identity, .. }
-        | Event::IdentityLinked { identity, .. }
-        | Event::LinkClaimed { identity, .. } => vec![identity.public(key).as_str().to_owned()],
-        // The known miss, written down in this module's own docs: a merge
-        // names two persons and no identity, and finding the identities would
-        // be a query this function cannot make.
-        Event::PersonMerged { .. } => Vec::new(),
-        Event::SignedIn { .. }
-        | Event::SignedOut { .. }
-        | Event::SessionRevoked { .. }
-        | Event::ActingAs { .. }
-        | Event::PartyDisabled { .. }
-        | Event::PartyEnabled { .. }
-        | Event::MatchProposed { .. }
-        | Event::MatchRejected { .. }
-        | Event::OrganizationCreated { .. }
-        | Event::GroupCreated { .. }
-        | Event::Invited { .. }
-        | Event::LinkRevoked { .. }
-        | Event::RoleSet { .. }
-        | Event::MemberRemoved { .. }
-        | Event::Left { .. }
-        | Event::Shared { .. }
-        | Event::Revoked { .. }
-        | Event::Transferred { .. }
-        | Event::DocumentCreated { .. }
-        | Event::DocumentEdited { .. }
-        | Event::DocumentPublished { .. }
-        | Event::SessionEnded { .. }
-        | Event::HandleSet { .. }
-        | Event::ClientRegistered { .. }
-        | Event::ClientUpdated { .. }
-        | Event::ClientSecretRotated { .. }
-        | Event::ClientDeleted { .. }
-        | Event::SigningKeyRotated { .. }
-        | Event::Authorized { .. }
-        | Event::CodeExchanged { .. }
-        | Event::TokenRefreshed { .. }
-        | Event::ServiceTokenIssued { .. }
-        | Event::TokenRevoked { .. }
-        // An impersonation is a session of an identity that already existed,
-        // and a re-authentication touches a column no identity list renders.
-        | Event::OperatorGranted { .. }
-        | Event::OperatorRevoked { .. }
-        | Event::ReAuthenticated { .. }
-        | Event::Impersonated { .. }
-        | Event::ImpersonationEnded { .. }
-        | Event::SigningKeyRetired { .. }
-        | Event::ConsentRevoked { .. } => Vec::new(),
-    }
-}
-
-fn sessions_changed(event: &Event, key: &IdKey) -> Vec<String> {
-    match event {
-        Event::Registered { session, .. }
-        | Event::SignedIn { session, .. }
-        | Event::SignedOut { session, .. }
-        | Event::SessionRevoked { session, .. } => {
-            vec![session.public(key).as_str().to_owned()]
-        }
-        // Disabling a party deletes every session its identities hold, and the
-        // event names none of them. The rows go; the list learns on re-read.
-        _ => Vec::new(),
-    }
-}
-
-fn matches_changed(event: &Event, key: &IdKey) -> Vec<String> {
-    fn one(candidate: Id<MatchCandidate>, key: &IdKey) -> Vec<String> {
-        vec![candidate.public(key).as_str().to_owned()]
-    }
-    match event {
-        Event::MatchProposed { candidate } | Event::MatchRejected { candidate } => {
-            one(*candidate, key)
-        }
-        Event::PersonMerged { candidate, .. } => candidate.map(|c| one(c, key)).unwrap_or_default(),
-        _ => Vec::new(),
-    }
-}
-
-fn resources_changed(event: &Event, key: &IdKey) -> Vec<String> {
-    fn one(resource: Id<Resource>, key: &IdKey) -> Vec<String> {
-        vec![resource.public(key).as_str().to_owned()]
-    }
-    match event {
-        Event::OrganizationCreated { resource, .. } | Event::GroupCreated { resource, .. } => {
-            one(*resource, key)
-        }
-        Event::DocumentCreated { document, .. }
-        | Event::DocumentEdited { document, .. }
-        | Event::DocumentPublished { document, .. } => one(*document, key),
-        Event::Transferred { resource, .. } => one(*resource, key),
-        _ => Vec::new(),
-    }
 }
 
 pub use super::platform_statements::statements;
@@ -633,7 +480,7 @@ mod tests {
         assert_eq!(names.len(), count, "a statement is listed twice");
         // One list statement per list query, plus every drill-in's own reads.
         assert_eq!(
-            count, 51,
+            count, 52,
             "a statement was added to a platform query and not to `statements()`"
         );
     }

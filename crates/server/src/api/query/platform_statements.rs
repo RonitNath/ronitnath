@@ -184,6 +184,11 @@ pub fn statements() -> Vec<(&'static str, &'static str, Vec<Value>)> {
             super::platform_person::HANDLE_ALIASES,
             bind![1i64],
         ),
+        (
+            "operators.list",
+            super::platform_operators::OPERATORS,
+            bind![],
+        ),
         ("find.handle", super::platform_find::BY_HANDLE, bind!["bea"]),
         (
             "find.email",

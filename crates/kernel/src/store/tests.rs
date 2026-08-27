@@ -73,6 +73,12 @@ async fn the_migration_creates_exactly_the_reports_tables() {
             "link",
             "match_candidate",
             "membership",
+            // Migration 9's: one row per node, upserted from the observation
+            // lane. The only table here that is not a record of something
+            // somebody commanded — a node's account of itself is an
+            // observation, and putting it on the change feed would grow the
+            // audit table by a node's pulse.
+            "node_report",
             // Migration 6's, the OpenID Provider's.
             "oidc_assertion",
             "oidc_client",
@@ -343,20 +349,22 @@ fn a_clock_a_test_owns_moves_only_when_told() {
 #[test]
 fn the_embedded_migrations_are_the_files_on_disk() {
     let sql = migrations();
-    // Seven files: `1_kernel.sql` creates every table, `2_relations.sql` adds
+    // Nine files: `1_kernel.sql` creates every table, `2_relations.sql` adds
     // what the relation store needs on top of them, `3_merge.sql` what merge
     // needs, `4_invitations.sql` the index "invitations I minted" seeks on,
     // `5_visibility.sql` the one that makes "the newest N I own" a bounded
     // read, `6_oidc.sql` the OpenID Provider, `7_authority.sql` what an
-    // operator's authority needs to be accountable. Each is asserted below by
-    // something only that file contains.
-    assert_eq!(sql.len(), 7);
+    // operator's authority needs to be accountable, `8_products.sql` runtime
+    // product enablement, and `9_node_report.sql` what each node says about
+    // itself. Each is asserted below by something only that file contains.
+    assert_eq!(sql.len(), 9);
     assert!(sql[0].contains("CREATE TABLE party"));
     assert!(sql[2].contains("person_link_is_append_only_update"));
     assert!(sql[3].contains("relation_granted_by_idx"));
     assert!(sql[4].contains("resource_owner_created_idx"));
     assert!(sql[5].contains("CREATE TABLE oidc_client"));
     assert!(sql[6].contains("CREATE TABLE audit_object"));
+    assert!(sql[8].contains("CREATE TABLE node_report"));
     // Order is what makes the second file able to alter the first's tables.
     assert!(sql[1].contains("ALTER TABLE relation"));
 }

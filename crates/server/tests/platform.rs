@@ -17,6 +17,7 @@ mod harness;
 
 use axum::http::StatusCode;
 use rn_kernel::bind;
+use rn_kernel::store::Reads as _;
 use rn_kernel::testing::Local;
 use rn_site::api::query::{ALL, Named};
 use tokio::sync::OnceCell;
@@ -40,7 +41,7 @@ fn platform_names() -> Vec<&'static str> {
 #[test]
 fn every_platform_query_is_reachable_and_named_once() {
     let names = platform_names();
-    assert_eq!(names.len(), 18, "the platform surface is eighteen queries");
+    assert_eq!(names.len(), 19, "the platform surface is nineteen queries");
     for name in &names {
         assert!(name.starts_with("platform-"), "{name}");
         assert_eq!(Named::parse(name).map(|q| q.as_str()), Some(*name));
@@ -335,4 +336,232 @@ async fn explain_the_relation_reads_ride_their_own_indexes() {
     // "who holds anything on this resource" — the two directions, two indexes.
     by("parties.as_subject", "relation_subject_key_idx", &plans);
     by("resources.as_object", "relation_object_idx", &plans);
+}
+
+// -------------------------------------------------- what the pages say ---
+
+/// The person page prints every factor a human has proven, and an operator
+/// console that printed the addresses would be the enumeration endpoint the
+/// whole identity model exists not to have. One screenshot onto a support
+/// ticket is all it takes.
+#[test]
+fn the_person_a_page_renders_carries_no_address_at_all() {
+    harness::run(async {
+        let state = state().await;
+        let server = harness::server(&state);
+        let operator = harness::register(&state, "Reader", "plat-mask-op@example.invalid").await;
+        harness::operate_platform(&state, operator.person).await;
+        // Somebody whose address is distinctive enough that finding any part
+        // of it in the answer is finding the address.
+        let subject =
+            harness::register(&state, "Masked", "plat-mask-subject@example.invalid").await;
+
+        let id = {
+            let response = server
+                .get("/api/q/platform-parties")
+                .add_header("cookie", format!("rn_session={}", operator.token))
+                .await;
+            response.assert_status_ok();
+            let rows: Vec<serde_json::Value> = response.json();
+            rows.iter()
+                .find(|row| row["display"] == "Masked")
+                .expect("the party is in the list")["public_id"]
+                .as_str()
+                .expect("a public id")
+                .to_owned()
+        };
+
+        let response = server
+            .get(&format!("/api/q/platform-party?subject={id}"))
+            .add_header("cookie", format!("rn_session={}", operator.token))
+            .await;
+        response.assert_status_ok();
+        let body = response.text();
+
+        // The claim, exactly: no `@`-bearing address survives. Every `@` in
+        // the answer is a mask's trailing one, which carries the first and
+        // last character of a local part and nothing else — enough to
+        // recognise a row on a support call, not enough to write to it.
+        assert!(
+            !body.contains("example.invalid"),
+            "a domain reached the answer: {body}"
+        );
+        for (index, _) in body.match_indices('@') {
+            // A mask is `…@` or `X…Y@`, so the `@` is preceded either by the
+            // ellipsis itself or by one character that follows it.
+            let before = &body[..index];
+            let masked = before.ends_with('\u{2026}')
+                || before
+                    .char_indices()
+                    .next_back()
+                    .is_some_and(|(last, _)| before[..last].ends_with('\u{2026}'));
+            assert!(
+                masked,
+                "an unmasked address reached the answer at byte {index}: {body}"
+            );
+        }
+
+        // And what it *does* carry is the mask, on a factor that says which
+        // kind it is and whether it has been proven.
+        let rows: Vec<serde_json::Value> = serde_json::from_str(&body).expect("an array");
+        let person = rows.first().expect("one party");
+        let factors = person["factors"].as_array().expect("a factor list");
+        let email = factors
+            .iter()
+            .find(|factor| factor["kind"] == "email")
+            .expect("the registration proved an address");
+        assert_eq!(email["hint"], "p\u{2026}t@");
+        // A password has no half worth showing, so it shows none.
+        let password = factors
+            .iter()
+            .find(|factor| factor["kind"] == "password")
+            .expect("the registration set a password");
+        assert!(password["hint"].is_null(), "{password}");
+        assert!(
+            subject.person.get() > 0,
+            "the subject resolved to a person row"
+        );
+    });
+}
+
+/// The one box: three exact seeks, a miss that is empty rather than a decline,
+/// and no prefix scan over a name.
+#[test]
+fn the_search_box_answers_exactly_or_empty() {
+    harness::run(async {
+        let state = state().await;
+        let server = harness::server(&state);
+        let operator = harness::register(&state, "Finder", "plat-find-op@example.invalid").await;
+        harness::operate_platform(&state, operator.person).await;
+        let cookie = format!("rn_session={}", operator.token);
+        harness::register(&state, "Findable", "plat-findable@example.invalid").await;
+
+        let ask = async |q: &str| -> Vec<serde_json::Value> {
+            let response = server
+                .get(&format!("/api/q/platform-find?q={q}"))
+                .add_header("cookie", cookie.clone())
+                .await;
+            assert_eq!(
+                response.status_code(),
+                StatusCode::OK,
+                "a search is never a decline: {}",
+                response.text()
+            );
+            response.json()
+        };
+
+        // The exact address finds the person behind the registration.
+        let hit = ask("plat-findable@example.invalid").await;
+        assert_eq!(hit.len(), 1, "{hit:?}");
+        assert_eq!(hit[0]["display"], "Findable");
+        assert_eq!(hit[0]["via"], "email");
+
+        // The exact public id finds the same row by another road.
+        let id = hit[0]["public_id"].as_str().expect("an id").to_owned();
+        let by_id = ask(&id).await;
+        assert_eq!(by_id.len(), 1);
+        assert_eq!(by_id[0]["public_id"], serde_json::json!(id));
+        assert_eq!(by_id[0]["via"], "id");
+
+        // A prefix of the display name is not a search: this box seeks and
+        // never scans, and saying so by finding nothing is the honest answer.
+        assert!(ask("Find").await.is_empty());
+        // Forty characters of junk: not a handle, not an address, not an id.
+        assert!(ask(&"9x_".repeat(14)).await.is_empty());
+        // And a miss is empty rather than a decline — an operator searching is
+        // not being probed.
+        assert!(ask("nobody@example.invalid").await.is_empty());
+    });
+}
+
+/// The rollout verdict is counted from the rows, so it can only say what it
+/// counted — and a node that has stopped reporting says so rather than
+/// leaving the version it left on standing for the deployment's.
+#[test]
+fn the_rollout_verdict_names_the_versions_it_counted() {
+    harness::run(async {
+        let state = state().await;
+        let server = harness::server(&state);
+        let operator = harness::register(&state, "Watcher", "plat-nodes@example.invalid").await;
+        harness::operate_platform(&state, operator.person).await;
+        let cookie = format!("rn_session={}", operator.token);
+
+        let seed = async |node_id: i64, version: &str, age: i64| {
+            let now = state.store.reads().now();
+            state
+                .store
+                .execute(
+                    "INSERT INTO node_report \
+                     (node_id, node, version, raft_role, feed_head, reported_at) \
+                     VALUES ($1, $2, $3, 'follower', 40, $4) \
+                     ON CONFLICT (node_id) DO UPDATE SET \
+                       version = excluded.version, reported_at = excluded.reported_at",
+                    bind![node_id, format!("node{node_id}"), version, now - age],
+                )
+                .await
+                .expect("a report row");
+        };
+        let nodes = async || -> Vec<serde_json::Value> {
+            server
+                .get("/api/q/platform-nodes")
+                .add_header("cookie", cookie.clone())
+                .await
+                .json()
+        };
+
+        // Three nodes, two versions, all of them speaking.
+        seed(1, "9f21ac3", 0).await;
+        seed(2, "9f21ac3", 2).await;
+        seed(3, "8b0e114", 3).await;
+        let rows = nodes().await;
+        assert_eq!(rows.len(), 3);
+        assert_eq!(rows[0]["rollout"], "in progress");
+        let versions = rows[0]["versions"].as_array().expect("the versions");
+        assert_eq!(versions.len(), 2, "both versions are named: {versions:?}");
+        assert!(versions.contains(&serde_json::json!("9f21ac3")));
+        assert!(versions.contains(&serde_json::json!("8b0e114")));
+        assert!(rows.iter().all(|row| row["reporting"] == true));
+
+        // A third version is nobody being able to say what is running.
+        seed(3, "3c5d992", 3).await;
+        seed(2, "8b0e114", 2).await;
+        assert_eq!(nodes().await[0]["rollout"], "divergent");
+
+        // And the node that stopped speaking is *not reporting* rather than
+        // holding the deployment in a rollout with the version it left on.
+        seed(3, "3c5d992", 600).await;
+        seed(2, "9f21ac3", 2).await;
+        let rows = nodes().await;
+        assert_eq!(rows[2]["reporting"], false, "{:?}", rows[2]);
+        assert!(rows[2]["reported_ago"].as_i64().expect("an age") >= 600);
+        assert_eq!(
+            rows[0]["rollout"], "settled",
+            "a departed node's version is not the deployment's: {rows:?}"
+        );
+        assert_eq!(rows[0]["reporting"], true);
+    });
+}
+
+/// Every node writes its own row and nobody else's, from the observation lane.
+#[test]
+fn a_node_writes_down_what_it_is() {
+    harness::run(async {
+        let state = state().await;
+        state
+            .store
+            .execute("DELETE FROM node_report", bind![])
+            .await
+            .expect("an empty table");
+        assert!(rn_site::observe::report(&state).await, "the row is written");
+        // Twice is one row: the upsert is on the node id, so a restart reuses
+        // the row rather than growing the table.
+        assert!(rn_site::observe::report(&state).await);
+        let rows = state
+            .store
+            .reads()
+            .query::<rn_kernel::store::Count>("SELECT count(*) AS n FROM node_report", bind![])
+            .await
+            .expect("the count");
+        assert_eq!(rows[0].0, 1);
+    });
 }

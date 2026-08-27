@@ -19,6 +19,8 @@ pub struct Party {
     pub public_id: PublicId,
     pub kind: String,
     pub display: String,
+    /// A person's `preferred_username`. Absent on every other kind.
+    pub handle: Option<String>,
     pub status: String,
     pub created_at: i64,
 }
@@ -29,6 +31,7 @@ pub struct PartyDetail {
     pub public_id: PublicId,
     pub kind: String,
     pub display: String,
+    pub handle: Option<String>,
     pub status: String,
     pub created_at: i64,
     pub identities: Vec<PartyIdentity>,
@@ -245,4 +248,208 @@ pub struct GrantedRelation {
     /// subjects with no row of their own to name.
     pub subject: Option<PublicId>,
     pub at: i64,
+}
+
+/// One node's reading of itself, and the verdict counted from the whole set.
+///
+/// `rollout` and `versions` are the same on every row because every row
+/// counted the same set; the screen reads them once.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+pub struct Node {
+    pub node_id: i64,
+    pub node: String,
+    pub version: String,
+    pub raft_role: String,
+    pub feed_head: i64,
+    pub reported_at: i64,
+    pub reported_ago: i64,
+    /// Whether the last reading is fresh enough to be current. False is what
+    /// the screen says as *not reporting*.
+    pub reporting: bool,
+    pub rollout: String,
+    pub versions: Vec<String>,
+}
+
+/// The two feed readings. Never a rate.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+pub struct Feed {
+    pub offset: i64,
+    pub commands_today: i64,
+}
+
+/// A signing key, and what retiring it would make unverifiable.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+pub struct Key {
+    pub kid: String,
+    pub status: String,
+    pub created_at: i64,
+    pub age_days: i64,
+    pub retired_at: Option<i64>,
+    pub signed_tokens_alive: i64,
+}
+
+/// A registered relying party.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+pub struct Client {
+    pub public_id: PublicId,
+    pub client_name: String,
+    pub client_uri: Option<String>,
+    pub owner: Option<PublicId>,
+    pub owner_display: Option<String>,
+    pub redirect_uris: Vec<String>,
+    pub token_endpoint_auth_method: String,
+    pub scopes: Vec<String>,
+    pub trusted: bool,
+    pub members_only: bool,
+    pub created_at: i64,
+    pub rotated_at: Option<i64>,
+    pub withdrawn_at: Option<i64>,
+    pub consents: i64,
+    pub live_tokens: i64,
+    pub last_issued_at: Option<i64>,
+}
+
+/// An outstanding invitation. Named by its public id, never by its token.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+pub struct Invitation {
+    pub public_id: PublicId,
+    pub container: Option<PublicId>,
+    pub container_kind: String,
+    pub container_display: Option<String>,
+    pub role: String,
+    pub minted_by: Option<String>,
+    pub created_at: i64,
+    pub expires_at: i64,
+    pub claimed_at: Option<i64>,
+    pub claimed_by: Option<String>,
+    pub suspended_at: Option<i64>,
+    pub state: String,
+}
+
+/// One person's consent to one client.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+pub struct Consent {
+    pub client: PublicId,
+    pub client_name: String,
+    pub person: PublicId,
+    pub person_display: String,
+    pub handle: Option<String>,
+    pub scopes: String,
+    pub at: i64,
+}
+
+/// What a disable would end, counted at the time of asking.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+pub struct Cascade {
+    pub sessions: i64,
+    pub tokens: i64,
+    pub links: i64,
+    pub consents: i64,
+}
+
+/// A row the one search box found, and which of the three seeks found it.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+pub struct Found {
+    pub public_id: PublicId,
+    pub kind: String,
+    pub display: String,
+    pub handle: Option<String>,
+    pub status: String,
+    pub created_at: i64,
+    pub via: String,
+}
+
+/// A factor of one of a person's registrations. Never a value.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+pub struct PersonFactor {
+    pub public_id: PublicId,
+    pub identity: PublicId,
+    pub kind: String,
+    pub verified: bool,
+    /// The masked local part, for an address. Nothing for anything else.
+    pub hint: Option<String>,
+}
+
+/// A session one of those registrations is holding.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+pub struct PersonSession {
+    pub public_id: PublicId,
+    pub identity: PublicId,
+    pub acting_kind: String,
+    pub acting_display: String,
+    /// Set only on a session an operator is wearing.
+    pub impersonated_by: Option<PublicId>,
+    pub created_at: i64,
+    pub last_seen_at: i64,
+    pub expires_at: i64,
+}
+
+/// A client this person has said yes to.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+pub struct PersonConsent {
+    pub client: PublicId,
+    pub client_name: String,
+    pub scopes: String,
+    pub at: i64,
+}
+
+/// One ruling that attached a registration to this person.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+pub struct Merge {
+    pub identity: PublicId,
+    pub method: String,
+    pub evidence: Option<String>,
+    pub asserted_by: Option<PublicId>,
+    pub asserted_display: Option<String>,
+    pub at: i64,
+}
+
+/// A name a merge absorbed: an id that still resolves here, or a handle
+/// nobody may take again.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+pub struct AbsorbedName {
+    pub kind: String,
+    pub was: String,
+    pub at: i64,
+}
+
+/// The person page: everything the deployment knows about one human.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+pub struct Person {
+    pub public_id: PublicId,
+    pub kind: String,
+    pub display: String,
+    pub handle: Option<String>,
+    pub status: String,
+    pub created_at: i64,
+    pub identities: Vec<PartyIdentity>,
+    pub memberships: Vec<Membership>,
+    pub resources: Vec<OwnedResource>,
+    pub relations: Vec<HeldRelation>,
+    #[serde(default)]
+    pub factors: Vec<PersonFactor>,
+    #[serde(default)]
+    pub sessions: Vec<PersonSession>,
+    #[serde(default)]
+    pub consents: Vec<PersonConsent>,
+    #[serde(default)]
+    pub merges: Vec<Merge>,
+    #[serde(default)]
+    pub aliases: Vec<AbsorbedName>,
+}
+
+/// Somebody who holds `platform:* #operator`.
+///
+/// `granted_by` is false on exactly one row — the bootstrap — and the screen
+/// says *granted by configuration* there rather than leaving a dash, because
+/// a dash is what a page prints when it does not know.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+pub struct Operator {
+    pub public_id: PublicId,
+    pub display: String,
+    pub handle: Option<String>,
+    pub status: String,
+    pub at: i64,
+    pub granted_by: bool,
+    pub granted_display: Option<String>,
 }
