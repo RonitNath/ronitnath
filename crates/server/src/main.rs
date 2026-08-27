@@ -60,6 +60,11 @@ async fn main() {
         return;
     }
 
+    // The observation lane: `last_seen`, match scanning and the two sweeps.
+    // Held rather than detached, so it stops when this scope does — a task
+    // still writing while hiqlite is being handed back is an auto-heal boot.
+    let lane = rn_site::observe::spawn(state.clone());
+
     let app = rn_site::router(state.clone());
 
     let listener = match tokio::net::TcpListener::bind(addr).await {
@@ -84,6 +89,8 @@ async fn main() {
     if let Err(error) = served {
         tracing::error!(%error, "the listener stopped with an error");
     }
+
+    lane.stop().await;
 
     // The listener has drained by the time `serve` returns; only now is it safe
     // to hand the raft group back, which is what lets a voter leave cleanly.

@@ -12,7 +12,7 @@ use std::sync::Arc;
 use hiqlite::Client;
 use rn_kernel::feed::ClusterFeed;
 use rn_kernel::ids::IdKey;
-use rn_kernel::observe::Observations;
+use rn_kernel::observe::{Matches, Observations};
 use rn_kernel::principal::PrincipalCache;
 use rn_kernel::store::{Clock, Store};
 
@@ -40,6 +40,9 @@ pub struct AppState {
     pub principals: Arc<PrincipalCache>,
     /// The observation lane: `last_seen`, drained on a timer, never on a read.
     pub observations: Arc<Observations>,
+    /// The other half of that lane: identities whose proofs moved and are
+    /// waiting to be scanned for match signals.
+    pub matches: Arc<Matches>,
     /// Live subscription sockets, so the per-identity and per-node caps are
     /// one shared count rather than a number each connection believes.
     pub connections: Arc<Connections>,
@@ -53,9 +56,23 @@ impl AppState {
     /// malformed one at load, and dev mints a well-formed ephemeral one.
     #[must_use]
     pub fn new(db: Client, config: AppConfig) -> Self {
+        Self::with_clock(db, config, Clock::System)
+    }
+
+    /// The same state on a clock the caller supplies.
+    ///
+    /// Everything time-dependent in the kernel reads `store.clock()`, so a
+    /// fixed clock is how a test asks what the deployment looks like five
+    /// minutes from now without waiting five minutes.
+    ///
+    /// # Panics
+    ///
+    /// As [`AppState::new`].
+    #[must_use]
+    pub fn with_clock(db: Client, config: AppConfig, clock: Clock) -> Self {
         let key = IdKey::from_hex(&config.require_id_key())
             .expect("the configuration refuses a malformed id key at load");
-        let store = Arc::new(Store::new(db.clone(), key, Clock::System));
+        let store = Arc::new(Store::new(db.clone(), key, clock));
         let feed = Arc::new(ClusterFeed::new(Arc::clone(&store)));
         let principals = Arc::new(PrincipalCache::new(PRINCIPAL_CACHE));
         // A revoked session must stop working, not merely stop being renewed.
@@ -70,6 +87,7 @@ impl AppState {
             feed,
             principals,
             observations: Arc::new(Observations::new()),
+            matches: Arc::new(Matches::new()),
             connections: Arc::new(Connections::default()),
         }
     }

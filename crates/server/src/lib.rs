@@ -27,6 +27,7 @@ pub mod config;
 pub mod db;
 pub mod http;
 pub mod links;
+pub mod observe;
 pub mod ops;
 pub mod presence;
 pub mod shell;

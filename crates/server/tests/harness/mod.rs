@@ -57,6 +57,17 @@ pub fn run<F: std::future::Future>(future: F) -> F::Output {
 /// One node per binary rather than per test: hiqlite's formation delay is paid
 /// once, and the tests share a database the way the routes share one process.
 pub async fn node(cell: &'static OnceCell<AppState>, raft: &str, api: &str) -> AppState {
+    node_on(cell, raft, api, rn_kernel::store::Clock::System).await
+}
+
+/// The same node on a clock the caller supplies, for the suites that need to
+/// ask what the deployment looks like five minutes from now.
+pub async fn node_on(
+    cell: &'static OnceCell<AppState>,
+    raft: &str,
+    api: &str,
+    clock: rn_kernel::store::Clock,
+) -> AppState {
     cell.get_or_init(|| async {
         let directory = Box::leak(Box::new(
             tempfile::tempdir().expect("a temporary data directory"),
@@ -73,7 +84,7 @@ pub async fn node(cell: &'static OnceCell<AppState>, raft: &str, api: &str) -> A
         let db = db::open_on(&config, raft, api, Tuning::fast_single_node(), &migrations)
             .await
             .expect("a single dev node");
-        AppState::new(db, config)
+        AppState::with_clock(db, config, clock)
     })
     .await
     .clone()
