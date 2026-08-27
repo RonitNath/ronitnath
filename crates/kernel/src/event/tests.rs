@@ -33,18 +33,19 @@ const fn index(event: &Event) -> usize {
         Event::LinkRevoked { .. } => 17,
         Event::LinkClaimed { .. } => 18,
         Event::RoleSet { .. } => 19,
-        Event::Left { .. } => 20,
-        Event::Shared { .. } => 21,
-        Event::Revoked { .. } => 22,
-        Event::Transferred { .. } => 23,
-        Event::DocumentCreated { .. } => 24,
-        Event::DocumentEdited { .. } => 25,
-        Event::DocumentPublished { .. } => 26,
+        Event::MemberRemoved { .. } => 20,
+        Event::Left { .. } => 21,
+        Event::Shared { .. } => 22,
+        Event::Revoked { .. } => 23,
+        Event::Transferred { .. } => 24,
+        Event::DocumentCreated { .. } => 25,
+        Event::DocumentEdited { .. } => 26,
+        Event::DocumentPublished { .. } => 27,
     }
 }
 
 /// How many there are. Stated once, asserted against both lists.
-const VARIANTS: usize = 27;
+const VARIANTS: usize = 28;
 
 /// One of each, with ids that are obviously placeholders.
 fn every_variant() -> Vec<Event> {
@@ -126,6 +127,10 @@ fn every_variant() -> Vec<Event> {
             party: Id::new(1),
         },
         Event::RoleSet {
+            container: Id::new(1),
+            party: Id::new(1),
+        },
+        Event::MemberRemoved {
             container: Id::new(1),
             party: Id::new(1),
         },

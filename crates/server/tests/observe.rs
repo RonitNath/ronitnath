@@ -21,6 +21,18 @@ use tokio::sync::OnceCell;
 
 static NODE: OnceCell<AppState> = OnceCell::const_new();
 
+/// These cases share one node *and one clock*, and each of them moves the
+/// world: a drain another case started would write the row this one is
+/// watching. So they run one at a time, which is what "the lane is a
+/// singleton" means when you are testing it rather than running it.
+static SERIAL: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+fn alone() -> std::sync::MutexGuard<'static, ()> {
+    SERIAL
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+}
+
 /// The second this suite's world starts at. Any plausible unix time will do;
 /// what matters is that the tests move it and the system clock cannot.
 const EPOCH: i64 = 1_800_000_000;
@@ -63,6 +75,7 @@ async fn candidates(state: &AppState) -> i64 {
 
 #[test]
 fn a_sighting_the_request_path_refused_to_write_is_written_by_the_drain() {
+    let _alone = alone();
     harness::run(async {
         let state = state().await;
         let server = harness::server(&state);
@@ -112,6 +125,7 @@ fn a_sighting_the_request_path_refused_to_write_is_written_by_the_drain() {
 
 #[test]
 fn two_identities_that_proved_the_same_oidc_subject_are_proposed_as_one_person() {
+    let _alone = alone();
     harness::run(async {
         let state = state().await;
         let server = harness::server(&state);
@@ -170,6 +184,7 @@ fn two_identities_that_proved_the_same_oidc_subject_are_proposed_as_one_person()
 
 #[test]
 fn the_lane_stops_when_it_is_told_to() {
+    let _alone = alone();
     harness::run(async {
         let state = state().await;
         let lane = rn_site::observe::spawn_every(state.clone(), Duration::from_millis(5));
@@ -185,6 +200,7 @@ fn the_lane_stops_when_it_is_told_to() {
 /// suites above can trust `harness::register`.
 #[test]
 fn a_registration_on_this_node_is_a_member() {
+    let _alone = alone();
     harness::run(async {
         let state = state().await;
         let who = harness::register(&state, "Member", "observe-member@example.invalid").await;

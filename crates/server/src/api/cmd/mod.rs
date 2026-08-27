@@ -23,8 +23,8 @@ use axum::{Json, Router, routing::post};
 use rn_api::commands::{
     ALL_COMMAND_NAMES, AddFactor, ClaimLink, ConfirmMatch, CreateDocument, CreateGroup,
     CreateOrganization, Disable, EditDocument, Enable, Invite, Leave, ProposeMatch,
-    PublishDocument, Register, RemoveFactor, Revoke, RevokeLink, RevokeSession, RuleMatch, SetRole,
-    Share, SignIn, SignOut, Split, Transfer, VerifyEmail,
+    PublishDocument, Register, RemoveFactor, RemoveMember, Revoke, RevokeLink, RevokeSession,
+    RuleMatch, SetRole, Share, SignIn, SignOut, Split, Transfer, VerifyEmail,
 };
 use rn_api::{Command, CommandEnvelope};
 use rn_kernel::Principal;
@@ -98,6 +98,7 @@ bindings! {
     plain ClaimLink => cmd::claim_link,
     plain RevokeLink => cmd::revoke_link,
     plain SetRole => cmd::set_role,
+    plain RemoveMember => cmd::remove_member,
     plain Leave => cmd::leave,
     plain Share => cmd::share,
     plain Revoke => cmd::revoke,

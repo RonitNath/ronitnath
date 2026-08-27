@@ -185,6 +185,13 @@ pub enum Event {
         /// Whose role.
         party: Id<Person>,
     },
+    /// A member was removed by somebody who administers the container.
+    MemberRemoved {
+        /// The container.
+        container: Id<Group>,
+        /// Who is no longer in it.
+        party: Id<Person>,
+    },
     /// A member left.
     Left {
         /// The container.
@@ -270,6 +277,7 @@ impl Event {
             Self::LinkRevoked { .. } => "revoke-link",
             Self::LinkClaimed { .. } => "claim-link",
             Self::RoleSet { .. } => "set-role",
+            Self::MemberRemoved { .. } => "remove-member",
             Self::Left { .. } => "leave",
             Self::Shared { .. } => "share",
             Self::Revoked { .. } => "revoke",
@@ -309,6 +317,7 @@ impl Event {
             | Self::DocumentCreated { owner, .. } => Some(*owner),
             Self::LinkClaimed { party, .. }
             | Self::RoleSet { party, .. }
+            | Self::MemberRemoved { party, .. }
             | Self::Left { party, .. } => Some(*party),
             Self::Transferred { to, .. } => Some(*to),
             _ => None,

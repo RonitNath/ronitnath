@@ -1,6 +1,6 @@
 //! Organizations, groups, invitations and roles.
 
-use rn_api::commands::{ClaimLink, Leave, RevokeLink, SetRole};
+use rn_api::commands::{ClaimLink, Leave, RemoveMember, RevokeLink, SetRole};
 use rn_api::whoami::MemberRole as WireRole;
 
 use super::world::{self, key, public};
@@ -496,5 +496,125 @@ async fn an_invitation_somebody_already_claimed_is_not_withdrawn() {
             .await
             .expect("reads"),
         Some(MemberRole::Member)
+    );
+}
+
+// ------------------------------------------------------ removing somebody ---
+
+#[tokio::test]
+async fn an_admin_removes_a_role_below_their_own_and_never_the_last_owner() {
+    let harness = Local::new();
+    let owner = world::person(&harness, "Owner", "rm-owner@example.test").await;
+    let admin = world::person(&harness, "Admin", "rm-admin@example.test").await;
+    let joiner = world::person(&harness, "Joiner", "rm-joiner@example.test").await;
+    let group = world::group(&harness, &owner, "Team", None)
+        .await
+        .expect("creates");
+    let container = public(key(&harness), group);
+    let party = Id::new(group.get());
+
+    for who in [&admin, &joiner] {
+        let token = world::invite(
+            &harness,
+            &owner,
+            container.clone(),
+            WireRole::Member,
+            TEST_EPOCH + 3_600,
+        )
+        .await
+        .expect("mints");
+        cmd::claim_link(
+            &harness.ctx(who.principal.clone()),
+            &ClaimLink {
+                token: token.expose().to_owned(),
+            },
+        )
+        .await
+        .expect("claims");
+    }
+    cmd::set_role(
+        &harness.ctx(owner.principal.clone()),
+        &SetRole {
+            group: container.clone(),
+            party: public(key(&harness), admin.person()),
+            role: WireRole::Admin,
+        },
+    )
+    .await
+    .expect("promotes");
+
+    // A member removes nobody, however much they would like to.
+    let refused = cmd::remove_member(
+        &harness.ctx(joiner.principal.clone()),
+        &RemoveMember {
+            group: container.clone(),
+            party: public(key(&harness), admin.person()),
+        },
+    )
+    .await;
+    assert!(matches!(refused, Err(ref e) if e.is_decline()));
+
+    // An admin removes a member — and not the owner above them, nor another
+    // admin, which would be removing whoever appointed them.
+    for above in [owner.person(), admin.person()] {
+        let refused = cmd::remove_member(
+            &harness.ctx(admin.principal.clone()),
+            &RemoveMember {
+                group: container.clone(),
+                party: public(key(&harness), above),
+            },
+        )
+        .await;
+        assert!(matches!(refused, Err(ref e) if e.is_decline()));
+    }
+    let committed = cmd::remove_member(
+        &harness.ctx(admin.principal.clone()),
+        &RemoveMember {
+            group: container.clone(),
+            party: public(key(&harness), joiner.person()),
+        },
+    )
+    .await
+    .expect("an admin removes a member");
+    assert_eq!(
+        committed.event,
+        Event::MemberRemoved {
+            container: group,
+            party: joiner.person()
+        }
+    );
+    assert_eq!(
+        org::role_of(harness.store(), party, joiner.person())
+            .await
+            .expect("reads"),
+        None
+    );
+
+    // The owner removes the admin, and cannot remove themselves — that is
+    // `Leave`, and here it is the last owner anyway.
+    cmd::remove_member(
+        &harness.ctx(owner.principal.clone()),
+        &RemoveMember {
+            group: container.clone(),
+            party: public(key(&harness), admin.person()),
+        },
+    )
+    .await
+    .expect("an owner removes an admin");
+    let me = public(key(&harness), owner.person());
+    let refused = cmd::remove_member(
+        &harness.ctx(owner.principal.clone()),
+        &RemoveMember {
+            group: container,
+            party: me,
+        },
+    )
+    .await;
+    assert!(matches!(refused, Err(ref e) if e.is_decline()));
+    assert_eq!(
+        org::owner_count(harness.store(), party)
+            .await
+            .expect("reads"),
+        1
     );
 }

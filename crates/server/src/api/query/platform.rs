@@ -230,6 +230,7 @@ fn parties_changed(event: &Event, key: &IdKey) -> Vec<String> {
         | Event::LinkRevoked { .. }
         | Event::LinkClaimed { .. }
         | Event::RoleSet { .. }
+        | Event::MemberRemoved { .. }
         | Event::Left { .. }
         | Event::Shared { .. }
         | Event::Revoked { .. }
@@ -265,6 +266,7 @@ fn identities_changed(event: &Event, key: &IdKey) -> Vec<String> {
         | Event::Invited { .. }
         | Event::LinkRevoked { .. }
         | Event::RoleSet { .. }
+        | Event::MemberRemoved { .. }
         | Event::Left { .. }
         | Event::Shared { .. }
         | Event::Revoked { .. }

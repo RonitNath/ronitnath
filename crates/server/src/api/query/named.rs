@@ -233,6 +233,7 @@ impl Named {
                 Event::GroupCreated { .. }
                     | Event::LinkClaimed { .. }
                     | Event::RoleSet { .. }
+                    | Event::MemberRemoved { .. }
                     | Event::Left { .. }
                     | Event::Transferred { .. }
             ),
@@ -241,6 +242,7 @@ impl Named {
                 Event::GroupCreated { .. }
                     | Event::LinkClaimed { .. }
                     | Event::RoleSet { .. }
+                    | Event::MemberRemoved { .. }
                     | Event::Left { .. }
                     | Event::Shared { .. }
                     | Event::Revoked { .. }

@@ -118,6 +118,10 @@ impl Event {
                 container: field(&json, "container")?,
                 party: field(&json, "party")?,
             },
+            "remove-member" => Self::MemberRemoved {
+                container: field(&json, "container")?,
+                party: field(&json, "party")?,
+            },
             "leave" => Self::Left {
                 container: field(&json, "container")?,
                 party: field(&json, "party")?,

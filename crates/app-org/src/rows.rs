@@ -67,6 +67,8 @@ pub struct Member {
     pub settable: bool,
     /// Whether this is the container's only owner, who cannot be demoted.
     pub last_owner: bool,
+    /// Whether this principal may take their membership away.
+    pub removable: bool,
 }
 
 /// `org-groups` — one group of the organization.

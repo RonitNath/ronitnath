@@ -146,7 +146,7 @@ pub fn result_of(event: &Event, key: &IdKey, party: Option<PublicId>) -> Value {
             "container": container.public(key),
             "party": ambiguous(),
         }),
-        Event::Left { container, party } => json!({
+        Event::MemberRemoved { container, party } | Event::Left { container, party } => json!({
             "container": container.public(key),
             "party": party.public(key),
         }),

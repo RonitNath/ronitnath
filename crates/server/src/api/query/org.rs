@@ -160,7 +160,10 @@ pub fn touched(query: Named, event: &Event, key: &IdKey, params: &Params) -> Tou
         Named::OrgMembers => membership_touch(event, params, key, party),
         Named::OrgGroups => match event {
             Event::GroupCreated { .. } | Event::Transferred { .. } => Touch::Set,
-            Event::LinkClaimed { .. } | Event::RoleSet { .. } | Event::Left { .. } => Touch::Set,
+            Event::LinkClaimed { .. }
+            | Event::RoleSet { .. }
+            | Event::MemberRemoved { .. }
+            | Event::Left { .. } => Touch::Set,
             _ => Touch::None,
         },
         Named::OrgContacts => match event {
@@ -206,6 +209,7 @@ fn overview_touch(event: &Event, party: i64, mine: impl Fn(Id<Group>) -> bool) -
             Touch::Set
         }
         Event::RoleSet { container, .. }
+        | Event::MemberRemoved { container, .. }
         | Event::Left { container, .. }
         | Event::LinkClaimed { container, .. }
             if mine(*container) =>
@@ -236,6 +240,10 @@ fn membership_touch(event: &Event, params: &Params, key: &IdKey, party: i64) -> 
     };
     match event {
         Event::RoleSet {
+            container,
+            party: who,
+        }
+        | Event::MemberRemoved {
             container,
             party: who,
         }

@@ -16,7 +16,9 @@ pub use identity::{
     VerifyEmail,
 };
 pub use merge::{ConfirmMatch, MatchSignal, ProposeMatch, RuleMatch, Split};
-pub use org::{ClaimLink, CreateGroup, CreateOrganization, Invite, Leave, RevokeLink, SetRole};
+pub use org::{
+    ClaimLink, CreateGroup, CreateOrganization, Invite, Leave, RemoveMember, RevokeLink, SetRole,
+};
 pub use resource::{CreateDocument, EditDocument, PublishDocument, Revoke, Share, Transfer};
 
 /// Implement [`Command`](crate::command::Command) for a list of args structs.
@@ -49,6 +51,7 @@ command_names! {
     ClaimLink => "claim-link",
     RevokeLink => "revoke-link",
     SetRole => "set-role",
+    RemoveMember => "remove-member",
     Leave => "leave",
     Share => "share",
     Revoke => "revoke",
@@ -71,7 +74,7 @@ mod tests {
     #[test]
     fn the_product_contract_is_covered_exactly_once() {
         // The list in docs/rebuild/plan.md §Product contract, verbatim.
-        assert_eq!(ALL_COMMAND_NAMES.len(), 26);
+        assert_eq!(ALL_COMMAND_NAMES.len(), 27);
         let mut sorted = ALL_COMMAND_NAMES.to_vec();
         sorted.sort_unstable();
         let count = sorted.len();

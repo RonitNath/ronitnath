@@ -11,7 +11,7 @@
 
 use leptos::prelude::*;
 use rn_api::MemberRole;
-use rn_api::commands::{Leave, SetRole};
+use rn_api::commands::{Leave, RemoveMember, SetRole};
 use rn_ui::{Column, Live, PageHead, Priority, SelectField, Table, sync_with};
 
 use crate::bits::{Aside, Note, act, on, refusal};
@@ -105,6 +105,8 @@ fn Seat(member: Member, container: String) -> impl IntoView {
     });
     let last_owner = member.last_owner;
     let settable = member.settable;
+    let removable = member.removable;
+    let removing = container.clone();
     let me = member.me;
 
     let sync = {
@@ -156,6 +158,24 @@ fn Seat(member: Member, container: String) -> impl IntoView {
                     ]
                     sync=sync.clone()
                 />
+            </Show>
+            <Show when=move || removable>
+                <button
+                    type="button"
+                    class="commit"
+                    on:click={
+                        let container = removing.clone();
+                        let party = member.public_id.clone();
+                        move |_| {
+                            let (Ok(group), Ok(party)) = (container.parse(), party.parse()) else {
+                                return;
+                            };
+                            act(leaving, RemoveMember { group, party }, |_| ());
+                        }
+                    }
+                >
+                    "Remove"
+                </button>
             </Show>
             <Show when=move || me>
                 <button

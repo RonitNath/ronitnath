@@ -72,6 +72,20 @@ pub struct RevokeLink {
     pub link: PublicId,
 }
 
+/// Remove somebody else's membership from a group or organization.
+///
+/// The counterpart to [`Leave`], which is the same write about yourself. An
+/// admin may remove a role below their own; the last owner cannot be removed
+/// at all, because a container with no owner is one nobody can transfer,
+/// invite into or administer again.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RemoveMember {
+    /// The group or organization.
+    pub group: PublicId,
+    /// Whose membership goes.
+    pub party: PublicId,
+}
+
 /// Leave a group or organization. The acting party removes its own membership.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Leave {
@@ -107,6 +121,10 @@ mod tests {
             role: MemberRole::Admin,
         });
         round_trip(&RevokeLink { link: id("l_") });
+        round_trip(&RemoveMember {
+            group: id("g_"),
+            party: id("p_"),
+        });
         round_trip(&Leave { group: id("g_") });
     }
 

@@ -178,9 +178,11 @@ async fn container_of(reads: &impl Reads, scope: Scope, params: &Params) -> Outc
 
 /// One membership, as the table renders it.
 ///
-/// `demotable` is the fact the row needs that the row does not contain: the
-/// last owner of a container cannot be demoted, and a select that discovered
-/// that only by being refused would be a control that lies until you use it.
+/// `settable`, `last_owner` and `removable` are the facts the row needs that
+/// the row does not contain: the last owner of a container cannot be demoted
+/// or removed, an admin does not outrank another admin, and a control that
+/// discovered either only by being refused would be a control that lies until
+/// you use it.
 fn member_row(member: &Member, owners: i64, scope: Scope, key: &IdKey) -> Row {
     let party = &member.party;
     let public_id = public_of(party.kind, party.id.get(), key);
@@ -202,6 +204,16 @@ fn member_row(member: &Member, owners: i64, scope: Scope, key: &IdKey) -> Row {
                 scope.role.covers(MemberRole::Admin)
             },
             "last_owner": is_owner && owners <= 1,
+            // The same rule `RemoveMember` applies, so the control is absent
+            // rather than present-and-refused: an owner removes anybody but
+            // the last owner, an admin removes members, nobody removes
+            // themselves — that is `Leave`.
+            "removable": party.id != scope.person
+                && match member.membership.role {
+                    MemberRole::Owner => scope.role == MemberRole::Owner && owners > 1,
+                    MemberRole::Admin => scope.role == MemberRole::Owner,
+                    MemberRole::Member => scope.role.covers(MemberRole::Admin),
+                },
         }),
     }
 }

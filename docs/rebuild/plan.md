@@ -17,7 +17,7 @@ sweep, observation drain (last_seen, match scanning), change-feed retention.
 
 Authoritative data and actions = the kernel commands: Register, SignIn,
 SignOut, RevokeSession, AddFactor, RemoveFactor, VerifyEmail, CreateOrganization,
-CreateGroup, Invite (mint link), RevokeLink, ClaimLink, SetRole, Leave, Share, Revoke,
+CreateGroup, Invite (mint link), RevokeLink, ClaimLink, SetRole, RemoveMember, Leave, Share, Revoke,
 Transfer, CreateDocument, EditDocument, PublishDocument, ProposeMatch,
 ConfirmMatch (self-link merge), RuleMatch (operator merge with evidence),
 Split, Disable, Enable. One transaction each, audit row inside, typed event
