@@ -1,0 +1,5 @@
+# Templates live at the workspace root (docs/rebuild/plan.md §Workspace), not
+# under the crate, because they are the site's pages rather than this crate's
+# private detail. Askama resolves `dirs` relative to this file.
+[general]
+dirs = ["../../templates"]

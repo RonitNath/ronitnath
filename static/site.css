@@ -1,0 +1,502 @@
+/* The public landing: three background layers, one hero, two corner readouts.
+ *
+ * Layer order, back to front:
+ *   .nebula     the dusk wash (light) / faint colour clouds (dark)
+ *   .starfield  the CSS fallback sky — the picture until WebGL is live, and
+ *               the picture forever under prefers-reduced-motion
+ *   canvas.starscape  the real sky, faded in once the first star batch uploads
+ *   .topbar / main / .sky-chrome   the page itself
+ */
+
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
+
+html {
+    background: var(--bg);
+    color: var(--fg);
+}
+
+body {
+    margin: 0;
+    min-height: 100dvh;
+    /* Every layer is fixed and viewport-sized; a page that fits must never
+     * grow a scrollbar out of a rounding error. */
+    overflow-x: hidden;
+    font-family: var(--font-body);
+    font-size: var(--text-body);
+    line-height: 1.5;
+}
+
+/* ---------------------------------------------------------------- sky ---- */
+
+.starscape,
+.starfield,
+.nebula {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+}
+
+.nebula {
+    z-index: 0;
+}
+
+.starfield {
+    z-index: 1;
+    opacity: 1;
+    visibility: visible;
+    transition: opacity 1.2s ease;
+}
+
+.starfield > div {
+    position: absolute;
+    inset: 0;
+}
+
+.starscape {
+    z-index: 2;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    transition: opacity 1.2s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+:root.starscape-active .starscape {
+    opacity: 1;
+}
+
+:root.starscape-active .starfield {
+    opacity: 0;
+    visibility: hidden;
+    transition:
+        opacity 1.2s ease,
+        visibility 0s linear 1.2s;
+}
+
+[data-theme="dark"] .nebula {
+    background:
+        radial-gradient(ellipse 600px 400px at 15% 10%, oklch(0.45 0.12 265 / 0.10), transparent),
+        radial-gradient(ellipse 500px 500px at 85% 30%, oklch(0.42 0.13 300 / 0.08), transparent),
+        radial-gradient(ellipse 700px 300px at 50% 70%, oklch(0.40 0.11 255 / 0.07), transparent),
+        radial-gradient(ellipse 400px 600px at 90% 90%, oklch(0.38 0.12 290 / 0.06), transparent);
+}
+
+/* Light mode's "nebula" is the dusk sky itself. The starscape canvas draws
+ * additively above it and leaves its alpha at zero, which is the only reason
+ * the two composite into one picture rather than one covering the other. */
+[data-theme="light"] .nebula {
+    background: var(--dusk);
+}
+
+/* The fallback starfield. Positions and sizes are a hand-placed designed asset
+ * ported from the legacy site — do not regenerate them. */
+[data-theme="dark"] .stars-dim {
+    background-image:
+        radial-gradient(1px 1px at 23px 45px, oklch(1 0 0 / 0.5), transparent),
+        radial-gradient(1px 1px at 89px 123px, oklch(0.86 0.06 265 / 0.45), transparent),
+        radial-gradient(1px 1px at 156px 67px, oklch(1 0 0 / 0.4), transparent),
+        radial-gradient(1px 1px at 234px 189px, oklch(0.82 0.07 265 / 0.45), transparent),
+        radial-gradient(1px 1px at 45px 267px, oklch(0.88 0.05 262 / 0.42), transparent),
+        radial-gradient(1px 1px at 178px 312px, oklch(1 0 0 / 0.48), transparent),
+        radial-gradient(1px 1px at 267px 89px, oklch(0.82 0.07 265 / 0.4), transparent),
+        radial-gradient(1px 1px at 312px 34px, oklch(1 0 0 / 0.38), transparent),
+        radial-gradient(1px 1px at 56px 234px, oklch(0.86 0.06 265 / 0.45), transparent),
+        radial-gradient(1px 1px at 123px 156px, oklch(1 0 0 / 0.42), transparent),
+        radial-gradient(1px 1px at 198px 23px, oklch(0.92 0.04 262 / 0.4), transparent),
+        radial-gradient(1px 1px at 345px 145px, oklch(0.88 0.05 264 / 0.42), transparent);
+    background-size:
+        250px 230px, 283px 257px, 311px 213px, 267px 251px, 297px 227px, 259px 267px,
+        301px 203px, 321px 239px, 243px 273px, 289px 191px, 277px 221px, 261px 209px;
+}
+
+[data-theme="dark"] .stars-med {
+    animation: twinkle-slow 15s ease-in-out infinite alternate;
+    background-image:
+        radial-gradient(1.2px 1.2px at 67px 12px, oklch(1 0 0 / 0.65), transparent),
+        radial-gradient(1.2px 1.2px at 145px 178px, oklch(0.86 0.06 265 / 0.6), transparent),
+        radial-gradient(1.2px 1.2px at 223px 89px, oklch(1 0 0 / 0.7), transparent),
+        radial-gradient(1.2px 1.2px at 312px 256px, oklch(0.82 0.07 265 / 0.58), transparent),
+        radial-gradient(1.2px 1.2px at 89px 345px, oklch(0.88 0.05 262 / 0.62), transparent),
+        radial-gradient(1.2px 1.2px at 178px 401px, oklch(1 0 0 / 0.55), transparent),
+        radial-gradient(1.2px 1.2px at 289px 145px, oklch(0.82 0.07 265 / 0.65), transparent),
+        radial-gradient(1.2px 1.2px at 401px 45px, oklch(1 0 0 / 0.6), transparent);
+    background-size:
+        349px 299px, 387px 329px, 361px 273px, 403px 311px,
+        379px 287px, 343px 321px, 391px 267px, 367px 303px;
+}
+
+[data-theme="dark"] .stars-bright {
+    animation: twinkle-med 7s ease-in-out infinite alternate;
+    background-image:
+        radial-gradient(1.8px 1.8px at 34px 89px, oklch(1 0 0 / 0.9), transparent),
+        radial-gradient(1.8px 1.8px at 167px 234px, oklch(0.88 0.05 264 / 0.8), transparent),
+        radial-gradient(1.8px 1.8px at 312px 45px, oklch(1 0 0 / 0.95), transparent),
+        radial-gradient(1.8px 1.8px at 478px 178px, oklch(0.82 0.07 265 / 0.75), transparent),
+        radial-gradient(1.8px 1.8px at 134px 345px, oklch(1 0 0 / 0.85), transparent),
+        radial-gradient(1.8px 1.8px at 345px 267px, oklch(0.88 0.05 262 / 0.7), transparent);
+    background-size:
+        457px 387px, 501px 419px, 471px 399px, 493px 423px, 463px 411px, 487px 381px;
+}
+
+/* Twilight: stars only in the dark top of the gradient, nothing down where the
+ * page turns near-white. Same picture the canvas will replace. */
+[data-theme="light"] .starfield {
+    mask-image: linear-gradient(180deg, #000 0%, #000 28%, transparent 60%);
+}
+
+[data-theme="light"] .stars-dim,
+[data-theme="light"] .stars-med,
+[data-theme="light"] .stars-bright {
+    background-image:
+        radial-gradient(2.5px 2.5px at 23px 45px, oklch(0.95 0.01 250 / 0.6), transparent),
+        radial-gradient(2.5px 2.5px at 89px 123px, oklch(0.95 0.01 250 / 0.55), transparent),
+        radial-gradient(2.5px 2.5px at 156px 67px, oklch(0.95 0.01 250 / 0.5), transparent),
+        radial-gradient(2.5px 2.5px at 234px 189px, oklch(0.95 0.01 250 / 0.55), transparent),
+        radial-gradient(2.5px 2.5px at 45px 267px, oklch(0.95 0.01 250 / 0.52), transparent),
+        radial-gradient(2.5px 2.5px at 178px 312px, oklch(0.95 0.01 250 / 0.58), transparent);
+    background-size:
+        250px 230px, 283px 257px, 311px 213px, 267px 251px, 297px 227px, 259px 267px;
+}
+
+[data-theme="light"] .stars-med {
+    animation: twinkle-slow 15s ease-in-out infinite alternate;
+}
+
+[data-theme="light"] .stars-bright {
+    animation: twinkle-med 7s ease-in-out infinite alternate;
+}
+
+@keyframes twinkle-slow {
+    0% { opacity: 0.7; }
+    50% { opacity: 0.9; }
+    100% { opacity: 1; }
+}
+
+@keyframes twinkle-med {
+    0% { opacity: 0.15; }
+    40% { opacity: 0.9; }
+    70% { opacity: 0.3; }
+    100% { opacity: 1; }
+}
+
+/* ------------------------------------------------------------- chrome ---- */
+
+.topbar {
+    position: relative;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    min-height: var(--topbar-height);
+    padding: 0.85rem;
+}
+
+/* The bar floats on the dark top of the dusk gradient in light mode, so its
+ * own foreground has to come from the on-dusk scale, not the page scale. */
+:root[data-theme="light"] .topbar,
+:root[data-theme="light"] .sky-chrome {
+    --fg: var(--on-dusk-fg);
+    --fg-muted: var(--on-dusk-muted);
+    --fg-subtle: var(--on-dusk-muted);
+    --border: var(--on-dusk-border);
+    --bg-subtle: var(--on-dusk-bg);
+    --accent: var(--on-dusk-accent);
+    --surface-glass: var(--on-dusk-glass);
+    --surface-glass-hover: var(--on-dusk-glass-hover);
+}
+
+@media (prefers-color-scheme: light) {
+    :root:not([data-theme="dark"]) .topbar,
+    :root:not([data-theme="dark"]) .sky-chrome {
+        --fg: var(--on-dusk-fg);
+        --fg-muted: var(--on-dusk-muted);
+        --fg-subtle: var(--on-dusk-muted);
+        --border: var(--on-dusk-border);
+        --bg-subtle: var(--on-dusk-bg);
+        --accent: var(--on-dusk-accent);
+        --surface-glass: var(--on-dusk-glass);
+        --surface-glass-hover: var(--on-dusk-glass-hover);
+    }
+}
+
+.theme-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.75rem;
+    height: 2.75rem;
+    padding: 0;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface-glass);
+    color: inherit;
+    cursor: pointer;
+}
+
+.theme-toggle:hover {
+    border-color: var(--accent);
+    background: var(--surface-glass-hover);
+}
+
+.theme-toggle:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+.theme-toggle-icon {
+    display: flex;
+    width: 1.1em;
+    height: 1.1em;
+    color: var(--fg-muted);
+}
+
+.theme-toggle:hover .theme-toggle-icon {
+    color: var(--fg);
+}
+
+.theme-toggle-icon svg {
+    width: 100%;
+    height: 100%;
+}
+
+.theme-icon-moon,
+:root[data-theme="light"] .theme-icon-sun {
+    display: none;
+}
+
+:root[data-theme="light"] .theme-icon-moon {
+    display: block;
+}
+
+@media (prefers-color-scheme: light) {
+    :root:not([data-theme="dark"]) .theme-icon-sun { display: none; }
+    :root:not([data-theme="dark"]) .theme-icon-moon { display: block; }
+}
+
+/* ---------------------------------------------------------- sky chrome --- */
+
+.sky-chrome {
+    position: fixed;
+    z-index: 3;
+    left: clamp(0.5rem, 2vw, 1rem);
+    bottom: clamp(0.75rem, 2vh, 1rem);
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+    max-width: calc(100% - 2 * clamp(0.5rem, 2vw, 1rem));
+    pointer-events: none;
+}
+
+.mini-globe {
+    width: clamp(112px, 20vmin, 152px);
+    height: clamp(112px, 20vmin, 152px);
+    opacity: 0;
+    transition: opacity 0.6s ease;
+    cursor: grab;
+    pointer-events: auto;
+    touch-action: none;
+}
+
+.mini-globe.is-ready {
+    opacity: 1;
+}
+
+.mini-globe:active {
+    cursor: grabbing;
+}
+
+.mini-globe:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+}
+
+.grounding {
+    margin: 0;
+    max-width: 100%;
+    min-height: 1.2em;
+    color: var(--fg-subtle);
+    font-size: 0.85rem;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.resume-orbit {
+    padding: 0.4rem 0.65rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface-glass);
+    color: var(--fg);
+    font: inherit;
+    font-size: 0.78rem;
+    cursor: pointer;
+    pointer-events: auto;
+}
+
+.resume-orbit:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+.resume-orbit[hidden] {
+    display: none;
+}
+
+/* Named-star callouts, drawn over the sky by the bundle. */
+.star-annotations {
+    position: fixed;
+    inset: 0;
+    z-index: 4;
+    pointer-events: none;
+}
+
+.star-callout {
+    position: fixed;
+    max-width: 12rem;
+    color: var(--fg);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    animation: callout-in 0.45s ease both;
+}
+
+.star-callout strong,
+.star-callout span {
+    display: block;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.star-callout strong {
+    font-family: var(--font-display);
+    font-size: 0.78rem;
+    font-weight: var(--weight-semibold);
+}
+
+.star-callout span {
+    margin-top: 0.18rem;
+    color: var(--fg-subtle);
+    font-size: 0.62rem;
+}
+
+@keyframes callout-in {
+    from { opacity: 0; transform: translateY(5px); }
+    to { opacity: 1; transform: none; }
+}
+
+/* --------------------------------------------------------------- hero ---- */
+
+/* A box that starts below the bar and ends at the fold centres its content
+ * half a bar-height too low. One extra bar-height of bottom padding raises
+ * flex-centred content by exactly half of itself, which cancels it. */
+.viewport-center {
+    position: relative;
+    z-index: 5;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: calc(100dvh - var(--topbar-height));
+    padding-inline: 1rem;
+    padding-block: 2rem calc(2rem + var(--topbar-height));
+}
+
+.home-card {
+    max-width: var(--col-narrow);
+    text-align: center;
+}
+
+.home-card h1 {
+    margin: 0 0 0.35rem;
+    color: var(--hero-fg);
+    font-family: var(--font-display);
+    font-size: var(--text-hero);
+    font-weight: var(--weight-semibold);
+    letter-spacing: 0.06em;
+    text-shadow: var(--hero-shadow);
+}
+
+.home-card .tagline {
+    margin: 0 0 1.75rem;
+    color: var(--hero-muted);
+    text-shadow: var(--hero-muted-shadow);
+}
+
+.company-link {
+    color: var(--company-fg);
+    text-decoration: underline;
+    text-underline-offset: 0.15em;
+}
+
+.company-link:hover {
+    opacity: 0.9;
+}
+
+.social-links {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.75rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.social-links a {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.6rem 0.95rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface-glass);
+    color: var(--fg);
+    font-size: 0.9rem;
+    text-decoration: none;
+    transition:
+        border-color 0.15s ease,
+        color 0.15s ease,
+        background-color 0.15s ease;
+}
+
+.social-links a:hover,
+.social-links a:focus-visible {
+    border-color: var(--accent);
+    background: var(--surface-glass-hover);
+    color: var(--accent);
+}
+
+/* Two by two on a phone, with Email beside LinkedIn rather than orphaned. */
+@media (max-width: 768px) {
+    .social-links {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .starscape,
+    .starfield,
+    .star-callout,
+    .social-links a,
+    .mini-globe {
+        transition: none;
+        animation: none;
+    }
+
+    [data-theme="dark"] .stars-med,
+    [data-theme="dark"] .stars-bright,
+    [data-theme="light"] .stars-med,
+    [data-theme="light"] .stars-bright {
+        animation: none;
+        opacity: 0.7;
+    }
+
+    :root.starscape-active .starfield {
+        visibility: hidden;
+    }
+}

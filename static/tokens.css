@@ -1,0 +1,149 @@
+/* Design tokens — docs/design.md is the authority for every value here.
+ *
+ * These will move to crates/ui/tokens.css when U1 lands it, so that one edit
+ * reaches the bundles as well as the server-rendered pages; until then this
+ * file is the single definition and the bundles link it. Both themes are
+ * authored, never inverted, and `color-scheme` is declared so form controls
+ * and scrollbars follow.
+ */
+
+@font-face {
+    font-family: "Agency Bold";
+    src: url("/static/fonts/agency-bold.ttf") format("truetype");
+    font-weight: 400 700;
+    font-style: normal;
+    font-display: swap;
+}
+
+:root {
+    color-scheme: dark;
+
+    --bg: oklch(0.06 0.005 240);
+    --bg-muted: oklch(0.10 0.008 240);
+    --bg-subtle: oklch(0.14 0.010 240);
+    --fg: oklch(0.96 0.002 80);
+    --fg-muted: oklch(0.75 0.005 80);
+    --fg-subtle: oklch(0.55 0.005 80);
+    --border: oklch(0.22 0.010 240);
+
+    --accent: oklch(0.65 0.15 210);
+    --accent-hover: oklch(0.72 0.15 210);
+
+    /* The identity pair. Public hero only — never on an internal surface. */
+    --hero-fg: oklch(0.63 0.235 27);
+    --hero-shadow: none;
+    --hero-muted: oklch(0.97 0.005 255);
+    --hero-muted-shadow: none;
+    --company-fg: oklch(0.80 0.135 80);
+
+    --surface-glass: color-mix(in oklab, var(--bg) 33%, transparent);
+    --surface-glass-hover: color-mix(in oklab, var(--bg-subtle) 55%, transparent);
+
+    --font-display: "Agency Bold", system-ui, sans-serif;
+    --font-body: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+
+    --radius: 0.25rem;
+    --topbar-height: 4.45rem;
+    --col-narrow: 500px;
+    /* Headings sit near body scale: distinction is family, letter-spacing and
+     * colour, not sheer size. This is the ceiling, not a starting point. */
+    --text-body: 1rem;
+    --text-hero: 1.75rem;
+    --weight-semibold: 600;
+
+    /* The light theme is dusk, not white paper: the page *is* the sky. */
+    --dusk-gradient: linear-gradient(
+        180deg,
+        oklch(0.26 0.070 265) 0%,
+        oklch(0.36 0.090 264) 14%,
+        oklch(0.52 0.090 258) 32%,
+        oklch(0.70 0.070 252) 50%,
+        oklch(0.78 0.060 246) 70%,
+        oklch(0.82 0.050 242) 86%,
+        oklch(0.88 0.030 238) 94%,
+        oklch(0.95 0.012 235) 100%
+    );
+}
+
+/* One block of light-theme values, applied by the media query for a visitor
+ * who has expressed no preference and by the attribute for one who has. */
+@media (prefers-color-scheme: light) {
+    :root:not([data-theme="dark"]) {
+        color-scheme: light;
+        --bg: oklch(0.97 0.003 240);
+        --bg-muted: oklch(0.93 0.005 240);
+        --bg-subtle: oklch(0.89 0.007 240);
+        --fg: oklch(0.15 0.010 240);
+        --fg-muted: oklch(0.30 0.012 255);
+        --fg-subtle: oklch(0.40 0.012 255);
+        --border: oklch(0.50 0.030 255);
+        --accent: oklch(0.34 0.14 215);
+        --accent-hover: oklch(0.24 0.12 215);
+        --hero-fg: oklch(0.80 0.135 80);
+        --hero-shadow:
+            0 1px 2px oklch(0.18 0.04 265 / 0.6),
+            0 0 16px oklch(0.16 0.03 265 / 0.5);
+        --hero-muted: oklch(0.97 0.005 255);
+        --hero-muted-shadow:
+            0 1px 2px oklch(0.18 0.04 265 / 0.6),
+            0 0 16px oklch(0.16 0.03 265 / 0.5);
+        --company-fg: oklch(0.63 0.235 27);
+        --dusk: var(--dusk-gradient);
+        --on-dusk-fg: oklch(0.97 0.005 255);
+        --on-dusk-muted: oklch(0.86 0.012 255);
+        --on-dusk-border: oklch(0.97 0.005 255 / 0.3);
+        --on-dusk-bg: oklch(0.97 0.005 255 / 0.12);
+        --on-dusk-accent: oklch(0.84 0.09 215);
+        --on-dusk-glass: oklch(0.42 0.095 262 / 0.42);
+        --on-dusk-glass-hover: oklch(0.52 0.100 260 / 0.55);
+    }
+}
+
+:root[data-theme="light"] {
+    color-scheme: light;
+    --bg: oklch(0.97 0.003 240);
+    --bg-muted: oklch(0.93 0.005 240);
+    --bg-subtle: oklch(0.89 0.007 240);
+    --fg: oklch(0.15 0.010 240);
+    --fg-muted: oklch(0.30 0.012 255);
+    --fg-subtle: oklch(0.40 0.012 255);
+    --border: oklch(0.50 0.030 255);
+    --accent: oklch(0.34 0.14 215);
+    --accent-hover: oklch(0.24 0.12 215);
+    --hero-fg: oklch(0.80 0.135 80);
+    --hero-shadow:
+        0 1px 2px oklch(0.18 0.04 265 / 0.6),
+        0 0 16px oklch(0.16 0.03 265 / 0.5);
+    --hero-muted: oklch(0.97 0.005 255);
+    --hero-muted-shadow:
+        0 1px 2px oklch(0.18 0.04 265 / 0.6),
+        0 0 16px oklch(0.16 0.03 265 / 0.5);
+    --company-fg: oklch(0.63 0.235 27);
+    --dusk: var(--dusk-gradient);
+    --on-dusk-fg: oklch(0.97 0.005 255);
+    --on-dusk-muted: oklch(0.86 0.012 255);
+    --on-dusk-border: oklch(0.97 0.005 255 / 0.3);
+    --on-dusk-bg: oklch(0.97 0.005 255 / 0.12);
+    --on-dusk-accent: oklch(0.84 0.09 215);
+    --on-dusk-glass: oklch(0.42 0.095 262 / 0.42);
+    --on-dusk-glass-hover: oklch(0.52 0.100 260 / 0.55);
+}
+
+:root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg: oklch(0.06 0.005 240);
+    --bg-muted: oklch(0.10 0.008 240);
+    --bg-subtle: oklch(0.14 0.010 240);
+    --fg: oklch(0.96 0.002 80);
+    --fg-muted: oklch(0.75 0.005 80);
+    --fg-subtle: oklch(0.55 0.005 80);
+    --border: oklch(0.22 0.010 240);
+    --accent: oklch(0.65 0.15 210);
+    --accent-hover: oklch(0.72 0.15 210);
+    --hero-fg: oklch(0.63 0.235 27);
+    --hero-shadow: none;
+    --hero-muted: oklch(0.97 0.005 255);
+    --hero-muted-shadow: none;
+    --company-fg: oklch(0.80 0.135 80);
+}

@@ -3,7 +3,7 @@
   # with the exact toolchain pinned here, never with whatever rustc happens to be
   # installed on the runner. The release image pins its own toolchain in the
   # Containerfile; keep the two in step when either moves.
-  description = "rn-site — ronitnath.com (Leptos islands + Axum)";
+  description = "rn-site — ronitnath.com (Axum + askama + trunk CSR bundles)";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
@@ -22,7 +22,7 @@
           overlays = [ (import rust-overlay) ];
         };
 
-        # The crate is edition 2024; leptos 0.9-beta wants a recent stable.
+        # The workspace is edition 2024 and pinned by docs/rebuild/plan.md.
         toolchain = pkgs.rust-bin.stable."1.97.1".default.override {
           extensions = [ "rust-src" "rustfmt" "clippy" ];
           targets = [ "wasm32-unknown-unknown" ];
@@ -32,13 +32,10 @@
         devShells.default = pkgs.mkShell {
           packages = [
             toolchain
-            pkgs.cargo-leptos
-            # wasm-opt, invoked by cargo-leptos on release builds.
-            pkgs.binaryen
-            # cargo-leptos shells out to the tailwind CLI for
-            # style/tailwind.css; providing it here keeps the devshell from
-            # reaching out to download one.
-            pkgs.tailwindcss_4
+            # trunk builds every CSR bundle (crates/<bundle>/index.html) and
+            # fetches its own pinned wasm-bindgen/wasm-opt, exactly as the
+            # Containerfile does, so the devshell and the image agree.
+            pkgs.trunk
             pkgs.pkg-config
           ];
         };

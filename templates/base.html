@@ -1,0 +1,46 @@
+{#- The one document shell every server-rendered page extends. `theme` is
+    resolved on the server (presence::theme_for); the inline script only
+    corrects it before first paint for a visitor whose browser sends no client
+    hint, which is why it is inline and not a fetched module. -#}
+<!DOCTYPE html>
+<html lang="en" data-theme="{{ theme }}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="rn-app-version" content="{{ version }}">
+<title>{% block title %}Ronit Nath{% endblock %}</title>
+<link rel="icon" href="/favicon.ico">
+<link rel="stylesheet" href="/static/tokens.css">
+<link rel="stylesheet" href="/static/site.css">
+<script>
+(function () {
+  var root = document.documentElement;
+  try {
+    var saved = localStorage.getItem("theme");
+    if (saved !== "light" && saved !== "dark") {
+      saved = matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+    }
+    root.setAttribute("data-theme", saved);
+    document.cookie = "rn_theme=" + saved + ";path=/;max-age=31536000;samesite=lax";
+  } catch (e) { /* the server-rendered attribute stands */ }
+})();
+</script>
+{% block head %}{% endblock %}
+</head>
+<body>
+{% block body %}{% endblock %}
+<script type="module">
+  const toggle = document.querySelector(".theme-toggle");
+  toggle?.addEventListener("click", () => {
+    const root = document.documentElement;
+    const next = root.getAttribute("data-theme") === "light" ? "dark" : "light";
+    root.setAttribute("data-theme", next);
+    try {
+      localStorage.setItem("theme", next);
+      document.cookie = "rn_theme=" + next + ";path=/;max-age=31536000;samesite=lax";
+    } catch (e) { /* the attribute is the source of truth for this page */ }
+    dispatchEvent(new Event("starscape-redraw"));
+  });
+</script>
+</body>
+</html>
