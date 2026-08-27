@@ -46,6 +46,11 @@ pub fn Sessions() -> impl IntoView {
         Column::new("Identity", |row: &Session| row.identity.to_string())
             .mono()
             .priority(Priority::Tertiary),
+        // Two sessions of one registration are two devices, and without this
+        // column they are two identical rows.
+        Column::new("Id", |row: &Session| row.public_id.to_string())
+            .mono()
+            .priority(Priority::Tertiary),
     ];
     let open = Callback::new(move |row: Session| selected.set(Some(row)));
 
@@ -98,7 +103,7 @@ fn Detail(session: Session, selected: RwSignal<Option<Session>>) -> impl IntoVie
         <Panel title=title on_close=close>
             <Facts facts=facts />
             <div class="actions">
-                <Act label="Revoke" run=run />
+                <Act label="Revoke" run=run then=Callback::new(move |()| selected.set(None)) />
             </div>
         </Panel>
     }

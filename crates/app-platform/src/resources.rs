@@ -71,7 +71,11 @@ pub fn Resources() -> impl IntoView {
             </div>
             <Show when=move || detail.get().is_some()>
                 {move || {
-                    detail.get().map(|resource| view! { <Detail resource=resource selected=selected /> })
+                    detail
+                        .get()
+                        .map(|resource| {
+                            view! { <Detail resource=resource selected=selected then=detail.refresh() /> }
+                        })
                 }}
             </Show>
         </div>
@@ -79,7 +83,11 @@ pub fn Resources() -> impl IntoView {
 }
 
 #[component]
-fn Detail(resource: ResourceDetail, selected: RwSignal<Option<String>>) -> impl IntoView {
+fn Detail(
+    resource: ResourceDetail,
+    selected: RwSignal<Option<String>>,
+    then: Callback<()>,
+) -> impl IntoView {
     let close = Callback::new(move |()| selected.set(None));
     let facts = vec![
         ("Kind", resource.kind.clone()),
@@ -104,7 +112,7 @@ fn Detail(resource: ResourceDetail, selected: RwSignal<Option<String>>) -> impl 
         .clone()
         .into_iter()
         .map(|granted| {
-            view! { <Grant resource=id.clone() granted=granted.clone() /> }
+            view! { <Grant resource=id.clone() granted=granted.clone() then=then /> }
         })
         .collect_view();
     let count = resource.relations.len();
@@ -122,14 +130,14 @@ fn Detail(resource: ResourceDetail, selected: RwSignal<Option<String>>) -> impl 
             >
                 {grants}
             </Group>
-            <Transferrer resource=resource.public_id.to_string() />
+            <Transferrer resource=resource.public_id.to_string() then=then />
         </Panel>
     }
 }
 
 /// One grant, with the one thing that can be done to it.
 #[component]
-fn Grant(resource: String, granted: GrantedRelation) -> impl IntoView {
+fn Grant(resource: String, granted: GrantedRelation, then: Callback<()>) -> impl IntoView {
     let subject = granted
         .subject
         .as_ref()
@@ -178,14 +186,14 @@ fn Grant(resource: String, granted: GrantedRelation) -> impl IntoView {
                 {format!("{} \u{00b7} {}", granted.subject_kind, when(granted.at))}
             </span>
             <span class="role">{granted.relation.clone()}</span>
-            <Act label="Revoke" run=run blocked=blocked />
+            <Act label="Revoke" run=run blocked=blocked then=then />
         </div>
     }
 }
 
 /// Ownership moves through this command and nowhere else.
 #[component]
-fn Transferrer(resource: String) -> impl IntoView {
+fn Transferrer(resource: String, then: Callback<()>) -> impl IntoView {
     let to = RwSignal::new(String::new());
     let blocked = Signal::derive(move || {
         let raw = to.get();
@@ -223,7 +231,7 @@ fn Transferrer(resource: String) -> impl IntoView {
                     prop:value=move || to.get()
                     on:input=move |event| to.set(event_target_value(&event))
                 />
-                <Act label="Transfer" run=run blocked=blocked />
+                <Act label="Transfer" run=run blocked=blocked then=then />
             </div>
         </section>
     }

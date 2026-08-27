@@ -51,18 +51,52 @@ pub fn when(unix_seconds: i64) -> String {
     )
 }
 
-/// Fetch one drill-in row whenever the selection changes.
+/// An open drill-in: the row, and the way to ask for it again.
 ///
-/// A drill-in is read rather than subscribed: it is addressed by a parameter
-/// the socket does not carry, and a panel that is open while its subject moves
-/// is re-read when the reader opens it again. Selecting nothing clears it,
-/// rather than leaving the last row on screen under a new heading.
-pub fn drill<T>(query: &'static str, selected: RwSignal<Option<String>>) -> RwSignal<Option<T>>
+/// A drill-in is read rather than subscribed — it is addressed by a parameter
+/// the socket does not carry — so a command run from inside one has to say
+/// when it has changed what the panel is showing. That is what
+/// [`Drill::refresh`] is for, and every command in this bundle passes it: an
+/// operator who rules on a candidate and sees nothing happen has no way to
+/// tell a ruling from a refusal.
+pub struct Drill<T: Send + Sync + 'static> {
+    found: RwSignal<Option<T>>,
+    revision: RwSignal<u64>,
+}
+
+impl<T: Send + Sync + 'static> Clone for Drill<T> {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+
+impl<T: Send + Sync + 'static> Copy for Drill<T> {}
+
+impl<T: Clone + Send + Sync + 'static> Drill<T> {
+    /// The row, as a reactive read.
+    pub fn get(&self) -> Option<T> {
+        self.found.get()
+    }
+
+    /// Ask for it again. Handed to a command as its `then`.
+    pub fn refresh(self) -> Callback<()> {
+        let revision = self.revision;
+        Callback::new(move |()| revision.update(|r| *r += 1))
+    }
+}
+
+/// Fetch one drill-in row whenever the selection changes, or on demand.
+///
+/// Selecting nothing clears it, rather than leaving the last row on screen
+/// under a new heading.
+pub fn drill<T>(query: &'static str, selected: RwSignal<Option<String>>) -> Drill<T>
 where
     T: DeserializeOwned + Clone + Send + Sync + 'static,
 {
     let found = RwSignal::new(None::<T>);
+    let revision = RwSignal::new(0u64);
     Effect::new(move |_| {
+        revision.track();
         let Some(id) = selected.get() else {
             found.set(None);
             return;
@@ -72,7 +106,7 @@ where
             found.set(rows.ok().and_then(|mut rows| rows.pop()));
         });
     });
-    found
+    Drill { found, revision }
 }
 
 /// The drill-in column: what is open, and the way out of it.
@@ -211,6 +245,10 @@ pub fn Act(
     /// Held for a precondition the caller is stating itself.
     #[prop(optional, into)]
     held: Signal<bool>,
+    /// Run when the command landed. A panel that a command changed has to be
+    /// told to read itself again; nothing else knows that it should.
+    #[prop(optional, into)]
+    then: Option<Callback<()>>,
 ) -> impl IntoView {
     let note = RwSignal::new(None::<String>);
     let busy = RwSignal::new(false);
@@ -225,7 +263,14 @@ pub fn Act(
         spawn_local(async move {
             let outcome = command().await;
             busy.set(false);
-            note.set(outcome.err());
+            match outcome {
+                Ok(()) => {
+                    if let Some(then) = then {
+                        then.run(());
+                    }
+                }
+                Err(reason) => note.set(Some(reason)),
+            }
         });
     };
     view! {

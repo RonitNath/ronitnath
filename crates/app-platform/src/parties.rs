@@ -52,14 +52,22 @@ pub fn Parties() -> impl IntoView {
                 />
             </div>
             <Show when=move || detail.get().is_some()>
-                {move || detail.get().map(|party| view! { <Detail party=party selected=selected /> })}
+                {move || {
+                    detail
+                        .get()
+                        .map(|party| view! { <Detail party=party selected=selected then=detail.refresh() /> })
+                }}
             </Show>
         </div>
     }
 }
 
 #[component]
-fn Detail(party: PartyDetail, selected: RwSignal<Option<String>>) -> impl IntoView {
+fn Detail(
+    party: PartyDetail,
+    selected: RwSignal<Option<String>>,
+    then: Callback<()>,
+) -> impl IntoView {
     let close = Callback::new(move |()| selected.set(None));
     let facts = vec![
         ("Kind", party.kind.clone()),
@@ -146,7 +154,7 @@ fn Detail(party: PartyDetail, selected: RwSignal<Option<String>>) -> impl IntoVi
             <Group label="Granted" count=counts.3 empty="It has been granted nothing.">
                 {relations}
             </Group>
-            <Status party=party.clone() />
+            <Status party=party.clone() then=then />
         </Panel>
     }
 }
@@ -157,7 +165,7 @@ fn Detail(party: PartyDetail, selected: RwSignal<Option<String>>) -> impl IntoVi
 /// decoration: it is the record of why every session this party held was
 /// deleted. Empty, the command is not offered.
 #[component]
-fn Status(party: PartyDetail) -> impl IntoView {
+fn Status(party: PartyDetail, then: Callback<()>) -> impl IntoView {
     let reason = RwSignal::new(String::new());
     let is_person = party.kind == "person";
     let disabled = party.status == "disabled";
@@ -217,6 +225,7 @@ fn Status(party: PartyDetail) -> impl IntoView {
                     label=if disabled { "Enable" } else { "Disable" }
                     run=run.clone()
                     blocked=blocked
+                    then=then
                 />
             </div>
         </section>

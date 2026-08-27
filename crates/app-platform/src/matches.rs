@@ -64,7 +64,11 @@ pub fn Matches() -> impl IntoView {
             </div>
             <Show when=move || detail.get().is_some()>
                 {move || {
-                    detail.get().map(|candidate| view! { <Detail candidate=candidate selected=selected /> })
+                    detail
+                        .get()
+                        .map(|candidate| {
+                            view! { <Detail candidate=candidate selected=selected then=detail.refresh() /> }
+                        })
                 }}
             </Show>
         </div>
@@ -72,7 +76,11 @@ pub fn Matches() -> impl IntoView {
 }
 
 #[component]
-fn Detail(candidate: CandidateDetail, selected: RwSignal<Option<String>>) -> impl IntoView {
+fn Detail(
+    candidate: CandidateDetail,
+    selected: RwSignal<Option<String>>,
+    then: Callback<()>,
+) -> impl IntoView {
     let close = Callback::new(move |()| selected.set(None));
     let one_person = match (&candidate.person_a, &candidate.person_b) {
         (Some(a), Some(b)) => a.public_id == b.public_id,
@@ -148,7 +156,11 @@ fn Detail(candidate: CandidateDetail, selected: RwSignal<Option<String>>) -> imp
                 </Show>
             </div>
             <Facts facts=facts />
-            <Ruling candidate=candidate.public_id.to_string() status=candidate.status.clone() />
+            <Ruling
+                candidate=candidate.public_id.to_string()
+                status=candidate.status.clone()
+                then=then
+            />
             <Group label="Person links" count=counts.0 empty="Neither registration has ever been attached to a person by a ruling.">
                 {links}
             </Group>
@@ -161,8 +173,8 @@ fn Detail(candidate: CandidateDetail, selected: RwSignal<Option<String>>) -> imp
                     "Detach one registration onto a person of its own. The reason lands on the new link row."
                 </p>
                 <div class="group-rows">
-                    <Splitter identity=splits.to_string() />
-                    <Splitter identity=split_b.to_string() />
+                    <Splitter identity=splits.to_string() then=then />
+                    <Splitter identity=split_b.to_string() then=then />
                 </div>
             </section>
         </Panel>
@@ -171,7 +183,7 @@ fn Detail(candidate: CandidateDetail, selected: RwSignal<Option<String>>) -> imp
 
 /// The ruling: evidence, and the two ways it can go.
 #[component]
-fn Ruling(candidate: String, status: String) -> impl IntoView {
+fn Ruling(candidate: String, status: String, then: Callback<()>) -> impl IntoView {
     let evidence = RwSignal::new(String::new());
     let open = status == "proposed";
     // Stated once, under the field it is about, because both buttons wait on
@@ -220,8 +232,13 @@ fn Ruling(candidate: String, status: String) -> impl IntoView {
             ></textarea>
             <p class="none">{move || missing.get()}</p>
             <div class="actions row">
-                <Act label="Same person" run=rule(candidate.clone(), true, evidence) held=held />
-                <Act label="Two people" run=rule(candidate, false, evidence) held=held />
+                <Act
+                    label="Same person"
+                    run=rule(candidate.clone(), true, evidence)
+                    held=held
+                    then=then
+                />
+                <Act label="Two people" run=rule(candidate, false, evidence) held=held then=then />
             </div>
         </section>
     }
@@ -229,7 +246,7 @@ fn Ruling(candidate: String, status: String) -> impl IntoView {
 
 /// Undo a merge for one registration.
 #[component]
-fn Splitter(identity: String) -> impl IntoView {
+fn Splitter(identity: String, then: Callback<()>) -> impl IntoView {
     let evidence = RwSignal::new(String::new());
     let held = Signal::derive(move || evidence.get().trim().is_empty());
     let name = identity.clone();
@@ -257,7 +274,7 @@ fn Splitter(identity: String) -> impl IntoView {
                 prop:value=move || evidence.get()
                 on:input=move |event| evidence.set(event_target_value(&event))
             />
-            <Act label="Split" run=run held=held />
+            <Act label="Split" run=run held=held then=then />
         </div>
     }
 }

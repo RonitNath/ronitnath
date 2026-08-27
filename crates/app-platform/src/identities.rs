@@ -78,7 +78,11 @@ pub fn Identities() -> impl IntoView {
             </div>
             <Show when=move || detail.get().is_some()>
                 {move || {
-                    detail.get().map(|identity| view! { <Detail identity=identity selected=selected /> })
+                    detail
+                        .get()
+                        .map(|identity| {
+                            view! { <Detail identity=identity selected=selected then=detail.refresh() /> }
+                        })
                 }}
             </Show>
         </div>
@@ -86,7 +90,11 @@ pub fn Identities() -> impl IntoView {
 }
 
 #[component]
-fn Detail(identity: IdentityDetail, selected: RwSignal<Option<String>>) -> impl IntoView {
+fn Detail(
+    identity: IdentityDetail,
+    selected: RwSignal<Option<String>>,
+    then: Callback<()>,
+) -> impl IntoView {
     let close = Callback::new(move |()| selected.set(None));
     let title = identity
         .person
@@ -147,7 +155,7 @@ fn Detail(identity: IdentityDetail, selected: RwSignal<Option<String>>) -> impl 
                     lead=session.public_id.to_string()
                     trail=format!("as {} \u{00b7} seen {}", session.acting_display, when(session.last_seen_at))
                 >
-                    <Act label="Revoke" run=run />
+                    <Act label="Revoke" run=run then=then />
                 </Line>
             }
         })
