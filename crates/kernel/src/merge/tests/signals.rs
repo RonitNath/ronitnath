@@ -187,6 +187,8 @@ async fn a_scan_never_proposes_a_pair_that_is_already_one_person() {
         &ConfirmMatch {
             candidate: public(&harness, candidate),
             other_session: None,
+            other_email: None,
+            other_password: None,
         },
     )
     .await

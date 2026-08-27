@@ -4,10 +4,17 @@
 //! There are exactly two things this command accepts as proof, and both are
 //! things only the person can produce:
 //!
-//! * **Live sessions on both identities.** The caller is signed in on one and
-//!   supplies the session token of the other. Holding two session tokens at
-//!   once is the same evidence as signing in twice, which is what "they are
-//!   both mine" means in practice.
+//! * **The other identity's credentials.** The caller is signed in on one and
+//!   types the address and password of the other. It is the same evidence as
+//!   signing in twice, and it is the form a *browser* can give: a page has no
+//!   way to hold two session cookies at once. Verified here, against the same
+//!   argon2id hash `SignIn` reads and with the same dummy verification on the
+//!   miss, so a wrong address does not answer faster than a wrong password.
+//!   **No session is created and nothing is handed back.** Proving you could
+//!   sign in is not signing in.
+//! * **Live sessions on both identities.** The caller supplies the session
+//!   token of the other. The same claim, for an API caller that can hold two
+//!   tokens at once.
 //! * **A factor both have verified.** The same address, proven on each side by
 //!   a message that was delivered and clicked. Unverified factors are not
 //!   admissible here: two people can *claim* an address and only one can
@@ -50,6 +57,11 @@ const AUDIT_LINK: &str = "INSERT INTO audit \
             json_object('event', 'confirm-match', 'candidate', $6, 'identity', $7, \
                         'person', $8, 'method', $9) \
      WHERE changes() > 0";
+
+/// The identity an address belongs to, and the password hash it proves
+/// against. The statement `SignIn` uses, for the same reason: the partial
+/// unique index on `factor(value) WHERE kind = 'email'` makes it a seek.
+pub const CREDENTIALS_SQL: &str = crate::cmd::SIGN_IN_SQL;
 
 /// A live session, by its token digest.
 pub const SESSION_SQL: &str =
@@ -121,6 +133,9 @@ async fn proof<S: Sql, F: Feed>(
     other: Id<Identity>,
     args: &ConfirmMatch,
 ) -> Outcome<Option<LinkMethod>> {
+    if let Some(method) = by_credentials(ctx, other, args).await? {
+        return Ok(Some(method));
+    }
     if let Some(raw) = args.other_session.as_deref() {
         let token = Token::from_wire(raw);
         let rows = ctx
@@ -139,6 +154,61 @@ async fn proof<S: Sql, F: Feed>(
         .first()
         .is_some_and(|row| row.0 > 0)
         .then_some(LinkMethod::Factor))
+}
+
+/// The other identity's own credentials, verified here.
+///
+/// Every refusal is `None` and every path does the same work: an address that
+/// belongs to nobody, one that belongs to somebody who is not the other half
+/// of this pair, and a wrong password all spend one argon2id verification, so
+/// the timing says nothing about which it was. No session is minted, nothing
+/// is written, and the caller's own cookie is untouched.
+async fn by_credentials<S: Sql, F: Feed>(
+    ctx: &Ctx<'_, S, F>,
+    other: Id<Identity>,
+    args: &ConfirmMatch,
+) -> Outcome<Option<LinkMethod>> {
+    let (Some(email), Some(password)) =
+        (args.other_email.as_deref(), args.other_password.as_deref())
+    else {
+        return Ok(None);
+    };
+    let email = crate::domain::normalize_email(email);
+    let candidate = ctx
+        .store
+        .query_opt::<Credentials>(CREDENTIALS_SQL, bind![email.as_str()])
+        .await?;
+    let Some(candidate) =
+        candidate.filter(|row| row.identity_id == other && row.status == "active")
+    else {
+        crate::password::verify_dummy_blocking(password).await;
+        return Ok(None);
+    };
+    let Some(phc) = candidate.phc.as_deref() else {
+        crate::password::verify_dummy_blocking(password).await;
+        return Ok(None);
+    };
+    if !crate::password::verify_blocking(password, phc).await {
+        return Ok(None);
+    }
+    Ok(Some(LinkMethod::SelfLink))
+}
+
+/// What the credentials lookup reads back.
+struct Credentials {
+    identity_id: Id<Identity>,
+    status: String,
+    phc: Option<String>,
+}
+
+impl crate::store::FromRow for Credentials {
+    fn from_row(row: &mut impl crate::store::Cursor) -> Result<Self, crate::store::RowError> {
+        Ok(Self {
+            identity_id: row.id("identity_id")?,
+            status: row.text("status")?,
+            phc: row.text_opt("phc")?,
+        })
+    }
 }
 
 /// The mutations and the audit row for whichever shape the pair has.

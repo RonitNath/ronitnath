@@ -404,20 +404,60 @@ fn two_registrations_become_one_person_and_come_apart_again() {
             .await;
         let candidate = id_of(&proposed, "candidate", "m_");
 
-        // Holding a live session on both is the same evidence as signing in
-        // twice, so the person proves this one themselves.
+        // The shape a browser can give: the other registration's own
+        // credentials, verified inside the command. Nothing is minted and the
+        // caller's cookie is untouched — which is what makes this reachable
+        // from a page at all, since a browser cannot hold two session cookies.
+        let wrong = mine
+            .post(
+                "confirm-match",
+                json!({
+                    "candidate": candidate,
+                    "other_email": "cmd-twice-b@example.invalid",
+                    "other_password": "not the password",
+                }),
+            )
+            .await;
+        assert_eq!(wrong.status_code(), StatusCode::FORBIDDEN);
         let merged = mine
             .run(
                 &mut at,
                 "confirm-match",
-                json!({ "candidate": candidate, "other_session": second.token }),
+                json!({
+                    "candidate": candidate,
+                    "other_email": "cmd-twice-b@example.invalid",
+                    "other_password": harness::PASSWORD,
+                }),
             )
             .await;
+        assert!(
+            merged.get("token").is_none() && merged.get("session").is_none(),
+            "confirming minted a session: {merged}"
+        );
+        // The reader is still themselves, on the cookie they arrived with.
+        assert_eq!(mine.identity().await, mine_identity);
         assert_eq!(merged["method"], "self");
         assert_eq!(id_of(&merged, "candidate", "m_"), candidate);
         let survivor = id_of(&merged, "survivor", "p_");
         let absorbed = id_of(&merged, "absorbed", "p_");
         assert_ne!(survivor, absorbed);
+        // One person: both registrations now resolve to the survivor.
+        for identity in [&mine_identity, &other_identity] {
+            let resolved = mine
+                .server
+                .get("/api/q/identities")
+                .add_header("cookie", mine.cookie.clone())
+                .await
+                .json::<Value>();
+            assert!(
+                resolved
+                    .as_array()
+                    .expect("a result set")
+                    .iter()
+                    .any(|row| row["public_id"] == json!(identity)),
+                "{identity} is not among the survivor's registrations: {resolved}"
+            );
+        }
 
         // And a merge is not irreversible: the identity detaches onto a person
         // of its own.

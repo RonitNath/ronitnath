@@ -30,6 +30,8 @@ fn confirmation(
     ConfirmMatch {
         candidate: public(harness, candidate),
         other_session: token.map(str::to_owned),
+        other_email: None,
+        other_password: None,
     }
 }
 
@@ -57,6 +59,68 @@ async fn holding_a_session_on_both_identities_is_proof() {
         }
     );
     assert_eq!(person(&harness, b).await, person_a);
+}
+
+/// A confirmation that proves with the other identity's credentials.
+fn credentials(
+    harness: &Local,
+    candidate: Id<MatchCandidate>,
+    email: &str,
+    password: &str,
+) -> ConfirmMatch {
+    ConfirmMatch {
+        candidate: public(harness, candidate),
+        other_session: None,
+        other_email: Some(email.to_owned()),
+        other_password: Some(password.to_owned()),
+    }
+}
+
+#[tokio::test]
+async fn the_other_identitys_credentials_are_proof_and_mint_nothing() {
+    let harness = Local::new();
+    let (first, second, candidate) = queued(&harness).await;
+    let (_, person_a) = who(&first);
+    let (b, person_b) = who(&second);
+    let sessions_before = count(&harness, "SELECT count(*) AS n FROM session", bind![]).await;
+
+    // A wrong password, an address nobody holds, and an address that is not
+    // the other half of this pair are the same refusal.
+    for (email, password) in [
+        ("two@example.test", "the wrong password entirely"),
+        ("nobody@example.test", TEST_PASSWORD),
+        ("one@example.test", TEST_PASSWORD),
+    ] {
+        let refused = confirm_match(
+            &harness.ctx(first.principal.clone()),
+            &credentials(&harness, candidate, email, password),
+        )
+        .await;
+        assert!(matches!(refused, Err(ref e) if e.is_decline()), "{email}");
+    }
+
+    let committed = confirm_match(
+        &harness.ctx(first.principal.clone()),
+        &credentials(&harness, candidate, "two@example.test", TEST_PASSWORD),
+    )
+    .await
+    .expect("signing in twice is signing in twice, whatever the shape");
+
+    assert_eq!(
+        committed.event,
+        Event::PersonMerged {
+            survivor: person_a,
+            absorbed: person_b,
+            method: LinkMethod::SelfLink,
+            candidate: Some(candidate),
+        }
+    );
+    assert_eq!(person(&harness, b).await, person_a);
+    assert_eq!(
+        count(&harness, "SELECT count(*) AS n FROM session", bind![]).await,
+        sessions_before,
+        "proving you could sign in minted a session"
+    );
 }
 
 #[tokio::test]

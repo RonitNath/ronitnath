@@ -54,6 +54,16 @@ pub struct ConfirmMatch {
     /// a bearer secret, so it is sent and never returned.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub other_session: Option<String>,
+    /// The address the *other* identity signs in with, when the proof is its
+    /// credentials. A browser has no way to hold two session tokens at once,
+    /// so this is the form of "I am both of these" a person can actually give.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub other_email: Option<String>,
+    /// Its password. Verified in-command against the same argon2id hash
+    /// `SignIn` reads, and no session is created: proving you can sign in is
+    /// not the same as signing in, and this command hands nothing back.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub other_password: Option<String>,
 }
 
 /// A platform operator rules on a candidate the person cannot prove
@@ -97,10 +107,20 @@ mod tests {
         round_trip(&ConfirmMatch {
             candidate: id("m_"),
             other_session: None,
+            other_email: None,
+            other_password: None,
         });
         round_trip(&ConfirmMatch {
             candidate: id("m_"),
             other_session: Some("an obviously fake token".into()),
+            other_email: None,
+            other_password: None,
+        });
+        round_trip(&ConfirmMatch {
+            candidate: id("m_"),
+            other_session: None,
+            other_email: Some("other@example.invalid".into()),
+            other_password: Some("an obviously fake password".into()),
         });
         round_trip(&RuleMatch {
             candidate: id("m_"),

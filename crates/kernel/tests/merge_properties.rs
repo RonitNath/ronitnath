@@ -199,6 +199,8 @@ proptest! {
                 &ConfirmMatch {
                     candidate: candidate.public(harness.store().ids()),
                     other_session: Some(second.token.expose().to_owned()),
+                    other_email: None,
+                    other_password: None,
                 },
             )
             .await
@@ -257,6 +259,8 @@ proptest! {
                 &ConfirmMatch {
                     candidate: candidate.public(harness.store().ids()),
                     other_session: Some(second.token.expose().to_owned()),
+                    other_email: None,
+                    other_password: None,
                 },
             )
             .await
@@ -306,6 +310,8 @@ proptest! {
                 &ConfirmMatch {
                     candidate: candidate.public(harness.store().ids()),
                     other_session: None,
+                    other_email: None,
+                    other_password: None,
                 },
             )
             .await;
@@ -427,6 +433,8 @@ async fn merge_them(harness: &Local, first: &Registered, second: &Registered) {
         &ConfirmMatch {
             candidate: candidate.public(harness.store().ids()),
             other_session: Some(second.token.expose().to_owned()),
+            other_email: None,
+            other_password: None,
         },
     )
     .await

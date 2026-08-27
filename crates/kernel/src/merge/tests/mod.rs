@@ -21,7 +21,7 @@ mod prelude {
     pub(super) use crate::ids::{Group, Id, Identity, MatchCandidate, Person};
     pub(super) use crate::merge::*;
     pub(super) use crate::store::{Count, Reads, Sqlite, Store, Value};
-    pub(super) use crate::testing::{Local, Registered};
+    pub(super) use crate::testing::{Local, Registered, TEST_PASSWORD};
 
     /// Run a count query and return the number.
     pub(super) async fn count(harness: &Local, sql: &'static str, params: Vec<Value>) -> i64 {

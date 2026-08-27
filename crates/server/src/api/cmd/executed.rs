@@ -85,6 +85,23 @@ impl Executed {
         }
     }
 
+    /// Whether this command changed what the caller's own cookie resolves to.
+    ///
+    /// Signing out is the obvious one. `ActAs` is the other: it rewrites the
+    /// session row, and the resolution of that cookie is cached — so without
+    /// evicting it here, the very next request would still answer as the
+    /// party the caller just stopped speaking as. Every *other* node learns
+    /// from the feed a moment later (`sub::invalidate`); this is the caller's
+    /// own, evicted before its own response leaves.
+    #[must_use]
+    pub fn rebinds_session(&self) -> bool {
+        self.ended
+            || matches!(
+                self.committed.event,
+                rn_kernel::Event::ActingAs { .. } | rn_kernel::Event::SessionRevoked { .. }
+            )
+    }
+
     /// The `Set-Cookie` this command implies, if any.
     #[must_use]
     pub fn cookie(&self, mode: crate::config::Mode) -> Option<String> {

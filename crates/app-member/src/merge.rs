@@ -6,18 +6,15 @@
 //! session on both registrations at once, which is the same evidence as
 //! signing in twice.
 //!
-//! It is not complete in this build, and the missing half is the server's.
-//! `ConfirmMatch` takes the *other* registration's session token, and nothing
-//! hands a browser one: `SignIn` puts its token in an `HttpOnly` cookie —
-//! replacing the caller's own — and returns only the identity it minted for.
-//! So the form below signs in to the other registration and offers the proof;
-//! where both registrations already resolve to one person, or share a verified
-//! factor, it lands, and otherwise it declines and says so. Closing it needs a
-//! reply that carries the second session, which is a change to the command
-//! surface and not to this page.
+//! A browser cannot hold two session cookies at once, so it gives that proof
+//! in the form it can: the other registration's address and password, sent to
+//! `ConfirmMatch`, verified inside the command against the same argon2id hash
+//! `SignIn` reads. Nothing is minted — proving you could sign in is not
+//! signing in — and the caller's own cookie is untouched, which is why the
+//! page does not have to put itself back together afterwards.
 
 use leptos::prelude::*;
-use rn_api::commands::{ConfirmMatch, SignIn, Split};
+use rn_api::commands::{ConfirmMatch, Split};
 use rn_ui::{Commit, Live, PageHead, use_whoami};
 
 use crate::api::{Refusal, attempt, run};
@@ -118,24 +115,22 @@ fn Proposed(row: Candidate, refusal: RwSignal<Option<Refusal>>) -> impl IntoView
             let Ok(candidate) = candidate.parse() else {
                 return;
             };
-            // Signing in to the other registration is the proof. The token it
-            // mints goes into the cookie and not into this reply, so what is
-            // sent below is the candidate alone, and the kernel falls back to
-            // the factor both registrations have verified.
-            if !address.is_empty() {
-                let _ = run(&SignIn {
-                    email: address,
-                    password: secret,
-                })
-                .await;
-            }
+            // Empty means "I have no credentials to offer" rather than "try an
+            // empty password": the kernel then falls back to a factor both
+            // registrations have verified, which is the other proof.
+            let typed = !address.is_empty();
             match run(&ConfirmMatch {
                 candidate,
                 other_session: None,
+                other_email: typed.then_some(address),
+                other_password: typed.then_some(secret),
             })
             .await
             {
-                Ok(_) => refusal.set(None),
+                Ok(_) => {
+                    password.set(String::new());
+                    refusal.set(None);
+                }
                 Err(refused) => refusal.set(Some(refused)),
             }
         });

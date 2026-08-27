@@ -176,7 +176,7 @@ async fn command(
 ) -> Response {
     match dispatch(&state, session.principal, name, body).await {
         Ok(executed) => {
-            if executed.ended {
+            if executed.rebinds_session() {
                 session::forget(&state, &headers);
             }
             let reply = executed.reply(&state.store.reads(), state.ids()).await;
