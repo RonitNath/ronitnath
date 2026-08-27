@@ -1,0 +1,35 @@
+# The perf harness's own crate, deliberately outside the workspace.
+#
+# `[workspace]` below makes this a workspace of one: it keeps the harness off
+# `cargo build --workspace`, out of the fast suite's compile time and out of
+# the shipped binary's dependency graph, which is right for a thing that only
+# ever runs against a cluster somebody started on purpose. The cost is that it
+# does not inherit `[workspace.dependencies]`, so the four pins below are
+# written out; they are the same versions the lock file already carries, so a
+# build here resolves out of the same registry cache.
+#
+# It talks HTTP/1.1 over a plain socket rather than through a client crate.
+# Two reasons: every target is `127.0.0.1` with no TLS to negotiate, and a
+# load generator that keeps its own connection is the only way to be sure a
+# measured latency is the server's and not a pool's.
+[package]
+name = "rn-perf"
+version = "0.1.0"
+edition = "2024"
+publish = false
+license = "UNLICENSED"
+
+[workspace]
+
+[[bin]]
+name = "rn-perf"
+path = "src/main.rs"
+
+[dependencies]
+tokio = { version = "1.53.1", features = ["rt-multi-thread", "macros", "net", "time", "sync", "io-util"] }
+tokio-tungstenite = "0.30.0"
+futures-util = { version = "0.3.34", features = ["sink"] }
+serde_json = "1.0.145"
+
+[profile.release]
+debug = 1
