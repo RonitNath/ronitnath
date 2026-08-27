@@ -20,7 +20,10 @@ fn main() {
     for bundle in ["starscape", "app-member", "app-org", "app-platform"] {
         let dist = std::path::Path::new("..").join(bundle).join("dist");
         if let Err(error) = std::fs::create_dir_all(&dist) {
-            println!("cargo::warning=could not create {}: {error}", dist.display());
+            println!(
+                "cargo::warning=could not create {}: {error}",
+                dist.display()
+            );
         }
         println!("cargo::rerun-if-changed={}", dist.display());
     }
