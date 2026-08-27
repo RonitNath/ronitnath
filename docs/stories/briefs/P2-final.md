@@ -1,0 +1,72 @@
+ORCHESTRATOR NOTE: the worktree exists at /Users/ronitnath/dev/worktrees/rn-site--p2 (branch rb-p2, cut from rebuild after P1 merged — P1 landed: authority::allows in every command, GrantOperator/RevokeOperator, ReAuthenticate + OPERATOR_SESSION_TTL + auth_time, SignInAs/EndImpersonation (bound `linking`: the session secret rides in the reply body; browser adoption is P4), link.suspended_at, audit_object rows, RetireKey; 47 commands; migration 7_authority.sql; Ctx::impersonation is currently filled from `mode == Dev` in crates/server/src/api/cmd/mod.rs — P5 replaces that with RN_SITE__IMPERSONATION). A prebuilt target/ is being copied in; DO NOT run cargo/trunk/just until target/.seed-complete exists (read first — there is a lot to read). P2, P3 and P5 run concurrently: stay inside YOU OWN; shared registries are append-only (/private/tmp/claude-502/-Users-ronitnath-dev/1a80dd12-969c-454a-80ea-f8f4533b4fa6/scratchpad/briefs/registries.md). Your migration number: P2 = 8, P3 = 9 (do not renumber). CARGO_BUILD_JOBS=4 (three workers share the machine).
+
+
+WORKSPACE: ~/dev/worktrees/rn-site--p2 (git worktree of ~/dev/love/projects/ronit/rn-site,
+  branch `rb-p2`, cut from `rebuild` after P1 has merged). Do not touch other worktrees.
+  P3 and P5 are working the same branch point in parallel; their paths are disjoint from
+  yours and you must not stage a file they own.
+
+READ FIRST, in order: docs/stories/platform-admin-requirements.md §B5 (all seven
+  requirements — this leg is B5 and nothing else); the board's frames A1, A2 and F2
+  (docs/design/platform-admin/, served locally); docs/rebuild/plan.md (§Product contract,
+  §API); crates/server/src/lib.rs (the router, built once at boot — the whole difficulty);
+  crates/server/src/sub/invalidate.rs and sub/mod.rs (the feed consumer every node runs);
+  crates/server/src/state.rs; crates/kernel/src/feed/mod.rs; crates/kernel/src/relation/
+  vocabulary.rs §Vocabulary (the "unregistered kind admits nothing" argument you are
+  copying); crates/kernel/src/cmd/mod.rs and the authority helper P1 landed;
+  crates/server/src/shell/mod.rs; tools/cluster.sh. That is the only context you get.
+
+YOU OWN: crates/kernel/src/product/**; crates/kernel/src/cmd/product.rs;
+  crates/kernel/migrations/8_product.sql; crates/server/src/product.rs;
+  crates/server/src/lib.rs; crates/server/src/api/query/platform_products.rs;
+  crates/api/src/commands/product.rs; crates/app-platform/src/products.rs.
+  Append-only in the shared registries.
+DO NOT TOUCH: any other crates/kernel/src/cmd/*.rs; any other platform query;
+  crates/app-platform/src/** beyond products.rs and its one nav line; crates/ui/**;
+  whoami. You may READ everything.
+  If you need something outside your paths, note it in your report — do not add it yourself.
+
+WORK — end states.
+ 1. A compiled-in catalogue (`rn_kernel::product::Catalogue`: slug, display, summary,
+    the routes it mounts) and a `product` table carrying only enablement. A slug absent
+    from the binary cannot be enabled. No row means disabled.
+ 2. `EnableProduct` / `DisableProduct`: operator-only, sensitive, one row each, audit
+    inside, `ProductEnabled` / `ProductDisabled` events. Disabling touches no product data.
+ 3. Every node holds a `ProductSet` projection re-read on those two events and on nothing
+    else, through the feed consumer that already runs on every node.
+ 4. Product routes are mounted at boot and wrapped in **one** gate that answers the
+    uniform 404 when the projection says off. Do not rebuild the Router per toggle; the
+    requirements doc records why, and if you disagree, say so in your report rather than
+    doing it.
+ 5. `platform-products` and the `/platform/products` screen: slug, display, state,
+    changed at, changed by, and the routes the product mounts — so the screen states
+    what turning it off will take away. The toggle round-trips through /api/cmd and
+    arrives as a live diff on /api/sub.
+ 6. `docs/rebuild/plan.md` gains the product model and the config the gate reads.
+
+ACCEPTANCE: the CI gate (`just gate`) green. Then the one that decides the leg, and it
+  is a transcript you paste into your report:
+    tools/cluster.sh start                       # three real voters
+    curl each node's product route               # 404, 404, 404
+    POST /api/cmd/enable-product on node 1 only
+    poll all three                               # 200 within 2s, on all three
+    pgrep -f rn-site                             # the same three pids as before
+    disable on node 3; poll all three            # 404 again
+  Nothing restarted. A leg that cannot produce that transcript has not delivered B5.
+  Visual: agent-browser screenshots of /platform/products at 1440 and 390, both themes,
+  viewed, into docs/review/p2/. Self-test with tools/ephemeral.sh, never :3004.
+  tools/cluster.sh stop; pgrep -f rn-site empty; leave no residue.
+RAILS: production and deploy out of scope. Never print, log or commit secrets. P3 and P5
+  are live on other paths — never `git add -A`, stage explicit files, do not revert or
+  overwrite edits by others, registries are append-only. Do not spawn agents. Work
+  autonomously; do not stop to ask questions. CARGO_BUILD_JOBS=6. Commit in units
+  (catalogue + migration; commands; projection + gate; query + screen; docs) and
+  `git push origin rb-p2` after each.
+REPORT: commit hashes; the catalogue entries you shipped and why those; the three-node
+  transcript in full with the pids; the gate's placement in the router and its cost per
+  request; screenshot paths; blockers.
+
+---
+
+
+ADDENDUM (P1 finding, yours because you are the only wave-2 leg in crates/kernel): `audit.request_digest` is a SHA-256 over the JSON of the command arguments, and SignIn/Register/AddFactor/ReAuthenticate-style commands include the password in that JSON. Give the `Command`/`run` path a redaction hook (the way ReAuthenticate already digests redacted args) so no credential ever enters the digest input; test: the digest of a SignIn with password A equals the digest with password B for otherwise identical args. Minimal edit in crates/kernel/src/cmd/mod.rs, listed in your report.

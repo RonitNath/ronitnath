@@ -1,0 +1,71 @@
+ORCHESTRATOR NOTE: the worktree exists at /Users/ronitnath/dev/worktrees/rn-site--p3 (branch rb-p3, cut from rebuild after P1 merged — P1 landed: authority::allows in every command, GrantOperator/RevokeOperator, ReAuthenticate + OPERATOR_SESSION_TTL + auth_time, SignInAs/EndImpersonation (bound `linking`: the session secret rides in the reply body; browser adoption is P4), link.suspended_at, audit_object rows, RetireKey; 47 commands; migration 7_authority.sql; Ctx::impersonation is currently filled from `mode == Dev` in crates/server/src/api/cmd/mod.rs — P5 replaces that with RN_SITE__IMPERSONATION). A prebuilt target/ is being copied in; DO NOT run cargo/trunk/just until target/.seed-complete exists (read first — there is a lot to read). P2, P3 and P5 run concurrently: stay inside YOU OWN; shared registries are append-only (/private/tmp/claude-502/-Users-ronitnath-dev/1a80dd12-969c-454a-80ea-f8f4533b4fa6/scratchpad/briefs/registries.md). Your migration number: P2 = 8, P3 = 9 (do not renumber). CARGO_BUILD_JOBS=4 (three workers share the machine).
+
+
+WORKSPACE: ~/dev/worktrees/rn-site--p3 (git worktree of ~/dev/love/projects/ronit/rn-site,
+  branch `rb-p3`, cut from `rebuild` after P1 has merged). Do not touch other worktrees.
+  P2 and P5 are working the same branch point; their paths are disjoint from yours.
+
+READ FIRST, in order: docs/stories/platform-admin-requirements.md §B4, §B6, §C7, §C8.2,
+  §C9.3, §C10.1, §D13, §E14.2, §E15.1 — your scope, and nothing outside it; the board's
+  frames F1, F3, F4 and F6 (docs/design/platform-admin/, served locally);
+  ~/dev/context/design/interface-taste.md (binding — the interface states, it does not
+  explain; no status pills; five type sizes); docs/rebuild/plan.md §API;
+  crates/server/src/api/query/{mod,named,platform,platform_parties,platform_identities,
+  platform_audit,platform_statements}.rs; crates/server/src/api/cluster.rs;
+  crates/server/src/ops.rs; crates/server/src/observe.rs; crates/app-platform/src/**;
+  crates/ui/src/** (read only — the table, its column priorities, and the panel);
+  crates/kernel/src/oidc/{key,token,client}.rs and migration 6_oidc.sql;
+  crates/server/src/api/whoami/name.rs (`masked` — the address rule you must obey).
+  That is the only context you get.
+
+YOU OWN: crates/server/src/api/query/platform_*.rs except platform_products.rs;
+  crates/server/src/api/cluster.rs; crates/server/src/observe.rs;
+  crates/server/src/ops.rs; crates/kernel/migrations/9_node_report.sql;
+  crates/api/src/cluster.rs; crates/app-platform/src/** except products.rs.
+  Append-only in the shared registries.
+DO NOT TOUCH: crates/kernel/src beyond your migration; crates/ui/**; crates/app-member/**;
+  whoami; crates/server/src/lib.rs. You may READ everything.
+  If you need something outside your paths, note it in your report — do not add it yourself.
+
+WORK — end states.
+ 1. `node_report`, upserted by each node from the observation lane every 15 s, and the
+    `platform-nodes` query over it with a rollout verdict *counted from the rows*
+    (settled / in progress / divergent). A row older than three intervals renders as
+    "not reporting" — the screen says what it witnessed.
+ 2. The deployment screen (frame F1): the node table, both raft groups, feed head and
+    commands-in-the-last-day as two readings, subscribers, pending observations, the key
+    table with ages, and rotate. `/platform/cluster` becomes a section of it.
+ 3. `platform-keys` with live-token counts, `platform-clients` with last issuance,
+    `platform-links` and `platform-consents` with revoke and a bulk revoke by client.
+ 4. The person page (frame F3): identities, factors **masked**, sessions, memberships,
+    owned resources, relations, consents, merge history with the signals a candidate
+    actually carries, and the controls. `reveal-factor` writes its own audit row.
+ 5. `platform-find?q=` — exact handle, exact email, exact public id, three seeks, no
+    prefix scan. A miss is empty, not a decline.
+ 6. Audit filters (frame F4) by actor, hat, object, command and time, each riding an
+    index, over P1's `audit_object` side table where the filter is by object.
+ 7. `/platform/operators` renders P1's rows, including the bootstrap grant with its
+    null `granted_by` stated as "granted by configuration".
+
+ACCEPTANCE: `just gate` green; `cargo test -p rn-site --test explain` covers every new
+  statement (and `platform_statements.rs` lists them, so the completeness test still
+  passes); a generated test asserts every filter combination the controls can produce is
+  an index seek. A server test asserts the rendered person JSON contains no full email
+  address. Visual: agent-browser screenshots of every page you touched at 1440 and 390,
+  both themes, VIEWED (not merely captured), into docs/review/p3/ — including the
+  deployment screen with three voters up and again with one killed
+  (tools/cluster.sh kill 2). Self-test with tools/ephemeral.sh, never :3004.
+  tools/cluster.sh stop; no residue; pgrep -f rn-site empty.
+RAILS: production and deploy out of scope. Never print, log or commit secrets, and never
+  put an unmasked address in a screenshot. P2 and P5 are live on other paths — never
+  `git add -A`, stage explicit files, do not revert or overwrite edits by others,
+  registries are append-only. Do not spawn agents. Work autonomously; do not stop to ask
+  questions. CARGO_BUILD_JOBS=6. Commit in units (node_report + query; deployment screen;
+  keys and clients; links and consents; person page; find; audit filters) and
+  `git push origin rb-p3` after each.
+REPORT: commit hashes; the queries added with their indexes; the EXPLAIN output for the
+  three `platform-find` statements; screenshot paths, and which ones you looked at;
+  anything the interface-taste rules made you undo; blockers.
+
+---
+

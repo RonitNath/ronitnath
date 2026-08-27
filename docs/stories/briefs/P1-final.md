@@ -1,0 +1,92 @@
+ORCHESTRATOR NOTE: the worktree exists at /Users/ronitnath/dev/worktrees/rn-site--p1 (branch rb-p1, cut from rebuild at 855dc78 which includes O1 and X0). A prebuilt target/ is being copied in by the orchestrator; DO NOT run any cargo/trunk/just command until the file target/.seed-complete exists (poll with `ls target/.seed-complete` between reading steps; read the docs and code first — that is a lot of reading). Other briefs referenced: /private/tmp/claude-502/-Users-ronitnath-dev/1a80dd12-969c-454a-80ea-f8f4533b4fa6/scratchpad/briefs/registries.md (the append-only shared files). Wave 2 has not started; you are alone in the repo except the orchestrator.
+
+
+WORKSPACE: ~/dev/worktrees/rn-site--p1 (git worktree of ~/dev/love/projects/ronit/rn-site,
+  branch `rb-p1`, cut from `rebuild` after O1 has landed). Do not touch other worktrees.
+  Seed target/ from the main checkout (cargo clean there first) — a cold debug build is
+  the slowest thing in this leg.
+
+READ FIRST, in order: docs/stories/platform-admin-requirements.md (§Findings, A2, A3,
+  C9, C10.2, C11, D12 — your whole scope); docs/design/platform-admin/dist/index.html
+  served locally, and the board's frames B1, B2, C, D; docs/rebuild/plan.md (§Model,
+  §API — you extend both); docs/kernel/index.html; crates/kernel/src/cmd/mod.rs (the
+  command shape, `is_platform_operator`, `member`), cmd/refs.rs, cmd/disable.rs,
+  cmd/enable.rs, cmd/set_role.rs, cmd/revoke_session.rs, cmd/act_as.rs, cmd/sign_in.rs,
+  merge/rule.rs (`make_operator`, and the evidence bound you copy), principal/mod.rs
+  (`Principal`, `expand`, `RESOLVE_SQL`), principal/cache.rs, relation/kinds.rs,
+  relation/check.rs, domain/session.rs, audit.rs, event/mod.rs, dev.rs;
+  crates/kernel/migrations/*.sql (never edit an applied one; add 7_authority.sql);
+  crates/server/src/bootstrap.rs, auth/session.rs, sub/invalidate.rs;
+  crates/api/src/commands/mod.rs and command.rs;
+  ~/dev/context/procedures/engineering.md §Security §Validation.
+  That is the only context you get, deliberately.
+
+YOU OWN: crates/kernel/** except crates/kernel/src/product/**, crates/kernel/src/cmd/product.rs
+  and migrations numbered 8 and above (those are P2's and P3's);
+  crates/kernel/migrations/7_authority.sql;
+  crates/api/src/commands/platform.rs (new). Append-only in the shared registries listed
+  in docs/stories/platform-admin-legs.md §The shared registries.
+DO NOT TOUCH: crates/server/src/** beyond the registry lines your commands need;
+  crates/app-*/**; crates/ui/**; tools/**. You may READ everything.
+  If you need something outside your paths, note it in your report — do not add it yourself.
+
+WORK — end states, not steps.
+ 1. `authority::allows(&ctx, want) -> Outcome<bool>` exists and EVERY command's
+    authorisation ends in it, with `platform:* #operator` as its last clause. The eight
+    open-coded `is_platform_operator` calls are gone into it. Finding F1 in the
+    requirements names the eighteen commands that have no operator path today; after
+    this leg none do.
+ 2. `GrantOperator` and `RevokeOperator` (requirement A2.1): actor + mandatory bounded
+    reason + audit row; `relation.granted_by` carries the granting person; revoking the
+    last operator declines. `crates/kernel/src/cmd/mod.rs:361`'s claim that `SetRole`
+    writes this row is corrected in the same commit.
+ 3. Sessions know when they were authenticated (A3.1, A3.2): `session.auth_time`,
+    `OPERATOR_SESSION_TTL`, a `ReAuthenticate` command, and a named `SENSITIVE` command
+    set that declines outside `PLATFORM_REAUTH_WINDOW` with a refusal a caller can
+    tell apart from the uniform decline.
+ 4. Impersonation (C11.2): `SignInAs { person, reason }` mints a real session for an
+    active identity of the target with `session.impersonated_by_identity_id` set and
+    `IMPERSONATION_TTL`; `Principal::Member` carries `impersonated_by`; `refs::actor`
+    returns the operator as actor and the target as hat — one function, every command;
+    ten named commands are refused from an impersonated session; `EndImpersonation`
+    deletes the session; the operator losing the relation ends it at resolve time.
+    `RN_SITE__IMPERSONATION` gates the command (C11.3) — the config field is P5's, so
+    read it through a `Ctx` flag and note the field you need in your report.
+ 5. The disable cascade is complete and reversible (C9.2, C9.3): `link.suspended_at`,
+    stamped by `Disable`, refused by `ClaimLink`, cleared by `Enable`; the cascade
+    counts land in the audit payload.
+ 6. `audit_object (audit_id, kind, id)` written inside every command's own transaction
+    (C10.2), so an operator's ruling can be found by the object it was about without a
+    full scan. Queries over it are P3's and P4's; the rows are yours.
+ 7. `RetireKey { kid, force?, reason }` (B6.2), refusing while tokens signed under that
+    kid are alive.
+ 8. `ActAs` admits any organization for an operator (C11.1) — attribution only.
+
+ACCEPTANCE: cargo fmt --check; cargo clippy --workspace --all-targets -- -D warnings;
+  cargo test --workspace --locked; cargo test -p rn-kernel --test explain (every new
+  lookup asserts its index); tools/size-gate.sh; cargo bench -p rn-kernel -- --quick
+  (check() is still one query and still inside its budget — a leg that widens `check`
+  has misread requirement C11.2).
+  The two that decide the leg:
+    - a table-driven test over ALL_COMMAND_NAMES: the actor holding nothing declines,
+      the actor holding platform:* #operator does not, and each success wrote an audit
+      row naming them. It enumerates the command list, so a command added later with no
+      operator path fails the build.
+    - an impersonation test asserting all six of C11.2's clauses.
+  Self-test the running behaviour with tools/ephemeral.sh (`just up`), not by taking
+  :3004 — that is somebody else's.
+  Leave no test residue; `just down` and `pgrep -f rn-site` empty at the end.
+RAILS: production and deploy are out of scope. Never print, log or commit a secret or a
+  private key. Other agents are active in wave 2 on server and bundle paths — never
+  `git add -A`, stage explicit files, do not revert or overwrite edits by others, and
+  treat the shared registries as append-only. Do not spawn agents. Work autonomously;
+  do not stop to ask questions. CARGO_BUILD_JOBS=6. Commit in units (authority sweep;
+  delegation; sessions and re-auth; impersonation; cascade and audit_object; keys) and
+  `git push origin rb-p1` after each.
+REPORT: commit hashes; the migration, table by table; the commands added with their
+  audit shapes and events; the config field you need from P5; the count of commands the
+  authority table-test covers (expect 40+, and say the number); bench deltas for
+  `check` and `principal::expand`; blockers.
+
+---
+
