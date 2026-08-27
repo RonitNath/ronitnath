@@ -40,9 +40,10 @@ use axum::Router;
 
 pub use state::AppState;
 
-/// The whole HTTP surface. Feature routers merge as peers; the freshness layer
-/// wraps all of them so no route can be added later that forgets the version
-/// header or picks its own cache policy.
+/// The whole HTTP surface. Feature routers merge as peers; the freshness and
+/// deadline layers wrap all of them so no route can be added later that
+/// forgets the version header, picks its own cache policy, or waits forever
+/// for a quorum that is not coming.
 pub fn router(state: AppState) -> Router {
     let session_surface = Router::new()
         .merge(ops::router())
@@ -59,6 +60,9 @@ pub fn router(state: AppState) -> Router {
 
     session_surface
         .merge(bearer_surface)
+        // Inside the freshness layer, so a refusal still carries the version
+        // header and the cache policy every other answer does.
+        .layer(axum::middleware::from_fn(http::deadline))
         .layer(axum::middleware::from_fn_with_state(state, http::freshness))
         .layer(tower_http::trace::TraceLayer::new_for_http())
 }

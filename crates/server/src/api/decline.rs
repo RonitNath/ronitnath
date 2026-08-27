@@ -59,6 +59,20 @@ pub fn not_found() -> Response {
     (StatusCode::NOT_FOUND, Json(Decline::default())).into_response()
 }
 
+/// The one refusal, as a `503`: this node could not answer in time.
+///
+/// A `503` rather than the `408` a generic timeout layer sends, and the
+/// difference is the honest one. `408` says the *client* was slow. What this
+/// answers is a node that took its whole budget and did not come back — which
+/// on a raft cluster means one thing, no quorum to commit with, and that is
+/// the server's condition, not the caller's. The body is the uniform decline
+/// because a refusal is a refusal: a caller learns that its command did not
+/// happen, and nothing about why the cluster is unhappy.
+#[must_use]
+pub fn unavailable() -> Response {
+    (StatusCode::SERVICE_UNAVAILABLE, Json(Decline::default())).into_response()
+}
+
 /// A replayed idempotency key carrying a different body.
 #[must_use]
 pub fn conflict() -> Response {
