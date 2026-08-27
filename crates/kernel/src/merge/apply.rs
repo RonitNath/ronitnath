@@ -102,7 +102,7 @@ const RELATIONS_AS_OBJECT: &str = "INSERT OR IGNORE INTO relation \
 /// An organization the absorbed person owned moves too, because what moves is
 /// its `resource` row's owner — the organization itself is never merged, only
 /// persons are, and its party row is untouched.
-const RESOURCES: &str = "UPDATE resource SET owner_party_id = $1 WHERE owner_party_id = $2 \
+pub(super) const RESOURCES: &str = "UPDATE resource SET owner_party_id = $1 WHERE owner_party_id = $2 \
      AND EXISTS (SELECT 1 FROM party WHERE id = $2 AND kind = 'person' AND status = 'active')";
 
 /// Step 4 — anything that already resolved to the absorbed person now resolves

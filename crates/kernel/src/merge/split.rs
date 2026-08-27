@@ -90,13 +90,19 @@ const RELATIONS_AS_OBJECT: &str = "INSERT OR IGNORE INTO relation \
 /// record of what it owned; `COALESCE` is what lets one statement address both
 /// shapes of object, because a document's `#owner` row names its `resource`
 /// row and an organization's names its `party` row.
-const RESOURCES: &str = "UPDATE resource SET owner_party_id = $1 WHERE owner_party_id = $2 \
-     AND EXISTS (SELECT 1 FROM relation r WHERE r.relation = 'owner' \
-                   AND r.subject_kind = 'person' AND r.subject_id = $3 \
-                   AND r.object_kind = resource.kind \
-                   AND r.object_id = COALESCE( \
-                       (SELECT pr.party_id FROM party_resource pr \
-                         WHERE pr.resource_id = resource.id), resource.id))";
+///
+/// Both halves are index seeks — `resource_owner_idx` on the outside and
+/// `relation_subject_key_idx` on the inside, which is why the subject is asked
+/// for as `subject_key` rather than as its two columns. `tests/explain.rs`
+/// holds that.
+pub(super) const RESOURCES: &str = "UPDATE resource SET owner_party_id = $1 WHERE owner_party_id = $2 \
+     AND EXISTS (SELECT 1 FROM relation r \
+                  WHERE r.subject_key = 'person:' || $3 \
+                    AND r.object_kind = resource.kind \
+                    AND r.object_id = COALESCE( \
+                        (SELECT pr.party_id FROM party_resource pr \
+                          WHERE pr.resource_id = resource.id), resource.id) \
+                    AND r.relation = 'owner')";
 
 /// And the survivor stops claiming to own what it no longer owns. Guarded on
 /// the column having actually moved, so it can only ever remove a row the
@@ -104,8 +110,8 @@ const RESOURCES: &str = "UPDATE resource SET owner_party_id = $1 WHERE owner_par
 /// Parameters are numbered in the order they appear, because that is the order
 /// SQLite assigns `$n` names an index in: the survivor first, the new person
 /// second.
-const DROP_OWNER: &str = "DELETE FROM relation WHERE relation = 'owner' \
-       AND subject_kind = 'person' AND subject_id = $1 \
+pub(super) const DROP_OWNER: &str = "DELETE FROM relation \
+     WHERE subject_key = 'person:' || $1 AND relation = 'owner' \
        AND EXISTS (SELECT 1 FROM resource res WHERE res.owner_party_id = $2 \
                      AND res.kind = relation.object_kind \
                      AND relation.object_id = COALESCE( \

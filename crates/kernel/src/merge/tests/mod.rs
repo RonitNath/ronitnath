@@ -5,6 +5,7 @@
 //! beside each other.
 
 mod operator;
+mod ownership;
 mod proofs;
 mod signals;
 mod steps;
