@@ -219,23 +219,33 @@ test("star labels name what is overhead and never land on the hero", async ({ pa
   await page.goto(site);
   await expect.poll(() => page.locator(".star-callout").count()).toBeGreaterThan(0);
 
-  const overlaps = await page.evaluate(() => {
+  // One snapshot, taken inside the page. The sky runs at 60x, so which stars
+  // are labelled changes every few seconds and the whole label set is rebuilt
+  // when it does — a locator read and then acted on can land either side of
+  // that rebuild. Reading every claim in one synchronous evaluate cannot: the
+  // rebuild happens in a frame callback, and a frame callback does not
+  // interleave with this function.
+  const labelled = await page.evaluate(() => {
     const hero = document.querySelector(".home-card")!.getBoundingClientRect();
-    return Array.from(document.querySelectorAll(".star-callout")).filter(label => {
-      const box = label.getBoundingClientRect();
-      return (
-        box.left < hero.right &&
-        box.right > hero.left &&
-        box.top < hero.bottom &&
-        box.bottom > hero.top
-      );
-    }).length;
+    const labels = Array.from(document.querySelectorAll(".star-callout"));
+    return {
+      overlaps: labels.filter(label => {
+        const box = label.getBoundingClientRect();
+        return (
+          box.left < hero.right &&
+          box.right > hero.left &&
+          box.top < hero.bottom &&
+          box.bottom > hero.top
+        );
+      }).length,
+      name: labels[0]?.querySelector("strong")?.textContent ?? "",
+      detail: labels[0]?.querySelector("span")?.textContent ?? "",
+    };
   });
-  expect(overlaps).toBe(0);
 
-  const label = page.locator(".star-callout").first();
-  await expect(label.locator("strong")).not.toBeEmpty();
-  await expect(label.locator("span")).toHaveText(/· \d+ ly$/i);
+  expect(labelled.overlaps).toBe(0);
+  expect(labelled.name).not.toBe("");
+  expect(labelled.detail).toMatch(/· \d+ ly$/i);
 });
 
 test("a phone frame elides the labels rather than covering the page with them", async ({ page }) => {
@@ -383,10 +393,18 @@ test("a star label opens the atlas on that star and holds it there", async ({ pa
   await page.goto(withTelemetry);
   await expect.poll(() => page.locator(".star-callout").count()).toBeGreaterThan(0);
 
-  const label = page.locator(".star-callout").first();
-  const name = await label.getAttribute("data-name");
+  // Read the name off the label and click *that* label in one synchronous
+  // step. The sky turns while the test runs and the label set is rebuilt when
+  // which stars are overhead changes, so a name read through a locator and a
+  // click made through the same locator can be two different stars. Nothing
+  // interleaves inside one evaluate, so these two cannot disagree.
+  const name = await page.evaluate(() => {
+    const label = document.querySelector<HTMLElement>(".star-callout")!;
+    const name = label.getAttribute("data-name");
+    label.click();
+    return name;
+  });
   expect(name).toBeTruthy();
-  await label.click();
 
   await expect(page.getByRole("dialog", { name: "Celestial atlas" })).toBeVisible();
   await page.waitForFunction(() => window.__rnStarscape.atlas()?.firstFrameAtMs > 0);
