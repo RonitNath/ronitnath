@@ -174,7 +174,8 @@ for round in $(seq 1 "$rounds"); do
     committed=$(stamp)
     if "$perf" commit --host "$host" --seed "$work/drill-seed.json" --seconds 2 --reads 0 \
         >> "$report" 2>&1; then
-        say "  $(at)  a command committed $(awk "BEGIN{printf \"%.1f\", $(stamp) - $committed}")s after the restart returned"
+        took=$(awk "BEGIN{printf \"%.1f\", $(stamp) - $committed}")
+        say "  $(at)  a command committed, ${took}s after the restart returned"
     else
         say "  $(at)  a command did NOT commit after the restart — see $report"
     fi

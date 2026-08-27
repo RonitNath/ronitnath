@@ -20,6 +20,15 @@
 #     at, so a reader can see the condition rather than trust it.
 #   * the world is seeded through the real API. See tools/perf/src/seed.rs.
 #
+# One thing this script sets and `tools/cluster.sh` does not: the dev profile's
+# optimization level. cluster.sh builds `cargo build -p rn-site`, which is the
+# dev profile, which is `opt-level = 0` with debug assertions on — and the
+# budgets in the kernel report are microseconds of *released* code. Measuring
+# an unoptimized binary against them would produce a table of failures that say
+# nothing about the product. So the profile is raised through the environment
+# rather than by editing a file this leg does not own; `--as-shipped 0` turns
+# it off, for anyone who wants to see what the debug tax actually is.
+#
 # The flame graphs come from a separate single-node server started *by* samply
 # (`--samply`, default on): attaching to a running process needs root on macOS,
 # and a profile taken under sudo is not a profile anybody will re-run. The
@@ -38,6 +47,7 @@ node=127.0.0.1:3161
 samply_node=127.0.0.1:3164
 keep=0
 do_samply=1
+optimized=1
 load_ceiling=${RN_PERF_LOAD_CEILING:-4}
 quiet_budget=${RN_PERF_QUIET_BUDGET:-5400}
 
@@ -49,6 +59,7 @@ while [ $# -gt 0 ]; do
         --workers) workers=$2; shift 2 ;;
         --keep) keep=1; shift ;;
         --no-samply) do_samply=0; shift ;;
+        --as-shipped) optimized=$2; shift 2 ;;
         *) echo "unknown option $1" >&2; exit 2 ;;
     esac
 done
@@ -91,19 +102,49 @@ oha_profile() {
     local name=$1 url=$2
     shift 2
     local load
+    local concurrency=${concurrency:-8}
     quiet || true
+    snapshot "before $name"
     load=$(load_now)
     log "profile $name (load average at start: $load)"
     {
         printf 'profile: %s\nurl: %s\nload average at start: %s\nstarted: %s\n\n' \
             "$name" "$url" "$load" "$(date -Iseconds)"
     } > "$out/$name.txt"
-    oha --no-tui -c 8 -z "${seconds}s" "$@" "$url" >> "$out/$name.txt" 2>&1
-    oha --no-tui -c 8 -z 5s -j "$@" "$url" > "$out/$name.json" 2>/dev/null || true
+    oha --no-tui -c "$concurrency" -z "${seconds}s" "$@" "$url" >> "$out/$name.txt" 2>&1
+    oha --no-tui -c "$concurrency" -z 5s --output-format json "$@" "$url" \
+        > "$out/$name.json" 2>/dev/null || true
     printf '    %s\n' "$(grep -m1 'Requests/sec' "$out/$name.txt" || true)"
 }
 
+# The same profile at one connection. A p99 taken at eight tells you what a
+# saturated server does; it does not tell you what one request costs, and a
+# budget is about one request. Both are recorded, and the report says which is
+# which rather than quoting the flattering one.
+oha_alone() {
+    concurrency=1 oha_profile "$@"
+}
+
+# A node's log is the only account of why it stopped, and `cluster.sh stop`
+# deletes the run directory it lives in — so the logs are copied out first, on
+# every exit path, whether the run succeeded or fell over.
+save_logs() {
+    for id in 1 2 3; do
+        [ -f "$work/../cluster/node$id/rn-site.log" ] \
+            && cp "$work/../cluster/node$id/rn-site.log" "$out/node$id.log" 2>/dev/null
+    done
+    true
+}
+
+# What the three nodes say about themselves right now, appended with a label,
+# so a profile that measured a dead cluster is visible as such afterwards.
+snapshot() {
+    { printf '\n--- %s (%s)\n' "$1" "$(date -Iseconds)"; tools/cluster.sh status; } \
+        >> "$out/cluster-timeline.txt" 2>&1 || true
+}
+
 cleanup() {
+    save_logs
     # The profiled node always goes, `--keep` or not: it is this script's own
     # process and nothing else in the run refers to it.
     if [ -n "${samply_pid:-}" ]; then
@@ -135,6 +176,12 @@ for bundle in starscape app-member app-org app-platform; do
     fi
 done
 
+if [ "$optimized" -eq 1 ]; then
+    export CARGO_PROFILE_DEV_OPT_LEVEL=3
+    export CARGO_PROFILE_DEV_DEBUG_ASSERTIONS=false
+    export CARGO_PROFILE_DEV_OVERFLOW_CHECKS=false
+fi
+
 log "building the server and the harness"
 CARGO_BUILD_JOBS=${CARGO_BUILD_JOBS:-4} cargo build --quiet -p rn-site
 (cd tools/perf && CARGO_BUILD_JOBS=${CARGO_BUILD_JOBS:-4} cargo build --quiet --release)
@@ -152,13 +199,12 @@ perf=$root/tools/perf/target/release/rn-perf
     printf 'rustc:    %s\n' "$(rustc --version)"
     printf 'oha:      %s\n' "$(oha --version)"
     printf 'samply:   %s\n' "$(samply --version 2>/dev/null || echo absent)"
+    printf 'server:   dev profile, opt-level %s, debug assertions %s\n' \
+        "${CARGO_PROFILE_DEV_OPT_LEVEL:-0}" "${CARGO_PROFILE_DEV_DEBUG_ASSERTIONS:-true}"
+    printf 'load ceiling: %s (one-minute average; three idle voters sit above zero)\n' \
+        "$load_ceiling"
     printf 'seed:     %s documents, %s subscribers, %s commit workers\n' \
         "$documents" "$subscribers" "$workers"
-    # Two of the report's budgets are stated as "one RTT plus a millisecond",
-    # so the run has to say what an RTT is here. On this harness it is the
-    # loopback, which is the floor a real intra-zone number sits above.
-    printf 'loopback: %s\n' \
-        "$(ping -c 20 -q 127.0.0.1 2>/dev/null | tail -1 || echo 'not measured')"
 } > "$out/run.txt"
 log "wrote $out/run.txt"
 
@@ -195,11 +241,14 @@ cookie=$(cat "$work/owner.cookie")
 
 # ---------------------------------------------------------------- oha profiles
 oha_profile whoami "http://$node/api/whoami" -H "cookie: rn_session=$cookie"
+oha_alone whoami-alone "http://$node/api/whoami" -H "cookie: rn_session=$cookie"
 oha_profile documents "http://$node/api/q/documents" -H "cookie: rn_session=$cookie"
+oha_alone documents-alone "http://$node/api/q/documents" -H "cookie: rn_session=$cookie"
 oha_profile landing "http://$node/"
 
 # ------------------------------------------------------- commit and fan-out
 quiet || true
+snapshot "before commit"
 log "commit profile (load average at start: $(load_now))"
 {
     printf 'profile: commit\nload average at start: %s\nstarted: %s\n\n' \
@@ -209,6 +258,7 @@ log "commit profile (load average at start: $(load_now))"
     --json "$out/commit.json" 2>&1 | tee -a "$out/commit.txt"
 
 quiet || true
+snapshot "before fan-out"
 log "websocket fan-out probe (load average at start: $(load_now))"
 {
     printf 'profile: fan-out\nload average at start: %s\nstarted: %s\n\n' \
@@ -216,6 +266,20 @@ log "websocket fan-out probe (load average at start: $(load_now))"
 } > "$out/fanout.txt"
 "$perf" wsprobe --seed "$work/seed.json" --subscribers "$subscribers" \
     --json "$out/fanout.json" 2>&1 | tee -a "$out/fanout.txt"
+
+# The commit path with the reads switched off. In the mixed profile a write
+# waits behind its worker's own reads, and on this build those reads are
+# seconds long — so the mixed number measures the queue and this one measures
+# the commit.
+quiet || true
+snapshot "before commit-alone"
+log "commit profile, writes only (load average at start: $(load_now))"
+{
+    printf 'profile: commit, writes only\nload average at start: %s\nstarted: %s\n\n' \
+        "$(load_now)" "$(date -Iseconds)"
+} > "$out/commit-alone.txt"
+"$perf" commit --seed "$work/seed.json" --seconds "$seconds" --reads 0 \
+    --json "$out/commit-alone.json" 2>&1 | tee -a "$out/commit-alone.txt"
 
 tools/cluster.sh status > "$out/cluster-after.txt"
 
