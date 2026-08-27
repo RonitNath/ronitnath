@@ -44,6 +44,11 @@ pub use sign_in::{LOOKUP as SIGN_IN_SQL, SignedIn, sign_in};
 pub use sign_out::sign_out;
 pub use verify_email::{mint_verification, verify_email};
 
+// The four merge commands live in `crate::merge`, beside the five steps they
+// share and the queue they act on; they are re-exported here so every command
+// route is reachable by one name.
+pub use crate::merge::{confirm_match, propose_match, rule_match, split};
+
 use serde::Serialize;
 use uuid::Uuid;
 

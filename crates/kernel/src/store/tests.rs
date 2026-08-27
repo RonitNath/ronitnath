@@ -85,8 +85,11 @@ async fn every_named_index_exists() {
         "audit_actor_idx",
         "factor_email_unique_idx",
         "factor_identity_idx",
+        "factor_verified_value_idx",
         "identity_person_idx",
         "identity_source_idx",
+        "match_candidate_a_idx",
+        "match_candidate_b_idx",
         "match_candidate_pair_idx",
         "match_candidate_queue_idx",
         "membership_party_idx",
@@ -317,6 +320,9 @@ fn a_clock_a_test_owns_moves_only_when_told() {
 #[test]
 fn the_embedded_migrations_are_the_files_on_disk() {
     let sql = migrations();
-    assert_eq!(sql.len(), 1, "K1 ships exactly one migration");
+    // K1's schema, K2's relations, K3's merge. hiqlite refuses a gap in the
+    // ids, so every leg's file is present even when its own is a placeholder.
+    assert_eq!(sql.len(), 3);
     assert!(sql[0].contains("CREATE TABLE party"));
+    assert!(sql[2].contains("person_link_is_append_only_update"));
 }

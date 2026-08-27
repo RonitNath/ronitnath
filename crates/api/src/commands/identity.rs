@@ -53,20 +53,32 @@ pub struct RevokeSession {
     pub session: PublicId,
 }
 
-/// Add a factor to the acting identity.
+/// Add a factor to an identity of the acting person.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AddFactor {
     /// What the new factor proves.
     pub kind: FactorKind,
     /// Its value: the address, the password, the credential. Never returned.
     pub value: String,
+    /// Which identity, when it is not the one the caller signed in with.
+    ///
+    /// This is the recovery path a merge exists for: after two registrations
+    /// are proven to be one human, the person signs in with the one they still
+    /// hold and rotates the factors of the one they lost. Omitted, the target
+    /// is the acting identity.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub identity: Option<PublicId>,
 }
 
-/// Remove a factor from the acting identity.
+/// Remove a factor from an identity of the acting person.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RemoveFactor {
     /// The factor to remove.
     pub factor: PublicId,
+    /// Which identity it belongs to, when it is not the one the caller signed
+    /// in with. The other half of the recovery path — see [`AddFactor`].
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub identity: Option<PublicId>,
 }
 
 /// Prove an email factor with the token that was mailed to it.
@@ -116,8 +128,17 @@ mod tests {
         round_trip(&AddFactor {
             kind: FactorKind::Passkey,
             value: "credential".into(),
+            identity: None,
         });
-        round_trip(&RemoveFactor { factor: id("f_") });
+        round_trip(&AddFactor {
+            kind: FactorKind::Email,
+            value: "recovered@example.test".into(),
+            identity: Some(id("i_")),
+        });
+        round_trip(&RemoveFactor {
+            factor: id("f_"),
+            identity: None,
+        });
         round_trip(&VerifyEmail {
             token: "opaque".into(),
         });

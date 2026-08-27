@@ -16,7 +16,8 @@ use serde_json::Value as Json;
 
 use crate::Offset;
 use crate::domain::FactorKind;
-use crate::ids::{Factor, Id, Identity, Person, Session, Table};
+use crate::ids::{Factor, Id, Identity, MatchCandidate, Person, Session, Table};
+use crate::merge::LinkMethod;
 
 /// One thing that happened.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -84,6 +85,46 @@ pub enum Event {
         /// Which.
         party: Id<Person>,
     },
+    /// Two identities were put on the match queue as possibly one human.
+    MatchProposed {
+        /// The queued pair.
+        candidate: Id<MatchCandidate>,
+    },
+    /// An operator ruled that a queued pair is two different humans.
+    MatchRejected {
+        /// The pair that is now closed.
+        candidate: Id<MatchCandidate>,
+    },
+    /// One person absorbed another. The report's `person.merged`; it is named
+    /// for the command that produced it because a feed consumer and a router
+    /// share one vocabulary, and `method` says which of the two it was.
+    PersonMerged {
+        /// The person that remains. Always the older of the two.
+        survivor: Id<Person>,
+        /// The person that is now an alias of the survivor.
+        absorbed: Id<Person>,
+        /// What proved it.
+        method: LinkMethod,
+        /// The candidate it came off, if it came off one.
+        candidate: Option<Id<MatchCandidate>>,
+    },
+    /// An identity that had no person of its own joined one. Not a merge:
+    /// nothing was absorbed, so no id changed meaning.
+    IdentityLinked {
+        /// The identity that was attached.
+        identity: Id<Identity>,
+        /// The person it joined.
+        person: Id<Person>,
+        /// What proved it.
+        method: LinkMethod,
+    },
+    /// An identity was detached onto a person of its own.
+    PersonSplit {
+        /// The identity that moved.
+        identity: Id<Identity>,
+        /// The person it moved to.
+        person: Id<Person>,
+    },
 }
 
 impl Event {
@@ -100,6 +141,14 @@ impl Event {
             Self::EmailVerified { .. } => "verify-email",
             Self::PartyDisabled { .. } => "disable",
             Self::PartyEnabled { .. } => "enable",
+            Self::MatchProposed { .. } => "propose-match",
+            Self::MatchRejected { .. } => "rule-match",
+            Self::IdentityLinked { method, .. } | Self::PersonMerged { method, .. } => match method
+            {
+                LinkMethod::Operator => "rule-match",
+                LinkMethod::SelfLink | LinkMethod::Factor | LinkMethod::Import => "confirm-match",
+            },
+            Self::PersonSplit { .. } => "split",
         }
     }
 
@@ -112,8 +161,14 @@ impl Event {
             | Self::SessionRevoked { identity, .. }
             | Self::FactorAdded { identity, .. }
             | Self::FactorRemoved { identity, .. }
-            | Self::EmailVerified { identity, .. } => Some(*identity),
-            Self::PartyDisabled { .. } | Self::PartyEnabled { .. } => None,
+            | Self::EmailVerified { identity, .. }
+            | Self::PersonSplit { identity, .. }
+            | Self::IdentityLinked { identity, .. } => Some(*identity),
+            Self::PartyDisabled { .. }
+            | Self::PartyEnabled { .. }
+            | Self::MatchProposed { .. }
+            | Self::MatchRejected { .. }
+            | Self::PersonMerged { .. } => None,
         }
     }
 
@@ -122,6 +177,8 @@ impl Event {
         match self {
             Self::Registered { person, .. } => Some(*person),
             Self::PartyDisabled { party } | Self::PartyEnabled { party } => Some(*party),
+            Self::PersonMerged { survivor, .. } => Some(*survivor),
+            Self::PersonSplit { person, .. } | Self::IdentityLinked { person, .. } => Some(*person),
             _ => None,
         }
     }
@@ -171,6 +228,37 @@ impl Event {
             },
             "enable" => Self::PartyEnabled {
                 party: field(&json, "party")?,
+            },
+            "propose-match" => Self::MatchProposed {
+                candidate: field(&json, "candidate")?,
+            },
+            // One tag, two shapes: a ruling either merges or closes the pair,
+            // and `survivor` is what tells them apart.
+            "rule-match" | "confirm-match" => match field::<Person>(&json, "survivor") {
+                Some(survivor) => Self::PersonMerged {
+                    survivor,
+                    absorbed: field(&json, "absorbed")?,
+                    method: <LinkMethod as crate::domain::Vocabulary>::parse(
+                        json.get("method")?.as_str()?,
+                    )?,
+                    candidate: field(&json, "candidate"),
+                },
+                None => match field::<Identity>(&json, "identity") {
+                    Some(identity) => Self::IdentityLinked {
+                        identity,
+                        person: field(&json, "person")?,
+                        method: <LinkMethod as crate::domain::Vocabulary>::parse(
+                            json.get("method")?.as_str()?,
+                        )?,
+                    },
+                    None => Self::MatchRejected {
+                        candidate: field(&json, "candidate")?,
+                    },
+                },
+            },
+            "split" => Self::PersonSplit {
+                identity: field(&json, "identity")?,
+                person: field(&json, "person")?,
             },
             _ => return None,
         })

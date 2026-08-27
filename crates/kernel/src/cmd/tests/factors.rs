@@ -18,6 +18,7 @@ async fn a_factor_can_be_added_and_the_unbuilt_kinds_are_refused() {
         &AddFactor {
             kind: FactorKind::Email,
             value: "second@example.test".into(),
+            identity: None,
         },
     )
     .await
@@ -35,6 +36,7 @@ async fn a_factor_can_be_added_and_the_unbuilt_kinds_are_refused() {
         &AddFactor {
             kind: FactorKind::Passkey,
             value: "credential".into(),
+            identity: None,
         },
     )
     .await;
@@ -63,6 +65,7 @@ async fn the_last_factor_of_a_kind_cannot_be_removed() {
         &harness.ctx(who.principal.clone()),
         &RemoveFactor {
             factor: target.clone(),
+            identity: None,
         },
     )
     .await;
@@ -77,13 +80,17 @@ async fn the_last_factor_of_a_kind_cannot_be_removed() {
         &AddFactor {
             kind: FactorKind::Email,
             value: "spare@example.test".into(),
+            identity: None,
         },
     )
     .await
     .expect("adds");
     remove_factor(
         &harness.ctx(who.principal),
-        &RemoveFactor { factor: target },
+        &RemoveFactor {
+            factor: target,
+            identity: None,
+        },
     )
     .await
     .expect("removes");

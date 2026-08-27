@@ -1,0 +1,10 @@
+-- Migration 2 — K2's relations leg. PLACEHOLDER, held by K3.
+--
+-- hiqlite's migration loader refuses a gap: it panics unless every id is one
+-- more than the last (`hiqlite::migration`, `migration.id != prev.id + 1`), so
+-- a worktree holding `1_kernel.sql` and `3_merge.sql` cannot boot a node at
+-- all — the cluster test fails before it reaches a statement.
+--
+-- This file is therefore an empty migration standing in for K2's, and it is
+-- K2's file that must survive the merge: replace it wholesale, do not merge
+-- into it. Nothing has been migrated anywhere with this hash.

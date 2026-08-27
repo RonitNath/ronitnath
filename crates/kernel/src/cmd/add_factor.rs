@@ -12,6 +12,7 @@ use crate::domain::{EMAIL_LIMIT, FactorKind, PASSWORD_MIN, looks_like_email, nor
 use crate::error::{Invalid, Outcome};
 use crate::event::Committed;
 use crate::feed::Feed;
+use crate::merge::target_identity;
 use crate::password;
 use crate::store::{Sql, Value};
 
@@ -23,8 +24,8 @@ const FACTOR: &str = "INSERT INTO factor (identity_id, kind, value, created_at) 
 const AUDIT: &str = "INSERT INTO audit \
                      (key, command, actor_identity_id, acting_as, at, request_digest, payload) \
                      SELECT $1, 'add-factor', $2, $3, $4, $5, \
-                            json_object('event', 'add-factor', 'identity', $2, 'factor', $6, \
-                                        'kind', $7) \
+                            json_object('event', 'add-factor', 'identity', $6, 'factor', $7, \
+                                        'kind', $8) \
                      WHERE changes() > 0";
 
 /// Add an email or password factor to the acting identity.
@@ -32,7 +33,11 @@ pub async fn add_factor<S: Sql, F: Feed>(
     ctx: &Ctx<'_, S, F>,
     args: &AddFactor,
 ) -> Outcome<Committed> {
-    let (identity, acting_as, _) = member(&ctx.principal)?;
+    let (actor, acting_as, _) = member(&ctx.principal)?;
+    // The acting identity by default, one of the person's others when the
+    // caller names it — `crate::merge::recovery` is where that rule lives.
+    let identity =
+        target_identity(&ctx.store.reads(), actor, acting_as, args.identity.as_ref()).await?;
     let kind = FactorKind::from(args.kind);
     if !kind.is_built() {
         return Err(Invalid::UnsupportedFactor.into());
@@ -79,10 +84,11 @@ pub async fn add_factor<S: Sql, F: Feed>(
             AUDIT,
             vec![
                 Value::from(ctx.key.to_string()),
-                Value::from(identity),
+                Value::from(actor),
                 Value::from(acting_as),
                 Value::from(now),
                 Value::from(crate::audit::digest_of(args)),
+                Value::from(identity),
                 factor.column("id"),
                 Value::from(<FactorKind as crate::domain::Vocabulary>::as_str(kind)),
             ],

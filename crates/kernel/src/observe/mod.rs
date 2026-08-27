@@ -13,8 +13,17 @@
 //! drops rather than grows. Sliding session expiry rides the same write, since
 //! it is the same row and the same indifference to being a few minutes late.
 //!
+//! Match scanning is the second observation ([`matches`]), and it is the same
+//! shape for the same reasons: a signal is a question raised about a pair, no
+//! authorisation reads it, and one raised a minute late is a question asked a
+//! minute late. It rides this lane so that registering never pays for it.
+//!
 //! The expiry sweep is here for the same reason: it is maintenance, it is
 //! bounded, and nothing waits on it.
+
+pub mod matches;
+
+pub use matches::Matches;
 
 use std::collections::HashMap;
 use std::sync::Mutex;

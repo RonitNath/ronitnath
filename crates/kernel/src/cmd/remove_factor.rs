@@ -13,6 +13,7 @@ use crate::error::{Outcome, decline};
 use crate::event::Committed;
 use crate::feed::Feed;
 use crate::ids;
+use crate::merge::target_identity;
 use crate::store::{Reads, Sql};
 
 /// The delete carries the whole rule: it is the acting identity's factor, and
@@ -26,7 +27,7 @@ const DELETE: &str = "DELETE FROM factor \
 const AUDIT: &str = "INSERT INTO audit \
                      (key, command, actor_identity_id, acting_as, at, request_digest, payload) \
                      SELECT $1, 'remove-factor', $2, $3, $4, $5, \
-                            json_object('event', 'remove-factor', 'identity', $2, 'factor', $6) \
+                            json_object('event', 'remove-factor', 'identity', $6, 'factor', $7) \
                      WHERE changes() > 0";
 
 /// Remove a factor, provided it is not the identity's last of its kind.
@@ -34,7 +35,9 @@ pub async fn remove_factor<S: Sql, F: Feed>(
     ctx: &Ctx<'_, S, F>,
     args: &RemoveFactor,
 ) -> Outcome<Committed> {
-    let (identity, acting_as, _) = member(&ctx.principal)?;
+    let (actor, acting_as, _) = member(&ctx.principal)?;
+    let identity =
+        target_identity(&ctx.store.reads(), actor, acting_as, args.identity.as_ref()).await?;
     let Ok(target) = ids::decode::<ids::Factor>(ctx.store.ids(), &args.factor) else {
         return decline();
     };
@@ -47,10 +50,11 @@ pub async fn remove_factor<S: Sql, F: Feed>(
             AUDIT,
             bind![
                 ctx.key.to_string(),
-                identity,
+                actor,
                 acting_as,
                 now,
                 crate::audit::digest_of(args),
+                identity,
                 target
             ],
         );
