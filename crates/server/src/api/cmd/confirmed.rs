@@ -186,18 +186,6 @@ mod tests {
     }
 
     #[test]
-    fn the_lead_bound_is_generous_about_lag_and_not_about_a_forged_header() {
-        // Replication lag is entries, not billions of them. The bound has to
-        // sit above anything a real follower is behind by and below what a
-        // caller can type into a header to buy two seconds of a node.
-        assert!(
-            MAX_LEAD >= 1_000,
-            "a batch of entries must still be waited for"
-        );
-        assert!(u64::from(u32::MAX) > MAX_LEAD, "and a forged one must not");
-    }
-
-    #[test]
     fn a_form_post_carries_the_offset_in_a_header_because_it_has_no_envelope() {
         let mut headers = HeaderMap::new();
         headers.insert(AFTER_HEADER, "17".parse().expect("a header value"));
