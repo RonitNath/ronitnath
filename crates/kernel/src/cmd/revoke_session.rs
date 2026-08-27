@@ -17,7 +17,7 @@
 
 use rn_api::commands::RevokeSession;
 
-use super::{Applied, Batch, Ctx, is_platform_operator, member, run};
+use super::{Applied, Batch, Ctx, is_platform_operator, refs, run};
 use crate::bind;
 use crate::error::{Outcome, decline};
 use crate::event::Committed;
@@ -52,7 +52,7 @@ pub async fn revoke_session<S: Sql, F: Feed>(
     ctx: &Ctx<'_, S, F>,
     args: &RevokeSession,
 ) -> Outcome<Committed> {
-    let (identity, acting_as, _) = member(&ctx.principal)?;
+    let (identity, person, acting_as) = refs::actor(&ctx.principal)?;
     let Ok(target) = ids::decode::<Session>(ctx.store.ids(), &args.session) else {
         // A forged or foreign id is refused without a query, and refused the
         // same way a real id belonging to somebody else would be.
@@ -61,7 +61,7 @@ pub async fn revoke_session<S: Sql, F: Feed>(
     let Some(Owner(whose)) = ctx.store.query_opt::<Owner>(OWNER, bind![target]).await? else {
         return decline();
     };
-    if whose != identity && !is_platform_operator(&ctx.store.reads(), acting_as).await? {
+    if whose != identity && !is_platform_operator(&ctx.store.reads(), person).await? {
         return decline();
     }
     let now = ctx.now();

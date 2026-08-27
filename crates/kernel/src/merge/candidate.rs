@@ -213,10 +213,10 @@ pub async fn propose_match<S: Sql, F: Feed>(
     if a == b {
         return decline();
     }
-    let (identity, acting_as, _) = crate::cmd::member(&ctx.principal)?;
-    let mine = owned_identity(ctx.store, acting_as, a).await?
-        || owned_identity(ctx.store, acting_as, b).await?;
-    if !mine && !is_platform_operator(&ctx.store.reads(), acting_as).await? {
+    let (identity, person, acting_as) = crate::cmd::refs::actor(&ctx.principal)?;
+    let mine =
+        owned_identity(ctx.store, person, a).await? || owned_identity(ctx.store, person, b).await?;
+    if !mine && !is_platform_operator(&ctx.store.reads(), person).await? {
         return decline();
     }
     let now = ctx.now();

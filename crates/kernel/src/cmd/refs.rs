@@ -21,10 +21,21 @@ use crate::relation::{Subject, SubjectKind};
 /// grants are theirs, and switching a session cannot conjure any — while the
 /// audit row records the organization, which is what makes an organization's
 /// history readable as its own.
-pub(super) fn actor(principal: &Principal) -> Outcome<(Id<Identity>, Id<Person>, Id<Person>)> {
+pub(crate) fn actor(principal: &Principal) -> Outcome<(Id<Identity>, Id<Person>, Id<Person>)> {
     let (identity, person, _) = super::member(principal)?;
-    let acting_as = principal.acting_as().unwrap_or(person);
-    Ok((identity, person, acting_as))
+    Ok((identity, person, acting_as(principal, person)))
+}
+
+/// The party a command's audit row is attributed to, for a caller that already
+/// holds the person — [`crate::cmd::sign_out`] wants the session too, and the
+/// merge commands read the person for their own authorisation first.
+///
+/// It is the acted-as party, never the person, and never
+/// [`super::member`]'s middle value: binding that into `audit.acting_as` is
+/// what makes an organization's history read as the human's instead of its
+/// own.
+pub(crate) fn acting_as(principal: &Principal, person: Id<Person>) -> Id<Person> {
+    principal.acting_as().unwrap_or(person)
 }
 
 /// A container's party id, from either a group id or an organization id.

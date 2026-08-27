@@ -7,7 +7,7 @@
 
 use rn_api::commands::RemoveFactor;
 
-use super::{Applied, Batch, Ctx, member, run};
+use super::{Applied, Batch, Ctx, refs, run};
 use crate::bind;
 use crate::error::{Outcome, decline};
 use crate::event::Committed;
@@ -35,9 +35,9 @@ pub async fn remove_factor<S: Sql, F: Feed>(
     ctx: &Ctx<'_, S, F>,
     args: &RemoveFactor,
 ) -> Outcome<Committed> {
-    let (actor, acting_as, _) = member(&ctx.principal)?;
+    let (actor, person, acting_as) = refs::actor(&ctx.principal)?;
     let identity =
-        target_identity(&ctx.store.reads(), actor, acting_as, args.identity.as_ref()).await?;
+        target_identity(&ctx.store.reads(), actor, person, args.identity.as_ref()).await?;
     let Ok(target) = ids::decode::<ids::Factor>(ctx.store.ids(), &args.factor) else {
         return decline();
     };

@@ -5,7 +5,7 @@
 
 use rn_api::commands::SignOut;
 
-use super::{Applied, Batch, Ctx, member, run};
+use super::{Applied, Batch, Ctx, member, refs, run};
 use crate::bind;
 use crate::error::Outcome;
 use crate::event::Committed;
@@ -22,7 +22,8 @@ const AUDIT: &str = "INSERT INTO audit \
 
 /// End the acting session.
 pub async fn sign_out<S: Sql, F: Feed>(ctx: &Ctx<'_, S, F>, args: &SignOut) -> Outcome<Committed> {
-    let (identity, acting_as, session) = member(&ctx.principal)?;
+    let (identity, person, session) = member(&ctx.principal)?;
+    let acting_as = refs::acting_as(&ctx.principal, person);
     let now = ctx.now();
 
     let Applied { committed, .. } = run(ctx, args, async || {

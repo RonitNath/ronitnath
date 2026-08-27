@@ -49,7 +49,7 @@ use super::LinkMethod;
 use super::recovery::owned_identity;
 use super::rule::EVIDENCE_LIMIT;
 use crate::bind;
-use crate::cmd::{Applied, Batch, Ctx, is_platform_operator, member, run};
+use crate::cmd::{Applied, Batch, Ctx, is_platform_operator, run};
 use crate::domain::Vocabulary;
 use crate::error::{Invalid, Outcome, decline};
 use crate::event::Committed;
@@ -140,7 +140,7 @@ const SIBLINGS_SQL: &str = "SELECT count(*) AS n FROM identity WHERE person_id =
 
 /// Detach an identity onto a person of its own.
 pub async fn split<S: Sql, F: Feed>(ctx: &Ctx<'_, S, F>, args: &Split) -> Outcome<Committed> {
-    let (actor, acting_as, _) = member(&ctx.principal)?;
+    let (actor, who, acting_as) = crate::cmd::refs::actor(&ctx.principal)?;
     let evidence = args.evidence.trim();
     if evidence.is_empty() {
         return Err(Invalid::Missing("evidence").into());
@@ -160,14 +160,13 @@ pub async fn split<S: Sql, F: Feed>(ctx: &Ctx<'_, S, F>, args: &Split) -> Outcom
     };
 
     // A person is theirs to split, or an operator's. Nobody else's.
-    let method =
-        if owned_identity(&ctx.store.reads(), acting_as, identity).await? && acting_as == person {
-            LinkMethod::SelfLink
-        } else if is_platform_operator(&ctx.store.reads(), acting_as).await? {
-            LinkMethod::Operator
-        } else {
-            return decline();
-        };
+    let method = if owned_identity(&ctx.store.reads(), who, identity).await? && who == person {
+        LinkMethod::SelfLink
+    } else if is_platform_operator(&ctx.store.reads(), who).await? {
+        LinkMethod::Operator
+    } else {
+        return decline();
+    };
 
     // Splitting the only identity of a person would move it from one person to
     // an identical new one and abandon the first: a rename with extra steps.

@@ -17,7 +17,7 @@ use rn_api::commands::Disable;
 
 use rn_api::ids::PublicId;
 
-use super::{Applied, Batch, Ctx, is_platform_operator, member, run};
+use super::{Applied, Batch, Ctx, is_platform_operator, refs, run};
 use crate::bind;
 use crate::error::{Outcome, decline};
 use crate::event::Committed;
@@ -52,8 +52,8 @@ const SESSIONS: &str =
 
 /// Move a party to `disabled`.
 pub async fn disable<S: Sql, F: Feed>(ctx: &Ctx<'_, S, F>, args: &Disable) -> Outcome<Committed> {
-    let (identity, acting_as, _) = member(&ctx.principal)?;
-    let target = authorised(ctx, acting_as, &args.party).await?;
+    let (identity, person, acting_as) = refs::actor(&ctx.principal)?;
+    let target = authorised(ctx, person, &args.party).await?;
     let now = ctx.now();
 
     let Applied { committed, .. } = run(ctx, args, async || {

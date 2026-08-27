@@ -11,7 +11,7 @@
 use rn_api::commands::Enable;
 
 use super::disable::authorised;
-use super::{Applied, Batch, Ctx, member, run};
+use super::{Applied, Batch, Ctx, refs, run};
 use crate::bind;
 use crate::error::Outcome;
 use crate::event::Committed;
@@ -28,8 +28,8 @@ const AUDIT: &str = "INSERT INTO audit \
 
 /// Move a disabled party back to `active`.
 pub async fn enable<S: Sql, F: Feed>(ctx: &Ctx<'_, S, F>, args: &Enable) -> Outcome<Committed> {
-    let (identity, acting_as, _) = member(&ctx.principal)?;
-    let target = authorised(ctx, acting_as, &args.party).await?;
+    let (identity, person, acting_as) = refs::actor(&ctx.principal)?;
+    let target = authorised(ctx, person, &args.party).await?;
     let now = ctx.now();
 
     let Applied { committed, .. } = run(ctx, args, async || {

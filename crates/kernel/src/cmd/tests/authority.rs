@@ -438,3 +438,129 @@ async fn a_platform_operator_revokes_a_grant_and_transfers_a_resource_they_do_no
         2
     );
 }
+
+// ------------------------------------- attribution, on the K1 commands ---
+
+/// Every command that takes only "my own" arguments still records the party
+/// the session speaks as.
+///
+/// `ActAs` moves attribution and nothing else, and the six commands here are
+/// the ones that read no `refs::` argument at all — so each of them reached
+/// for [`crate::cmd::member`]'s middle value, which is the *person*, and wrote
+/// that into `audit.acting_as`. An organization's history then read as the
+/// human's, which is exactly the fact `ActAs` exists to record. The
+/// authorisation half is asserted here too, in the same test: `disable` on the
+/// organization is allowed because the *person* owns it, not because the
+/// session points at it.
+#[tokio::test]
+async fn the_k1_commands_attribute_themselves_to_the_party_the_session_speaks_as() {
+    use rn_api::commands::{
+        ActAs, AddFactor, Disable, Enable, FactorKind, RemoveFactor, RevokeSession, SignOut,
+    };
+
+    let harness = Local::new();
+    let founder = world::person(&harness, "Founder", "attr-founder@example.test").await;
+    let (org, _) = world::organization(&harness, &founder, "Isoastra")
+        .await
+        .expect("founds");
+    let organization: Id<crate::ids::Person> = Id::new(org.get());
+
+    cmd::act_as(
+        &harness.ctx(founder.principal.clone()),
+        &ActAs {
+            party: Some(public(key(&harness), org)),
+        },
+    )
+    .await
+    .expect("its admin may speak as it");
+
+    // A second session of the same identity, for `revoke-session` to end.
+    let other = harness
+        .sign_in("attr-founder@example.test")
+        .await
+        .expect("signs in again");
+    let doomed = other.principal.session().expect("a member has a session");
+
+    // What the next request resolves to: the same identity and the same
+    // person, pointed at the organization.
+    let acting = crate::principal::Principal::Member {
+        identity: founder.principal.identity().expect("has one"),
+        person: Some(founder.person()),
+        acting_as: organization,
+        session: founder.principal.session().expect("has one"),
+    };
+
+    cmd::add_factor(
+        &harness.ctx(acting.clone()),
+        &AddFactor {
+            kind: FactorKind::Email,
+            value: "attr-second@example.test".into(),
+            identity: None,
+        },
+    )
+    .await
+    .expect("adds an address");
+    let added = crate::ids::Id::<crate::ids::Factor>::new(
+        world::count(
+            &harness,
+            "SELECT max(id) AS n FROM factor WHERE value = $1",
+            bind!["attr-second@example.test"],
+        )
+        .await,
+    );
+    cmd::remove_factor(
+        &harness.ctx(acting.clone()),
+        &RemoveFactor {
+            factor: public(key(&harness), added),
+            identity: None,
+        },
+    )
+    .await
+    .expect("takes it off again");
+    cmd::revoke_session(
+        &harness.ctx(acting.clone()),
+        &RevokeSession {
+            session: public(key(&harness), doomed),
+        },
+    )
+    .await
+    .expect("their own other device");
+    // The person owns the organization, so the person may disable it — and
+    // the session pointing at it is not what says so.
+    let party = public(key(&harness), org);
+    cmd::disable(
+        &harness.ctx(acting.clone()),
+        &Disable {
+            party: party.clone(),
+            reason: "a drill".into(),
+        },
+    )
+    .await
+    .expect("its owner may");
+    cmd::enable(&harness.ctx(acting.clone()), &Enable { party })
+        .await
+        .expect("and may put it back");
+    cmd::sign_out(&harness.ctx(acting), &SignOut {})
+        .await
+        .expect("ends the acting session");
+
+    for command in [
+        "add-factor",
+        "remove-factor",
+        "revoke-session",
+        "disable",
+        "enable",
+        "sign-out",
+    ] {
+        let attributed = world::count(
+            &harness,
+            "SELECT count(*) AS n FROM audit WHERE command = $1 AND acting_as = $2",
+            bind![command, organization],
+        )
+        .await;
+        assert_eq!(
+            attributed, 1,
+            "{command} was not attributed to the organization the session speaks as"
+        );
+    }
+}

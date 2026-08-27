@@ -7,7 +7,7 @@
 
 use rn_api::commands::AddFactor;
 
-use super::{Applied, Batch, Ctx, member, run};
+use super::{Applied, Batch, Ctx, refs, run};
 use crate::domain::{EMAIL_LIMIT, FactorKind, PASSWORD_MIN, looks_like_email, normalize_email};
 use crate::error::{Invalid, Outcome};
 use crate::event::Committed;
@@ -33,11 +33,11 @@ pub async fn add_factor<S: Sql, F: Feed>(
     ctx: &Ctx<'_, S, F>,
     args: &AddFactor,
 ) -> Outcome<Committed> {
-    let (actor, acting_as, _) = member(&ctx.principal)?;
+    let (actor, person, acting_as) = refs::actor(&ctx.principal)?;
     // The acting identity by default, one of the person's others when the
     // caller names it — `crate::merge::recovery` is where that rule lives.
     let identity =
-        target_identity(&ctx.store.reads(), actor, acting_as, args.identity.as_ref()).await?;
+        target_identity(&ctx.store.reads(), actor, person, args.identity.as_ref()).await?;
     let kind = FactorKind::from(args.kind);
     if !kind.is_built() {
         return Err(Invalid::UnsupportedFactor.into());

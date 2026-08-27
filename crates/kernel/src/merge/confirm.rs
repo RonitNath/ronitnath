@@ -83,7 +83,7 @@ pub async fn confirm_match<S: Sql, F: Feed>(
     ctx: &Ctx<'_, S, F>,
     args: &ConfirmMatch,
 ) -> Outcome<Committed> {
-    let (identity, acting_as, _) = member(&ctx.principal)?;
+    let (identity, person, _) = member(&ctx.principal)?;
     let Ok(candidate) = ids::decode::<MatchCandidate>(ctx.store.ids(), &args.candidate) else {
         return decline();
     };
@@ -98,9 +98,9 @@ pub async fn confirm_match<S: Sql, F: Feed>(
     // their person already absorbed.
     let mine = if row.other(identity).is_some() {
         identity
-    } else if owned_identity(&ctx.store.reads(), acting_as, row.identity_a).await? {
+    } else if owned_identity(&ctx.store.reads(), person, row.identity_a).await? {
         row.identity_a
-    } else if owned_identity(&ctx.store.reads(), acting_as, row.identity_b).await? {
+    } else if owned_identity(&ctx.store.reads(), person, row.identity_b).await? {
         row.identity_b
     } else {
         return decline();
@@ -221,7 +221,7 @@ fn push<S: Sql, F: Feed>(
     candidate: Id<MatchCandidate>,
     now: crate::Timestamp,
 ) -> Outcome<()> {
-    let (identity, acting_as, _) = member(&ctx.principal)?;
+    let (identity, _person, acting_as) = crate::cmd::refs::actor(&ctx.principal)?;
     let head = vec![
         Value::from(ctx.key.to_string()),
         Value::from(identity),

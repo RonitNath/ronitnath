@@ -34,7 +34,7 @@ mod enable;
 mod invite;
 mod leave;
 mod publish_document;
-mod refs;
+pub(crate) mod refs;
 mod register;
 mod remove_factor;
 mod remove_member;
