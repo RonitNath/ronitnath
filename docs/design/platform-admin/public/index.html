@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Platform admin — design</title>
+<style>
+  :root { color-scheme: light dark; --bg:#f7f7f9; --fg:#16171d; --muted:#5d606b; --line:#d9dbe3; --accent:#7a4fc9; --new:#8a3b1e; --ext:#1e5a8a; --def:#5d606b; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#0f1117; --fg:#e8e9ee; --muted:#9b9fad; --line:#2a2d38; --accent:#b79cff; --new:#e09a72; --ext:#7fc0f0; --def:#9b9fad; } }
+  html,body { margin:0; background:var(--bg); color:var(--fg); font:16px/1.55 system-ui, sans-serif; }
+  main { max-width:78rem; margin:0 auto; padding:3rem 1.5rem 6rem; }
+  h1 { font-size:2.2rem; line-height:1.15; margin:0 0 .5rem; }
+  h2 { font-size:1.45rem; margin:3rem 0 .75rem; font-weight:600; }
+  h3 { font-size:1.05rem; margin:2rem 0 .4rem; font-weight:600; }
+  p, li { max-width:68ch; } .lede { color:var(--muted); }
+  a { color:var(--accent); } a.board { font-weight:600; }
+  table { border-collapse:collapse; width:100%; font-size:.95rem; }
+  th,td { text-align:left; padding:.45rem .6rem; border-bottom:1px solid var(--line); vertical-align:top; }
+  th { font-weight:600; color:var(--muted); font-size:.85rem; letter-spacing:.02em; }
+  code { font:0.9em ui-monospace, monospace; }
+  .m { font-size:.8rem; letter-spacing:.03em; }
+  .NEW { color:var(--new); } .EXTEND { color:var(--ext); } .DEFER { color:var(--def); } .EXISTS { color:var(--muted); }
+  .counts td:last-child { text-align:right; font-variant-numeric:tabular-nums; }
+  .wrap { overflow-x:auto; }
+</style>
+</head>
+<body><main>
+
+<h1>Platform admin</h1>
+<p class="lede">Twenty-one stories about operating a deployment, read against the tree at
+<code>rb-x0</code>, turned into requirements and drawn.</p>
+<p><a class="board" href="board.html">Open the diagrams (tldraw) →</a></p>
+<p>The requirements in full — file:line evidence, command shapes, audit shapes,
+config keys, one falsifiable acceptance test each — are
+<code>docs/stories/platform-admin-requirements.md</code>. The implementation
+legs are <code>docs/stories/platform-admin-legs.md</code>. This page is the
+condensed table and the frame index.</p>
+
+<h2>Five findings</h2>
+<p>These are not one story's business, and every leg inherits them.</p>
+<ol>
+<li><b>God mode is eight commands wide, not twenty-six.</b>
+  <code>is_platform_operator</code> is consulted by <code>disable</code>,
+  <code>enable</code>, <code>revoke</code>, <code>revoke_link</code>,
+  <code>revoke_session</code>, <code>transfer</code>, the merge rulings and the
+  OIDC commands. The other eighteen authorise against ownership or membership
+  alone, so an operator cannot <code>set_role</code> inside a tenant, cannot
+  <code>invite</code>, cannot <code>share</code>. The ruling says full authority
+  over every party and resource.</li>
+<li><b><code>SetRole</code> cannot grant the operator relation</b>, though
+  <code>cmd/mod.rs:361</code> says it does: it writes membership rows and takes
+  a container, and <code>platform</code> is not one. So story 2 has no
+  implementation at all today, not a partial one.</li>
+<li><b>A disable deletes what an enable cannot restore</b> — and misses the one
+  thing that needs it. Sessions, tokens and codes go and should; invitation
+  links are untouched, so a disabled person's outstanding invitations still
+  claim.</li>
+<li><b>An operator's ruling is invisible to the person it was about.</b> The
+  <code>audit</code> query is keyed by actor, so a revocation done to you by
+  somebody else is not in your list.</li>
+<li><b>There is no product concept in the tree at all</b>, and the router is
+  built once at boot — which is the whole difficulty of story 5.</li>
+</ol>
+
+<h2>The frames</h2>
+<div class="wrap"><table>
+<tr><th>frame</th><th>what it draws</th><th>requirements</th></tr>
+<tr><td>A1</td><td>Deployment topology: three voters, the edge, the per-node projection</td><td>B4, B5.3</td></tr>
+<tr><td>A2</td><td>Sequence — a product toggle reaches every node, no restart</td><td>B5.2–B5.4</td></tr>
+<tr><td>B1</td><td>State — an operator session and the impersonated one it opens</td><td>C11.2</td></tr>
+<tr><td>B2</td><td>Sequence — sign in as a person, and what each audit row says</td><td>C11.2, C10.2</td></tr>
+<tr><td>C</td><td>Operator delegation: bootstrap, grant, revoke, the last-one rule</td><td>A1, A2.1</td></tr>
+<tr><td>D</td><td>Disable and enable — what ends, what is stamped, what is kept</td><td>C9.1–C9.3</td></tr>
+<tr><td>E1</td><td>Backup and restore onto a fresh formation</td><td>F16</td></tr>
+<tr><td>E2</td><td>Export and import an organization (deferred; the shape)</td><td>F17.1</td></tr>
+<tr><td>F1</td><td>UI — the deployment screen, 1440</td><td>B4.3, B6.4</td></tr>
+<tr><td>F2</td><td>UI — the products screen, 1440</td><td>B5.6</td></tr>
+<tr><td>F3</td><td>UI — the person, everything the system knows, 1440</td><td>C7.1, C7.3</td></tr>
+<tr><td>F4</td><td>UI — the audit with filters, 1440</td><td>D13.2</td></tr>
+<tr><td>F5</td><td>UI — the impersonation bar, 1440</td><td>C11.2</td></tr>
+<tr><td>F6</td><td>UI — deployment, person and the bar at 390</td><td>B4.3, C7.3, C11.2</td></tr>
+</table></div>
+
+<h2>Requirements, condensed</h2>
+<p>Fifty-eight, across all twenty-one stories. The mark is
+<span class="m EXISTS">EXISTS</span> (shipped, and the acceptance test is the
+regression), <span class="m EXTEND">EXTEND</span> (the mechanism is there and
+does not reach far enough), <span class="m NEW">NEW</span>, or
+<span class="m DEFER">DEFER</span> (with what unblocks it).</p>
+
+<div class="wrap"><table>
+<tr><th>id</th><th>mark</th><th>requirement</th><th>the test that could fail</th></tr>
+
+<tr><td>A1.1</td><td class="m EXISTS">EXISTS</td><td>Configured-address bootstrap, unaudited, once</td><td>a second grant writes no row; count stays 1</td></tr>
+<tr><td>A1.2</td><td class="m EXTEND">EXTEND</td><td>The deployment screen states that the bootstrap happened</td><td>fresh instance renders "granted by configuration", <code>granted_by</code> null</td></tr>
+<tr><td>A2.1</td><td class="m NEW">NEW</td><td><code>GrantOperator</code> / <code>RevokeOperator</code>, reason mandatory, last one refused; query and screen</td><td>grant → B holds the tier; revoke → B 404s on <code>/platform</code>; revoking the last declines</td></tr>
+<tr><td>A3.1</td><td class="m EXTEND">EXTEND</td><td><code>OPERATOR_SESSION_TTL</code>, 8 h, applied at sign-in and at grant</td><td>two sign-ins on one clock differ by exactly the TTL delta</td></tr>
+<tr><td>A3.2</td><td class="m NEW">NEW</td><td><code>session.auth_time</code>, <code>ReAuthenticate</code>, a 15-minute window over a named sensitive set</td><td>a 16-minute-old session is refused with 401; no ordinary command answers 401</td></tr>
+<tr><td>A3.3</td><td class="m DEFER">DEFER</td><td>Mandatory second factor for operators</td><td>unblocked by a WebAuthn factor kind; A3.2 is the interim control and the same seam</td></tr>
+
+<tr><td>B4.1</td><td class="m NEW">NEW</td><td><code>node_report</code>, upserted by the observation lane every 15 s</td><td>kill a voter; its row reads "not reporting" on the other two within 60 s</td></tr>
+<tr><td>B4.2</td><td class="m NEW">NEW</td><td>Query <code>platform-nodes</code> and a rollout verdict counted from the rows</td><td>two versions → "in progress", three → "divergent"</td></tr>
+<tr><td>B4.3</td><td class="m EXTEND">EXTEND</td><td>The deployment screen: nodes, rollout, raft, feed, observations, keys</td><td>screenshots at 1440 and 390, both themes, three voters and one killed</td></tr>
+<tr><td>B4.4</td><td class="m EXTEND">EXTEND</td><td>Feed growth as two readings, never an extrapolated rate</td><td>both statements are index seeks under <code>EXPLAIN</code></td></tr>
+<tr><td>B5.1</td><td class="m NEW">NEW</td><td>Compiled-in catalogue, <code>product</code> table, no row = disabled</td><td>enabling a slug absent from the binary declines and writes nothing</td></tr>
+<tr><td>B5.2</td><td class="m NEW">NEW</td><td><code>EnableProduct</code> / <code>DisableProduct</code>, one row each, data untouched</td><td>enable/disable/enable leaves the product's own row counts unchanged</td></tr>
+<tr><td>B5.3</td><td class="m NEW">NEW</td><td>Per-node <code>ProductSet</code> projection, invalidated by the feed</td><td>one <code>SELECT</code> per toggle per node and none otherwise</td></tr>
+<tr><td>B5.4</td><td class="m NEW">NEW</td><td>One <code>product_gate</code> layer answering 404, not a rebuilt router</td><td><b>toggle on node 1 of three; all three flip within 2 s, same pids</b></td></tr>
+<tr><td>B5.5</td><td class="m NEW">NEW</td><td><code>whoami.products</code>, so no bundle draws a dead link</td><td>the rail omits a disabled product; <code>whoami_leaks_nothing</code> extended</td></tr>
+<tr><td>B5.6</td><td class="m NEW">NEW</td><td>Query and screen, with the routes each product mounts</td><td>toggle round-trips over <code>/api/cmd</code> and arrives on <code>/api/sub</code> with no reload</td></tr>
+<tr><td>B5.7</td><td class="m DEFER">DEFER</td><td>Per-product settings</td><td>unblocked by a second setting; one setting is a shape guessed, not observed</td></tr>
+<tr><td>B6.1</td><td class="m NEW">NEW</td><td>Query <code>platform-keys</code>, with live tokens per key</td><td>rotate twice → one active, two retiring; the count is an index seek</td></tr>
+<tr><td>B6.2</td><td class="m NEW">NEW</td><td><code>RetireKey</code>, refused while tokens under it are alive</td><td>refused; forced with a reason succeeds and the kid leaves the JWKS</td></tr>
+<tr><td>B6.3</td><td class="m NEW">NEW</td><td>Query <code>platform-clients</code> and the screen, with last issuance</td><td>exercise one grant; "last issued" reads within a second</td></tr>
+<tr><td>B6.4</td><td class="m EXTEND">EXTEND</td><td>Key age and <em>rotate</em> on the deployment screen</td><td>covered by B4.3</td></tr>
+
+<tr><td>C7.1</td><td class="m EXTEND">EXTEND</td><td>Factors, consents, aliases and handle on <code>platform-party</code>; addresses masked</td><td>the rendered JSON carries no full address; <code>reveal-factor</code> writes its own audit row</td></tr>
+<tr><td>C7.2</td><td class="m NEW">NEW</td><td>Query <code>platform-find</code>: exact handle, email or id, never a prefix scan</td><td>all three under <code>EXPLAIN</code>; garbage returns <code>[]</code> having run nothing</td></tr>
+<tr><td>C7.3</td><td class="m EXTEND">EXTEND</td><td>The person page and its controls</td><td>screenshots on a seeded instance with a merged person, a consent and two sessions</td></tr>
+<tr><td>C8.1</td><td class="m EXISTS">EXISTS</td><td>Proposed merges, rulings with mandatory evidence, split</td><td><code>cargo test -p rn-kernel merge</code></td></tr>
+<tr><td>C8.2</td><td class="m EXTEND">EXTEND</td><td>The signals behind a candidate, named, beside the ruling — never a score</td><td>one line per signal the row actually carries</td></tr>
+<tr><td>C9.1</td><td class="m EXISTS">EXISTS</td><td>Disable ends sessions, tokens and codes; status is reversible</td><td><code>cargo test -p rn-kernel status</code></td></tr>
+<tr><td>C9.2</td><td class="m EXTEND">EXTEND</td><td><code>link.suspended_at</code>: stamped by disable, cleared by enable</td><td>claim in a second browser is declined, then works after enable (e2e)</td></tr>
+<tr><td>C9.3</td><td class="m NEW">NEW</td><td>The cascade is previewed before and recorded after</td><td>preview counts and audit counts agree when nothing moved between</td></tr>
+<tr><td>C10.1</td><td class="m EXTEND">EXTEND</td><td>Queries and screens for links and consents, with bulk revoke</td><td>revoke a link; the claim page declines on the next request</td></tr>
+<tr><td>C10.2</td><td class="m NEW">NEW</td><td><code>about-me</code>: rulings made about me, whoever the actor was, over an <code>audit_object</code> side table</td><td>an operator revokes B's session; it is in B's <code>about-me</code> and not in B's <code>audit</code></td></tr>
+<tr><td>C11.1</td><td class="m EXTEND">EXTEND</td><td>An operator may <code>ActAs</code> any organization — attribution, not authority</td><td>after the switch, <code>check()</code> returns exactly what it returned before</td></tr>
+<tr><td>C11.2</td><td class="m NEW">NEW</td><td><code>SignInAs</code>: a real session for the target, <code>impersonated_by</code> on the row, the operator as actor in <code>refs::actor</code>, ten commands refused, four ways to end</td><td>six assertions in one e2e: owner is B, actor is the operator, B's <code>about-me</code> has it, <code>AddFactor</code> declines, 30 min ends it, the operator's own session survives</td></tr>
+<tr><td>C11.3</td><td class="m NEW">NEW</td><td><code>RN_SITE__IMPERSONATION</code>, off in prod until turned on</td><td>with the key off the command declines and the control is absent</td></tr>
+
+<tr><td>D12.1</td><td class="m EXISTS">EXISTS</td><td>Transfer and revoke, operator-admitted, wired to the resources screen</td><td><code>cargo test -p rn-kernel sharing</code></td></tr>
+<tr><td>D12.2</td><td class="m EXTEND">EXTEND</td><td>One <code>authority::allows</code> every command ends in — closing finding 1</td><td><b>table-driven over <code>ALL_COMMAND_NAMES</code>: declines without the relation, succeeds with it, and each success wrote an audit row naming the operator</b></td></tr>
+<tr><td>D13.1</td><td class="m EXISTS">EXISTS</td><td>The whole log, newest first, live at the head</td><td>a command in one tab arrives in the audit in another</td></tr>
+<tr><td>D13.2</td><td class="m EXTEND">EXTEND</td><td>Filters by actor, hat, object, command and time — each with an index</td><td>every filter combination the controls can produce is a seek; the test is generated from the control's options</td></tr>
+<tr><td>D13.3</td><td class="m DEFER">DEFER</td><td>Tenant-facing audit visibility as a product setting</td><td>deferred with B5.7</td></tr>
+
+<tr><td>E14.1</td><td class="m EXISTS">EXISTS</td><td>Client registration, rotation, deletion (leg O1)</td><td>O1's in-repo relying-party proof</td></tr>
+<tr><td>E14.2</td><td class="m NEW">NEW</td><td>The operator screen; the secret shown exactly once</td><td>a replayed idempotency key returns no secret</td></tr>
+<tr><td>E14.3</td><td class="m EXTEND">EXTEND</td><td>Deleting a client states what goes with it</td><td>delete with two consents; the audit payload carries 2</td></tr>
+<tr><td>E15.1</td><td class="m NEW">NEW</td><td>Consents listed and revoked in bulk — one command per consent</td><td>three consents, one already gone: three rows, and the answer names it</td></tr>
+<tr><td>E15.2</td><td class="m EXTEND">EXTEND</td><td>The same list on the person page and on <code>/app</code></td><td>covered by C7.1</td></tr>
+
+<tr><td>F16.1</td><td class="m NEW">NEW</td><td>A verification spike first: what hiqlite 0.14 actually exposes</td><td>the leg's first commit names the API or its absence, with the version</td></tr>
+<tr><td>F16.2</td><td class="m NEW">NEW</td><td><code>rn-site admin backup</code>, with a manifest naming its offset</td><td>manifest counts equal <code>SELECT count(*)</code> per table</td></tr>
+<tr><td>F16.3</td><td class="m NEW">NEW</td><td><code>restore</code> onto an empty formation; the health screen proves it</td><td>round trip: every public id resolves to the same rows; an id-key mismatch is refused</td></tr>
+<tr><td>F16.4</td><td class="m EXTEND">EXTEND</td><td><code>tools/ephemeral.sh backup|restore</code></td><td>the round-trip script is that wrapper</td></tr>
+<tr><td>F17.1</td><td class="m DEFER">DEFER</td><td>Export and import an organization</td><td>unblocked by F16.2 shipping and a second product existing</td></tr>
+<tr><td>F18.1</td><td class="m EXISTS">EXISTS</td><td><code>ephemeral.sh reset &amp;&amp; up</code> — wipe and rebootstrap in one command</td><td>reset, up, sign in as operator, land on <code>/platform</code></td></tr>
+<tr><td>F18.2</td><td class="m EXTEND">EXTEND</td><td><code>tools/cluster.sh reset</code> for the three-voter case</td><td>ends with three ready nodes and an operator who can sign in</td></tr>
+<tr><td>F18.3</td><td class="m NEW">NEW</td><td><code>admin wipe</code> refuses outside dev, loudly</td><td><code>RN_SITE__MODE=prod</code> exits non-zero and touches nothing</td></tr>
+
+<tr><td>G19.1</td><td class="m EXISTS">EXISTS</td><td>One-click operator sign-in, compiled out of a release</td><td><code>tests/dev_sign_in.rs</code> and the negative-space 404 row</td></tr>
+<tr><td>G20.1</td><td class="m EXISTS">EXISTS</td><td>Three voters; kill one, commits continue; kill two, writes refuse</td><td><code>tools/perf/drill.sh</code>, evidenced in <code>docs/perf/</code></td></tr>
+<tr><td>G20.2</td><td class="m EXISTS">EXISTS</td><td>An ephemeral instance per worktree, ports derived from the path</td><td>two directories up at once on different ports; both stopped; no residue</td></tr>
+<tr><td>G20.3</td><td class="m EXTEND">EXTEND</td><td>The health screen must tell the truth about the cluster, not the node</td><td>B4.1's</td></tr>
+<tr><td>G21.1</td><td class="m NEW">NEW</td><td><code>rn-site admin</code> against a stopped node's store, running real commands</td><td>writes a relation row <em>and</em> an audit row; against a running node it names the lock</td></tr>
+<tr><td>G21.2</td><td class="m NEW">NEW</td><td>A loopback-only second listener, <code>/admin/*</code>, off unless configured</td><td>a non-loopback address fails config validation; <code>/admin/*</code> is absent from the public router for all six principals</td></tr>
+</table></div>
+
+<h2>Counts</h2>
+<div class="wrap"><table class="counts">
+<tr><td><span class="m EXISTS">EXISTS</span></td><td>10</td></tr>
+<tr><td><span class="m EXTEND">EXTEND</span></td><td>18</td></tr>
+<tr><td><span class="m NEW">NEW</span></td><td>26</td></tr>
+<tr><td><span class="m DEFER">DEFER</span></td><td>4</td></tr>
+<tr><td><b>total</b></td><td><b>58</b></td></tr>
+</table></div>
+
+<h2>The two requirements the arc is judged on</h2>
+<p><b>B5.4.</b> Three voters up. Toggle a product on node 1. Every node answers
+differently within two seconds, and <code>pgrep</code> shows the same three
+pids before and after. A leg that cannot produce that transcript has not
+delivered runtime product enablement, whatever else it built.</p>
+<p><b>D12.2.</b> A table-driven test over every command name: the actor holding
+nothing is declined, the actor holding <code>platform:* #operator</code> is
+not, and every success wrote an audit row naming them. The test enumerates the
+command list, so a command added later with no operator path fails the build
+rather than being noticed in a review.</p>
+
+</main></body>
+</html>
