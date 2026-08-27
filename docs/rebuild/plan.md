@@ -30,7 +30,8 @@ SetHandle, RegisterClient, UpdateClient, RotateClientSecret, DeleteClient,
 RotateSigningKey, Authorize, ExchangeCode, RefreshToken, ClientCredentials,
 RevokeToken, RevokeConsent, EndSession — and the platform operator's own six
 (leg P1): GrantOperator, RevokeOperator, ReAuthenticate, SignInAs,
-EndImpersonation, RetireKey. Forty-seven in all
+EndImpersonation, RetireKey — and the deployment's own two (leg P2):
+EnableProduct, DisableProduct. Forty-nine in all
 (`rn_api::commands::ALL_COMMAND_NAMES`). One transaction each, audit row
 inside, typed event appended to the change feed.
 
@@ -165,6 +166,40 @@ than a scan of the change feed. Three session lives, not one: `SESSION_TTL`
 14 days, `OPERATOR_SESSION_TTL` 8 hours chosen at `SignIn` and imposed by
 `GrantOperator`, `IMPERSONATION_TTL` 30 minutes.
 
+Migration 8 (`8_product.sql`) adds `product (slug, enabled, changed_at,
+changed_by)` and nothing else, because **a product is two halves and only one
+of them is data**. What a product *is* — its slug, its name, its summary and
+the routes it mounts — is the compiled-in catalogue
+`rn_kernel::product::CATALOGUE`, so a slug the binary does not carry cannot be
+enabled: a typo is a refusal rather than a row nothing reads, which is the
+argument `relation::vocabulary` already makes about unregistered kinds. A slug
+with **no row is disabled**, so a release that adds a product does not turn it
+on across every deployment on upgrade. Disabling writes one row and touches no
+product data: the routes go, the data stays.
+
+**A toggle reaches every node through the change feed, and no router is
+rebuilt.** Every node holds `AppState::products`, a `ProductSet` — a bitmask
+over the catalogue's order — loaded at boot and re-read by the feed consumer
+every node already runs (`server::sub::invalidate`) on `ProductEnabled` and
+`ProductDisabled` and on nothing else. One `SELECT` per toggle per node, and a
+toggle is a human action. The routes themselves are mounted once, at boot, and
+wrapped where they merge in one gate (`server::product::gate`) that answers the
+uniform `404` while the product is off — a `404` and not a `403`, so a disabled
+product is indistinguishable from one this deployment never had. Rebuilding the
+`Router` into an `ArcSwap` per toggle was considered and rejected (requirement
+B5.4): it buys nothing a caller can observe and costs a whole-router clone plus
+an in-flight request holding the old tree with the old per-route state. The
+gate reads one atomic word; there is no configuration for it, because the
+enablement *is* the configuration and it lives in the database.
+
+`audit.request_digest` is taken over **redacted** arguments
+(`kernel::audit::REDACTED_FIELDS`): the audit table is also the change feed and
+has no retention, so a password reaching the digest input would be a permanent,
+offline-guessable record of it. One consequence is stated rather than
+discovered: two calls under one idempotency key that differ *only* in a
+credential are a replay rather than a conflict, which is the safer answer for a
+retry.
+
 **Impersonation is a real session, not a fourth principal.** `SignInAs` mints a
 `session` row for an active identity of the target, so `principal::expand`
 resolves the target's own subject set and `check()` learns no new case;
@@ -253,6 +288,16 @@ rots.
 - Queries the Provider adds: `oidc-clients` and `oidc-tokens` (a platform
   operator's; the second is a drill-in on a session) and `authorizations` (the
   reader's own).
+- **Products** (leg P2): `platform-products` answers one row per *catalogue*
+  entry — slug, display, summary, state, changed at, changed by, and the routes
+  it mounts — joined in Rust, because one side of that join is the binary
+  rather than a table. A product nobody has decided about is on the screen and
+  reads as off. The screen is `/platform/products`; the toggle round-trips
+  through `POST /api/cmd/enable-product` | `disable-product` (operator-only and
+  *sensitive*) and arrives back as a live diff on `/api/sub`.
+  Enabled products mount their own routes on the public surface —
+  `starscape` mounts `GET /sky` — and every one of them is behind the gate
+  above, so a route added inside a product cannot forget it.
 - Shells: `GET /app`, `/org`, `/platform` (+ any sub-path) serve the tier's
   askama shell only if the principal holds that tier; otherwise 404 for
   `/platform`, redirect to `/auth?next=` for the others when anonymous, 404 when
