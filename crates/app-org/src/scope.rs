@@ -8,18 +8,61 @@
 //!
 //! The switcher renders only when there is more than one to switch between; a
 //! control with a single option is a label pretending to be a control.
+//!
+//! It lives in the shell's rail slot, because which organization the pages are
+//! about is navigation. It is not the act-as control beside it: that one moves
+//! who the writes are *by* and is the same question in every tier, and a
+//! reader can be reading one organization while speaking as another.
+//!
+//! Switching ends every subscription the old scope opened. A page's `Live` is
+//! disposed with the view when the scope moves, but its reconnect loop is not —
+//! it would go on holding a socket open for rows nothing will render — so a
+//! scoped subscription registers itself here and the switcher disconnects it.
+
+use std::sync::Arc;
 
 use leptos::prelude::*;
 use rn_api::{MemberRole, OrganizationRef};
-use rn_ui::use_whoami;
+use rn_ui::{Live, use_whoami};
+use serde::de::DeserializeOwned;
 
 /// Where the choice is kept, per browser.
 const KEY: &str = "rn-org";
+
+/// Ending one subscription opened under the scope in force.
+type Ender = Arc<dyn Fn() + Send + Sync>;
 
 /// The organization in force, as a context every page reads.
 #[derive(Clone, Copy)]
 pub struct Scope {
     chosen: RwSignal<Option<String>>,
+    open: StoredValue<Vec<Ender>>,
+}
+
+impl Scope {
+    /// Subscribe to a query under the organization in force.
+    ///
+    /// The same call as [`Live::subscribe`], and the reason to use it instead:
+    /// the subscription is ended when the scope moves, rather than left
+    /// reconnecting to an organization nothing on screen is about any more.
+    pub fn live<T>(self, query: &str, params: &[(&str, &str)]) -> Live<T>
+    where
+        T: Clone + DeserializeOwned + Send + Sync + 'static,
+    {
+        let live = Live::<T>::subscribe(query, params);
+        self.open
+            .update_value(|open| open.push(Arc::new(move || live.disconnect())));
+        live
+    }
+
+    /// End every subscription the scope in force opened.
+    fn close(self) {
+        self.open.update_value(|open| {
+            for end in open.drain(..) {
+                end();
+            }
+        });
+    }
 }
 
 impl Scope {
@@ -55,7 +98,15 @@ impl Scope {
     }
 
     /// Choose one, and remember it.
+    ///
+    /// The old scope's subscriptions are ended before the new one is
+    /// announced: every page under this scope is about to be rebuilt, and the
+    /// sockets the last one opened have nothing left to feed.
     pub fn choose(self, id: String) {
+        if self.chosen.get_untracked().as_deref() == Some(id.as_str()) {
+            return;
+        }
+        self.close();
         if let Ok(Some(storage)) = window().local_storage() {
             let _ = storage.set_item(KEY, &id);
         }
@@ -77,6 +128,7 @@ pub fn provide_scope() -> Scope {
         .and_then(|storage| storage.get_item(KEY).ok().flatten());
     let scope = Scope {
         chosen: RwSignal::new(stored),
+        open: StoredValue::new(Vec::new()),
     };
     provide_context(scope);
     scope
@@ -105,14 +157,13 @@ pub fn Switcher() -> impl IntoView {
             })
             .collect_view();
         Some(view! {
-            <div class="switcher">
-                <select
-                    aria-label="Organization"
-                    on:change=move |event| scope.choose(event_target_value(&event))
-                >
-                    {options}
-                </select>
-            </div>
+            <label for="org-scope">"Organization"</label>
+            <select
+                id="org-scope"
+                on:change=move |event| scope.choose(event_target_value(&event))
+            >
+                {options}
+            </select>
         })
     }
 }

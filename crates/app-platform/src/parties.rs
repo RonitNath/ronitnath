@@ -4,10 +4,12 @@
 //! is the four answers that follow: the registrations that resolve to it, the
 //! containers it belongs to, what it owns, and what it has been granted.
 //!
-//! `Disable` and `Enable` act on a *person*. An organization and a group are
-//! parties too and this command does not decode their ids — the kernel refuses
-//! them rather than half-understanding one — so the button says so instead of
-//! offering an action that would come back declined.
+//! `Disable` and `Enable` act on any party. A person is theirs and an
+//! operator's; an organization is its owner's and an operator's; a group is
+//! whoever owns it. An operator may do any of it, which is what this page is,
+//! so the control is offered on every row and the one precondition left is the
+//! reason — which is not decoration: it is what the audit row records about
+//! why every session that party held was deleted.
 
 use leptos::prelude::*;
 use rn_api::commands::{Disable, Enable};
@@ -26,7 +28,7 @@ pub fn Parties() -> impl IntoView {
     let columns = vec![
         Column::new("Name", |row: &Party| row.display.clone()),
         Column::new("Kind", |row: &Party| row.kind.clone()),
-        Column::new("Status", |row: &Party| row.status.clone()),
+        Column::new("Status", |row: &Party| row.status.clone()).state(),
         Column::new("Created", |row: &Party| when(row.created_at))
             .mono()
             .priority(Priority::Secondary),
@@ -163,23 +165,19 @@ fn Detail(
 ///
 /// `Disable` writes its reason onto the audit row, so the field is not
 /// decoration: it is the record of why every session this party held was
-/// deleted. Empty, the command is not offered.
+/// deleted. Empty, the command is not offered. Re-enabling carries nothing —
+/// the reason it is being undone is the audit row that disabled it.
 #[component]
 fn Status(party: PartyDetail, then: Callback<()>) -> impl IntoView {
     let reason = RwSignal::new(String::new());
-    let is_person = party.kind == "person";
     let disabled = party.status == "disabled";
 
     let party_id = party.public_id.clone();
     let blocked = Signal::derive(move || {
-        if !is_person {
-            Some("Only a person is disabled by this command.".to_owned())
-        } else if disabled {
+        if disabled || !reason.get().trim().is_empty() {
             None
-        } else if reason.get().trim().is_empty() {
-            Some("A reason is required: it lands on the audit row.".to_owned())
         } else {
-            None
+            Some("A reason is required: it lands on the audit row.".to_owned())
         }
     });
 
@@ -211,7 +209,7 @@ fn Status(party: PartyDetail, then: Callback<()>) -> impl IntoView {
         <section class="group">
             <h3>"Status"</h3>
             <div class="actions">
-                <Show when=move || is_person && !disabled>
+                <Show when=move || !disabled>
                     <input
                         type="text"
                         class="reason"

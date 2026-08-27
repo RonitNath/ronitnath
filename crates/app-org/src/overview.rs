@@ -10,10 +10,11 @@
 
 use leptos::prelude::*;
 use rn_api::commands::{Disable, Enable, Transfer};
-use rn_ui::{Live, PageHead};
+use rn_ui::PageHead;
 
 use crate::bits::{Aside, Copyable, Note, act, on};
 use crate::rows::Org;
+use crate::scope::use_scope;
 
 /// The overview, for one organization.
 #[component]
@@ -21,7 +22,7 @@ pub fn Overview(
     /// The organization's public id.
     org: String,
 ) -> impl IntoView {
-    let live = Live::<Org>::subscribe("org", &[("org", &org)]);
+    let live = use_scope().live::<Org>("org", &[("org", &org)]);
     move || {
         let Some(row) = live.rows().into_iter().next() else {
             return view! { <PageHead title="Organization" /> }.into_any();

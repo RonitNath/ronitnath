@@ -293,8 +293,10 @@ pub fn Act(
 ///
 /// `403` and `404` are one event, and the client says so in one word: an
 /// operator who could tell "no such row" from "not yours" could enumerate the
-/// deployment by asking.
+/// deployment by asking. A `422` is the other case and says which field it was
+/// about — none of these panels has two fields for one command, so the whole
+/// complaint goes beside the one control there is.
 #[must_use]
 pub fn refusal(error: &rn_ui::ApiError) -> String {
-    error.to_string()
+    error.message()
 }

@@ -43,7 +43,7 @@ pub fn Resources() -> impl IntoView {
         Column::new("Owner", |row: &Resource| {
             format!("{} ({})", row.owner_display, row.owner_kind)
         }),
-        Column::new("Status", |row: &Resource| row.status.clone()),
+        Column::new("Status", |row: &Resource| row.status.clone()).state(),
         Column::new("Zone", |row: &Resource| row.home_zone.clone()).priority(Priority::Secondary),
         Column::new("Created", |row: &Resource| when(row.created_at))
             .mono()

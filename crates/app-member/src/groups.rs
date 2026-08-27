@@ -10,7 +10,7 @@
 use leptos::prelude::*;
 use rn_api::commands::{CreateGroup, Invite, Leave, SetRole};
 use rn_api::whoami::MemberRole;
-use rn_ui::{Commit, Live, PageHead};
+use rn_ui::{Column, Commit, Live, PageHead, Priority, SelectField, Table, sync_with};
 
 use crate::api::{Refusal, attempt};
 use crate::parts::{Act, Carry, Note, Pair, Section, titled, when};
@@ -67,27 +67,25 @@ pub fn Groups() -> impl IntoView {
             .into_any()
     };
 
-    let roster = move || {
+    let chosen = RwSignal::new(None::<String>);
+    let roster = Signal::derive(move || {
         let Some(id) = current.get() else {
-            return ().into_any();
+            return Vec::new();
         };
-        let rows: Vec<Member> = members
+        members
             .rows()
             .into_iter()
             .filter(|member| member.group == id)
-            .collect();
-        if rows.is_empty() {
-            return view! {
-                <tr>
-                    <td class="empty" colspan="4">"Nobody yet."</td>
-                </tr>
-            }
-            .into_any();
-        }
-        rows.into_iter()
-            .map(|member| view! { <Rostered member=member refusal=refusal /> })
-            .collect_view()
-            .into_any()
+            .collect()
+    });
+    // Whoever the reader last opened, re-read from the live rows so the panel
+    // moves when somebody else changes the role it is showing.
+    let seat = move || {
+        let id = chosen.get()?;
+        roster
+            .get()
+            .into_iter()
+            .find(|member| member.public_id.as_deref() == Some(id.as_str()))
     };
 
     let leaving = move || {
@@ -117,20 +115,41 @@ pub fn Groups() -> impl IntoView {
             </div>
             <div class="column">
                 <section class="section">
-                <h2>
-                    {move || group_of().map_or_else(|| "Members".to_owned(), |group| group.display)}
-                </h2>
-                <table class="tbl">
-                    <thead>
-                        <tr>
-                            <th class="p1" scope="col">"Member"</th>
-                            <th class="p1" scope="col">"Role"</th>
-                            <th class="p2" scope="col">"Contact"</th>
-                            <th class="p3" scope="col">"Joined"</th>
-                        </tr>
-                    </thead>
-                    <tbody>{roster}</tbody>
-                </table>
+                    <h2>
+                        {move || {
+                            group_of().map_or_else(|| "Members".to_owned(), |group| group.display)
+                        }}
+                    </h2>
+                    <Table
+                        rows=roster
+                        columns=vec![
+                            Column::new(
+                                "Member",
+                                |row: &Member| {
+                                    if row.you {
+                                        format!("{} (you)", row.display)
+                                    } else {
+                                        row.display.clone()
+                                    }
+                                },
+                            ),
+                            Column::new("Role", |row: &Member| titled(&row.role)),
+                            Column::new(
+                                    "Contact",
+                                    |row: &Member| {
+                                        if row.contact { "visible" } else { "" }.to_owned()
+                                    },
+                                )
+                                .priority(Priority::Secondary),
+                            Column::new("Joined", |row: &Member| when(row.joined_at))
+                                .mono()
+                                .priority(Priority::Tertiary),
+                        ]
+                        empty="Nobody yet. An invitation is how somebody gets here."
+                        per_page=10
+                        on_row=Callback::new(move |row: Member| chosen.set(row.public_id))
+                    />
+                    {move || seat().map(|member| view! { <Rostered member=member /> })}
                     {leaving}
                 </section>
                 <Inviting group=current refusal=refusal />
@@ -140,50 +159,56 @@ pub fn Groups() -> impl IntoView {
     }
 }
 
-/// One person in the roster. Their role is a field, so changing it syncs on
-/// the change rather than waiting for a button nobody would press.
+/// One person in the roster, and the one thing about them that can move.
+///
+/// A role is a choice from a vocabulary, and a `<select>` in every row of a
+/// table is a column of accidents — so the roster picks a row and the control
+/// is under it. It syncs on the change: there is no save button anywhere in
+/// this application, and a role is a field like any other.
 #[component]
-fn Rostered(member: Member, refusal: RwSignal<Option<Refusal>>) -> impl IntoView {
-    let group = member.group.clone();
-    let party = member.public_id.clone();
-    let held = member.role.clone();
-    let set = move |event: leptos::ev::Event| {
-        let wanted = event_target_value(&event);
-        let (Some(party), Ok(group)) = (party.clone(), group.parse()) else {
-            return;
-        };
-        let Ok(party) = party.parse() else {
-            return;
-        };
-        let role = match wanted.as_str() {
-            "owner" => MemberRole::Owner,
-            "admin" => MemberRole::Admin,
-            _ => MemberRole::Member,
-        };
-        attempt(SetRole { group, party, role }, refusal, |_| {});
+fn Rostered(member: Member) -> impl IntoView {
+    let held = Signal::derive({
+        let role = member.role.clone();
+        move || role.clone()
+    });
+    let sync = {
+        let group = member.group.clone();
+        let party = member.public_id.clone();
+        sync_with(move |wanted: String| {
+            let group = group.clone();
+            let party = party.clone();
+            async move {
+                let (Ok(group), Some(party)) = (group.parse(), party) else {
+                    return Err("That is not a group.".to_owned());
+                };
+                let Ok(party) = party.parse() else {
+                    return Err("That member has no id to name.".to_owned());
+                };
+                let role = match wanted.as_str() {
+                    "owner" => MemberRole::Owner,
+                    "admin" => MemberRole::Admin,
+                    _ => MemberRole::Member,
+                };
+                match crate::api::run(SetRole { group, party, role }).await {
+                    Ok(_) => Ok(()),
+                    Err(refused) => Err(refused.message()),
+                }
+            }
+        })
     };
-    let selected = move |option: &str| option == held;
     view! {
-        <tr>
-            <td class="p1">
-                {member.display.clone()} {if member.you { " (you)" } else { "" }}
-            </td>
-            <td class="p1 does">
-                <select aria-label="Role" on:change=set>
-                    <option value="member" selected=selected("member")>
-                        "Member"
-                    </option>
-                    <option value="admin" selected=selected("admin")>
-                        "Admin"
-                    </option>
-                    <option value="owner" selected=selected("owner")>
-                        "Owner"
-                    </option>
-                </select>
-            </td>
-            <td class="p2 quiet">{if member.contact { "visible" } else { "—" }}</td>
-            <td class="p3 mono num">{when(member.joined_at)}</td>
-        </tr>
+        <div class="seat">
+            <SelectField
+                label=format!("{}\u{2019}s role", member.display)
+                value=held
+                options=vec![
+                    ("member".to_owned(), "Member".to_owned()),
+                    ("admin".to_owned(), "Admin".to_owned()),
+                    ("owner".to_owned(), "Owner".to_owned()),
+                ]
+                sync=sync
+            />
+        </div>
     }
 }
 

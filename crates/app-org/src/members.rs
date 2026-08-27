@@ -4,19 +4,28 @@
 //! container is the organization, rendered by the same table and the same
 //! panel a group's members are.
 //!
-//! The role control is under the table rather than inside it, and that is a
-//! shape the table forces: a column produces text. Selecting a row opens the
-//! panel, the select syncs the moment it changes, and a refusal — the last
-//! owner cannot be demoted — is shown beside the select that asked for it.
+//! The role control is under the table rather than inside it, because a role
+//! is a choice from a vocabulary and a row is not where a `<select>` belongs:
+//! selecting a row opens the panel, the select syncs the moment it changes,
+//! and a refusal — the last owner cannot be demoted — is shown beside the
+//! select that asked for it.
+//!
+//! Taking a membership away is a verb rather than a choice, so it is in the
+//! row, on the rows the query says this reader may take it from. `removable`
+//! is computed by the same rule the command refuses by: an owner removes
+//! anybody but the last owner, an admin removes members and not another admin,
+//! and nobody removes themselves — that is `Leave`, and it is in the panel
+//! with the last-owner rule it carries.
 
 use leptos::prelude::*;
 use rn_api::MemberRole;
 use rn_api::commands::{Leave, RemoveMember, SetRole};
-use rn_ui::{Column, Live, PageHead, Priority, SelectField, Table, sync_with};
+use rn_ui::{Column, PageHead, Priority, RowAction, SelectField, Table, sync_with};
 
 use crate::bits::{Aside, Note, act, on, refusal};
 use crate::minting::Mint;
 use crate::rows::Member;
+use crate::scope::use_scope;
 
 /// The organization's members.
 #[component]
@@ -58,18 +67,33 @@ pub fn Roster(
     } else {
         vec![("org", &org), ("group", &container)]
     };
-    let live = Live::<Member>::subscribe("org-members", &params);
+    let live = use_scope().live::<Member>("org-members", &params);
     let chosen = RwSignal::new(None::<String>);
+    let note = RwSignal::new(None::<String>);
 
     let columns = vec![
         Column::new("Member", |row: &Member| row.display.clone()),
         Column::new("Role", |row: &Member| row.role.clone()),
         Column::new("Since", |row: &Member| on(row.since)).priority(Priority::Secondary),
-        Column::new("Status", |row: &Member| row.status.clone()).priority(Priority::Tertiary),
+        Column::new("Status", |row: &Member| row.status.clone())
+            .state()
+            .priority(Priority::Tertiary),
         Column::new("Identifier", |row: &Member| row.public_id.clone())
             .mono()
             .priority(Priority::Tertiary),
     ];
+    let removing = container.clone();
+    let remove = RowAction::new(
+        "Remove",
+        Callback::new(move |row: Member| {
+            let (Ok(group), Ok(party)) = (removing.parse(), row.public_id.parse()) else {
+                return;
+            };
+            act(note, RemoveMember { group, party }, |_| ());
+        }),
+    )
+    .when(|row: &Member| row.removable)
+    .undo();
     let rows = Signal::derive(move || live.rows());
     let empty = format!("Nobody belongs to this {container_name} yet.");
 
@@ -85,7 +109,9 @@ pub fn Roster(
             columns=columns
             empty=empty
             on_row=Callback::new(move |row: Member| chosen.set(Some(row.public_id)))
+            actions=vec![remove]
         />
+        <Note note=note />
         {move || {
             selected()
                 .map(|member| {
@@ -105,8 +131,6 @@ fn Seat(member: Member, container: String) -> impl IntoView {
     });
     let last_owner = member.last_owner;
     let settable = member.settable;
-    let removable = member.removable;
-    let removing = container.clone();
     let me = member.me;
 
     let sync = {
@@ -158,24 +182,6 @@ fn Seat(member: Member, container: String) -> impl IntoView {
                     ]
                     sync=sync.clone()
                 />
-            </Show>
-            <Show when=move || removable>
-                <button
-                    type="button"
-                    class="commit"
-                    on:click={
-                        let container = removing.clone();
-                        let party = member.public_id.clone();
-                        move |_| {
-                            let (Ok(group), Ok(party)) = (container.parse(), party.parse()) else {
-                                return;
-                            };
-                            act(leaving, RemoveMember { group, party }, |_| ());
-                        }
-                    }
-                >
-                    "Remove"
-                </button>
             </Show>
             <Show when=move || me>
                 <button

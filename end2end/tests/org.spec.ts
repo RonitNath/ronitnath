@@ -190,8 +190,8 @@ test("a document owned by the organization is written, shared and published", as
   await row.click();
 
   // The body syncs on blur; there is no save button anywhere on the page.
-  await page.locator("#doc-body").fill("The first rule.");
-  await page.locator("#doc-body").blur();
+  await page.getByLabel("Body").fill("The first rule.");
+  await page.getByLabel("Body").blur();
   await expect
     .poll(async () => (await page.getByRole("row", { name: /E2E Charter/ }).textContent()) ?? "", {
       timeout: 15_000,

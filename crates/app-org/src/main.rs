@@ -44,8 +44,7 @@ fn main() {
 fn App() -> impl IntoView {
     scope::provide_scope();
     view! {
-        <Shell tier=Tier::Org nav=NAV>
-            <Switcher />
+        <Shell tier=Tier::Org nav=NAV rail=std::sync::Arc::new(|| view! { <Switcher /> }.into_any())>
             <Routes fallback=Decline>
                 <Route
                     path=path!("")

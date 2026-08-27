@@ -1,11 +1,16 @@
 //! `/app/sessions` — the devices this person is signed in on.
+//!
+//! A session row *is* the session: there is no status, and ending one is
+//! deleting it. So the verb is in the row — this page exists to run it — and
+//! the one on the device reading the page says "Sign out", because that is
+//! what revoking your own session is.
 
 use leptos::prelude::*;
 use rn_api::commands::RevokeSession;
-use rn_ui::{Live, PageHead};
+use rn_ui::{Column, Live, PageHead, Priority, RowAction, Table};
 
 use crate::api::{Refusal, attempt};
-use crate::parts::{Act, Note, when};
+use crate::parts::{Note, when};
 use crate::rows::Session;
 
 #[component]
@@ -13,69 +18,51 @@ pub fn Sessions() -> impl IntoView {
     let sessions = Live::<Session>::subscribe("sessions", &[]);
     let refusal = RwSignal::new(None::<Refusal>);
 
-    let rows = move || {
-        let rows = sessions.rows();
-        if rows.is_empty() {
-            return view! {
-                <tr>
-                    <td class="empty" colspan="5">"No sessions."</td>
-                </tr>
-            }
-            .into_any();
-        }
-        rows.into_iter()
-            .map(|row| {
-                let id = row.public_id.clone();
-                let current = row.current;
-                let revoke = Callback::new(move |()| {
-                    let id = id.clone();
-                    let Ok(session) = id.parse() else {
-                        return;
-                    };
-                    attempt(RevokeSession { session }, refusal, move |_| {
-                        // Revoking the session you are reading with is signing
-                        // out, so the browser leaves the bundle rather than
-                        // staying on a page it can no longer read.
-                        if current && let Some(window) = web_sys::window() {
-                            let _ = window.location().assign("/auth");
-                        }
-                    });
+    let columns = vec![
+        Column::new("Signed in", |row: &Session| when(row.created_at)).mono(),
+        Column::new("Last seen", |row: &Session| when(row.last_seen_at))
+            .mono()
+            .priority(Priority::Secondary),
+        Column::new("Ends", |row: &Session| when(row.expires_at))
+            .mono()
+            .priority(Priority::Tertiary),
+        Column::new("Device", |row: &Session| {
+            if row.current { "This device" } else { "" }.to_owned()
+        }),
+    ];
+
+    let end = |label: &'static str, current: bool| {
+        RowAction::new(
+            label,
+            Callback::new(move |row: Session| {
+                let Ok(session) = row.public_id.parse() else {
+                    return;
+                };
+                attempt(RevokeSession { session }, refusal, move |_| {
+                    // Revoking the session you are reading with is signing
+                    // out, so the browser leaves the bundle rather than
+                    // staying on a page it can no longer read.
+                    if current && let Some(window) = web_sys::window() {
+                        let _ = window.location().assign("/auth");
+                    }
                 });
-                view! {
-                    <tr>
-                        <td class="p1 mono num">{when(row.created_at)}</td>
-                        <td class="p2 mono num">{when(row.last_seen_at)}</td>
-                        <td class="p3 mono num">{when(row.expires_at)}</td>
-                        <td class="p1 you">{if row.current { "This device" } else { "" }}</td>
-                        <td class="p1 does">
-                            <Act
-                                label=if current { "Sign out" } else { "Revoke" }
-                                undo=true
-                                on_act=revoke
-                            />
-                        </td>
-                    </tr>
-                }
-            })
-            .collect_view()
-            .into_any()
+            }),
+        )
+        .when(move |row: &Session| row.current == current)
+        .undo()
     };
+
+    let rows = Signal::derive(move || sessions.rows());
 
     view! {
         <PageHead title="Sessions" />
         <div class="sheet">
-            <table class="tbl">
-            <thead>
-                <tr>
-                    <th class="p1" scope="col">"Signed in"</th>
-                    <th class="p2" scope="col">"Last seen"</th>
-                    <th class="p3" scope="col">"Ends"</th>
-                    <th class="p1" scope="col">""</th>
-                    <th class="p1" scope="col">""</th>
-                </tr>
-            </thead>
-                <tbody>{rows}</tbody>
-            </table>
+            <Table
+                rows=rows
+                columns=columns
+                empty="No sessions. Signing in on a device puts one here."
+                actions=vec![end("Sign out", true), end("Revoke", false)]
+            />
         </div>
         <Note refusal=refusal />
     }

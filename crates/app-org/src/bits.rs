@@ -33,14 +33,14 @@ pub fn at(instant: i64) -> String {
     format!("{day} {time}")
 }
 
-/// What a decline reads as beside the control that caused it.
+/// What a refusal reads as beside the control that caused it.
+///
+/// One line, because an `/org` control is one control: a `422` naming three
+/// fields is three sentences, and there is nowhere else on these panels to put
+/// them.
 #[must_use]
 pub fn refusal(error: &ApiError) -> String {
-    match error {
-        ApiError::Declined => "Declined.".to_owned(),
-        ApiError::Conflict => "That request was already sent with a different body.".to_owned(),
-        other => other.to_string(),
-    }
+    error.message()
 }
 
 /// A value a reader has to move by hand, with the button that moves it.

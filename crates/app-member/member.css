@@ -58,30 +58,13 @@
   overflow-wrap: anywhere;
 }
 
-/* A row's commands: text, not chrome. Destructive words take the warm ink. */
+/* A row's commands sit on one line. The word itself — `.act` — is styled by
+ * `tokens.css`, because all three bundles have one. */
 .actions {
   display: flex;
   flex-wrap: wrap;
   gap: 0.75rem;
   align-items: baseline;
-}
-.act {
-  cursor: pointer;
-  padding: 0;
-  color: var(--accent);
-  font-size: var(--text-2);
-}
-.act:hover {
-  color: var(--accent-hover);
-  text-decoration: underline;
-}
-.act[data-weight="undo"] {
-  color: var(--hero-red);
-}
-.act:disabled {
-  color: var(--fg-subtle);
-  cursor: default;
-  text-decoration: none;
 }
 
 /* A table of few columns does not want the whole content column: past about
@@ -91,14 +74,6 @@
   max-width: 58rem;
 }
 
-/* A table cell that holds commands rather than a value. */
-.tbl td.does {
-  width: 1%;
-  white-space: nowrap;
-}
-.tbl td.you {
-  color: var(--fg-muted);
-}
 
 /* A form that sits inside a section: the fields stack, the commit follows. */
 .inline + .inline,
@@ -135,18 +110,16 @@
   color: var(--fg-muted);
 }
 
-/* The editor. One column of words; the title is a field like any other. */
-.editor textarea {
-  width: 100%;
-  min-height: 22rem;
-  padding: 0.5rem 0.6rem;
-  background: var(--bg-muted);
-  font-family: var(--font-body);
-  line-height: 1.55;
-  resize: vertical;
-}
+/* The editor. One column of words; the title is a field like any other, and
+ * the body is `TextArea`, which brings its own shape. */
 .editor .field {
   max-width: none;
+}
+
+/* The control under a roster: it is about the row above it, so it sits in. */
+.seat {
+  margin-top: 0.75rem;
+  padding-left: var(--cell-pad);
 }
 
 /* Quiet running text: an empty list, a count, a revision. */

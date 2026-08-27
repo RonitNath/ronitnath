@@ -7,16 +7,17 @@
 //! possible at all. An invitation sent to the wrong address used to have to be
 //! waited out.
 //!
-//! Only an unclaimed, unexpired link can be withdrawn. Taking one back after
-//! somebody walked through it would say nothing about the membership they now
-//! hold, which is what `Leave` is for.
+//! Only an unclaimed link can be withdrawn, so the verb is absent on the
+//! others rather than present and refused. Taking one back after somebody
+//! walked through it would say nothing about the membership they now hold,
+//! which is what `Leave` is for.
 
 use leptos::prelude::*;
 use rn_api::commands::RevokeLink;
-use rn_ui::{Live, PageHead};
+use rn_ui::{Column, Live, PageHead, Priority, RowAction, Table};
 
 use crate::api::{Refusal, attempt};
-use crate::parts::{Act, Note, titled, when};
+use crate::parts::{Note, titled, when};
 use crate::rows::Invitation;
 
 #[component]
@@ -24,61 +25,54 @@ pub fn Invitations() -> impl IntoView {
     let invitations = Live::<Invitation>::subscribe("invitations", &[]);
     let refusal = RwSignal::new(None::<Refusal>);
 
-    let rows = move || {
-        let rows = invitations.rows();
-        if rows.is_empty() {
-            return view! {
-                <tr>
-                    <td class="empty" colspan="6">"No invitations. Mint one from a group."</td>
-                </tr>
+    let columns = vec![
+        Column::new("Group", |row: &Invitation| row.container.display.clone()),
+        Column::new("Role", |row: &Invitation| titled(&row.role)),
+        Column::new("State", |row: &Invitation| {
+            if row.claimed_at.is_some() {
+                "claimed"
+            } else {
+                "unclaimed"
             }
-            .into_any();
-        }
-        rows.into_iter()
-            .map(|row| {
-                let id = row.id.clone();
-                let open = row.claimed_at.is_none();
-                let withdraw = Callback::new(move |()| {
-                    let Ok(link) = id.parse() else {
-                        return;
-                    };
-                    attempt(RevokeLink { link }, refusal, |_| ());
-                });
-                view! {
-                    <tr>
-                        <td class="p1">{row.container.display.clone()}</td>
-                        <td class="p1">{titled(&row.role)}</td>
-                        <td class="p1">{row.claimed_by.clone().unwrap_or_default()}</td>
-                        <td class="p2 mono num">
-                            {row.claimed_at.map(when).unwrap_or_default()}
-                        </td>
-                        <td class="p3 mono num">{when(row.expires_at)}</td>
-                        <td class="p1 does">
-                            <Act label="Withdraw" undo=true on_act=withdraw disabled=!open />
-                        </td>
-                    </tr>
-                }
-            })
-            .collect_view()
-            .into_any()
-    };
+            .to_owned()
+        })
+        .state(),
+        Column::new("Claimed by", |row: &Invitation| {
+            row.claimed_by.clone().unwrap_or_default()
+        }),
+        Column::new("Claimed", |row: &Invitation| {
+            row.claimed_at.map(when).unwrap_or_default()
+        })
+        .mono()
+        .priority(Priority::Secondary),
+        Column::new("Expires", |row: &Invitation| when(row.expires_at))
+            .mono()
+            .priority(Priority::Tertiary),
+    ];
+
+    let withdraw = RowAction::new(
+        "Withdraw",
+        Callback::new(move |row: Invitation| {
+            let Ok(link) = row.id.parse() else {
+                return;
+            };
+            attempt(RevokeLink { link }, refusal, |_| ());
+        }),
+    )
+    .when(|row: &Invitation| row.claimed_at.is_none())
+    .undo();
+
+    let rows = Signal::derive(move || invitations.rows());
 
     view! {
         <PageHead title="Invitations" />
         <div class="sheet">
-            <table class="tbl">
-                <thead>
-                    <tr>
-                        <th class="p1" scope="col">"Group"</th>
-                        <th class="p1" scope="col">"Role"</th>
-                        <th class="p1" scope="col">"Claimed by"</th>
-                        <th class="p2" scope="col">"Claimed"</th>
-                        <th class="p3" scope="col">"Expires"</th>
-                        <th class="p1" scope="col">""</th>
-                    </tr>
-                </thead>
-                <tbody>{rows}</tbody>
-            </table>
+            <Table
+                rows=rows
+                columns=columns
+                empty="No invitations. Mint one from a group."
+                actions=vec![withdraw]
+            />
         </div>
         <Note refusal=refusal />
     }

@@ -37,7 +37,7 @@ pub fn Matches() -> impl IntoView {
         Column::new("B", |row: &Candidate| side(row.person_b.as_ref())),
         Column::new("Signal", |row: &Candidate| row.signal.clone()),
         Column::new("Score", |row: &Candidate| format!("{:.2}", row.score)).mono(),
-        Column::new("Status", |row: &Candidate| row.status.clone()),
+        Column::new("Status", |row: &Candidate| row.status.clone()).state(),
         Column::new("Raised", |row: &Candidate| when(row.created_at))
             .mono()
             .priority(Priority::Secondary),

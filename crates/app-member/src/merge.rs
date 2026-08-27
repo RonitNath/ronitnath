@@ -119,7 +119,7 @@ fn Proposed(row: Candidate, refusal: RwSignal<Option<Refusal>>) -> impl IntoView
             // empty password": the kernel then falls back to a factor both
             // registrations have verified, which is the other proof.
             let typed = !address.is_empty();
-            match run(&ConfirmMatch {
+            match run(ConfirmMatch {
                 candidate,
                 other_session: None,
                 other_email: typed.then_some(address),

@@ -6,17 +6,12 @@
  * panel about one row of it.
  *
  * The rules the design brief fixes and this file keeps: borderless by default,
- * flat and rectangular, no status dot anywhere, and a state is a word in its
- * own colour rather than a tinted capsule. Colours are stated as light-dark()
- * pairs so the mode toggle is one attribute on <html> and nothing here is an
- * inversion of anything.
+ * flat and rectangular, no status dot anywhere. A state is a word in its own
+ * colour rather than a tinted capsule — `tokens.css` owns that ink now, since
+ * every bundle's tables render one.
  */
 
 :root {
-  --state-live: light-dark(oklch(0.42 0.11 155), oklch(0.76 0.13 155));
-  --state-stopped: light-dark(oklch(0.48 0.16 27), oklch(0.72 0.16 27));
-  --state-open: light-dark(oklch(0.48 0.12 70), oklch(0.78 0.13 75));
-  --state-gone: light-dark(oklch(0.42 0.13 300), oklch(0.75 0.13 300));
   --panel-width: 24rem;
 }
 
@@ -159,34 +154,6 @@
   flex: 1 1 100%;
   color: var(--fg-muted);
   padding-left: 0.1rem;
-}
-
-/* A state is a word in its own colour. Never a capsule, never a dot. */
-
-.state {
-  font-size: var(--text-1);
-  color: var(--fg-muted);
-}
-.state[data-state="active"],
-.state[data-state="published"],
-.state[data-state="confirmed"],
-.state[data-state="proven"] {
-  color: var(--state-live);
-}
-.state[data-state="disabled"],
-.state[data-state="deleted"] {
-  color: var(--state-stopped);
-}
-.state[data-state="draft"],
-.state[data-state="proposed"],
-.state[data-state="unproven"] {
-  color: var(--state-open);
-}
-.state[data-state="merged"],
-.state[data-state="operator"],
-.state[data-state="self"],
-.state[data-state="factor"] {
-  color: var(--state-gone);
 }
 
 /* Commands. The reason one cannot run is text beside it, never silence. */

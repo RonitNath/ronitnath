@@ -9,10 +9,11 @@
 use leptos::prelude::*;
 use rn_api::DocRole;
 use rn_api::commands::{CreateDocument, EditDocument, PublishDocument, Revoke, Share, Transfer};
-use rn_ui::{Column, Commit, Live, PageHead, Priority, Table, TextField, sync_with};
+use rn_ui::{Column, Commit, PageHead, Priority, Table, TextArea, TextField, sync_with};
 
 use crate::bits::{Aside, Choice, Note, act, on, refusal};
 use crate::rows::Document;
+use crate::scope::use_scope;
 
 /// The organization's documents.
 #[component]
@@ -20,16 +21,16 @@ pub fn Documents(
     /// The organization's public id.
     org: String,
 ) -> impl IntoView {
-    let live = Live::<Document>::subscribe("org-documents", &[("org", &org)]);
+    let live = use_scope().live::<Document>("org-documents", &[("org", &org)]);
     let chosen = RwSignal::new(None::<String>);
     let columns = vec![
         Column::new("Title", |row: &Document| row.title.clone()),
-        Column::new("Status", |row: &Document| {
-            if row.unpublished {
-                format!("{} · draft ahead", row.status)
-            } else {
-                row.status.clone()
-            }
+        Column::new("Status", |row: &Document| row.status.clone()).state(),
+        // Whether the draft is ahead of what is published is a different fact
+        // from what the document *is*, and folding the two into one cell was
+        // what stopped the status being a word the ink could colour.
+        Column::new("Draft", |row: &Document| {
+            if row.unpublished { "ahead" } else { "" }.to_owned()
         }),
         Column::new("Revision", |row: &Document| row.draft_rev.to_string())
             .mono()
@@ -107,8 +108,10 @@ fn Editor(document: Document) -> impl IntoView {
         let held = document.title.clone();
         move || held.clone()
     });
-    let body = RwSignal::new(document.body.clone());
-    let body_note = RwSignal::new(None::<String>);
+    let body = Signal::derive({
+        let held = document.body.clone();
+        move || held.clone()
+    });
     let publish_note = RwSignal::new(None::<String>);
 
     let title_sync = {
@@ -118,32 +121,18 @@ fn Editor(document: Document) -> impl IntoView {
             async move { edit(&id, rev, Some(value), None).await }
         })
     };
-    let save_body = {
+    let body_sync = {
         let id = id.clone();
-        move || {
+        sync_with(move |value: String| {
             let id = id.clone();
-            let text = body.get_untracked();
-            leptos::task::spawn_local(async move {
-                body_note.set(edit(&id, rev, None, Some(text)).await.err());
-            });
-        }
+            async move { edit(&id, rev, None, Some(value)).await }
+        })
     };
 
     view! {
         <div class="panel editor">
             <TextField label="Title" value=title sync=title_sync />
-            <div class="field">
-                <label for="doc-body">"Body"</label>
-                <textarea
-                    id="doc-body"
-                    rows="12"
-                    spellcheck="true"
-                    prop:value=move || body.get()
-                    on:input=move |event| body.set(event_target_value(&event))
-                    on:blur=move |_| save_body()
-                ></textarea>
-                <Note note=body_note />
-            </div>
+            <TextArea label="Body" value=body sync=body_sync rows=12 />
             <Commit
                 label="Publish document"
                 version=Signal::derive(move || rev as u64)

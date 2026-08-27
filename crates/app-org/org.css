@@ -2,23 +2,14 @@
  *
  * Nothing here restates a token or a component: the shell, the table and the
  * fields come from rn-ui, and these are the shapes only an operator console
- * for one organization has — the scope switcher above the page, the fact list
- * on the overview, the drill-in panel a table opens, and the folded-away
- * affordance a rare decision lives behind.
+ * for one organization has — the fact list on the overview, the drill-in
+ * panel a table opens, and the folded-away affordance a rare decision lives
+ * behind. The scope switcher is drawn in the shell's rail slot and styled
+ * there: which organization the pages are about is navigation.
  *
  * Borderless: regions are separated by space and by ground, never by a rule
  * that is not already the table's hairline.
  */
-
-.switcher {
-  margin-bottom: 0.75rem;
-}
-.switcher select {
-  background: var(--bg-muted);
-  color: var(--fg);
-  font-size: var(--text-2);
-  padding: 0.25rem 0.4rem;
-}
 
 /* The overview's facts: label left, value right, on one axis. */
 .facts {
@@ -116,12 +107,8 @@
   color: var(--fg-subtle);
   font-size: var(--text-2);
 }
-.editor textarea {
+.panel .field.words {
   width: min(52rem, 100%);
-  background: var(--bg);
-  padding: 0.4rem 0.5rem;
-  resize: vertical;
-  line-height: 1.45;
 }
 
 .block {

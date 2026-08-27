@@ -12,10 +12,10 @@
 use leptos::prelude::*;
 use rn_api::commands::{Revoke, Share, Transfer};
 use rn_api::whoami::DocRole;
-use rn_ui::{Commit, Live, use_whoami};
+use rn_ui::{Column, Commit, Live, Priority, RowAction, Table, use_whoami};
 
 use crate::api::{Refusal, attempt};
-use crate::parts::{Act, Note, Section, titled, when};
+use crate::parts::{Note, Section, titled, when};
 use crate::rows::{Group, Share as Grant};
 
 #[component]
@@ -57,54 +57,32 @@ pub fn Sharing(
         );
     });
 
-    let granted = move || {
+    let granted = Signal::derive(move || {
         let id = document.get();
-        let rows: Vec<Grant> = shares
+        shares
             .rows()
             .into_iter()
             .filter(|row| row.document == id)
-            .collect();
-        if rows.is_empty() {
-            return view! {
-                <tr>
-                    <td class="empty" colspan="4">"Nobody else."</td>
-                </tr>
-            }
-            .into_any();
-        }
-        rows.into_iter()
-            .map(|row| {
-                let id = id.clone();
-                let subject = row.subject.clone();
-                let relation = row.relation.clone();
-                let revoke = Callback::new(move |()| {
-                    let (Ok(resource), Ok(subject)) = (id.parse(), subject.parse()) else {
-                        return;
-                    };
-                    attempt(
-                        Revoke {
-                            resource,
-                            subject,
-                            relation: role_of(&relation),
-                        },
-                        refusal,
-                        |_| {},
-                    );
-                });
-                view! {
-                    <tr>
-                        <td class="p1">{row.display.clone()}</td>
-                        <td class="p1">{titled(&row.relation)}</td>
-                        <td class="p3 mono num">{when(row.at)}</td>
-                        <td class="p1 does">
-                            <Act label="Revoke" undo=true on_act=revoke />
-                        </td>
-                    </tr>
-                }
-            })
-            .collect_view()
-            .into_any()
-    };
+            .collect::<Vec<Grant>>()
+    });
+    let revoke = RowAction::new(
+        "Revoke",
+        Callback::new(move |row: Grant| {
+            let (Ok(resource), Ok(subject)) = (row.document.parse(), row.subject.parse()) else {
+                return;
+            };
+            attempt(
+                Revoke {
+                    resource,
+                    subject,
+                    relation: role_of(&row.relation),
+                },
+                refusal,
+                |_| {},
+            );
+        }),
+    )
+    .undo();
 
     let options = move || {
         groups
@@ -118,17 +96,19 @@ pub fn Sharing(
 
     view! {
         <Section title="Shared with">
-            <table class="tbl">
-                <thead>
-                    <tr>
-                        <th class="p1" scope="col">"Subject"</th>
-                        <th class="p1" scope="col">"May"</th>
-                        <th class="p3" scope="col">"Since"</th>
-                        <th class="p1" scope="col">""</th>
-                    </tr>
-                </thead>
-                <tbody>{granted}</tbody>
-            </table>
+            <Table
+                rows=granted
+                columns=vec![
+                    Column::new("Subject", |row: &Grant| row.display.clone()),
+                    Column::new("May", |row: &Grant| titled(&row.relation)),
+                    Column::new("Since", |row: &Grant| when(row.at))
+                        .mono()
+                        .priority(Priority::Tertiary),
+                ]
+                empty="Nobody else. A share names one of your groups, or a person by their id."
+                per_page=10
+                actions=vec![revoke]
+            />
             <div class="inline">
                 <div class="field">
                     <label for="share-group">"One of your groups"</label>

@@ -7,10 +7,11 @@
 
 use leptos::prelude::*;
 use rn_api::commands::ALL_COMMAND_NAMES;
-use rn_ui::{Column, Live, PageHead, Priority, Table};
+use rn_ui::{Column, PageHead, Priority, Table};
 
 use crate::bits::at;
 use crate::rows::Audited;
+use crate::scope::use_scope;
 
 /// The organization's audit tail.
 #[component]
@@ -49,7 +50,7 @@ fn Tail(org: String, command: String) -> impl IntoView {
     } else {
         vec![("org", &org), ("command", &command)]
     };
-    let live = Live::<Audited>::subscribe("org-audit", &params);
+    let live = use_scope().live::<Audited>("org-audit", &params);
     let columns = vec![
         Column::new("Offset", |row: &Audited| row.offset.to_string()).mono(),
         Column::new("Command", |row: &Audited| row.command.clone()),

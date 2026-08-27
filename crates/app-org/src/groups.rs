@@ -7,12 +7,13 @@
 
 use leptos::prelude::*;
 use rn_api::commands::CreateGroup;
-use rn_ui::{Column, Live, PageHead, Priority, Table};
+use rn_ui::{Column, PageHead, Priority, Table};
 
 use crate::bits::{Aside, Note, act, on};
 use crate::members::Roster;
 use crate::minting::Mint;
 use crate::rows::{Contact, Group, Invitation};
+use crate::scope::use_scope;
 
 /// The organization's groups.
 #[component]
@@ -20,7 +21,7 @@ pub fn Groups(
     /// The organization's public id.
     org: String,
 ) -> impl IntoView {
-    let live = Live::<Group>::subscribe("org-groups", &[("org", &org)]);
+    let live = use_scope().live::<Group>("org-groups", &[("org", &org)]);
     let chosen = RwSignal::new(None::<String>);
     let columns = vec![
         Column::new("Group", |row: &Group| row.display.clone()),
@@ -116,10 +117,12 @@ fn Inside(group: Group, org: String) -> impl IntoView {
 /// Whose contact details are visible inside this group.
 #[component]
 fn Contacts(group: String, org: String) -> impl IntoView {
-    let live = Live::<Contact>::subscribe("org-contacts", &[("org", &org), ("group", &group)]);
+    let live = use_scope().live::<Contact>("org-contacts", &[("org", &org), ("group", &group)]);
     let columns = vec![
         Column::new("Contact", |row: &Contact| row.display.clone()),
-        Column::new("Status", |row: &Contact| row.status.clone()).priority(Priority::Secondary),
+        Column::new("Status", |row: &Contact| row.status.clone())
+            .state()
+            .priority(Priority::Secondary),
     ];
     let rows = Signal::derive(move || live.rows());
     view! {
@@ -139,7 +142,7 @@ fn Contacts(group: String, org: String) -> impl IntoView {
 #[component]
 fn Links(group: String, org: String) -> impl IntoView {
     let live =
-        Live::<Invitation>::subscribe("org-invitations", &[("org", &org), ("group", &group)]);
+        use_scope().live::<Invitation>("org-invitations", &[("org", &org), ("group", &group)]);
     let columns = vec![
         Column::new("Role", |row: &Invitation| row.role.clone()),
         Column::new("Minted", |row: &Invitation| on(row.created_at)),

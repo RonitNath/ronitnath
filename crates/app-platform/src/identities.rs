@@ -48,7 +48,7 @@ pub fn Identities() -> impl IntoView {
                 .map_or_else(|| "unresolved".to_owned(), |person| person.display.clone())
         }),
         Column::new("Source", |row: &Identity| row.source.clone()),
-        Column::new("Status", |row: &Identity| row.status.clone()),
+        Column::new("Status", |row: &Identity| row.status.clone()).state(),
         Column::new("Factors", |row: &Identity| factors(&row.factors))
             .priority(Priority::Secondary),
         Column::new("Zone", |row: &Identity| row.home_zone.clone()).priority(Priority::Tertiary),

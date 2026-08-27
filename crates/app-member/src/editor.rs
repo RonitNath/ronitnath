@@ -12,19 +12,17 @@
 //! not a save: it carries the revision it is promoting.
 
 mod share;
-mod words;
 
 use leptos::prelude::*;
 use leptos::task::spawn_local;
 use leptos_router::hooks::use_params_map;
 use rn_api::commands::{EditDocument, PublishDocument};
-use rn_ui::{Commit, Live, PageHead, TextField, sync_with};
+use rn_ui::{Commit, Live, PageHead, TextArea, TextField, sync_with};
 
 use crate::api::{Refusal, attempt, run};
 use crate::parts::{Note, Pair, Section, titled, when};
 use crate::rows::Document;
 use share::Sharing;
-use words::Words;
 
 #[component]
 pub fn Editor() -> impl IntoView {
@@ -79,7 +77,7 @@ pub fn Editor() -> impl IntoView {
                 title,
                 body,
             };
-            match run(&args).await {
+            match run(args).await {
                 Ok(result) => {
                     if let Some(now) = result.get("rev").and_then(serde_json::Value::as_i64) {
                         rev.set(now);
@@ -144,11 +142,13 @@ pub fn Editor() -> impl IntoView {
                     })
                     sync=title_sync.clone()
                 />
-                <Words
+                <TextArea
+                    label="Body"
                     value=Signal::derive(move || {
                         document.get().and_then(|row| row.body).unwrap_or_default()
                     })
                     sync=body_sync.clone()
+                    rows=14
                     readonly=!editable
                 />
             </div>
