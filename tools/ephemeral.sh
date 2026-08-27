@@ -5,6 +5,9 @@
 #   tools/ephemeral.sh status    what this worktree's instance reports
 #   tools/ephemeral.sh stop      SIGTERM it, wait, drop the pid file
 #   tools/ephemeral.sh reset     stop, then wipe the state directory
+#   tools/ephemeral.sh backup [dir]   stop, back up, leave it stopped
+#   tools/ephemeral.sh restore <dir>  stop, wipe, put it back
+#   tools/ephemeral.sh admin ...      `rn-site admin` against this instance
 #
 # Everything that could collide between two worktrees on one machine is
 # derived from the worktree's own absolute path: the three ports, the state
@@ -15,6 +18,7 @@
 #
 #   slot   = sha256(worktree path) mod 100
 #   app    = 3300 + slot   the HTTP surface, and the public origin
+#   admin  = 3400 + slot   the loopback-only /admin/* listener (G21.2)
 #   raft   = 8300 + slot   hiqlite's peer protocol (single voter, dev topology)
 #   api    = 8400 + slot   hiqlite's own API listener
 #
@@ -30,6 +34,20 @@
 # every public id, and the signing key is what the OpenID Provider's stored
 # keys are sealed under. A dev process that minted fresh ones would rename
 # every object and orphan every signing key on every start.
+#
+# `backup` and `restore` wrap the two subcommands (F16.4), and both stop the
+# instance first: they open the data directory directly, and hiqlite holds an
+# exclusive lock on it — which the subcommand refuses on, naming the pid.
+#
+# A backup directory holds the two key files as well as the rows, under
+# `keys/`, mode 0600. That is not the manifest carrying a secret — the manifest
+# carries a *fingerprint* and never the key — it is this wrapper keeping the
+# one thing a `reset` would otherwise destroy. Public ids are derived from the
+# id key on read and stored in no column, so a round trip under a fresh key
+# would produce a database where every row is right and every public id is
+# different, and `restore` refuses exactly that. A real deployment's key lives
+# in its secret store and does not travel with its backups; a throwaway
+# instance has nowhere else to put it. Treat the directory as a secret.
 #
 # Overrides, for the test that proves two of these coexist:
 #
@@ -52,6 +70,7 @@ digest() {
 slot=$((16#$(digest "$root") % 100))
 
 app_port=$((3300 + slot))
+admin_port=$((3400 + slot))
 raft_port=$((8300 + slot))
 api_port=$((8400 + slot))
 
@@ -124,6 +143,7 @@ cmd_up() {
     RN_SITE__MODE=dev \
     RN_SITE__DEV=1 \
     RN_SITE__ADDR="127.0.0.1:$app_port" \
+    RN_SITE__ADMIN_ADDR="127.0.0.1:$admin_port" \
     RN_SITE__DB_PATH="$db_path" \
     RN_SITE__STATIC_DIR="$root/static" \
     RN_SITE__PUBLIC_ORIGIN="$origin" \
@@ -140,7 +160,7 @@ cmd_up() {
     local deadline=$((SECONDS + 60))
     while [ "$SECONDS" -lt "$deadline" ]; do
         if curl --fail --silent --max-time 2 "$origin/readyz" | grep -q '"status":"ok"'; then
-            log "slot $slot  pid $pid  app $app_port  raft $raft_port  hiqlite-api $api_port"
+            log "slot $slot  pid $pid  app $app_port  admin $admin_port  raft $raft_port  hiqlite-api $api_port"
             log "up at $origin"
             log "sign in at $origin/auth — the button under the form opens an operator session"
             return 0
@@ -191,14 +211,76 @@ cmd_reset() {
     log "state removed: $state"
 }
 
+# `rn-site admin ...` against this worktree's instance, with the same
+# environment `up` serves under. It refuses while the instance is running and
+# names the pid, which is the point — so this stops nothing on its own.
+cmd_admin() {
+    [ -x "$binary" ] || cargo build --quiet -p rn-site
+    mint_key 16 "$id_key_file"
+    mint_key 32 "$oidc_key_file"
+    RN_SITE__MODE=dev \
+    RN_SITE__DEV=1 \
+    RN_SITE__DB_PATH="$db_path" \
+    RN_SITE__STATIC_DIR="$root/static" \
+    RN_SITE__PUBLIC_ORIGIN="$origin" \
+    RN_SITE__ID_KEY_FILE="$id_key_file" \
+    RN_SITE__OIDC_KEY_FILE="$oidc_key_file" \
+    RN_SITE_HQL_ADDR_RAFT="127.0.0.1:$raft_port" \
+    RN_SITE_HQL_ADDR_API="127.0.0.1:$api_port" \
+    RUST_LOG="${RN_SITE_EPH_LOG:-warn}" \
+        "$binary" admin "$@"
+}
+
+# Stop, walk the database out, and leave it stopped: whoever asked for a
+# backup is in the middle of something.
+cmd_backup() {
+    local dir=${1:-$state/backups/$(date -u +%Y%m%dT%H%M%SZ)}
+    cmd_stop
+    mkdir -p "$dir"
+    cmd_admin backup "$dir"
+    # The keys, which a `reset` would destroy and which the manifest
+    # deliberately does not carry. See the header.
+    ( umask 077; mkdir -p "$dir/keys" )
+    cp "$id_key_file" "$dir/keys/id.key"
+    cp "$oidc_key_file" "$dir/keys/oidc.key"
+    chmod 600 "$dir/keys/id.key" "$dir/keys/oidc.key"
+    log "keys copied into $dir/keys — treat this directory as a secret"
+    log "backup complete: $dir"
+}
+
+# Wipe, put the keys back, then put the rows back. In that order: the restore
+# refuses an id-key fingerprint that is not the manifest's, so the key has to
+# be in place before the subcommand runs.
+cmd_restore() {
+    local dir=${1:?usage: ephemeral.sh restore <dir>}
+    [ -f "$dir/manifest.json" ] || { echo "ephemeral: $dir holds no manifest.json" >&2; exit 1; }
+    cmd_reset
+    mkdir -p "$state/data"
+    if [ -f "$dir/keys/id.key" ]; then
+        ( umask 077
+          cp "$dir/keys/id.key" "$id_key_file"
+          cp "$dir/keys/oidc.key" "$oidc_key_file" )
+        chmod 600 "$id_key_file" "$oidc_key_file"
+        log "keys restored from $dir/keys"
+    else
+        log "no keys in $dir/keys; the restore will refuse the id-key mismatch"
+    fi
+    cmd_admin restore "$dir"
+    log "restored from $dir — 'tools/ephemeral.sh up' to serve it"
+}
+
 case "${1:-up}" in
     up|start) cmd_up ;;
+    backup) shift; cmd_backup "$@" ;;
+    restore) shift; cmd_restore "$@" ;;
+    admin) shift; cmd_admin "$@" ;;
     status) cmd_status ;;
     stop|down) cmd_stop ;;
     reset) cmd_reset ;;
-    ports) printf 'slot %s app %s raft %s api %s\n' "$slot" "$app_port" "$raft_port" "$api_port" ;;
+    ports) printf 'slot %s app %s admin %s raft %s api %s\n' \
+        "$slot" "$app_port" "$admin_port" "$raft_port" "$api_port" ;;
     *)
-        sed -n '2,8p' "${BASH_SOURCE[0]}" >&2
+        sed -n '2,11p' "${BASH_SOURCE[0]}" >&2
         exit 2
         ;;
 esac

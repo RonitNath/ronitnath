@@ -5,6 +5,7 @@
 #   tools/cluster.sh status       what each node reports on /readyz
 #   tools/cluster.sh kill <n>     stop one node, leaving the other two
 #   tools/cluster.sh stop         stop everything and remove the state
+#   tools/cluster.sh reset        stop, wipe, start, seed — in one word
 #
 # The binary is the release build — see cmd_start.
 #
@@ -166,13 +167,52 @@ cmd_stop() {
     log "cluster stopped and state removed"
 }
 
+# F18.2 — stop, wipe, start, seed, in one word.
+#
+# `stop` already removes the run directory, so the wipe is not a second step:
+# the cluster is formed fresh on every start and a half-formed raft directory
+# left behind is poison for the next one. What this adds is the seed, which is
+# the part that makes the difference between three ready nodes and three ready
+# nodes somebody can sign into.
+#
+# The seed runs against node 1's app port and its own data directory, and it
+# takes the node down to do it — `tools/seed.sh` starts a server, registers
+# through the real form, stops it, and runs `bootstrap-operator`, because
+# hiqlite holds an exclusive lock and the two halves cannot both have it. So
+# node 1 is stopped, seeded and started again, and the other two follow it
+# through raft.
+cmd_reset() {
+    cmd_stop
+    cmd_start
+    log "seeding the first operator through the real form"
+    cmd_kill 1
+    RN_SITE__MODE=prod \
+    RN_SITE__ADDR="127.0.0.1:$(app_port 1)" \
+    RN_SITE__DB_PATH="$run_dir/node1/data/db.sqlite" \
+    RN_SITE__STATIC_DIR="$root/static" \
+    RN_SITE__ID_KEY=000102030405060708090a0b0c0d0e0f \
+    RN_SITE_HQL_NODE_ID=1 \
+    RN_SITE_HQL_NODES="$peer_map" \
+    RN_SITE_HQL_ADDR_RAFT=127.0.0.1:8101 \
+    RN_SITE_HQL_ADDR_API=127.0.0.1:8201 \
+    RN_SITE_HQL_SECRET_RAFT="$secret_raft" \
+    RN_SITE_HQL_SECRET_API="$secret_api" \
+    RN_SITE_HQL_LOCAL_CLUSTER=1 \
+    RN_SEED_BINARY="$binary" \
+        tools/seed.sh
+    start_node 1
+    wait_for_ready
+    log "reset complete: three ready nodes and an operator that can sign in"
+}
+
 case "${1:-}" in
     start) cmd_start ;;
+    reset) cmd_reset ;;
     status) cmd_status ;;
     kill) shift; cmd_kill "$@" ;;
     stop) cmd_stop ;;
     *)
-        sed -n '2,10p' "${BASH_SOURCE[0]}" >&2
+        sed -n '2,11p' "${BASH_SOURCE[0]}" >&2
         exit 2
         ;;
 esac

@@ -152,7 +152,7 @@ rn-site admin restore <dir>
 ```
 
 `crates/server/src/admin/backup.rs` is that walk and `admin/restore.rs` is its
-inverse; the manifest's shape is `admin::manifest::Manifest`.
+inverse; the manifest's shape is `admin::backup::Manifest`.
 
 ### What the manifest carries, and what it deliberately does not
 
@@ -160,7 +160,7 @@ inverse; the manifest's shape is `admin::manifest::Manifest`.
 |---|---|
 | `offset` | the audit id the walk was consistent at — F16.2's refusal is "no offset, no backup" |
 | `schema` | sha-256 over the applied migration hashes, so a restore onto a different schema is caught before it writes |
-| `id_key` | a **fingerprint** — sha-256 of the key, hex, first 16 characters. Never the key |
+| `id_key` | a **fingerprint** — sixteen characters of a sha-256 over a domain-separated string carrying the key. Never the key |
 | `counts` | one row count per table, which is the acceptance test |
 | `node`, `version`, `at` | which node wrote it, on which build, when |
 
@@ -174,8 +174,7 @@ deployment it was carried to.
 ```sh
 tools/ephemeral.sh backup                 # into target/ephemeral/backups/<stamp>/
 tools/ephemeral.sh backup /tmp/somewhere
-tools/ephemeral.sh reset
-tools/ephemeral.sh restore /tmp/somewhere
+tools/ephemeral.sh restore /tmp/somewhere # wipes first; a restore is a formation act
 ```
 
 Both wrap `rn-site admin`, and both stop the instance first: the subcommands
@@ -187,6 +186,83 @@ On a *running* node the same actions are reachable over
 `RN_SITE__ADMIN_ADDR`'s loopback-only listener — but `backup` and `restore` are
 not among them, and that is deliberate: a walk taken while commits are landing
 is consistent at no offset at all.
+
+### The key files travel with the wrapper, and never with the manifest
+
+`tools/ephemeral.sh backup` copies the instance's id key and signing key into
+`<dir>/keys/`, mode 0600, and `restore` puts them back before the subcommand
+runs. That is not the manifest carrying a secret — it carries a fingerprint
+and never the key. It is the wrapper keeping the one thing a `reset` destroys:
+the id key derives every public id and is stored in no column, so a round trip
+under a fresh key would produce a database where every row is right and every
+public id is different, which is precisely what the restore refuses.
+
+A real deployment's key lives in its secret store
+(`/etc/rn-site/cluster-secrets/id-key`, `deploy/CUTOVER.md` §3) and does not
+travel with its backups. A throwaway worktree instance has nowhere else to put
+it. **Treat a backup directory as a secret.**
+
+## The round trip, run
+
+Against this worktree's ephemeral instance, seeded with a person, an
+organization and a document:
+
+```
+$ tools/ephemeral.sh backup /tmp/bk
+==> stopped (slot 23)
+backup at offset 4 — 18 rows over 23 tables, into /tmp/bk
+  party                2
+  identity             1
+  membership           1
+  resource             2
+  audit                4
+  document             1
+  factor               2
+  party_resource       1
+  relation             1
+  session              2
+  audit_object         1
+==> keys copied into /tmp/bk/keys — treat this directory as a secret
+
+$ cat /tmp/bk/manifest.json          # without the per-table block
+{ "format": 1, "offset": 4,
+  "schema":  "esBHcqgn8A67GQItbnhEnd5yqDBE0UgTTjyFnrDxI6I",
+  "id_key":  "EP2gTHYd4ci5B0v_",
+  "node": "local", "version": "dev", "at": 1787872771 }
+
+$ tools/ephemeral.sh restore /tmp/bk
+==> state removed: …/target/ephemeral
+==> keys restored from /tmp/bk/keys
+restored 18 rows over 23 tables from /tmp/bk
+the feed head is 4; the manifest was consistent at 4
+
+$ curl -s 127.0.0.1:3423/admin/readyz
+{"feed_head":4, … ,"status":"ok"}
+```
+
+And every public id resolves to the same rows — the person, the identity and
+the organization are byte for byte the ones the instance answered with before
+the reset:
+
+```
+p_pvzjVHBrN03Vk_QYYCteLQ   i_21gpVLqmlRtnbTONd1BSsA   o_7CfQtgnjHm2k62ki0nwlLg
+```
+
+The three refusals, run against the same directory:
+
+```
+$ tools/ephemeral.sh admin restore /tmp/bk           # onto the restored instance
+rn-site admin: this database is not empty — party already holds 5 row(s).
+A restore is a formation act, not a merge: wipe it first                    exit 1
+
+$ tools/ephemeral.sh admin restore /tmp/bk2          # manifest id_key edited
+rn-site admin: this backup was taken under id key 0000000000000000 and this
+deployment's is EP2gTHYd4ci5B0v_. Restoring it would rename every object in
+it — every saved link, every bookmarked URL, every token subject             exit 1
+
+$ RN_SITE__MODE=prod rn-site admin wipe
+rn-site admin: refusing to wipe a deployment in mode=prod …                  exit 1
+```
 
 ## What this does not cover
 

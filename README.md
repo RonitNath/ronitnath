@@ -61,7 +61,9 @@ cp .env.example .env                    # then RN_SITE__DEV=1 puts a "Sign in as
                                         # (debug builds only; `just run-dev`)
 tools/seed.sh                           # register the first operator and grant it
 just up                                 # this worktree's own instance
+rn-site admin operators                 # the way in without the web tier (G21)
 tools/cluster.sh start                  # three real voters on this host
+tools/cluster.sh reset                  # stop, wipe, start, seed — in one word
 tools/perf/run.sh                       # oha + samply against that cluster
 tools/size-gate.sh                      # the structure limits, as CI runs them
 ```
@@ -84,8 +86,9 @@ and never from the path of the index it is handed. For live work on a bundle,
 
 `just up` is the per-worktree instance (`tools/ephemeral.sh`): it derives a
 slot from the worktree's absolute path — `sha256(path) mod 100` — and takes
-its three ports from it (`3300 + slot` for HTTP, `8300 + slot` and
-`8400 + slot` for hiqlite's two listeners), keeping its database, log, pid
+its four ports from it (`3300 + slot` for HTTP, `3400 + slot` for the
+node-local admin listener, `8300 + slot` and `8400 + slot` for hiqlite's two
+listeners), keeping its database, log, pid
 file, id key and signing key under `<worktree>/target/ephemeral/`. So two
 checkouts, or two agents, are up at the same time without knowing about each
 other, and neither collides with `cargo run` on :3004 or `tools/cluster.sh` on
@@ -100,6 +103,52 @@ registers one through the real form, then runs `rn-site bootstrap-operator
 subcommand needs the database to itself, which a formed cluster never gives it;
 on a deployment the running process takes the same grant instead, from
 `RN_SITE__BOOTSTRAP_OPERATOR_EMAIL` (`deploy/CUTOVER.md` §6).
+
+## Administering it without the web tier
+
+Two ways in that do not go through a browser, because they cover two different
+failures (story G21, `crates/server/src/admin/`).
+
+```sh
+rn-site admin operators                                   # a stopped node's store
+rn-site admin grant-operator her@example.invalid \
+    --reason "on call this week" --as me@example.invalid
+rn-site admin sessions --person her@example.invalid
+rn-site admin audit --tail 20
+rn-site admin backup <dir>                                # a logical backup
+rn-site admin restore <dir>                               # onto an empty database
+rn-site admin wipe                                        # dev only, and it says so
+
+tools/ephemeral.sh backup [dir]                           # the round trip, wrapped
+tools/ephemeral.sh restore <dir>
+```
+
+The subcommand opens the database directly, so it runs only against a
+**stopped** node — hiqlite holds an exclusive lock on its data directory, and
+against a running one the subcommand exits non-zero naming the pid that holds
+it. For a node that is still serving, `RN_SITE__ADMIN_ADDR=127.0.0.1:3399`
+opens a second listener carrying the same actions under `/admin/*`. That
+listener has no cookie and no session: **reaching the socket is the
+authority**, which is defensible only because the socket is loopback, so the
+configuration refuses a non-loopback address at boot in both modes. `/admin/*`
+is absent from the public router entirely, and `crates/server/tests/surface.rs`
+holds a row per route asserting that for all six principals.
+
+Neither way in is a second authorisation path. Both run the same kernel command
+the browser's `POST /api/cmd/<name>` runs, with a principal built from
+`--as <email>` — so every action lands in the audit with an actor, and an
+address that does not hold `platform:* #operator` is refused exactly as it
+would be in a browser. `--as` names who is accountable; it grants nothing.
+
+Backup is a **logical** walk — every table in dependency order, at one feed
+offset — and not a hiqlite snapshot. `docs/ops-backup.md` is the finding that
+settled that, with the version pinned and the API quoted. The manifest carries
+the offset it is consistent at, a schema digest, per-table row counts and a
+*fingerprint* of the id key; a restore refuses a non-empty database, a schema
+that is not the one the rows came out of, and an id key that is not the one the
+public ids were derived under. That last refusal is the one that matters most,
+because the failure it prevents is invisible: every row correct and every
+public id different.
 
 ## Delivery
 
