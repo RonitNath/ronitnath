@@ -38,6 +38,9 @@ pub struct Tuning {
     pub heartbeat_interval_ms: Option<u64>,
     /// `false` keeps cache WAL and snapshots in memory.
     pub cache_storage_disk: bool,
+    /// How many pooled connections serve local reads. `None` takes one per
+    /// core.
+    pub read_pool_size: Option<usize>,
 }
 
 impl Default for Tuning {
@@ -45,6 +48,7 @@ impl Default for Tuning {
         Self {
             heartbeat_interval_ms: None,
             cache_storage_disk: true,
+            read_pool_size: None,
         }
     }
 }
@@ -56,6 +60,7 @@ impl Tuning {
         Self {
             heartbeat_interval_ms: Some(50),
             cache_storage_disk: false,
+            read_pool_size: None,
         }
     }
 }
@@ -169,6 +174,7 @@ fn node_config(
         secret_raft: topology.secret_raft,
         secret_api: topology.secret_api,
         health_check_delay_secs: 0,
+        read_pool_size: tuning.read_pool_size.unwrap_or_else(read_pool_size),
         cache_storage_disk: tuning.cache_storage_disk,
         learner_only: topology.learner_only,
         ..NodeConfig::default()
@@ -181,6 +187,22 @@ fn node_config(
         node_config.raft_config.election_timeout_max = heartbeat * 6;
     }
     Ok(node_config)
+}
+
+/// How many connections serve local reads: one per core, within reason.
+///
+/// hiqlite's default is 4, and 4 is what a hundred subscribers queue behind.
+/// Every socket that a commit touches re-reads the feed and re-reads its own
+/// query, so one notification is two reads per connection and the pool is
+/// what serialises them — the fan-out probe's milliseconds are mostly that
+/// queue (finding 5, `docs/perf/2026-08-27.md`). Reads are local and
+/// CPU-bound, so the ceiling worth having is the core count; the floor of 4
+/// keeps hiqlite's own behaviour on a machine that will not say.
+fn read_pool_size() -> usize {
+    std::thread::available_parallelism()
+        .map(std::num::NonZeroUsize::get)
+        .unwrap_or(4)
+        .clamp(4, 16)
 }
 
 /// How many voters the configured peer map expects (one in local dev).

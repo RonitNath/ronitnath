@@ -227,9 +227,7 @@ where
     }
 
     let commit_ended = started.elapsed();
-    let committed = audit::replay(ctx.store, ctx.key, &digest)
-        .await?
-        .ok_or_else(|| KernelError::Invariant("committed batch left no audit row".to_owned()))?;
+    let committed = read_back(ctx, &digest).await?;
     let read_back_ended = started.elapsed();
     ctx.feed.notify(committed.offset).await;
     let done = started.elapsed();
@@ -253,6 +251,48 @@ where
         committed,
         fresh: true,
     })
+}
+
+/// How long a node will wait to see a batch it has already committed.
+const READ_BACK_PATIENCE: std::time::Duration = std::time::Duration::from_secs(2);
+
+/// How often it looks. A follower applies an entry the leader has committed in
+/// well under a millisecond on a healthy cluster; this is several looks per
+/// that.
+const READ_BACK_POLL: std::time::Duration = std::time::Duration::from_micros(200);
+
+/// Read back the audit row of a batch that has just committed.
+///
+/// The commit went through raft and returned, which means a quorum has it —
+/// and says nothing about whether *this* node has applied it yet. Read
+/// straight back, a command run on a follower asks its own state machine
+/// about a row that is in the log and not yet in the database, and the answer
+/// is "committed batch left no audit row": an invariant failure reported for a
+/// command that worked perfectly. Measured at 20-46% of `create-document`s
+/// posted to a follower (finding 2, `docs/perf/2026-08-27.md`) — which the
+/// report attributed to the precondition read, and this is the half of it
+/// that was actually being seen.
+///
+/// So it waits. The row is not in doubt: the batch committed, the audit
+/// statement is inside it, and every one of those is guarded by the same
+/// guard. What is in doubt is only when this node catches up, and if it never
+/// does the invariant failure is the honest answer after all.
+async fn read_back<S: Sql, F: Feed>(
+    ctx: &Ctx<'_, S, F>,
+    digest: &str,
+) -> Outcome<crate::event::Committed> {
+    let deadline = std::time::Instant::now() + READ_BACK_PATIENCE;
+    loop {
+        if let Some(committed) = audit::replay(ctx.store, ctx.key, digest).await? {
+            return Ok(committed);
+        }
+        if std::time::Instant::now() >= deadline {
+            return Err(KernelError::Invariant(
+                "committed batch left no audit row".to_owned(),
+            ));
+        }
+        tokio::time::sleep(READ_BACK_POLL).await;
+    }
 }
 
 /// What [`run`] produced, and whether this call is what produced it.

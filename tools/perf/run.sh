@@ -200,7 +200,12 @@ perf=$root/tools/perf/target/release/rn-perf
 log "wrote $out/run.txt"
 
 # ---------------------------------------------------------------- the cluster
+# Stopped first, always. A cluster left up by a previous `--keep` run is a
+# cluster running the previous binary against the previous schema, and
+# `cluster.sh start` would say "already running" and measure it — which is a
+# whole run of numbers about a revision nobody asked about.
 log "starting the three-voter cluster"
+tools/cluster.sh stop >/dev/null 2>&1 || true
 tools/cluster.sh start
 tools/cluster.sh status > "$out/cluster-before.txt"
 

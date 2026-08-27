@@ -32,8 +32,18 @@ fn main() -> std::process::ExitCode {
     let runtime = match tokio::runtime::Builder::new_multi_thread()
         // Two worker threads, because the harness shares this machine with
         // whatever it is measuring and a load generator that takes the box is
-        // measuring itself.
-        .worker_threads(2)
+        // measuring itself. `RN_PERF_WORKERS` raises it, which is how the
+        // fan-out probe was told apart from its own deserialization: a
+        // hundred sockets timestamping their own diffs on two threads is a
+        // queue, and a queue in the load generator reads exactly like a
+        // queue in the server.
+        .worker_threads(
+            std::env::var("RN_PERF_WORKERS")
+                .ok()
+                .and_then(|value| value.parse().ok())
+                .filter(|workers| *workers > 0)
+                .unwrap_or(2),
+        )
         .enable_all()
         .build()
     {
