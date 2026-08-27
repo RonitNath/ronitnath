@@ -204,64 +204,111 @@ it. **Treat a backup directory as a secret.**
 
 ## The round trip, run
 
-Against this worktree's ephemeral instance, seeded with a person, an
-organization and a document:
+Against this worktree's ephemeral instance, seeded through the real form with
+a person, an organization and a document. `tools/ephemeral.sh backup|restore`
+**is** the script F16.3 asks for; this is its transcript.
 
 ```
 $ tools/ephemeral.sh backup /tmp/bk
 ==> stopped (slot 23)
-backup at offset 4 — 18 rows over 23 tables, into /tmp/bk
-  party                2
-  identity             1
-  membership           1
-  resource             2
-  audit                4
-  document             1
-  factor               2
-  party_resource       1
-  relation             1
-  session              2
-  audit_object         1
+backup at offset 3 — 16 rows over 23 tables, into /tmp/bk
+  party                2      audit                3      relation             1
+  identity             1      document             1      session              1
+  membership           1      factor               2      audit_object         1
+  resource             2      party_resource       1
 ==> keys copied into /tmp/bk/keys — treat this directory as a secret
 
 $ cat /tmp/bk/manifest.json          # without the per-table block
-{ "format": 1, "offset": 4,
+{ "format": 1, "offset": 3,
   "schema":  "esBHcqgn8A67GQItbnhEnd5yqDBE0UgTTjyFnrDxI6I",
-  "id_key":  "EP2gTHYd4ci5B0v_",
-  "node": "local", "version": "dev", "at": 1787872771 }
+  "id_key":  "yAvjpO5OWd7HxI3p",
+  "node": "local", "version": "dev", "at": 1787874087 }
+```
 
+**F16.2's acceptance**, checked against the state-machine file directly rather
+than against the tool that wrote the manifest:
+
+```
+$ python3 - # SELECT count(*) per table, compared with the manifest
+tables checked: 23   mismatches: []
+```
+
+**F16.3's**, the round trip:
+
+```
 $ tools/ephemeral.sh restore /tmp/bk
 ==> state removed: …/target/ephemeral
 ==> keys restored from /tmp/bk/keys
-restored 18 rows over 23 tables from /tmp/bk
-the feed head is 4; the manifest was consistent at 4
+restored 16 rows over 23 tables from /tmp/bk
+the feed head is 3; the manifest was consistent at 3
 
-$ curl -s 127.0.0.1:3423/admin/readyz
-{"feed_head":4, … ,"status":"ok"}
+$ tools/ephemeral.sh up && curl -s 127.0.0.1:3423/admin/readyz
+3 ok                                 # feed_head, status
 ```
 
-And every public id resolves to the same rows — the person, the identity and
-the organization are byte for byte the ones the instance answered with before
-the reset:
+And every public id resolves to the same rows. The same address signs in with
+the same password and is answered with the identifiers the instance was
+answering with before the reset, byte for byte:
 
 ```
-p_pvzjVHBrN03Vk_QYYCteLQ   i_21gpVLqmlRtnbTONd1BSsA   o_7CfQtgnjHm2k62ki0nwlLg
+                    before the reset          after the restore
+person              p_Ombpj23YKnwshNUcbiYHfA  p_Ombpj23YKnwshNUcbiYHfA
+organization        o_XayRkv6ZDjUJf1-Dudh3Gw  o_XayRkv6ZDjUJf1-Dudh3Gw
 ```
 
-The three refusals, run against the same directory:
+The three refusals, run:
 
 ```
-$ tools/ephemeral.sh admin restore /tmp/bk           # onto the restored instance
+$ tools/ephemeral.sh admin restore /tmp/bk          # onto the restored instance
 rn-site admin: this database is not empty — party already holds 5 row(s).
 A restore is a formation act, not a merge: wipe it first                    exit 1
 
-$ tools/ephemeral.sh admin restore /tmp/bk2          # manifest id_key edited
+$ tools/ephemeral.sh admin restore /tmp/bk2         # manifest id_key edited
 rn-site admin: this backup was taken under id key 0000000000000000 and this
 deployment's is EP2gTHYd4ci5B0v_. Restoring it would rename every object in
 it — every saved link, every bookmarked URL, every token subject             exit 1
 
 $ RN_SITE__MODE=prod rn-site admin wipe
 rn-site admin: refusing to wipe a deployment in mode=prod …                  exit 1
+```
+
+**G21.1's**, against a node that is up:
+
+```
+$ tools/ephemeral.sh admin operators
+rn-site admin: this node is running as pid 3798 and hiqlite holds an exclusive
+lock on …/target/ephemeral/data. Stop it first, or use the loopback admin
+listener (RN_SITE__ADMIN_ADDR)                                               exit 1
+```
+
+and against one that is stopped, the grant that has to leave two rows:
+
+```
+$ tools/ephemeral.sh admin grant-operator second@example.invalid \
+      --reason "the P5 acceptance" --as roundtrip@example.invalid
+second@example.invalid now holds platform:* #operator
+
+$ tools/ephemeral.sh admin operators              # the relation row
+p_pvzjVHBrN03Vk_QYYCteLQ  Round Trip  since 1787872820  (bootstrap)
+p_Zh-T_bD6KW_ow0WiVrxb5g  Round Trip  since 1787872825
+
+$ tools/ephemeral.sh admin audit --tail 1         # and the audit row
+      11  grant-operator  actor 1  at 1787872825
+          {"event":"grant-operator","person":4,"reason":"the P5 acceptance"}
+```
+
+**G21.2's**, the listener:
+
+```
+$ curl -s 127.0.0.1:3423/admin/audit?tail=5            # loopback: rows
+{"audit":[…]}
+$ curl -so /dev/null -w '%{http_code}' 127.0.0.1:3323/admin/audit?tail=5
+404                                                     # the public listener
+
+$ RN_SITE__ADMIN_ADDR=0.0.0.0:3399 rn-site
+rn-site: RN_SITE__ADMIN_ADDR must be a loopback address; 0.0.0.0:3399 is not.
+Reaching that socket is the whole authorisation for /admin/*, which is
+defensible only because the socket cannot be reached from off the host  exit 1
 ```
 
 ## What this does not cover
