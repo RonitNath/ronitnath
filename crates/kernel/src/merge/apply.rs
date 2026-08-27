@@ -26,6 +26,20 @@
 //! because every identity now resolves to the survivor — and they are the only
 //! record of what that person held, which is what [`split`](super::split)
 //! copies back when a merge has to be undone.
+//!
+//! ## Ownership follows the person
+//!
+//! `Transfer` is the only command that changes an owner; a merge is not a
+//! change of owner but a change of *who that owner is*, so it moves
+//! `resource.owner_party_id` from the absorbed person to the survivor and
+//! unions the `#owner` relation rows across with every other grant. Without
+//! it a merged person's documents would be owned by a party no principal can
+//! ever expand to, and `list_visible` would stop returning them to the human
+//! who still has them open in a tab.
+//!
+//! Only persons are ever merged. An organization the absorbed person owned
+//! changes hands here — its `resource` row does — but the organization itself
+//! is not absorbed and its party row is untouched.
 
 use crate::Timestamp;
 use crate::cmd::Batch;
@@ -76,6 +90,20 @@ const RELATIONS_AS_OBJECT: &str = "INSERT OR IGNORE INTO relation \
      SELECT 'person', $1, r.relation, r.subject_kind, r.subject_id, r.granted_by, $2 \
      FROM relation r WHERE r.object_kind = 'person' AND r.object_id = $3 \
        AND EXISTS (SELECT 1 FROM party WHERE id = $3 AND kind = 'person' AND status = 'active')";
+
+/// Step 3½ — ownership follows the person.
+///
+/// `resource.owner_party_id` is the one column a merge moves that `Transfer`
+/// otherwise owns exclusively, and the exception is the orchestrator's ruling:
+/// the owner is not changing, the *person* is. The `#owner` relation rows come
+/// across with every other grant in [`RELATIONS_AS_SUBJECT`], so the column and
+/// the row that mirrors it move in the same batch and cannot disagree.
+///
+/// An organization the absorbed person owned moves too, because what moves is
+/// its `resource` row's owner — the organization itself is never merged, only
+/// persons are, and its party row is untouched.
+const RESOURCES: &str = "UPDATE resource SET owner_party_id = $1 WHERE owner_party_id = $2 \
+     AND EXISTS (SELECT 1 FROM party WHERE id = $2 AND kind = 'person' AND status = 'active')";
 
 /// Step 4 — anything that already resolved to the absorbed person now resolves
 /// past it, so a chain stays one hop long.
@@ -159,6 +187,7 @@ impl Merge {
         for sql in [MEMBERSHIPS, RELATIONS_AS_SUBJECT, RELATIONS_AS_OBJECT] {
             batch.any(sql, vec![survivor.clone(), at.clone(), absorbed.clone()]);
         }
+        batch.any(RESOURCES, vec![survivor.clone(), absorbed.clone()]);
         batch.any(ALIAS_REPOINT, vec![survivor.clone(), absorbed.clone()]);
         batch.one(
             ALIAS_INSERT,

@@ -18,6 +18,30 @@
 //! own, other people have acted on that for however long the merge stood, and
 //! silently revoking them would be a second unreviewed change on top of the
 //! first. Taking a grant away is `Revoke`, and it is somebody's decision.
+//!
+//! ## What a split restores of ownership, and what it cannot
+//!
+//! Ownership is the one thing a merge moves that both parties cannot keep:
+//! `resource.owner_party_id` holds exactly one party. So where a grant is
+//! copied, ownership is *moved back* — and the survivor's `#owner` row for
+//! those resources goes with it, because a column and the row that mirrors it
+//! may not disagree.
+//!
+//! Which resources move back is a fact the database holds: the absorbed
+//! person's own `#owner` rows were left in place by the merge, so
+//! "the resources `from_person_id` owned when it was absorbed" is a query, not
+//! a reconstruction. Two things bound it, and the tests say both:
+//!
+//! * **Only what the survivor still owns.** A resource the survivor has since
+//!   `Transfer`red on is left alone. The split is undoing a merge, not
+//!   reversing every decision taken while it stood.
+//! * **Per person, never per identity.** A `resource` row names a party, and
+//!   nothing anywhere records which *identity* of that party brought it. If
+//!   the absorbed person was itself made of two identities, splitting one of
+//!   them out hands that one all of the former person's resources. Splitting
+//!   the second afterwards then moves them on again, because by then the first
+//!   new person is the owner and holds the `#owner` row. Sorting that out is
+//!   `Transfer`, and it is somebody's decision.
 
 use rn_api::commands::Split;
 
@@ -58,6 +82,35 @@ const RELATIONS_AS_OBJECT: &str = "INSERT OR IGNORE INTO relation \
      (object_kind, object_id, relation, subject_kind, subject_id, granted_by, at) \
      SELECT 'person', $1, r.relation, r.subject_kind, r.subject_id, r.granted_by, $2 \
      FROM relation r WHERE r.object_kind = 'person' AND r.object_id = $3";
+
+/// Ownership moves back, for the resources the person this identity came from
+/// owned at the moment it was absorbed and the survivor still owns today.
+///
+/// The `#owner` relation row the merge left on the absorbed person is the
+/// record of what it owned; `COALESCE` is what lets one statement address both
+/// shapes of object, because a document's `#owner` row names its `resource`
+/// row and an organization's names its `party` row.
+const RESOURCES: &str = "UPDATE resource SET owner_party_id = $1 WHERE owner_party_id = $2 \
+     AND EXISTS (SELECT 1 FROM relation r WHERE r.relation = 'owner' \
+                   AND r.subject_kind = 'person' AND r.subject_id = $3 \
+                   AND r.object_kind = resource.kind \
+                   AND r.object_id = COALESCE( \
+                       (SELECT pr.party_id FROM party_resource pr \
+                         WHERE pr.resource_id = resource.id), resource.id))";
+
+/// And the survivor stops claiming to own what it no longer owns. Guarded on
+/// the column having actually moved, so it can only ever remove a row the
+/// statement above just contradicted.
+/// Parameters are numbered in the order they appear, because that is the order
+/// SQLite assigns `$n` names an index in: the survivor first, the new person
+/// second.
+const DROP_OWNER: &str = "DELETE FROM relation WHERE relation = 'owner' \
+       AND subject_kind = 'person' AND subject_id = $1 \
+       AND EXISTS (SELECT 1 FROM resource res WHERE res.owner_party_id = $2 \
+                     AND res.kind = relation.object_kind \
+                     AND relation.object_id = COALESCE( \
+                         (SELECT pr.party_id FROM party_resource pr \
+                           WHERE pr.resource_id = res.id), res.id))";
 
 /// The identity's own sessions follow it. Everyone else's stay where they are.
 const SESSIONS: &str =
@@ -150,6 +203,11 @@ pub async fn split<S: Sql, F: Feed>(ctx: &Ctx<'_, S, F>, args: &Split) -> Outcom
         for sql in [MEMBERSHIPS, RELATIONS_AS_SUBJECT, RELATIONS_AS_OBJECT] {
             batch.any(sql, vec![fresh.clone(), Value::from(now), source.clone()]);
         }
+        batch.any(
+            RESOURCES,
+            vec![fresh.clone(), Value::from(person), source.clone()],
+        );
+        batch.any(DROP_OWNER, vec![Value::from(person), fresh.clone()]);
         batch.any(
             SESSIONS,
             vec![fresh.clone(), Value::from(identity), Value::from(person)],

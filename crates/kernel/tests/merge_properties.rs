@@ -8,15 +8,18 @@
 //! do not need a thousand cases to fail when they are wrong.
 
 use proptest::prelude::*;
-use rn_api::commands::{ConfirmMatch, MatchSignal, Split};
+use rn_api::commands::{ConfirmMatch, CreateDocument, MatchSignal, Split, Transfer};
 use rn_kernel::domain::Vocabulary;
 use rn_kernel::error::KernelError;
 use rn_kernel::event::Event;
-use rn_kernel::ids::{Id, Identity, MatchCandidate, Person};
+use rn_kernel::ids::{Id, Identity, MatchCandidate, Person, Resource};
 use rn_kernel::merge::{self, candidate};
+use rn_kernel::principal::Principal;
+use rn_kernel::relation::{self, Object, Page, Relation};
+use rn_kernel::resource::kinds;
 use rn_kernel::store::{Count, Cursor, FromRow, Reads, RowError, Value};
 use rn_kernel::testing::{Local, Registered};
-use rn_kernel::{bind, principal};
+use rn_kernel::{bind, cmd, principal};
 
 fn block<F: std::future::Future>(future: F) -> F::Output {
     tokio::runtime::Builder::new_current_thread()
@@ -364,5 +367,302 @@ async fn no_table_outside_the_kernel_references_a_person() {
         ],
         "a table outside the kernel now references a party: product rows \
          reference an identity, never a person"
+    );
+}
+
+// ------------------------------------------------- ownership and the person --
+
+/// A document owned by whoever is acting, and its resource id.
+async fn document(harness: &Local, owner: &Principal, title: &str) -> Id<Resource> {
+    let committed = cmd::create_document(
+        &harness.ctx(owner.clone()),
+        &CreateDocument {
+            title: title.to_owned(),
+            body: String::new(),
+            owner: None,
+        },
+    )
+    .await
+    .expect("the owner may create a document");
+    let Event::DocumentCreated { document, .. } = committed.event else {
+        panic!("creating a document produces a create-document event");
+    };
+    document
+}
+
+/// The party on the resource row.
+async fn owner_of(harness: &Local, resource: Id<Resource>) -> i64 {
+    let rows: Vec<Count> = harness
+        .store()
+        .query(
+            "SELECT owner_party_id AS n FROM resource WHERE id = $1",
+            bind![resource],
+        )
+        .await
+        .expect("query runs");
+    rows[0].0
+}
+
+/// The `#owner` relation rows on a document, as the person ids that hold them.
+async fn owner_rows(harness: &Local, resource: Id<Resource>) -> Vec<String> {
+    rows(
+        harness,
+        "SELECT subject_kind || ':' || subject_id AS t FROM relation \
+         WHERE object_kind = 'document' AND object_id = $1 AND relation = 'owner' ORDER BY t",
+        bind![resource],
+    )
+    .await
+}
+
+/// Merge two self-registered people, the way a person proves it themselves.
+async fn merge_them(harness: &Local, first: &Registered, second: &Registered) {
+    let (a, _) = who(first);
+    let (b, _) = who(second);
+    let candidate = queue(harness, a, b, MatchSignal::NameAndGroup).await;
+    let signed_in = principal::resolve(harness.store(), &first.token)
+        .await
+        .expect("resolves");
+    merge::confirm_match(
+        &harness.ctx(signed_in.principal),
+        &ConfirmMatch {
+            candidate: candidate.public(harness.store().ids()),
+            other_session: Some(second.token.expose().to_owned()),
+        },
+    )
+    .await
+    .expect("two live sessions are proof");
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(4))]
+
+    /// Ownership follows the person.
+    ///
+    /// After a merge the survivor is not merely *allowed* to reach what the
+    /// absorbed person owned — it owns it. The two ways that has to show are
+    /// the two a caller ever sees: `list_visible` returns the rows, and
+    /// `check(survivor, owner, r)` answers yes. They are asserted separately
+    /// because they read different things — the `resource` column and the
+    /// `#owner` relation row — and a merge that moved one without the other
+    /// would pass whichever half somebody happened to write.
+    #[test]
+    fn a_merged_persons_resources_are_owned_by_the_survivor(
+        mine in 0usize..3,
+        theirs in 1usize..3,
+    ) {
+        block(async move {
+            let harness = Local::new();
+            let first = harness.register("Ronit", "owns-a@example.test").await.expect("registers");
+            let second = harness.register("Ronit", "owns-b@example.test").await.expect("registers");
+            let (_, person_a) = who(&first);
+            let (_, person_b) = who(&second);
+
+            let mut all = Vec::new();
+            for n in 0..mine {
+                all.push(document(&harness, &first.principal, &format!("mine {n}")).await);
+            }
+            let mut absorbed = Vec::new();
+            for n in 0..theirs {
+                absorbed.push(document(&harness, &second.principal, &format!("theirs {n}")).await);
+            }
+            for doc in &absorbed {
+                prop_assert_eq!(owner_of(&harness, *doc).await, person_b.get());
+            }
+            all.extend(absorbed.iter().copied());
+
+            merge_them(&harness, &first, &second).await;
+
+            // The column moved.
+            for doc in &all {
+                prop_assert_eq!(
+                    owner_of(&harness, *doc).await,
+                    person_a.get(),
+                    "a resource is still owned by a party nobody can act as"
+                );
+            }
+
+            // And both read paths agree with it.
+            let signed_in = principal::resolve(harness.store(), &first.token)
+                .await
+                .expect("resolves");
+            let subjects = principal::expand(harness.store(), &signed_in.principal)
+                .await
+                .expect("expands");
+            let listed = relation::list_visible(
+                harness.store(),
+                &subjects,
+                kinds::DOCUMENT,
+                Page::first(50),
+            )
+            .await
+            .expect("lists");
+            let seen: std::collections::BTreeSet<i64> =
+                listed.iter().map(|row| row.id.get()).collect();
+            for doc in &all {
+                prop_assert!(seen.contains(&doc.get()), "list_visible lost a merged resource");
+                prop_assert!(
+                    relation::check(
+                        harness.store(),
+                        &subjects,
+                        Relation::Owner,
+                        Object::document(*doc),
+                    )
+                    .await
+                    .expect("checks"),
+                    "the survivor does not hold #owner on a resource it owns"
+                );
+            }
+            Ok(())
+        })?;
+    }
+}
+
+/// What a split gives back of ownership, and what it leaves alone.
+///
+/// Three resources, three fates: the one the absorbed person owned goes back,
+/// the one the survivor owned all along stays, and the one the survivor
+/// transferred on while the merge stood stays with whoever holds it now. The
+/// last is the interesting one — a split undoes a merge, not every decision
+/// taken while it stood.
+#[tokio::test]
+async fn a_split_hands_back_the_resources_the_person_arrived_owning() {
+    let harness = Local::new();
+    let first = harness
+        .register("Ronit", "split-owner-a@example.test")
+        .await
+        .expect("registers");
+    let second = harness
+        .register("Ronit", "split-owner-b@example.test")
+        .await
+        .expect("registers");
+    let third = harness
+        .register("Abeer", "split-owner-c@example.test")
+        .await
+        .expect("registers");
+    let (_, person_a) = who(&first);
+    let (b, person_b) = who(&second);
+    let (_, person_c) = who(&third);
+
+    let ours = document(&harness, &first.principal, "the survivor's own").await;
+    let theirs = document(&harness, &second.principal, "brought to the merge").await;
+    let moved_on = document(&harness, &second.principal, "transferred away after").await;
+
+    merge_them(&harness, &first, &second).await;
+    assert_eq!(owner_of(&harness, theirs).await, person_a.get());
+
+    // While the merge stands, the survivor hands one of them on. That is a
+    // decision somebody took, and the split must not reverse it.
+    let signed_in = principal::resolve(harness.store(), &first.token)
+        .await
+        .expect("resolves");
+    cmd::transfer(
+        &harness.ctx(signed_in.principal.clone()),
+        &Transfer {
+            resource: moved_on.public(harness.store().ids()),
+            to: person_c.public(harness.store().ids()),
+        },
+    )
+    .await
+    .expect("the owner may transfer");
+
+    let committed = merge::split(
+        &harness.ctx(signed_in.principal),
+        &Split {
+            identity: b.public(harness.store().ids()),
+            evidence: "merged in error".into(),
+        },
+    )
+    .await
+    .expect("splits");
+    let Event::PersonSplit { person: fresh, .. } = committed.event else {
+        panic!("a split produces a split event");
+    };
+
+    assert_eq!(
+        owner_of(&harness, theirs).await,
+        fresh.get(),
+        "the resource the identity arrived owning did not go back"
+    );
+    let mut expected = vec![
+        // The absorbed person's own row, which the merge kept as the record of
+        // what it held — and which is how the split found this resource.
+        format!("person:{}", person_b.get()),
+        format!("person:{}", fresh.get()),
+    ];
+    expected.sort();
+    assert_eq!(
+        owner_rows(&harness, theirs).await,
+        expected,
+        "the survivor still claims to own what it handed back"
+    );
+    assert_eq!(
+        owner_of(&harness, ours).await,
+        person_a.get(),
+        "the survivor's own resource followed the split"
+    );
+    assert_eq!(
+        owner_of(&harness, moved_on).await,
+        person_c.get(),
+        "a split reversed a transfer taken while the merge stood"
+    );
+}
+
+/// The limit the module doc states, said as a test: attribution is per
+/// *person*, never per identity.
+///
+/// A person made of two identities is absorbed. Splitting one of them out
+/// hands that one everything the former person owned, including what the
+/// other identity brought, because nothing in the schema records which
+/// identity of a party created a resource — `resource.owner_party_id` names a
+/// party and that is the whole of it. Sorting the rest out is `Transfer`.
+#[tokio::test]
+async fn a_split_cannot_tell_which_identity_of_a_person_brought_a_resource() {
+    let harness = Local::new();
+    let anchor = harness
+        .register("Ronit", "attr-anchor@example.test")
+        .await
+        .expect("registers");
+    let left = harness
+        .register("Ronit", "attr-left@example.test")
+        .await
+        .expect("registers");
+    let right = harness
+        .register("Ronit", "attr-right@example.test")
+        .await
+        .expect("registers");
+
+    let from_left = document(&harness, &left.principal, "left brought this").await;
+    let from_right = document(&harness, &right.principal, "right brought this").await;
+
+    // Two identities become one person, and that person is then absorbed.
+    merge_them(&harness, &left, &right).await;
+    merge_them(&harness, &anchor, &left).await;
+
+    let (_, person_anchor) = who(&anchor);
+    assert_eq!(owner_of(&harness, from_left).await, person_anchor.get());
+    assert_eq!(owner_of(&harness, from_right).await, person_anchor.get());
+
+    let (right_identity, _) = who(&right);
+    let signed_in = principal::resolve(harness.store(), &anchor.token)
+        .await
+        .expect("resolves");
+    let committed = merge::split(
+        &harness.ctx(signed_in.principal),
+        &Split {
+            identity: right_identity.public(harness.store().ids()),
+            evidence: "the right-hand registration was not me".into(),
+        },
+    )
+    .await
+    .expect("splits");
+    let Event::PersonSplit { person: fresh, .. } = committed.event else {
+        panic!("a split produces a split event");
+    };
+
+    assert_eq!(owner_of(&harness, from_right).await, fresh.get());
+    assert_eq!(
+        owner_of(&harness, from_left).await,
+        fresh.get(),
+        "attribution is per person: the split takes everything that person owned"
     );
 }

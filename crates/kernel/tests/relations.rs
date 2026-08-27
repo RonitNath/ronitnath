@@ -308,7 +308,9 @@ proptest! {
         })?;
     }
 
-    /// Nothing but `Transfer` moves `resource.owner_party_id`.
+    /// No command but `Transfer` moves `resource.owner_party_id`. (Merge and
+    /// `Split` move it too, but they change which party a person *is* rather
+    /// than who the owner is; `tests/merge_properties.rs` holds that pair.)
     #[test]
     fn transfer_is_the_only_command_that_changes_an_owner(
         role in doc_role(),

@@ -1,10 +1,16 @@
-//! `Transfer` — the only way `resource.owner_party_id` ever changes.
+//! `Transfer` — the only *command* that changes who owns a resource.
 //!
 //! That claim is worth stating precisely, because it is the invariant a
-//! proptest asserts over random command sequences: no other statement in this
-//! crate writes that column, and the schema's trigger refuses a group as its
-//! value on insert *and* on update, so "groups are granted, never owners"
-//! survives this command too.
+//! proptest asserts over random command sequences: no other command writes
+//! that column, and the schema's trigger refuses a group as its value on
+//! insert *and* on update, so "groups are granted, never owners" survives this
+//! command too.
+//!
+//! The one other statement in the crate that writes `owner_party_id` is
+//! [`merge`](crate::merge), and it is not an exception to the rule so much as
+//! a different question: a merge does not change the owner, it changes which
+//! party *is* that person. `Split` moves the column back the same way. Both
+//! move the `#owner` relation row with it, exactly as this command does.
 //!
 //! Four statements, one guard. The resource's current owner is the guard, so a
 //! transfer that raced another transfer writes nothing rather than overwriting
