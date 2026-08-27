@@ -6,6 +6,8 @@
 #   tools/cluster.sh kill <n>     stop one node, leaving the other two
 #   tools/cluster.sh stop         stop everything and remove the state
 #
+# The binary is the release build — see cmd_start.
+#
 # This is a real three-voter raft cluster, not three unrelated processes: they
 # share the peer map and the secrets, so killing one proves the quorum survives
 # and killing two proves writes refuse. What it is not is production — one host,
@@ -24,7 +26,7 @@ root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 cd "$root"
 
 run_dir=${RN_SITE_CLUSTER_DIR:-$root/target/cluster}
-binary=$root/target/debug/rn-site
+binary=$root/target/release/rn-site
 nodes=(1 2 3)
 
 # The peer map every node agrees on. Loopback throughout: see the header.
@@ -104,7 +106,11 @@ wait_for_ready() {
 
 cmd_start() {
     log "building rn-site"
-    CARGO_BUILD_JOBS=${CARGO_BUILD_JOBS:-4} cargo build --quiet -p rn-site
+    # `--release`, and not for speed's sake: the budgets in the kernel report
+    # are microseconds of released code, so a debug binary measured against
+    # them produces a table of failures about the compiler. The script named
+    # in the gate manifest as the resilience harness builds what ships.
+    CARGO_BUILD_JOBS=${CARGO_BUILD_JOBS:-4} cargo build --quiet --release -p rn-site
     mkdir -p "$run_dir"
     for id in "${nodes[@]}"; do
         start_node "$id"

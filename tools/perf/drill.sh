@@ -4,6 +4,7 @@
 #   tools/perf/drill.sh                 two rounds, into docs/perf/<today>/
 #   tools/perf/drill.sh --rounds 1      one
 #   tools/perf/drill.sh --keep          leave the cluster up afterwards
+#   tools/perf/drill.sh --label x       write to docs/perf/x/ rather than today
 #
 # The three claims under test, in the order the plan states them:
 #
@@ -26,19 +27,21 @@ rounds=2
 seconds=150
 keep=0
 documents=${RN_PERF_DRILL_DOCUMENTS:-500}
+label=
 work=$root/target/perf
-out=$root/docs/perf/$(date +%F)
 
 while [ $# -gt 0 ]; do
     case "$1" in
         --rounds) rounds=$2; shift 2 ;;
         --seconds) seconds=$2; shift 2 ;;
         --documents) documents=$2; shift 2 ;;
+        --label) label=$2; shift 2 ;;
         --keep) keep=1; shift ;;
         *) echo "unknown option $1" >&2; exit 2 ;;
     esac
 done
 
+out=$root/docs/perf/${label:-$(date +%F)}
 mkdir -p "$out" "$work"
 perf=$root/tools/perf/target/release/rn-perf
 log() { printf '==> %s\n' "$*"; }
@@ -63,7 +66,7 @@ cleanup() {
 trap cleanup EXIT
 
 log "building the server and the harness"
-CARGO_BUILD_JOBS=${CARGO_BUILD_JOBS:-4} cargo build --quiet -p rn-site
+CARGO_BUILD_JOBS=${CARGO_BUILD_JOBS:-4} cargo build --quiet --release -p rn-site
 (cd tools/perf && CARGO_BUILD_JOBS=${CARGO_BUILD_JOBS:-4} cargo build --quiet --release)
 
 if [ -z "$(readyz 1)" ]; then

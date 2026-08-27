@@ -62,10 +62,12 @@ jobs:
             # the release suite (tools/perf/run.sh, docs/perf/<date>.md).
             cargo bench -p rn-kernel -- --quick --noplot
             # Every shell script in the repository, not only the deploy ones:
-            # tools/cluster.sh and tools/seed.sh are how the resilience and
-            # perf drills run, and a syntax error in one of them is found at
-            # the worst possible moment otherwise.
-            bash -n deploy/*.sh tools/*.sh
+            # tools/cluster.sh, tools/seed.sh and the two harnesses under
+            # tools/perf are how the resilience and perf drills run, and a
+            # syntax error in one of them is found at the worst possible
+            # moment otherwise. The perf scripts are their own glob because
+            # `tools/*.sh` does not descend.
+            bash -n deploy/*.sh tools/*.sh tools/perf/*.sh
             # Structure limits (procedures/engineering.md): 200 lines for a
             # composition root, 600 for anything else.
             tools/size-gate.sh

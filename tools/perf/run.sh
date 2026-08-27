@@ -20,14 +20,13 @@
 #     at, so a reader can see the condition rather than trust it.
 #   * the world is seeded through the real API. See tools/perf/src/seed.rs.
 #
-# One thing this script sets and `tools/cluster.sh` does not: the dev profile's
-# optimization level. cluster.sh builds `cargo build -p rn-site`, which is the
-# dev profile, which is `opt-level = 0` with debug assertions on — and the
-# budgets in the kernel report are microseconds of *released* code. Measuring
-# an unoptimized binary against them would produce a table of failures that say
-# nothing about the product. So the profile is raised through the environment
-# rather than by editing a file this leg does not own; `--as-shipped 0` turns
-# it off, for anyone who wants to see what the debug tax actually is.
+# The binary under test is the release build, and it is `tools/cluster.sh` that
+# builds it. This script used to raise the dev profile's optimization level
+# through the environment because cluster.sh built `opt-level = 0`; it does not
+# any more, and neither does this. What is measured is what ships.
+#
+# `--label <name>` puts the evidence in `docs/perf/<name>/` instead of today's
+# date, which is how a second run on the same day does not overwrite the first.
 #
 # The flame graphs come from a separate single-node server started *by* samply
 # (`--samply`, default on): attaching to a running process needs root on macOS,
@@ -47,7 +46,7 @@ node=127.0.0.1:3161
 samply_node=127.0.0.1:3164
 keep=0
 do_samply=1
-optimized=1
+label=
 load_ceiling=${RN_PERF_LOAD_CEILING:-4}
 quiet_budget=${RN_PERF_QUIET_BUDGET:-5400}
 
@@ -59,13 +58,12 @@ while [ $# -gt 0 ]; do
         --workers) workers=$2; shift 2 ;;
         --keep) keep=1; shift ;;
         --no-samply) do_samply=0; shift ;;
-        --as-shipped) optimized=$2; shift 2 ;;
+        --label) label=$2; shift 2 ;;
         *) echo "unknown option $1" >&2; exit 2 ;;
     esac
 done
 
-date_stamp=$(date +%F)
-out=$root/docs/perf/$date_stamp
+out=$root/docs/perf/${label:-$(date +%F)}
 work=$root/target/perf
 mkdir -p "$out" "$work"
 
@@ -176,14 +174,8 @@ for bundle in starscape app-member app-org app-platform; do
     fi
 done
 
-if [ "$optimized" -eq 1 ]; then
-    export CARGO_PROFILE_DEV_OPT_LEVEL=3
-    export CARGO_PROFILE_DEV_DEBUG_ASSERTIONS=false
-    export CARGO_PROFILE_DEV_OVERFLOW_CHECKS=false
-fi
-
 log "building the server and the harness"
-CARGO_BUILD_JOBS=${CARGO_BUILD_JOBS:-4} cargo build --quiet -p rn-site
+CARGO_BUILD_JOBS=${CARGO_BUILD_JOBS:-4} cargo build --quiet --release -p rn-site
 (cd tools/perf && CARGO_BUILD_JOBS=${CARGO_BUILD_JOBS:-4} cargo build --quiet --release)
 perf=$root/tools/perf/target/release/rn-perf
 
@@ -199,8 +191,7 @@ perf=$root/tools/perf/target/release/rn-perf
     printf 'rustc:    %s\n' "$(rustc --version)"
     printf 'oha:      %s\n' "$(oha --version)"
     printf 'samply:   %s\n' "$(samply --version 2>/dev/null || echo absent)"
-    printf 'server:   dev profile, opt-level %s, debug assertions %s\n' \
-        "${CARGO_PROFILE_DEV_OPT_LEVEL:-0}" "${CARGO_PROFILE_DEV_DEBUG_ASSERTIONS:-true}"
+    printf 'server:   release profile (tools/cluster.sh)\n'
     printf 'load ceiling: %s (one-minute average; three idle voters sit above zero)\n' \
         "$load_ceiling"
     printf 'seed:     %s documents, %s subscribers, %s commit workers\n' \
@@ -297,7 +288,7 @@ if [ "$do_samply" -eq 1 ] && command -v samply >/dev/null 2>&1; then
     RUST_LOG=warn \
         samply record --save-only --profile-name rn-site \
             -o "$out/flamegraph-whoami-and-commit.json.gz" \
-            -- "$root/target/debug/rn-site" > "$work/samply-node/rn-site.log" 2>&1 &
+            -- "$root/target/release/rn-site" > "$work/samply-node/rn-site.log" 2>&1 &
     samply_pid=$!
 
     for _ in $(seq 90); do
@@ -329,7 +320,7 @@ if [ "$do_samply" -eq 1 ] && command -v samply >/dev/null 2>&1; then
 
     if command -v python3 >/dev/null 2>&1; then
         python3 tools/perf/hot-frames.py "$out/flamegraph-whoami-and-commit.json.gz" \
-            --binary "$root/target/debug/rn-site" --top 25 \
+            --binary "$root/target/release/rn-site" --top 25 \
             > "$out/hot-frames.txt" 2>&1 || true
         log "hot frames at $out/hot-frames.txt"
     fi
