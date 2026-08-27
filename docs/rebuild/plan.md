@@ -12,8 +12,13 @@ files its brief names.
 
 Users: a visitor (anonymous, reads the landing and public pages); a member
 (any signed-in person: `/app`); an organization operator (`/org`); a platform
-operator (`/platform`, audience of one today). Recurring jobs: session expiry
-sweep, observation drain (last_seen, match scanning), change-feed retention.
+operator (`/platform`, audience of one today). Recurring jobs, all on the
+observation lane (`kernel::observe`, started by `server::observe::spawn`):
+the last_seen drain, match scanning, and two bounded expiry sweeps — sessions
+and links. There is **no change-feed retention job**, because in this cut the
+change feed *is* the audit table: pruning it would delete the record. Retention
+by cursor horizon arrives with the commitlog state machine (rung 7), which is
+the first thing here that has a log separate from the audit.
 
 Authoritative data and actions = the kernel commands: Register, SignIn,
 SignOut, RevokeSession, ActAs, AddFactor, RemoveFactor, VerifyEmail, CreateOrganization,
@@ -115,14 +120,25 @@ proposed|confirmed|rejected`. A status no command produces does not exist.
   acting_as: {kind, public_id, display}, tiers: [member|org|platform],
   organizations: [{public_id, display, role}], session_expires_at }`. Never emails,
   never internal ids, never roles beyond what the chrome renders.
-- `POST /api/cmd/<name>` JSON body `{ key: <idempotency uuid>, ...args }` →
-  `200 { offset, result }` | `409` replayed key with a different body |
-  `403/404` uniform decline. Same-origin enforced via `Sec-Fetch-Site`
-  (never Origin equality — see memory `no-referrer makes Origin null`).
-- `GET /api/q/<name>?…` → JSON; cacheable `private, no-store`; a query handler
-  receives a `ReadStore` type that has no `execute` — the "nothing reachable
-  from a GET writes" rule is enforced by the type system, and a test asserts
-  `ReadStore` exposes no mutating method.
+- `POST /api/cmd/<name>` JSON body `{ key: <idempotency uuid>, after?:
+  <offset>, ...args }` → `200 { offset, result }` | `409` replayed key with a
+  different body | `422 { invalid: [{ field, message }] }` for a malformed
+  request, which is the one refusal that may be specific because it describes
+  what the caller itself sent | `503` uniform decline when this node passed
+  its deadline (`http::COMMAND_DEADLINE`) — a timed-out command is *undecided*,
+  which is what the key is for | `403/404` uniform decline for everything
+  else. `after` is the read-your-writes barrier: the offset the caller has
+  already been shown, which this node waits to reach before reading anything.
+  A caller that cannot carry an envelope — the `/auth` form posts — sends it
+  as `x-rn-after` and reads it back off `x-rn-offset`. Same-origin enforced via
+  `Sec-Fetch-Site` (never Origin equality — see memory `no-referrer makes
+  Origin null`).
+- `GET /api/q/<name>?…` → JSON, `Cache-Control: private, no-store` — the
+  response carries session-shaped state, so it is private to one reader and
+  not stored, including by the browser's own bfcache. A query handler receives
+  a `ReadStore` type that has no `execute` — the "nothing reachable from a GET
+  writes" rule is enforced by the type system, and a test asserts `ReadStore`
+  exposes no mutating method.
 - `WS /api/sub` — client sends `{ subscribe: [<query name + params>], from: <offset> }`;
   server sends `{ offset, query, diff: [{op: put|del, key, row}] }` derived from the
   change feed, plus `{ resync }` after a release mismatch; heartbeat 25 s.
@@ -135,21 +151,25 @@ proposed|confirmed|rejected`. A status no command produces does not exist.
 
 ## Gate manifest
 
-| invariant | command | suite |
-|---|---|---|
-| format / lint | `cargo fmt --check`; `cargo clippy --workspace --all-targets -- -D warnings` | fast |
-| kernel contract | `cargo test -p rn-kernel` (unit + proptest: check nesting, merge idempotence, no group owner, no weak-signal merge, id round-trip/forgery rejection) | fast |
-| no full scan | `cargo test -p rn-kernel explain_` — every hot query under `EXPLAIN QUERY PLAN` asserts its index | fast |
-| route/auth matrix | `cargo test -p rn-site` — every route × {anonymous, member, org operator, platform operator, authenticated-unauthorized, bearer} | fast |
-| negative space | `cargo test -p rn-site negative_space` — `/manage`, `/api/realtime`, `/pkg/*`, `/auth/*` GET-only SSR islands are 404; no `manage`/`capability`/`resource_grants` symbol in the tree (`rg` in a test) | fast |
-| GET never writes | type-level (`ReadStore`) + `cargo test -p rn-site read_store_has_no_execute` | fast |
-| bundles build | `trunk build --release` for each bundle; `cargo check --target wasm32-unknown-unknown -p rn-ui -p rn-app -p rn-org -p rn-platform -p rn-starscape` | fast |
-| size gates | `tools/size-gate.sh` (≤200 root, warn 350, fail 600) | fast |
-| golden flows | `end2end/` playwright: register → org → group → invite → claim (second browser) → share doc → live diff arrives; merge two self-registered identities; operator ruling; revoke session kills the other tab | release |
-| visual | agent-browser screenshots of every SPA route and askama page, both themes, 1440 and 390 wide, viewed | release |
-| performance | `cargo bench -p rn-kernel` against budgets in the kernel report; `tools/perf/run.sh` (oha + samply on a 3-node local cluster) → `docs/perf/<date>.md` | release |
-| resilience | `tools/cluster.sh` 3 nodes; kill one, commits continue; kill two, writes refuse; restart, converges | release |
-| release build | Containerfile builds; `/readyz` reports version; CI workflow runs the fast suite | release |
+Every row is evidenced in `docs/rebuild/review.md` (leg R1, 2026-08-27): the
+exact command that was run, its output, and — where a row could not be run on
+the reviewer's machine — why.
+
+| invariant | command | suite | evidence |
+|---|---|---|---|
+| format / lint | `cargo fmt --check`; `cargo clippy --workspace --all-targets -- -D warnings` | fast | review.md §Acceptance |
+| kernel contract | `cargo test -p rn-kernel` (unit + proptest: check nesting, merge idempotence, no group owner, no weak-signal merge, id round-trip/forgery rejection) | fast | review.md §Acceptance, §Model conformance |
+| no full scan | `cargo test -p rn-kernel --test explain` — every hot query under `EXPLAIN QUERY PLAN` asserts its index | fast | review.md §Acceptance |
+| route/auth matrix | `cargo test -p rn-site` — every route × {anonymous, member, org operator, platform operator, authenticated-unauthorized, bearer} | fast | review.md §Trust boundaries |
+| negative space | `cargo test -p rn-site negative_space` — `/manage`, `/api/realtime`, `/pkg/*`, `/metrics`, `/dev-dashboard` are 404 for anonymous *and* signed-in; no `manage`/`capability`/`resource_grants` symbol in the tree (`rg` in a test, scoped to `crates/server/src` — the tree-wide check is review.md's) | fast | review.md §Negative space |
+| GET never writes | type-level (`ReadStore`) + `cargo test -p rn-site read_store_has_no_execute` | fast | review.md §Negative space |
+| bundles build | `trunk build --release` for each bundle; `cargo check --target wasm32-unknown-unknown -p rn-api -p rn-ui -p rn-app -p rn-org -p rn-platform -p rn-starscape` | fast | review.md §Acceptance |
+| size gates | `tools/size-gate.sh` (≤200 root, warn 350, fail 600) | fast | review.md §Size gates |
+| golden flows | `end2end/` playwright, `--workers=1 --project=chromium` against a node seeded by `tools/seed.sh`: register → org → group → invite → claim (second browser) → share doc → live diff arrives; merge two self-registered identities; operator ruling; revoke session kills the other tab | release | review.md §Golden flows |
+| visual | agent-browser screenshots of every SPA route and askama page, both themes, 1440 and 390 wide, viewed | release | review.md §Visual conformance |
+| performance | `cargo bench -p rn-kernel` against budgets in the kernel report; `tools/perf/run.sh` (oha + samply on a 3-node local cluster) → `docs/perf/<date>.md` | release | `docs/perf/2026-08-27.md`, `docs/perf/2026-08-27-f5.md`; verified against their raw evidence in review.md §Performance |
+| resilience | `tools/cluster.sh` 3 nodes; kill one, commits continue; kill two, writes refuse with the uniform decline (`503`, bounded by `http::COMMAND_DEADLINE`); restart, converges | release | `docs/perf/2026-08-27-f5/drill-{1,2}.txt`; read in review.md §Resilience |
+| release build | Containerfile builds; `/readyz` reports version; CI workflow runs the fast suite | release | review.md §Release build — not runnable in the review worktree |
 
 ## Ladder — bounded legs
 
