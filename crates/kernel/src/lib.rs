@@ -55,6 +55,7 @@ pub mod oidc;
 pub mod org;
 pub mod password;
 pub mod principal;
+pub mod product;
 pub mod relation;
 pub mod resource;
 pub mod store;
