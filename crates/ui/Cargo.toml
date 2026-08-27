@@ -5,3 +5,42 @@ edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 publish.workspace = true
+
+[dependencies]
+rn-api = { workspace = true }
+leptos = { workspace = true, features = ["csr"] }
+leptos_router = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+uuid = { workspace = true }
+thiserror = { workspace = true }
+gloo-net = { workspace = true }
+console_error_panic_hook = { workspace = true }
+futures-util = { workspace = true }
+wasm-bindgen = { workspace = true }
+wasm-bindgen-futures = { workspace = true }
+js-sys = { workspace = true }
+web-sys = { workspace = true, features = [
+    "Storage",
+    "Window",
+    "Document",
+    "Element",
+    "HtmlElement",
+    "HtmlInputElement",
+    "HtmlSelectElement",
+    "KeyboardEvent",
+    "MediaQueryList",
+    "RequestCredentials",
+    "RequestMode",
+] }
+
+# The fixture server is a native dev tool: it must never be pulled into a wasm
+# build, so its dependencies are gated on the target rather than the example.
+[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
+axum = { workspace = true }
+tokio = { workspace = true }
+serde_json = { workspace = true }
+
+[[example]]
+name = "fixture"
+path = "examples/fixture.rs"
