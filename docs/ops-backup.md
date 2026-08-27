@@ -172,7 +172,7 @@ deployment it was carried to.
 ## Operating it
 
 ```sh
-tools/ephemeral.sh backup                 # into target/ephemeral/backups/<stamp>/
+tools/ephemeral.sh backup                 # into target/backups/<stamp>/
 tools/ephemeral.sh backup /tmp/somewhere
 tools/ephemeral.sh restore /tmp/somewhere # wipes first; a restore is a formation act
 ```

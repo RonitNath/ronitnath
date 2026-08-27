@@ -234,7 +234,11 @@ cmd_admin() {
 # Stop, walk the database out, and leave it stopped: whoever asked for a
 # backup is in the middle of something.
 cmd_backup() {
-    local dir=${1:-$state/backups/$(date -u +%Y%m%dT%H%M%SZ)}
+    # Under `target/backups/`, deliberately *not* under `target/ephemeral/`:
+    # `restore` wipes the state directory before it puts anything back, and a
+    # default that put backups inside it would destroy the backup it was
+    # reading on the second round trip.
+    local dir=${1:-$root/target/backups/$(date -u +%Y%m%dT%H%M%SZ)}
     cmd_stop
     mkdir -p "$dir"
     cmd_admin backup "$dir"
