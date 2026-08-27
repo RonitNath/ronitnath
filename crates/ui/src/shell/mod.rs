@@ -12,7 +12,6 @@ use leptos::html::Button;
 use leptos::prelude::*;
 use leptos::task::spawn_local;
 use leptos_router::components::{A, Router};
-use leptos_router::hooks::use_location;
 
 use rn_api::{Tier, Whoami};
 
@@ -78,7 +77,6 @@ pub fn Shell(
             who.set(Some(whoami));
         }
     });
-    theme::set(theme::current());
 
     view! {
         <Router base=tier_base(tier)>
@@ -96,7 +94,6 @@ fn Chrome(tier: Tier, nav: &'static [NavItem], children: Children) -> impl IntoV
     let who = use_whoami();
     let open = RwSignal::new(false);
     let trigger = NodeRef::<Button>::new();
-    let location = use_location();
 
     // Closing always returns focus to the control that opened the drawer.
     let close = move || {
@@ -115,14 +112,6 @@ fn Chrome(tier: Tier, nav: &'static [NavItem], children: Children) -> impl IntoV
     });
 
     let base = tier_base(tier);
-    let here = move || {
-        let path = location.pathname.get();
-        nav.iter()
-            .filter(|item| path == format!("{base}{}", item.path))
-            .map(|item| item.label)
-            .next()
-            .unwrap_or_else(|| tier_label(tier))
-    };
 
     let links = nav
         .iter()
@@ -177,7 +166,7 @@ fn Chrome(tier: Tier, nav: &'static [NavItem], children: Children) -> impl IntoV
                 >
                     "Sections"
                 </button>
-                <span class="where">{here}</span>
+                <span class="where">{tier_label(tier)}</span>
             </header>
             <nav class="rail" aria-label="Sections">
                 <div class="rail-identity">{identity}</div>

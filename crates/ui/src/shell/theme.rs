@@ -64,6 +64,10 @@ pub fn current() -> Mode {
 }
 
 /// Put `mode` on the document and remember it.
+///
+/// Only a deliberate choice calls this. Until someone makes one, nothing is
+/// stored and nothing is stamped on the document, so `color-scheme: light dark`
+/// keeps following the operating system.
 pub fn set(mode: Mode) {
     if let Some(root) = document().document_element() {
         let _ = root.set_attribute("data-theme", mode.as_str());
@@ -88,9 +92,15 @@ fn stored() -> Option<Mode> {
 #[component]
 pub fn ThemeToggle() -> impl IntoView {
     let mode = RwSignal::new(current());
-    Effect::new(move |_| set(mode.get()));
     view! {
-        <button type="button" on:click=move |_| mode.update(|m| *m = m.other())>
+        <button
+            type="button"
+            on:click=move |_| {
+                let next = mode.get_untracked().other();
+                set(next);
+                mode.set(next);
+            }
+        >
             {move || match mode.get().other() {
                 Mode::Light => "Light",
                 Mode::Dark => "Dark",

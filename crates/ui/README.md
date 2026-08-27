@@ -9,12 +9,13 @@ every bundle's `index.html` and embedded by the askama pages.
 Two terminals, from the repo root:
 
 ```sh
-cargo run -p rn-ui --example fixture                  # the API, on :3199
-cd crates/app-member && trunk serve \
-  --proxy-backend=http://127.0.0.1:3199/api --proxy-ws  # the bundle, on :8080
+cargo run -p rn-ui --example fixture                        # the API, on :3199
+cd crates/app-member && trunk serve --public-url / --serve-base /
 ```
 
 Then open `http://127.0.0.1:8080/app` (`/org`, `/platform` in the other two
-crates). The fixture serves `fixtures/whoami.json`, answers `/api/q/<name>`
-from `fixtures/q/<name>.json`, echoes commands, and pushes one diff on
-`/api/sub` followed by heartbeats.
+crates). The proxies to the fixture live in each bundle's `Trunk.toml`; the two
+flags override the production `public_url` so trunk serves the app at the tier
+path instead of under `/app/pkg/`. The fixture serves `fixtures/whoami.json`,
+answers `/api/q/<name>` from `fixtures/q/<name>.json`, echoes commands, and
+pushes one diff on `/api/sub` followed by heartbeats.

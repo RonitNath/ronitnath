@@ -134,6 +134,7 @@ button,
 input,
 select,
 textarea {
+  accent-color: var(--accent);
   font: inherit;
   color: inherit;
   background: transparent;
@@ -227,7 +228,7 @@ textarea {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.6rem 0.9rem 0.1rem;
+  padding: 0.6rem 0.9rem;
   font-size: var(--text-1);
 }
 .rail-foot button {
@@ -269,6 +270,7 @@ textarea {
 }
 .topbar button {
   cursor: pointer;
+  font-size: var(--text-2);
   padding: 0.25rem 0.5rem;
   color: var(--fg-muted);
 }
@@ -333,13 +335,18 @@ textarea {
   background: var(--bg-muted);
   min-width: 12rem;
 }
+/* No native affordance beside our own: the filter clears by selecting it. */
+.table-tools input::-webkit-search-cancel-button,
+.table-tools input::-webkit-search-decoration {
+  appearance: none;
+  display: none;
+}
 .table-tools .count {
   color: var(--fg-subtle);
   font-size: var(--text-1);
   font-variant-numeric: tabular-nums;
 }
 .table-tools .pager {
-  margin-left: auto;
   display: flex;
   align-items: center;
   gap: 0.4rem;
@@ -442,8 +449,7 @@ textarea {
   gap: 0.5rem;
 }
 .field.toggle > label {
-  order: 2;
-  font-size: var(--text-3);
+  font-size: var(--text-2);
   color: var(--fg);
 }
 .field.toggle .note {

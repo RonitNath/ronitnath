@@ -3,5 +3,18 @@
 [build]
 public_url = "/org/pkg/"
 
+# `trunk serve --public-url / --serve-base /` overrides the production
+# public_url for development, so the app answers at /<tier> with the SPA
+# fallback trunk only applies under its serve base.
 [serve]
-serve_base = "/org"
+serve_base = "/"
+
+# The API comes from the fixture server (cargo run -p rn-ui --example fixture).
+# The socket is a separate entry because a websocket proxy cannot also carry
+# the JSON routes, and it goes first because trunk takes the longest match.
+[[proxies]]
+backend = "ws://127.0.0.1:3199/api/sub"
+ws = true
+
+[[proxies]]
+backend = "http://127.0.0.1:3199/api"
