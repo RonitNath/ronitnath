@@ -23,6 +23,7 @@
 use rn_api::commands::RemoveMember;
 
 use super::{Batch, Ctx, refs, run};
+use crate::authority::{self, Want};
 use crate::bind;
 use crate::error::{Outcome, decline};
 use crate::event::Committed;
@@ -51,18 +52,17 @@ pub async fn remove_member<S: Sql, F: Feed>(
         return decline();
     }
 
-    let Some(actor_role) = org::role_of(ctx.store, container, person).await? else {
-        return decline();
-    };
-    if !actor_role.covers(MemberRole::Admin) {
-        return decline();
-    }
+    let actor_role = org::role_of(ctx.store, container, person).await?;
     let Some(current) = org::role_of(ctx.store, container, target).await? else {
+        // Not a membership this container has. Not authorisation either: an
+        // operator cannot remove somebody who is not there.
         return decline();
     };
-    if !may_remove(actor_role, current) {
-        return decline();
-    }
+    authority::require(
+        ctx,
+        Want::Settled(actor_role.is_some_and(|held| may_remove(held, current))),
+    )
+    .await?;
     if current == MemberRole::Owner && org::owner_count(ctx.store, container).await? <= 1 {
         return decline();
     }

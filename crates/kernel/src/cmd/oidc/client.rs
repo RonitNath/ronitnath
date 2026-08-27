@@ -296,9 +296,8 @@ pub async fn delete_client<S: Sql, F: Feed>(
 ) -> Outcome<Committed> {
     let (identity, person, acting_as) = refs::actor(&ctx.principal)?;
     let client = client_of(ctx, args.client.as_str()).await?;
-    if !may_administer(ctx, person, &client).await? {
-        return decline();
-    }
+    let ordinary = may_administer(ctx, person, &client).await?;
+    crate::authority::require(ctx, crate::authority::Want::Settled(ordinary)).await?;
     let now = ctx.now();
 
     let Applied { committed, .. } = run(ctx, args, async || {
@@ -306,6 +305,23 @@ pub async fn delete_client<S: Sql, F: Feed>(
         batch.one(
             registry::DELETE_SQL,
             vec![Value::from(now), Value::from(client.id)],
+        );
+        // Immediately after the tombstone, because `changes()` is the *last*
+        // statement's count and the three cascades below are `any`: a client
+        // nobody had ever consented to deleted its grants, `changes()` read
+        // zero, and the audit row this command exists to write was skipped —
+        // reported to the caller as a guard miss on a delete that had in fact
+        // happened.
+        batch.one(
+            DELETE_AUDIT,
+            vec![
+                Value::from(ctx.key.to_string()),
+                Value::from(identity),
+                Value::from(acting_as),
+                Value::from(now),
+                Value::from(crate::audit::digest_of(args)),
+                Value::from(client.id),
+            ],
         );
         batch.any(
             registry::REVOKE_CLIENT_TOKENS_SQL,
@@ -318,17 +334,6 @@ pub async fn delete_client<S: Sql, F: Feed>(
         batch.any(
             registry::DELETE_CLIENT_GRANTS_SQL,
             vec![Value::from(client.id)],
-        );
-        batch.one(
-            DELETE_AUDIT,
-            vec![
-                Value::from(ctx.key.to_string()),
-                Value::from(identity),
-                Value::from(acting_as),
-                Value::from(now),
-                Value::from(crate::audit::digest_of(args)),
-                Value::from(client.id),
-            ],
         );
         Ok(batch)
     })

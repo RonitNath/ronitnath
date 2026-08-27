@@ -9,6 +9,7 @@ mod authority;
 mod documents;
 mod factors;
 mod identity;
+mod operator;
 mod orgs;
 mod sessions;
 mod sharing;

@@ -86,19 +86,30 @@ pub use verify_email::{mint_verification, verify_email};
 // route is reachable by one name.
 pub use crate::merge::{confirm_match, propose_match, rule_match, split};
 
+/// Whether a person holds `platform:* #operator`.
+///
+/// Re-exported under the name the tier checks outside this crate ask by. It is
+/// deliberately *not* how a command authorises itself any more: the eight
+/// open-coded calls that used to sit inside command modules are one clause of
+/// [`crate::authority::allows`] now, so that the eighteen commands that had no
+/// operator path could stop being eighteen separate omissions. What is left
+/// here is the read the server makes to decide whether to serve the
+/// `/platform` shell at all, which is a question about a bundle rather than
+/// about a write.
+pub use crate::authority::is_operator as is_platform_operator;
+
 use std::future::Future;
 
 use serde::Serialize;
 use uuid::Uuid;
 
 use crate::audit;
-use crate::bind;
 use crate::error::{KernelError, Outcome, decline};
 use crate::event::Committed;
 use crate::feed::Feed;
 use crate::ids::{Id, Identity, Person, Session};
 use crate::principal::Principal;
-use crate::store::{Count, Reads, Sql, Stmt, Store, StoreError, Value};
+use crate::store::{Sql, Stmt, Store, StoreError, Value};
 
 /// Everything a command needs that is not its own arguments.
 pub struct Ctx<'a, S: Sql, F: Feed> {
@@ -351,23 +362,4 @@ pub(crate) fn member(principal: &Principal) -> Outcome<(Id<Identity>, Id<Person>
         } => Ok((*identity, person.unwrap_or(*acting_as), *session)),
         Principal::Bearer { .. } | Principal::Anonymous => decline(),
     }
-}
-
-/// Whether a person holds `platform:* #operator`.
-///
-/// Platform administration is a relation, not a column and not a role enum —
-/// the kernel report's ruling, and the reason there is no `is_admin` anywhere
-/// in this crate. The row is written by an operator seeding it or by K2's
-/// `SetRole`; K1 only reads it, which is why the operator paths here are
-/// reachable and testable before that command exists.
-pub async fn is_platform_operator(store: &impl Reads, person: Id<Person>) -> Outcome<bool> {
-    let rows = store
-        .query::<Count>(
-            "SELECT count(*) AS n FROM relation \
-             WHERE object_kind = 'platform' AND object_id = 0 AND relation = 'operator' \
-               AND subject_kind = 'person' AND subject_id = $1",
-            bind![person],
-        )
-        .await?;
-    Ok(rows.first().is_some_and(|c| c.0 > 0))
 }

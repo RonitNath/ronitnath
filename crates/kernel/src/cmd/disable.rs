@@ -17,13 +17,14 @@ use rn_api::commands::Disable;
 
 use rn_api::ids::PublicId;
 
-use super::{Applied, Batch, Ctx, is_platform_operator, refs, run};
+use super::{Applied, Batch, Ctx, refs, run};
+use crate::authority::{self, Want};
 use crate::bind;
 use crate::error::{Outcome, decline};
 use crate::event::Committed;
 use crate::feed::Feed;
 use crate::ids::{self, Group, Id, Organization, Person};
-use crate::org::{self, MemberRole};
+use crate::org::MemberRole;
 use crate::resource;
 use crate::store::{Reads, Sql};
 
@@ -53,8 +54,8 @@ const SESSIONS: &str =
 
 /// Move a party to `disabled`.
 pub async fn disable<S: Sql, F: Feed>(ctx: &Ctx<'_, S, F>, args: &Disable) -> Outcome<Committed> {
-    let (identity, person, acting_as) = refs::actor(&ctx.principal)?;
-    let target = authorised(ctx, person, &args.party).await?;
+    let (identity, _person, acting_as) = refs::actor(&ctx.principal)?;
+    let target = authorised(ctx, &args.party).await?;
     let now = ctx.now();
     // Every relying party holding a token for this party. A disable ends every
     // session at once, so there is no single `sid` to name and the logout
@@ -98,29 +99,33 @@ pub async fn disable<S: Sql, F: Feed>(ctx: &Ctx<'_, S, F>, args: &Disable) -> Ou
 /// kind, one naming a row that is not there, and one this principal does not
 /// administer all decline identically — telling them apart is how a caller
 /// enumerates a deployment.
+///
+/// Each of the three kinds ends in [`authority::allows`], so the operator
+/// clause is the same sentence here as everywhere else rather than the
+/// hand-written `is_platform_operator` this file used to carry twice.
 pub(super) async fn authorised<S: Sql, F: Feed>(
     ctx: &Ctx<'_, S, F>,
-    acting_as: Id<Person>,
     named: &PublicId,
 ) -> Outcome<Id<Person>> {
     let key = ctx.store.ids();
     // A person: themselves, or an operator.
     if let Ok(person) = ids::decode::<Person>(key, named) {
-        return if acting_as == person || is_platform_operator(ctx.store, acting_as).await? {
-            Ok(person)
-        } else {
-            decline()
-        };
+        authority::require(ctx, Want::Themselves(person)).await?;
+        return Ok(person);
     }
     // An organization: its owner, or an operator. An organization is its own
     // root group, so the membership that says "owner" is on its own party id.
     if let Ok(organization) = ids::decode::<Organization>(key, named) {
         let party: Id<Person> = Id::new(organization.get());
-        return if owns_container(ctx, acting_as, party).await? {
-            Ok(party)
-        } else {
-            decline()
-        };
+        authority::require(
+            ctx,
+            Want::Role {
+                container: party,
+                role: MemberRole::Owner,
+            },
+        )
+        .await?;
+        return Ok(party);
     }
     // A group: whoever owns it. That is a person or an organization, and for
     // an organization the rule is the organization's own — its owner.
@@ -131,21 +136,18 @@ pub(super) async fn authorised<S: Sql, F: Feed>(
         return decline();
     };
     let party: Id<Person> = Id::new(group.get());
-    if acting_as == row.owner_party_id || owns_container(ctx, acting_as, row.owner_party_id).await?
+    let (_, person, _) = super::member(&ctx.principal)?;
+    if authority::allows(ctx, Want::Settled(person == row.owner_party_id)).await?
+        || authority::allows(
+            ctx,
+            Want::Role {
+                container: row.owner_party_id,
+                role: MemberRole::Owner,
+            },
+        )
+        .await?
     {
         return Ok(party);
     }
     decline()
-}
-
-/// Whether this person owns a container, or operates the platform.
-async fn owns_container<S: Sql, F: Feed>(
-    ctx: &Ctx<'_, S, F>,
-    acting_as: Id<Person>,
-    container: Id<Person>,
-) -> Outcome<bool> {
-    if org::role_of(ctx.store, container, acting_as).await? == Some(MemberRole::Owner) {
-        return Ok(true);
-    }
-    is_platform_operator(ctx.store, acting_as).await
 }

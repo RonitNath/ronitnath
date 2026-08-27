@@ -8,13 +8,14 @@
 use rn_api::commands::CreateDocument;
 
 use super::{Batch, Ctx, refs, run};
+use crate::authority::{self, Want};
 use crate::document::{self, BODY_LIMIT, FIRST_REV, TITLE_LIMIT};
 use crate::domain::{DEFAULT_ZONE, Vocabulary as _};
-use crate::error::{Invalid, Outcome, decline};
+use crate::error::{Invalid, Outcome};
 use crate::event::Committed;
 use crate::feed::Feed;
 use crate::ids::{Id, Person};
-use crate::org::{self, MemberRole};
+use crate::org::MemberRole;
 use crate::relation::{self, SubjectKind};
 use crate::resource;
 use crate::store::{Reads, Sql, Value};
@@ -56,9 +57,14 @@ pub async fn create_document<S: Sql, F: Feed>(
             let container: Id<Person> = Id::new(org.get());
             // Membership is enough to make something in an organization;
             // administering *who* is in it is the admin's job, not this one's.
-            if !org::holds(ctx.store, container, person, MemberRole::Member).await? {
-                return decline();
-            }
+            authority::require(
+                ctx,
+                Want::Role {
+                    container,
+                    role: MemberRole::Member,
+                },
+            )
+            .await?;
             (container, SubjectKind::Organization)
         }
         None => (person, SubjectKind::Person),

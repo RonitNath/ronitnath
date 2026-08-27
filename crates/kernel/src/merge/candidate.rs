@@ -13,8 +13,9 @@
 use rn_api::commands::{MatchSignal, ProposeMatch};
 
 use super::recovery::owned_identity;
+use crate::authority::{self, Want};
 use crate::bind;
-use crate::cmd::{Applied, Batch, Ctx, is_platform_operator, run};
+use crate::cmd::{Applied, Batch, Ctx, run};
 use crate::domain::Vocabulary;
 use crate::error::{Outcome, decline};
 use crate::event::Committed;
@@ -216,9 +217,7 @@ pub async fn propose_match<S: Sql, F: Feed>(
     let (identity, person, acting_as) = crate::cmd::refs::actor(&ctx.principal)?;
     let mine =
         owned_identity(ctx.store, person, a).await? || owned_identity(ctx.store, person, b).await?;
-    if !mine && !is_platform_operator(&ctx.store.reads(), person).await? {
-        return decline();
-    }
+    authority::require(ctx, Want::Settled(mine)).await?;
     let now = ctx.now();
 
     let Applied { committed, .. } = run(ctx, args, async || {

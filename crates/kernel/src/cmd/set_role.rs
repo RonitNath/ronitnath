@@ -14,6 +14,7 @@
 use rn_api::commands::SetRole;
 
 use super::{Batch, Ctx, refs, run};
+use crate::authority::{self, Want};
 use crate::bind;
 use crate::domain::Vocabulary as _;
 use crate::error::{Outcome, decline};
@@ -40,19 +41,23 @@ pub async fn set_role<S: Sql, F: Feed>(ctx: &Ctx<'_, S, F>, args: &SetRole) -> O
         return decline();
     }
 
-    let Some(actor_role) = org::role_of(ctx.store, container, person).await? else {
-        return decline();
-    };
-    if !actor_role.covers(MemberRole::Admin) {
-        return decline();
-    }
+    let actor_role = org::role_of(ctx.store, container, person).await?;
+    authority::require(
+        ctx,
+        Want::Settled(actor_role.is_some_and(|held| held.covers(MemberRole::Admin))),
+    )
+    .await?;
+    // The target's row is not authorisation — a member who is not there has
+    // no role to change, whoever is asking.
     let Some(current) = org::role_of(ctx.store, container, target).await? else {
         return decline();
     };
     if current == MemberRole::Owner {
-        if actor_role != MemberRole::Owner {
-            return decline();
-        }
+        // Only an owner demotes an owner, and an operator is the deployment's
+        // owner of last resort. The last-owner rule below is not
+        // authorisation and binds them too: a container with nobody to
+        // transfer it is not a thing an operator wants either.
+        authority::require(ctx, Want::Settled(actor_role == Some(MemberRole::Owner))).await?;
         if org::owner_count(ctx.store, container).await? <= 1 {
             return decline();
         }

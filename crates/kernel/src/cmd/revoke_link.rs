@@ -18,13 +18,14 @@
 
 use rn_api::commands::RevokeLink;
 
-use super::{Applied, Batch, Ctx, is_platform_operator, refs, run};
+use super::{Applied, Batch, Ctx, refs, run};
+use crate::authority::{self, Want};
 use crate::bind;
 use crate::error::{Outcome, decline};
 use crate::event::Committed;
 use crate::feed::Feed;
 use crate::ids::{self, Group, Id, Link};
-use crate::org::{self, MemberRole};
+use crate::org::MemberRole;
 use crate::store::{Cursor, FromRow, Reads, RowError, Sql};
 
 /// The container an unclaimed link grants into, and nothing else about it.
@@ -66,7 +67,7 @@ pub async fn revoke_link<S: Sql, F: Feed>(
     ctx: &Ctx<'_, S, F>,
     args: &RevokeLink,
 ) -> Outcome<Committed> {
-    let (identity, person, acting_as) = refs::actor(&ctx.principal)?;
+    let (identity, _person, acting_as) = refs::actor(&ctx.principal)?;
     let Ok(link) = ids::decode::<Link>(ctx.store.ids(), &args.link) else {
         return decline();
     };
@@ -76,11 +77,14 @@ pub async fn revoke_link<S: Sql, F: Feed>(
         return decline();
     };
     let party: Id<crate::ids::Person> = Id::new(container.get());
-    if !org::holds(ctx.store, party, person, MemberRole::Admin).await?
-        && !is_platform_operator(ctx.store, person).await?
-    {
-        return decline();
-    }
+    authority::require(
+        ctx,
+        Want::Role {
+            container: party,
+            role: MemberRole::Admin,
+        },
+    )
+    .await?;
     let now = ctx.now();
 
     let Applied { committed, .. } = run(ctx, args, async || {

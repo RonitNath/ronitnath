@@ -12,11 +12,12 @@
 use rn_api::commands::Invite;
 
 use super::{Batch, Ctx, Minted, refs, run};
+use crate::authority::{self, Want};
 use crate::domain::{Token, Vocabulary as _};
 use crate::error::{Outcome, decline};
 use crate::feed::Feed;
 use crate::invite::{self, MAX_TTL};
-use crate::org::{self, MemberRole};
+use crate::org::MemberRole;
 use crate::relation::{self, Object, SubjectKind};
 use crate::store::{Reads, Sql, Value};
 
@@ -36,16 +37,15 @@ pub async fn invite<S: Sql, F: Feed>(ctx: &Ctx<'_, S, F>, args: &Invite) -> Outc
     if role == MemberRole::Owner {
         return decline();
     }
-    if !org::holds(
-        ctx.store,
-        crate::ids::Id::new(container.get()),
-        person,
-        MemberRole::Admin,
+    let _ = person;
+    authority::require(
+        ctx,
+        Want::Role {
+            container: crate::ids::Id::new(container.get()),
+            role: MemberRole::Admin,
+        },
     )
-    .await?
-    {
-        return decline();
-    }
+    .await?;
 
     let now = ctx.now();
     // The caller's expiry, capped. An invitation that never runs out is a

@@ -28,8 +28,8 @@ const AUDIT: &str = "INSERT INTO audit \
 
 /// Move a disabled party back to `active`.
 pub async fn enable<S: Sql, F: Feed>(ctx: &Ctx<'_, S, F>, args: &Enable) -> Outcome<Committed> {
-    let (identity, person, acting_as) = refs::actor(&ctx.principal)?;
-    let target = authorised(ctx, person, &args.party).await?;
+    let (identity, _person, acting_as) = refs::actor(&ctx.principal)?;
+    let target = authorised(ctx, &args.party).await?;
     let now = ctx.now();
 
     let Applied { committed, .. } = run(ctx, args, async || {

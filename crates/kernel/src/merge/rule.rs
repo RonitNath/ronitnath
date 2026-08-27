@@ -17,8 +17,9 @@ use rn_api::commands::RuleMatch;
 
 use super::candidate::{self, CandidateStatus};
 use super::{LinkMethod, Plan, apply};
+use crate::authority::{self, Want};
 use crate::bind;
-use crate::cmd::{Applied, Batch, Ctx, is_platform_operator, run};
+use crate::cmd::{Applied, Batch, Ctx, run};
 use crate::error::{Invalid, Outcome, decline};
 use crate::event::Committed;
 use crate::feed::Feed;
@@ -75,9 +76,8 @@ pub async fn rule_match<S: Sql, F: Feed>(
     }
     // Platform administration is a relation, not a column: `platform:*
     // #operator @person`. An operator who loses the row loses the command.
-    if !is_platform_operator(&ctx.store.reads(), person).await? {
-        return decline();
-    }
+    let _ = person;
+    authority::require(ctx, Want::Platform).await?;
     let Ok(candidate) = ids::decode::<MatchCandidate>(ctx.store.ids(), &args.candidate) else {
         return decline();
     };
