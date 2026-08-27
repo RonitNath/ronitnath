@@ -94,9 +94,11 @@ fn serves_dev_sign_in(config: &AppConfig) -> bool {
 #[derive(Debug, Default)]
 struct Fields {
     display_name: String,
+    handle: String,
     email: String,
     error_display_name: String,
     error_email: String,
+    error_handle: String,
     error_password: String,
     error_form: String,
 }
@@ -159,6 +161,7 @@ impl AuthPage {
                 match field {
                     "display name" => fields.error_display_name = message,
                     "email" => fields.error_email = message,
+                    "handle" => fields.error_handle = message,
                     "password" => fields.error_password = message,
                     _ => fields.error_form = message,
                 }
@@ -202,6 +205,8 @@ struct RegisterForm {
     #[serde(default)]
     display_name: String,
     #[serde(default)]
+    handle: String,
+    #[serde(default)]
     email: String,
     #[serde(default)]
     password: String,
@@ -217,6 +222,14 @@ async fn register(
     let next = next::validate(form.next.as_deref());
     let args = Register {
         display_name: form.display_name.clone(),
+        // Empty means the reader let the prefill stand and their script did
+        // not run: the suggestion the field would have carried is the one the
+        // server uses, so a form that arrives without JavaScript registers.
+        handle: if form.handle.trim().is_empty() {
+            rn_kernel::oidc::handle::suggest(&form.email)
+        } else {
+            form.handle.clone()
+        },
         email: form.email.clone(),
         password: form.password,
     };
@@ -232,6 +245,7 @@ async fn register(
             // fields that are not secrets are, so a typo is a correction
             // rather than a retype.
             page.register.display_name = form.display_name;
+            page.register.handle = form.handle;
             page.register.email = form.email;
             let (status, page) = page.refuse(&error);
             (status, page).into_response()

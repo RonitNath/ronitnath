@@ -40,6 +40,15 @@ pub const CANARY: &str = "canary-8f3a1c9e-never-logged-never-echoed";
 /// ids for rows the reader may not address.
 pub const CANARY_ID_KEY: &str = "5ecbe7a11deadbeef0d1e5ca1ab1e999";
 
+/// The issuer every node in these suites answers as — `iss` exactly, and the
+/// origin every OpenID endpoint URL in the discovery document is built from.
+pub const PUBLIC_ORIGIN: &str = "http://127.0.0.1:3004";
+
+/// The key the OpenID Provider's signing keys are sealed under in these
+/// suites. Fixed rather than minted, so a key one case writes opens for the
+/// next; obviously not a deployment's.
+pub const OIDC_SEAL_KEY: &str = "0f0e0d0c0b0a090807060504030201000f0e0d0c0b0a09080706050403020100";
+
 /// The runtime every test in a binary shares.
 ///
 /// A `#[tokio::test]` builds and drops a runtime per test, and hiqlite's raft
@@ -143,6 +152,9 @@ async fn boot(
             static_dir: PathBuf::from("../../static"),
             id_key: Some(CANARY_ID_KEY.to_string()),
             bootstrap_operator_email,
+            public_origin: PUBLIC_ORIGIN.to_string(),
+            // Fixed, so a signing key one case writes opens for the next.
+            oidc_key: Some(OIDC_SEAL_KEY.to_string()),
             dev,
         };
         let migrations = Migrations::embedded::<rn_kernel::Migrations>()
@@ -178,6 +190,7 @@ pub async fn register(state: &AppState, display: &str, email: &str) -> Somebody 
         &ctx(state, Principal::Anonymous),
         &rn_api::commands::Register {
             display_name: display.to_owned(),
+            handle: rn_kernel::oidc::handle::fixture(email),
             email: email.to_owned(),
             password: PASSWORD.to_owned(),
         },
@@ -225,6 +238,7 @@ fn ctx(
     principal: Principal,
 ) -> Ctx<'_, hiqlite::Client, rn_kernel::feed::ClusterFeed> {
     Ctx {
+        provider: state.provider.as_ref(),
         store: state.store.as_ref(),
         feed: state.feed.as_ref(),
         principal,

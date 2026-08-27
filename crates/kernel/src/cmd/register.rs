@@ -20,8 +20,19 @@ use crate::feed::Feed;
 use crate::password;
 use crate::store::{Sql, Value};
 
-const PARTY: &str = "INSERT INTO party (kind, display_name, status, created_at) \
-                     VALUES ('person', $1, 'active', $2) RETURNING id";
+/// The handle is claimed here, and the two ways it can be taken are both
+/// refused by the database rather than by a read before the batch. A read
+/// would be a precondition outside the transaction — and, worse, it would run
+/// before [`run`] gets to answer a replayed idempotency key, which is how a
+/// retried registration turns into a refusal.
+///
+/// A live handle collides on `party_handle_unique_idx`; one a merge or a
+/// rename filed away is refused by this `WHERE NOT EXISTS`, which makes the
+/// whole batch write nothing and reads as the uniform decline.
+const PARTY: &str = "INSERT INTO party (kind, display_name, handle, status, created_at) \
+                     SELECT 'person', $1, $2, 'active', $3 \
+                     WHERE NOT EXISTS (SELECT 1 FROM party_handle_alias WHERE handle = $2) \
+                     RETURNING id";
 
 const IDENTITY: &str = "INSERT INTO identity (source, person_id, home_zone, status, created_at) \
                         VALUES ($1, $2, $3, 'active', $4) RETURNING id";
@@ -71,6 +82,11 @@ pub async fn register<S: Sql, F: Feed>(ctx: &Ctx<'_, S, F>, args: &Register) -> 
     if args.password.chars().count() < PASSWORD_MIN {
         return Err(Invalid::PasswordTooShort(PASSWORD_MIN).into());
     }
+    // The handle is chosen here and changeable by `SetHandle`. Its *shape* is
+    // an `Invalid` — the caller typed it — and a handle somebody already holds
+    // declines through the UNIQUE index in the batch, exactly as a registered
+    // address does: two different reasons for "no" that read the same.
+    let handle = crate::oidc::handle::validate(&args.handle)?;
 
     // Hashed once, outside the batch and off the reactor: argon2 is tens of
     // milliseconds, a retry must not pay for it twice, and no transaction is
@@ -83,7 +99,7 @@ pub async fn register<S: Sql, F: Feed>(ctx: &Ctx<'_, S, F>, args: &Register) -> 
 
     let applied = run(ctx, args, async || {
         let mut batch = Batch::new();
-        let party = batch.one(PARTY, bind![display_name, now]);
+        let party = batch.one(PARTY, bind![display_name, handle.as_str(), now]);
         let identity = batch.one(
             IDENTITY,
             vec![

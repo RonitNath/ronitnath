@@ -27,6 +27,11 @@ pub enum FactorKind {
 pub struct Register {
     /// How the new party is named in a UI.
     pub display_name: String,
+    /// The person's handle — their `preferred_username`, unique
+    /// deployment-wide, chosen here and changeable by `SetHandle`. The form
+    /// prefills it from the address's local part; it is the caller's either
+    /// way.
+    pub handle: String,
     /// The email factor, unverified until [`VerifyEmail`].
     pub email: String,
     /// The password factor, hashed before it is stored.
@@ -129,6 +134,7 @@ mod tests {
     fn identity_commands_round_trip() {
         round_trip(&Register {
             display_name: "Ronit".into(),
+            handle: "ronit".into(),
             email: "ronit@isoastra.com".into(),
             password: "hunter2".into(),
         });

@@ -130,6 +130,12 @@ pub struct Whoami {
     /// The human it resolved to, if it has been resolved.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub person: Option<PersonRef>,
+    /// The acting person's handle — what an RP reads as
+    /// `preferred_username`, and what the chrome shows so a reader can see
+    /// the name other sites will call them. Absent for a registration that
+    /// has not resolved to a person, which has nowhere to hold one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub handle: Option<String>,
     /// Who the principal is acting as: the person, or an organization.
     pub acting_as: PartyRef,
     /// Which bundles this principal may hold.
@@ -156,6 +162,7 @@ mod tests {
                 public_id: crate::testing::id("p_"),
                 display: "Ronit".into(),
             }),
+            handle: Some("ronit".into()),
             acting_as: PartyRef {
                 kind: PartyKind::Organization,
                 public_id: crate::testing::id("o_"),
@@ -180,9 +187,11 @@ mod tests {
     fn an_unresolved_identity_omits_the_person_entirely_and_is_named_by_a_mask() {
         let mut w = whoami();
         w.person = None;
+        w.handle = None;
         w.identity.display = "r…t@".into();
         let json = serde_json::to_value(&w).expect("serialises");
         assert!(json.get("person").is_none());
+        assert!(json.get("handle").is_none());
         assert_eq!(json["identity"]["display"], "r…t@");
         round_trip(&w);
     }

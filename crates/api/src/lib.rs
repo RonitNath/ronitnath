@@ -16,6 +16,7 @@ pub mod cluster;
 pub mod command;
 pub mod commands;
 pub mod ids;
+pub mod oidc;
 pub mod sub;
 pub mod whoami;
 
@@ -25,6 +26,7 @@ mod testing;
 pub use cluster::{ClusterView, RaftView, RaftViews};
 pub use command::{Command, CommandEnvelope, CommandReply, Decline};
 pub use ids::{IdKind, PublicId, PublicIdError};
+pub use oidc::{ClientAuthMethod, ClientMetadata, GrantType, Scope};
 pub use sub::{DiffOp, QueryRef, SubMessage, SubRequest};
 pub use whoami::{
     DocRole, IdentityRef, MemberRole, OrganizationRef, PartyKind, PartyRef, PersonRef, Tier, Whoami,

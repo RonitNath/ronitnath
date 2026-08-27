@@ -216,7 +216,7 @@ fn overview_touch(event: &Event, party: i64, mine: impl Fn(Id<Group>) -> bool) -
         {
             Touch::Set
         }
-        Event::PartyDisabled { party: it } | Event::PartyEnabled { party: it }
+        Event::PartyDisabled { party: it, .. } | Event::PartyEnabled { party: it }
             if it.get() == party =>
         {
             Touch::Set

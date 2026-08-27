@@ -42,11 +42,24 @@ const fn index(event: &Event) -> usize {
         Event::DocumentCreated { .. } => 26,
         Event::DocumentEdited { .. } => 27,
         Event::DocumentPublished { .. } => 28,
+        Event::HandleSet { .. } => 29,
+        Event::ClientRegistered { .. } => 30,
+        Event::ClientUpdated { .. } => 31,
+        Event::ClientSecretRotated { .. } => 32,
+        Event::ClientDeleted { .. } => 33,
+        Event::SigningKeyRotated { .. } => 34,
+        Event::Authorized { .. } => 35,
+        Event::CodeExchanged { .. } => 36,
+        Event::TokenRefreshed { .. } => 37,
+        Event::ServiceTokenIssued { .. } => 38,
+        Event::TokenRevoked { .. } => 39,
+        Event::ConsentRevoked { .. } => 40,
+        Event::SessionEnded { .. } => 41,
     }
 }
 
 /// How many there are. Stated once, asserted against both lists.
-const VARIANTS: usize = 29;
+const VARIANTS: usize = 42;
 
 /// One of each, with ids that are obviously placeholders.
 fn every_variant() -> Vec<Event> {
@@ -63,10 +76,12 @@ fn every_variant() -> Vec<Event> {
         Event::SignedOut {
             identity: Id::new(1),
             session: Id::new(1),
+            clients: vec![Id::new(1)],
         },
         Event::SessionRevoked {
             identity: Id::new(1),
             session: Id::new(1),
+            clients: Vec::new(),
         },
         Event::ActingAs {
             identity: Id::new(1),
@@ -86,7 +101,10 @@ fn every_variant() -> Vec<Event> {
             identity: Id::new(1),
             factor: Id::new(1),
         },
-        Event::PartyDisabled { party: Id::new(1) },
+        Event::PartyDisabled {
+            party: Id::new(1),
+            clients: Vec::new(),
+        },
         Event::PartyEnabled { party: Id::new(1) },
         Event::MatchProposed {
             candidate: Id::new(1),
@@ -170,6 +188,37 @@ fn every_variant() -> Vec<Event> {
             document: Id::new(1),
             rev: 1,
         },
+        Event::HandleSet { person: Id::new(1) },
+        Event::ClientRegistered {
+            client: Id::new(1),
+            owner: Some(Id::new(1)),
+        },
+        Event::ClientUpdated { client: Id::new(1) },
+        Event::ClientSecretRotated { client: Id::new(1) },
+        Event::ClientDeleted { client: Id::new(1) },
+        Event::SigningKeyRotated {
+            kid: "a-kid".to_owned(),
+        },
+        Event::Authorized {
+            client: Id::new(1),
+            person: Id::new(1),
+        },
+        Event::CodeExchanged { client: Id::new(1) },
+        Event::TokenRefreshed { client: Id::new(1) },
+        Event::ServiceTokenIssued {
+            client: Id::new(1),
+            service: Id::new(1),
+        },
+        Event::TokenRevoked { client: Id::new(1) },
+        Event::ConsentRevoked {
+            client: Id::new(1),
+            person: Id::new(1),
+        },
+        Event::SessionEnded {
+            identity: Id::new(1),
+            session: Id::new(1),
+            clients: vec![Id::new(2), Id::new(3)],
+        },
     ]
 }
 
@@ -225,7 +274,10 @@ fn an_event_says_whose_cached_resolution_it_invalidates() {
     assert_eq!(registered.touches_identity(), Some(Id::new(3)));
     assert_eq!(registered.touches_person(), Some(Id::new(2)));
 
-    let disabled = Event::PartyDisabled { party: Id::new(2) };
+    let disabled = Event::PartyDisabled {
+        party: Id::new(2),
+        clients: Vec::new(),
+    };
     assert_eq!(disabled.touches_identity(), None);
     assert_eq!(disabled.touches_person(), Some(Id::new(2)));
 }

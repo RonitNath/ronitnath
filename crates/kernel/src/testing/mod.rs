@@ -34,6 +34,9 @@ pub const TEST_PASSWORD: &str = "an obviously fake test password";
 pub struct Harness<S: Sql> {
     /// The change feed, which also owns the store.
     pub feed: LocalFeed<S>,
+    /// The issuer and sealing key the OpenID Provider's commands run under.
+    /// A fixture's, never a deployment's: the seal is minted per harness.
+    pub provider: crate::oidc::Provider,
 }
 
 /// The in-process harness: real SQLite, real migrations, no raft.
@@ -66,6 +69,7 @@ impl<S: Sql> Harness<S> {
     pub fn over(store: Store<S>) -> Self {
         Self {
             feed: LocalFeed::new(Arc::new(store)),
+            provider: crate::oidc::Provider::dev(),
         }
     }
 
@@ -89,6 +93,7 @@ impl<S: Sql> Harness<S> {
         Ctx {
             store: self.store(),
             feed: &self.feed,
+            provider: &self.provider,
             principal,
             key,
         }
@@ -107,6 +112,9 @@ impl<S: Sql> Harness<S> {
             &self.ctx(Principal::Anonymous),
             &rn_api::commands::Register {
                 display_name: display.to_owned(),
+                // Derived from the whole address, so two fixtures never
+                // collide on a handle the way two local parts would.
+                handle: crate::oidc::handle::fixture(email),
                 email: email.to_owned(),
                 password: TEST_PASSWORD.to_owned(),
             },

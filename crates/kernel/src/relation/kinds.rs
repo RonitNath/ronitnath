@@ -110,6 +110,18 @@ pub(super) const KERNEL_KINDS: &[Kind] = &[
         }],
     },
     Kind {
+        name: "oidc_client",
+        is_resource: false,
+        is_container: false,
+        admits: &[Admits {
+            // Consent. Only a person may hold it: a client is authorised by
+            // the human whose claims it will read, never by a group they
+            // happen to belong to.
+            relation: Relation::Authorized,
+            subjects: &[SubjectKind::Person],
+        }],
+    },
+    Kind {
         name: "platform",
         is_resource: false,
         is_container: false,

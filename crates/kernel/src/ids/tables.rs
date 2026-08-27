@@ -78,4 +78,13 @@ tables! {
     MatchCandidate = 0x9f2c_41d7_0000_0009, "match_candidate", IdKind::MatchCandidate;
     /// A bearer link. Claimed by its token, named by this.
     Link = 0x9f2c_41d7_0000_000a, "link", IdKind::Link;
+    /// A registered OpenID client. Its public id *is* its `client_id`.
+    OidcClient = 0x9f2c_41d7_0000_000b, "oidc_client", IdKind::OidcClient;
+    /// A signing key. No public form: a key is named by its `kid`, which is
+    /// what a JWT header carries and what an RP looks up in the JWKS.
+    OidcKey = 0x9f2c_41d7_0000_000c, "oidc_key";
+    /// An authorization code. Named by its secret and by nothing else.
+    OidcCode = 0x9f2c_41d7_0000_000d, "oidc_code";
+    /// An access or refresh token. The same.
+    OidcToken = 0x9f2c_41d7_0000_000e, "oidc_token";
 }

@@ -11,6 +11,11 @@ mod merge;
 mod org;
 mod resource;
 
+pub use crate::oidc::{
+    Authorize, ClientCredentials, DeleteClient, EndSession, ExchangeCode, RefreshToken,
+    RegisterClient, RevokeConsent, RevokeToken, RotateClientSecret, RotateSigningKey, SetHandle,
+    UpdateClient,
+};
 pub use identity::{
     ActAs, AddFactor, Disable, Enable, FactorKind, Register, RemoveFactor, RevokeSession, SignIn,
     SignOut, VerifyEmail,
@@ -66,6 +71,22 @@ command_names! {
     Split => "split",
     Disable => "disable",
     Enable => "enable",
+    // The OpenID Provider. The registry half is operator work; the protocol
+    // half carries its own credential, which is why it is a command like any
+    // other rather than a route with authority of its own.
+    SetHandle => "set-handle",
+    RegisterClient => "register-client",
+    UpdateClient => "update-client",
+    RotateClientSecret => "rotate-client-secret",
+    DeleteClient => "delete-client",
+    RotateSigningKey => "rotate-signing-key",
+    Authorize => "authorize",
+    ExchangeCode => "exchange-code",
+    RefreshToken => "refresh-token",
+    ClientCredentials => "client-credentials",
+    RevokeToken => "revoke-token",
+    RevokeConsent => "revoke-consent",
+    EndSession => "end-session",
 }
 
 #[cfg(test)]
@@ -75,7 +96,7 @@ mod tests {
     #[test]
     fn the_product_contract_is_covered_exactly_once() {
         // The list in docs/rebuild/plan.md §Product contract, verbatim.
-        assert_eq!(ALL_COMMAND_NAMES.len(), 28);
+        assert_eq!(ALL_COMMAND_NAMES.len(), 41);
         let mut sorted = ALL_COMMAND_NAMES.to_vec();
         sorted.sort_unstable();
         let count = sorted.len();

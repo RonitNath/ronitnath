@@ -110,6 +110,7 @@ proptest! {
                 &harness.ctx(Principal::Anonymous),
                 &Register {
                     display_name: "Ronit".into(),
+                    handle: "atomic".into(),
                     email: "atomic@example.test".into(),
                     password: TEST_PASSWORD.into(),
                 },

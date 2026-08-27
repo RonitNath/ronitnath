@@ -42,6 +42,12 @@ pub enum IdKind {
     Factor,
     /// `m_` — a match candidate awaiting proof.
     MatchCandidate,
+    /// `c_` — a registered OpenID Connect client.
+    ///
+    /// A client is named by this everywhere except at the OAuth endpoints,
+    /// where `client_id` is the same string: an RP holds one identifier, and
+    /// it is the one every other page shows.
+    OidcClient,
     /// `l_` — an invitation link.
     ///
     /// The id names the row, never the secret: a link is *claimed* by its
@@ -63,12 +69,13 @@ impl IdKind {
             Self::Session => "s_",
             Self::Factor => "f_",
             Self::MatchCandidate => "m_",
+            Self::OidcClient => "c_",
             Self::Link => "l_",
         }
     }
 
     /// Every kind, so a caller can exhaustively map prefixes without matching.
-    pub const ALL: [Self; 10] = [
+    pub const ALL: [Self; 11] = [
         Self::Person,
         Self::Identity,
         Self::Organization,
@@ -78,6 +85,7 @@ impl IdKind {
         Self::Session,
         Self::Factor,
         Self::MatchCandidate,
+        Self::OidcClient,
         Self::Link,
     ];
 }

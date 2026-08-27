@@ -39,6 +39,7 @@ mod prelude {
     pub(super) fn registration(email: &str) -> Register {
         Register {
             display_name: "Ronit".into(),
+            handle: crate::oidc::handle::fixture(email),
             email: email.into(),
             password: TEST_PASSWORD.into(),
         }

@@ -250,6 +250,8 @@ mod tests {
 
     fn cfg(mode: Mode, db_path: PathBuf) -> AppConfig {
         AppConfig {
+            public_origin: "http://127.0.0.1:3004".to_owned(),
+            oidc_key: Some("00".repeat(32)),
             mode,
             db_path,
             addr: "127.0.0.1:0".parse().unwrap(),

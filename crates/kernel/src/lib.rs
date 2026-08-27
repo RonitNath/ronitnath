@@ -49,6 +49,7 @@ pub mod ids;
 pub mod invite;
 pub mod merge;
 pub mod observe;
+pub mod oidc;
 pub mod org;
 pub mod password;
 pub mod principal;

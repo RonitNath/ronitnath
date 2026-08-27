@@ -47,6 +47,12 @@ pub enum Invalid {
     /// A factor kind the schema admits but no command in this cut produces.
     #[error("that factor kind is not accepted yet")]
     UnsupportedFactor,
+    /// A handle that is not 3–32 characters of lowercase letters, digits and
+    /// inner dashes. Specific, like every other [`Invalid`]: it describes the
+    /// shape of what the caller sent, and a form has to render it beside the
+    /// field.
+    #[error("a handle is 3-32 characters of a-z, 0-9 and dashes")]
+    BadHandle,
 }
 
 /// Everything a command returns instead of an event.

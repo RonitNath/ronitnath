@@ -39,6 +39,8 @@ fn with_env(pairs: &[(&str, &str)]) -> MutexGuard<'static, ()> {
 
 fn prod() -> AppConfig {
     AppConfig {
+        public_origin: "http://127.0.0.1:3004".to_owned(),
+        oidc_key: Some("00".repeat(32)),
         mode: Mode::Prod,
         db_path: PathBuf::from("/var/lib/rn-site/db.sqlite"),
         addr: "0.0.0.0:3160".parse().expect("a bind address"),
@@ -235,6 +237,8 @@ fn a_single_host_cluster_needs_the_declaration_the_harness_makes() {
 fn dev_needs_no_provisioning_at_all() {
     let _guard = with_env(&[]);
     let config = AppConfig {
+        public_origin: "http://127.0.0.1:3004".to_owned(),
+        oidc_key: Some("00".repeat(32)),
         mode: Mode::Dev,
         db_path: PathBuf::from("data/db.sqlite"),
         addr: "127.0.0.1:3004".parse().expect("a loopback address"),

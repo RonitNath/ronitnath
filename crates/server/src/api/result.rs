@@ -28,7 +28,7 @@
 use rn_api::PublicId;
 use rn_kernel::Event;
 use rn_kernel::domain::Vocabulary as _;
-use rn_kernel::ids::{Group, Id, IdKey, Organization, Person, Resource};
+use rn_kernel::ids::{Group, Id, IdKey, Organization, Person, Resource, Service};
 use serde_json::{Value, json};
 
 /// The `party` row an event names whose kind the event does not fix.
@@ -48,7 +48,7 @@ pub const fn ambiguous_party(event: &Event) -> Option<i64> {
         // A member may be a person, an organization or a group.
         Event::RoleSet { party, .. } => Some(party.get()),
         // Any party may be disabled, and the four kinds share no tag.
-        Event::PartyDisabled { party } | Event::PartyEnabled { party } => Some(party.get()),
+        Event::PartyDisabled { party, .. } | Event::PartyEnabled { party } => Some(party.get()),
         // A session may speak as a person or as an organization.
         Event::ActingAs { party, .. } => Some(party.get()),
         _ => None,
@@ -68,7 +68,9 @@ pub fn result_of(event: &Event, key: &IdKey, party: Option<PublicId>) -> Value {
             identity, person, ..
         } => json!({ "identity": identity.public(key), "person": person.public(key) }),
         Event::SignedIn { identity, .. } => json!({ "identity": identity.public(key) }),
-        Event::SignedOut { session, .. } | Event::SessionRevoked { session, .. } => {
+        Event::SignedOut { session, .. }
+        | Event::SessionRevoked { session, .. }
+        | Event::SessionEnded { session, .. } => {
             json!({ "session": session.public(key) })
         }
         Event::FactorAdded { factor, .. }
@@ -185,6 +187,33 @@ pub fn result_of(event: &Event, key: &IdKey, party: Option<PublicId>) -> Value {
         Event::DocumentEdited { document, rev } | Event::DocumentPublished { document, rev } => {
             json!({ "document": document.public(key), "rev": rev })
         }
+
+        // --- the OpenID Provider ------------------------------------------
+        // Never a secret. A code, an access token and a refresh token exist in
+        // the clear once, in the answer the `/oidc/*` endpoints build from the
+        // command's own return type — not here, which is a function of the
+        // event and would emit them at `/api/cmd/<name>` as well.
+        Event::HandleSet { person } => json!({ "person": person.public(key) }),
+        Event::ClientRegistered { client, owner } => json!({
+            "client": client.public(key),
+            "owner": owner.map(|owner| owner.public(key)),
+        }),
+        Event::ClientUpdated { client }
+        | Event::ClientSecretRotated { client }
+        | Event::ClientDeleted { client }
+        | Event::CodeExchanged { client }
+        | Event::TokenRefreshed { client }
+        | Event::TokenRevoked { client } => json!({ "client": client.public(key) }),
+        Event::Authorized { client, person } | Event::ConsentRevoked { client, person } => json!({
+            "client": client.public(key),
+            "person": person.public(key),
+        }),
+        Event::ServiceTokenIssued { client, service } => json!({
+            "client": client.public(key),
+            "service": Id::<Service>::new(service.get()).public(key),
+        }),
+        // The `kid` is public — it is what the JWKS publishes each key by.
+        Event::SigningKeyRotated { kid } => json!({ "kid": kid }),
     }
 }
 
@@ -200,6 +229,7 @@ fn object_id_of(kind: &str, id: i64, key: &IdKey) -> Value {
         "organization" => json!(Id::<Organization>::new(id).public(key)),
         "group" => json!(Id::<Group>::new(id).public(key)),
         "person" => json!(Id::<Person>::new(id).public(key)),
+        "oidc_client" => json!(Id::<rn_kernel::ids::OidcClient>::new(id).public(key)),
         _ => Value::Null,
     }
 }

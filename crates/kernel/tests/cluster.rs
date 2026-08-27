@@ -32,9 +32,11 @@ async fn a_registration_flows_through_raft_and_out_of_the_feed() {
     let store = node.store.clone();
     let mut wakes = Box::pin(feed.subscribe());
 
+    let provider = rn_kernel::oidc::Provider::dev();
     let ctx = |principal: Principal| Ctx {
         store: store.as_ref(),
         feed: &feed,
+        provider: &provider,
         principal,
         key: uuid::Uuid::new_v4(),
     };
@@ -45,6 +47,7 @@ async fn a_registration_flows_through_raft_and_out_of_the_feed() {
         &ctx(Principal::Anonymous),
         &rn_api::commands::Register {
             display_name: "Ronit".into(),
+            handle: "cluster".into(),
             email: "cluster@example.test".into(),
             password: TEST_PASSWORD.into(),
         },

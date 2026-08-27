@@ -44,6 +44,7 @@ pub fn field_of(invalid: &Invalid) -> &'static str {
         Invalid::NotAnEmail => "email",
         Invalid::PasswordTooShort(_) => "password",
         Invalid::UnsupportedFactor => "kind",
+        Invalid::BadHandle => "handle",
     }
 }
 
@@ -143,6 +144,7 @@ mod tests {
             (Invalid::NotAnEmail, "email"),
             (Invalid::PasswordTooShort(12), "password"),
             (Invalid::UnsupportedFactor, "kind"),
+            (Invalid::BadHandle, "handle"),
         ] {
             assert_eq!(field_of(&invalid), field);
         }

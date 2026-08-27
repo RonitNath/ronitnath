@@ -22,10 +22,12 @@ use axum::extract::{Path, State};
 use axum::response::{IntoResponse, Response};
 use axum::{Json, Router, routing::post};
 use rn_api::commands::{
-    ALL_COMMAND_NAMES, ActAs, AddFactor, ClaimLink, ConfirmMatch, CreateDocument, CreateGroup,
-    CreateOrganization, Disable, EditDocument, Enable, Invite, Leave, ProposeMatch,
-    PublishDocument, Register, RemoveFactor, RemoveMember, Revoke, RevokeLink, RevokeSession,
-    RuleMatch, SetRole, Share, SignIn, SignOut, Split, Transfer, VerifyEmail,
+    ALL_COMMAND_NAMES, ActAs, AddFactor, Authorize, ClaimLink, ClientCredentials, ConfirmMatch,
+    CreateDocument, CreateGroup, CreateOrganization, DeleteClient, Disable, EditDocument, Enable,
+    EndSession, ExchangeCode, Invite, Leave, ProposeMatch, PublishDocument, RefreshToken, Register,
+    RegisterClient, RemoveFactor, RemoveMember, Revoke, RevokeConsent, RevokeLink, RevokeSession,
+    RevokeToken, RotateClientSecret, RotateSigningKey, RuleMatch, SetHandle, SetRole, Share,
+    SignIn, SignOut, Split, Transfer, UpdateClient, VerifyEmail,
 };
 use rn_api::{Command, CommandEnvelope};
 use rn_kernel::Principal;
@@ -44,7 +46,15 @@ use rn_kernel::Offset;
 /// The kind says what the function returns and therefore what the reply does
 /// with the secret it minted: `plain` nothing, `minting` a new session cookie,
 /// `ending` the caller's own, `linking` a bearer link handed back in the reply
-/// body because a link has no other name.
+/// body because a link has no other name, and `quiet` a command that returns a
+/// secret this route deliberately drops.
+///
+/// `quiet` is the OpenID Provider's. `register-client` hands back a client
+/// secret, `authorize` a code, `exchange-code` and its neighbours a token
+/// pair — and every one of those is read only by the `/oidc/*` endpoint that
+/// called the kernel directly. Bound here, the reply is the event and nothing
+/// else, so the vocabulary stays one list without this route becoming a second
+/// way to mint an OpenID secret.
 macro_rules! bindings {
     ($($kind:ident $args:ty => $run:path),+ $(,)?) => {
         /// The command names this build executes. Everything else in
@@ -64,6 +74,7 @@ macro_rules! bindings {
                     let ctx = Ctx {
                         store: state.store.as_ref(),
                         feed: state.feed.as_ref(),
+                        provider: state.provider.as_ref(),
                         principal,
                         key: envelope.key,
                     };
@@ -81,6 +92,9 @@ macro_rules! bindings {
     };
     (@run linking $ctx:ident, $run:path, $args:expr) => {
         $run(&$ctx, &$args).await.map(Executed::linking).map_err(CommandError::Kernel)
+    };
+    (@run quiet $ctx:ident, $run:path, $args:expr) => {
+        $run(&$ctx, &$args).await.map(|out| Executed::of(out.committed)).map_err(CommandError::Kernel)
     };
     (@run ending $ctx:ident, $run:path, $args:expr) => {
         $run(&$ctx, &$args).await.map(Executed::ending).map_err(CommandError::Kernel)
@@ -116,6 +130,21 @@ bindings! {
     plain Split => cmd::split,
     plain Disable => cmd::disable,
     plain Enable => cmd::enable,
+    // The OpenID Provider.
+    plain SetHandle => cmd::set_handle,
+    quiet RegisterClient => cmd::register_client,
+    plain UpdateClient => cmd::update_client,
+    quiet RotateClientSecret => cmd::rotate_client_secret,
+    plain DeleteClient => cmd::delete_client,
+    plain RotateSigningKey => cmd::rotate_signing_key,
+    quiet Authorize => cmd::authorize,
+    quiet ExchangeCode => cmd::exchange_code,
+    quiet RefreshToken => cmd::refresh_token,
+    quiet ClientCredentials => cmd::client_credentials,
+    plain RevokeToken => cmd::revoke_token,
+    plain RevokeConsent => cmd::revoke_consent,
+    // The caller's own session is the one that ended, so the cookie goes too.
+    ending EndSession => cmd::end_session,
 }
 
 /// Run a command, on this handler's own task.

@@ -24,6 +24,7 @@ use crate::event::Committed;
 use crate::feed::Feed;
 use crate::ids;
 use crate::ids::{Id, Identity, Session};
+use crate::oidc::token as oidc;
 use crate::store::{Cursor, FromRow, Reads, RowError, Sql};
 
 /// Whose session it is. One indexed read by primary key, and also the check
@@ -36,7 +37,7 @@ const AUDIT: &str = "INSERT INTO audit \
                      (key, command, actor_identity_id, acting_as, at, request_digest, payload) \
                      SELECT $1, 'revoke-session', $2, $3, $4, $5, \
                             json_object('event', 'revoke-session', 'identity', $6, \
-                                        'session', $7) \
+                                        'session', $7, 'clients', json($8)) \
                      WHERE changes() > 0";
 
 struct Owner(Id<Identity>);
@@ -65,9 +66,13 @@ pub async fn revoke_session<S: Sql, F: Feed>(
         return decline();
     }
     let now = ctx.now();
+    let targets = oidc::logout_targets(&ctx.store.reads(), target).await?;
+    let clients = oidc::target_ids_json(&targets);
 
     let Applied { committed, .. } = run(ctx, args, async || {
         let mut batch = Batch::new();
+        batch.any(oidc::DELETE_SESSION_TOKENS_SQL, bind![target]);
+        batch.any(oidc::DELETE_SESSION_CODES_SQL, bind![target]);
         batch.one(DELETE, bind![target, whose]);
         batch.one(
             AUDIT,
@@ -78,7 +83,8 @@ pub async fn revoke_session<S: Sql, F: Feed>(
                 now,
                 crate::audit::digest_of(args),
                 whose,
-                target
+                target,
+                clients.as_str()
             ],
         );
         Ok(batch)

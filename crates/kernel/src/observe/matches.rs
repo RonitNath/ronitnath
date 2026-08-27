@@ -126,6 +126,7 @@ mod tests {
         );
         assert!(!queue.observe(&Event::PartyDisabled {
             party: Id::<Person>::new(1),
+            clients: Vec::new(),
         }));
         assert_eq!(queue.len(), 3);
     }

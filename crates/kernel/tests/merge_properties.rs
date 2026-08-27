@@ -362,6 +362,31 @@ async fn no_table_outside_the_kernel_references_a_person() {
             "identity.person_id",
             "membership.group_id",
             "membership.party_id",
+            // O1, the OpenID Provider. Every one of these is a *kernel*
+            // column and names a person on purpose, because what an OpenID
+            // client is told about is a human rather than a registration: the
+            // client it owns, the service party it speaks as, whose code and
+            // whose token, whose consent, and whose `sub`.
+            //
+            // Merging stays cheap all the same, and each one says how.
+            // `oidc_subject` is read through `person_alias`, so both subs
+            // resolve to the survivor without a row moving. A consent is a
+            // relation row, and merge unions those onto the survivor;
+            // `oidc_consent` is the scope attribute beside it, and an
+            // absorbed person's row not moving means the survivor is asked to
+            // consent again — the safe direction. A code and a token are
+            // bound to a *session*, and a session binds an identity, which is
+            // exactly what a merge leaves alone.
+            "oidc_client.owner_party_id",
+            "oidc_client.service_party_id",
+            "oidc_code.person_id",
+            "oidc_consent.person_id",
+            "oidc_subject.person_id",
+            "oidc_token.person_id",
+            "oidc_token.service_party_id",
+            // The handles a merge absorbed, which keep resolving to the
+            // survivor and stay unavailable to anybody else.
+            "party_handle_alias.person_id",
             // K2: the party row of an organization or group, bound to its resource.
             "party_resource.party_id",
             "person_alias.old_person_id",

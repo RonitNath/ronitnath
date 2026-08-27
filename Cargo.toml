@@ -89,6 +89,13 @@ getrandom = "0.4.3"
 sha2 = "0.11.0"
 aes = "0.9.2"
 base64 = "0.23.1"
+# The OpenID Provider's signing keys (RS256) and the sealing of their private
+# halves at rest. `rsa` carries its own `sha2` 0.10 and `rand_core` 0.6 — the
+# RustCrypto generation its trait bounds are written against — so both are
+# pinned here rather than borrowed from the lines above, which are 0.11/0.4.
+rsa = { version = "0.9.10", features = ["sha2"] }
+rand_core = { version = "0.6.4", features = ["getrandom"] }
+aes-gcm = "0.10.3"
 
 # Test and measurement.
 criterion = "0.8.2"

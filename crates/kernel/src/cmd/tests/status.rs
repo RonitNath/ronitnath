@@ -194,7 +194,8 @@ async fn an_organization_and_its_groups_are_disabled_by_their_owner_and_by_nobod
     assert_eq!(
         committed.event,
         Event::PartyDisabled {
-            party: ids::Id::new(org.get())
+            party: ids::Id::new(org.get()),
+            clients: Vec::new(),
         }
     );
 

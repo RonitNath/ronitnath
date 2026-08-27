@@ -29,6 +29,9 @@ argon2 = { workspace = true }
 base64 = { workspace = true }
 getrandom = { workspace = true }
 sha2 = { workspace = true }
+rsa = { workspace = true }
+rand_core = { workspace = true }
+aes-gcm = { workspace = true }
 
 # The test harness is public — a benchmark is a separate crate and an
 # integration test that built its own fixtures would be proving a second

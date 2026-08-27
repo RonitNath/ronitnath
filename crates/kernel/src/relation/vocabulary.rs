@@ -39,6 +39,12 @@ pub enum Relation {
     Contact,
     /// Platform administration, held as `platform:* #operator @person`.
     Operator,
+    /// A person has authorised an OpenID client, held as
+    /// `oidc_client:X #authorized @person:Y`. Consent is a grant like any
+    /// other, so "has this person authorised this client" is `check()` and
+    /// not a second authorisation path; the *scopes* they agreed to are the
+    /// attribute `oidc_consent` carries, read only after `check()` said yes.
+    Authorized,
 }
 
 impl Relation {
@@ -52,6 +58,7 @@ impl Relation {
         Self::Admin,
         Self::Contact,
         Self::Operator,
+        Self::Authorized,
     ];
 
     /// The word the row stores.
@@ -65,6 +72,7 @@ impl Relation {
             Self::Admin => "admin",
             Self::Contact => "contact",
             Self::Operator => "operator",
+            Self::Authorized => "authorized",
         }
     }
 
@@ -87,6 +95,7 @@ impl Relation {
             Self::Owner => (Ladder::Both, 3),
             Self::Contact => (Ladder::Contact, 0),
             Self::Operator => (Ladder::Operator, 0),
+            Self::Authorized => (Ladder::Authorized, 0),
         }
     }
 
@@ -115,6 +124,9 @@ enum Ladder {
     Contact,
     /// operator, alone.
     Operator,
+    /// authorized, alone. Consent nests with nothing: agreeing to one client
+    /// says nothing about any other, and there is no stronger word than it.
+    Authorized,
 }
 
 impl Ladder {
@@ -125,6 +137,7 @@ impl Ladder {
                 | (Self::Membership, Self::Membership)
                 | (Self::Contact, Self::Contact)
                 | (Self::Operator, Self::Operator)
+                | (Self::Authorized, Self::Authorized)
                 | (Self::Both, Self::Both | Self::Document | Self::Membership)
         )
     }

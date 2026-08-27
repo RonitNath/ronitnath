@@ -71,6 +71,21 @@
         {% endif %}
       </div>
 
+      {#- The handle: what other sites will call this person
+          (`preferred_username`). Prefilled from the address's local part
+          below, and only until the reader touches it; a form that arrives
+          with it empty gets the same suggestion from the server, so this
+          registers without JavaScript. -#}
+      <div class="field">
+        <label for="register-handle">Handle</label>
+        <input id="register-handle" name="handle" type="text" spellcheck="false"
+               autocapitalize="none" autocorrect="off" autocomplete="off"
+               pattern="[a-z0-9\-]{3,32}" value="{{ register.handle }}">
+        {% if !register.error_handle.is_empty() %}
+        <p class="note" data-state="invalid">{{ register.error_handle }}</p>
+        {% endif %}
+      </div>
+
       <div class="field">
         <label for="register-password">Password</label>
         <input id="register-password" name="password" type="password"
@@ -90,4 +105,22 @@
       it sits here and is named by the button's `form=` attribute. -#}
   {{ dev_form|safe }}
 </main>
+<script type="module">
+  const email = document.getElementById("register-email");
+  const handle = document.getElementById("register-handle");
+  if (email && handle) {
+    // Only while the reader has not chosen one themselves.
+    let owned = handle.value.length > 0;
+    handle.addEventListener("input", () => { owned = true; });
+    email.addEventListener("input", () => {
+      if (owned) return;
+      handle.value = email.value
+        .split("@")[0]
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "")
+        .slice(0, 32);
+    });
+  }
+</script>
 {% endblock %}

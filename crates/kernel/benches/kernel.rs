@@ -158,6 +158,7 @@ fn principal(c: &mut Criterion) {
 fn registration(n: u32) -> Register {
     Register {
         display_name: "Ronit".into(),
+        handle: format!("bench-{n}"),
         email: format!("bench-{n}@example.test"),
         password: TEST_PASSWORD.into(),
     }
@@ -209,9 +210,11 @@ fn commit_on_a_node(c: &mut Criterion) {
     let store = node.store.clone();
     let mut n = 0u32;
 
+    let provider = rn_kernel::oidc::Provider::dev();
     let ctx = |key: uuid::Uuid| cmd::Ctx {
         store: store.as_ref(),
         feed: &feed,
+        provider: &provider,
         principal: Principal::Anonymous,
         key,
     };

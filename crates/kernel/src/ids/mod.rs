@@ -38,8 +38,8 @@ mod tables;
 mod tests;
 
 pub use tables::{
-    Factor, Group, Identity, Link, MatchCandidate, Organization, Person, Public, Resource, Service,
-    Session, Table,
+    Factor, Group, Identity, Link, MatchCandidate, OidcClient, OidcCode, OidcKey, OidcToken,
+    Organization, Person, Public, Resource, Service, Session, Table,
 };
 
 /// Width of the AES block the id occupies, and of the ciphertext.

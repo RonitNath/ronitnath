@@ -13,6 +13,7 @@ use hiqlite::Client;
 use rn_kernel::feed::ClusterFeed;
 use rn_kernel::ids::IdKey;
 use rn_kernel::observe::{Matches, Observations};
+use rn_kernel::oidc::Provider;
 use rn_kernel::principal::PrincipalCache;
 use rn_kernel::store::{Clock, Store};
 
@@ -36,6 +37,10 @@ pub struct AppState {
     pub store: Arc<Store<Client>>,
     /// The change feed. Commands notify it; `/api/sub` subscribes to it.
     pub feed: Arc<ClusterFeed>,
+    /// The OpenID Provider's deployment facts: this deployment's issuer and
+    /// the key its signing keys are sealed under. One per process, because
+    /// `iss` is one string and a second one would be a second issuer.
+    pub provider: Arc<Provider>,
     /// Resolved cookies, kept warm and invalidated from the feed.
     pub principals: Arc<PrincipalCache>,
     /// The observation lane: `last_seen`, drained on a timer, never on a read.
@@ -78,9 +83,11 @@ impl AppState {
         // A revoked session must stop working, not merely stop being renewed.
         // The feed is the witness that says when (`sub::invalidate`).
         crate::sub::invalidate::spawn(Arc::clone(&feed), Arc::clone(&principals));
+        let provider = Arc::new(config.provider());
         Self {
             db,
             config: Arc::new(config),
+            provider,
             version: release_version().into(),
             node: node_name().into(),
             store,

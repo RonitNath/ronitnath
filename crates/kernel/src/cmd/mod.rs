@@ -33,6 +33,7 @@ mod edit_document;
 mod enable;
 mod invite;
 mod leave;
+pub(crate) mod oidc;
 mod publish_document;
 pub(crate) mod refs;
 mod register;
@@ -61,6 +62,11 @@ pub use edit_document::edit_document;
 pub use enable::enable;
 pub use invite::invite;
 pub use leave::leave;
+pub use oidc::{
+    Authorized, Granted, Issued, Registered, authorize, client_credentials, delete_client,
+    end_session, exchange_code, refresh_token, register_client, revoke_consent, revoke_token,
+    rotate_client_secret, rotate_signing_key, set_handle, update_client,
+};
 pub use publish_document::publish_document;
 pub use register::register;
 pub use remove_factor::remove_factor;
@@ -100,6 +106,9 @@ pub struct Ctx<'a, S: Sql, F: Feed> {
     pub store: &'a Store<S>,
     /// The change feed, notified after the commit.
     pub feed: &'a F,
+    /// This deployment's issuer and signing-key seal — what the OpenID
+    /// Provider's commands need and no other command reads.
+    pub provider: &'a crate::oidc::Provider,
     /// Who is asking.
     pub principal: Principal,
     /// The caller's idempotency key.

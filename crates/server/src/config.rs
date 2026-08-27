@@ -57,6 +57,29 @@ pub struct AppConfig {
     /// the same grant, taken by the running process (see [`crate::bootstrap`]).
     #[serde(default)]
     pub bootstrap_operator_email: Option<String>,
+    /// This deployment's public origin — the scheme, host and port a reader
+    /// types, with no trailing slash.
+    ///
+    /// It is the OpenID Provider's `iss`, *exactly*: every relying party
+    /// compares it byte for byte, and every endpoint URL in the discovery
+    /// document is built from it. Required in production for that reason —
+    /// a deployment that guessed its own name would issue tokens nobody
+    /// accepts — and loopback in dev, which is where `just run-dev` serves.
+    #[serde(default = "default_public_origin")]
+    pub public_origin: String,
+    /// The key the OpenID Provider's signing keys are sealed under at rest,
+    /// 64 lowercase hex characters (an AES-256 key).
+    ///
+    /// Not the id key, and deliberately a second variable: the id key names
+    /// rows, and this one forges identity. One secret that did both would be
+    /// one leak that did both. `RN_SITE__OIDC_KEY_FILE` names a file holding
+    /// it, the same contract the id key and the raft secrets already use.
+    ///
+    /// Required in prod. In dev an ephemeral one is minted per process, which
+    /// means the signing keys already in the database will not open — so a dev
+    /// process rotates a fresh one on demand and the JWKS changes per boot,
+    /// which is what a disposable-dev database is.
+    pub oidc_key: Option<String>,
     /// Whether this process serves the developer sign-in bypass
     /// (`RN_SITE__DEV=1`, and `crates/server/src/auth/dev.rs`).
     ///
@@ -91,6 +114,7 @@ impl AppConfig {
             .set_default("addr", "127.0.0.1:3004")?
             .set_default("static_dir", "static")?
             .set_default("dev", false)?
+            .set_default("public_origin", default_public_origin())?
             .add_source(config::File::with_name(&path).required(false))
             .add_source(
                 config::Environment::with_prefix("RN_SITE")
@@ -102,11 +126,38 @@ impl AppConfig {
         if let Some(from_file) = id_key_file()? {
             loaded.id_key = Some(from_file);
         }
+        if let Some(from_file) = secret_file("RN_SITE__OIDC_KEY_FILE")? {
+            loaded.oidc_key = Some(from_file);
+        }
+        loaded.public_origin = loaded.public_origin.trim_end_matches('/').to_owned();
         loaded.validate()?;
         Ok(loaded)
     }
 
     fn validate(&self) -> Result<(), ConfigError> {
+        match &self.oidc_key {
+            Some(key) if !is_seal_key(key) => {
+                return Err(ConfigError::Invalid(
+                    "oidc_key must be 64 lowercase hex characters (an AES-256 key)".into(),
+                ));
+            }
+            None if self.mode == Mode::Prod => {
+                return Err(ConfigError::Invalid(
+                    "mode=prod requires RN_SITE__OIDC_KEY: the OpenID Provider's signing keys \
+                     are sealed under it, so a generated one would make every key in the \
+                     database unreadable on restart"
+                        .into(),
+                ));
+            }
+            _ => {}
+        }
+        if self.mode == Mode::Prod && !self.public_origin.starts_with("https://") {
+            return Err(ConfigError::Invalid(
+                "mode=prod requires an https RN_SITE__PUBLIC_ORIGIN: it is the OpenID \
+                 Provider's issuer, and every relying party compares it byte for byte"
+                    .into(),
+            ));
+        }
         match &self.id_key {
             Some(key) if !is_id_key(key) => Err(ConfigError::Invalid(
                 "id_key must be 32 lowercase hex characters (an AES-128 key)".into(),
@@ -161,6 +212,41 @@ impl AppConfig {
     }
 }
 
+/// The OpenID Provider, built from this configuration.
+///
+/// The sealing key is minted when none is configured, which
+/// [`Self::validate`] has already made impossible in production.
+impl AppConfig {
+    #[must_use]
+    pub fn provider(&self) -> rn_kernel::oidc::Provider {
+        let seal = self
+            .oidc_key
+            .as_deref()
+            .and_then(rn_kernel::oidc::SealKey::from_hex)
+            .unwrap_or_else(|| {
+                tracing::warn!(
+                    "no oidc_key configured; minting an ephemeral one for this dev process — \
+                     signing keys already in the database will not open"
+                );
+                rn_kernel::oidc::SealKey::mint()
+            });
+        rn_kernel::oidc::Provider::new(self.public_origin.clone(), seal)
+    }
+}
+
+/// Where this deployment answers, when nothing says otherwise: the address
+/// `just run-dev` serves on.
+fn default_public_origin() -> String {
+    "http://127.0.0.1:3004".to_owned()
+}
+
+fn is_seal_key(key: &str) -> bool {
+    key.len() == 64
+        && key
+            .bytes()
+            .all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase())
+}
+
 /// The id key from the file `RN_SITE__ID_KEY_FILE` names, if it names one.
 ///
 /// Trailing whitespace is trimmed before anything looks at the value: a secret
@@ -168,7 +254,13 @@ impl AppConfig {
 /// and a 33-character key is refused by [`is_id_key`] with a message about hex
 /// digits that is true and useless.
 fn id_key_file() -> Result<Option<String>, ConfigError> {
-    let Ok(path) = std::env::var("RN_SITE__ID_KEY_FILE") else {
+    secret_file("RN_SITE__ID_KEY_FILE")
+}
+
+/// A secret from the file a variable names, trimmed of the newline an editor
+/// leaves and `printf` does not.
+fn secret_file(variable: &str) -> Result<Option<String>, ConfigError> {
+    let Ok(path) = std::env::var(variable) else {
         return Ok(None);
     };
     let path = path.trim();
@@ -176,7 +268,7 @@ fn id_key_file() -> Result<Option<String>, ConfigError> {
         return Ok(None);
     }
     let key = std::fs::read_to_string(path).map_err(|error| {
-        ConfigError::Invalid(format!("RN_SITE__ID_KEY_FILE: cannot read {path}: {error}"))
+        ConfigError::Invalid(format!("{variable}: cannot read {path}: {error}"))
     })?;
     Ok(Some(key.trim_end().to_string()))
 }
@@ -214,6 +306,8 @@ mod tests {
             static_dir: PathBuf::from("static"),
             id_key: id_key.map(str::to_string),
             bootstrap_operator_email: None,
+            public_origin: "https://ronitnath.com".to_owned(),
+            oidc_key: Some("a".repeat(64)),
             dev: false,
         }
     }

@@ -32,7 +32,8 @@ const PARTY: &str = "UPDATE party SET status = 'disabled' WHERE id = $1 AND stat
 const AUDIT: &str = "INSERT INTO audit \
                      (key, command, actor_identity_id, acting_as, at, request_digest, payload) \
                      SELECT $1, 'disable', $2, $3, $4, $5, \
-                            json_object('event', 'disable', 'party', $6, 'reason', $7) \
+                            json_object('event', 'disable', 'party', $6, 'reason', $7, \
+                                        'clients', json($8)) \
                      WHERE changes() > 0";
 
 /// Every session of every identity resolved onto the party goes with it — a
@@ -55,6 +56,12 @@ pub async fn disable<S: Sql, F: Feed>(ctx: &Ctx<'_, S, F>, args: &Disable) -> Ou
     let (identity, person, acting_as) = refs::actor(&ctx.principal)?;
     let target = authorised(ctx, person, &args.party).await?;
     let now = ctx.now();
+    // Every relying party holding a token for this party. A disable ends every
+    // session at once, so there is no single `sid` to name and the logout
+    // tokens carry `sub` alone — which is exactly what "this subject, wherever
+    // they are" means.
+    let targets = crate::oidc::token::logout_targets_of_person(&ctx.store.reads(), target).await?;
+    let clients = crate::oidc::token::target_ids_json(&targets);
 
     let Applied { committed, .. } = run(ctx, args, async || {
         let mut batch = Batch::new();
@@ -68,9 +75,15 @@ pub async fn disable<S: Sql, F: Feed>(ctx: &Ctx<'_, S, F>, args: &Disable) -> Ou
                 now,
                 crate::audit::digest_of(args),
                 target,
-                args.reason.as_str()
+                args.reason.as_str(),
+                clients.as_str()
             ],
         );
+        // The tokens go before the sessions they reference, and the codes with
+        // them: `oidc_token.session_id` points at a row that is about to stop
+        // existing.
+        batch.any(crate::oidc::token::DELETE_PERSON_TOKENS_SQL, bind![target]);
+        batch.any(crate::oidc::token::DELETE_PERSON_CODES_SQL, bind![target]);
         batch.any(SESSIONS, bind![target]);
         Ok(batch)
     })

@@ -223,7 +223,7 @@ pub fn page(params: &Params) -> i64 {
 fn parties_changed(event: &Event, key: &IdKey) -> Vec<String> {
     match event {
         Event::Registered { person, .. }
-        | Event::PartyDisabled { party: person }
+        | Event::PartyDisabled { party: person, .. }
         | Event::PartyEnabled { party: person }
         | Event::PersonSplit { person, .. }
         | Event::IdentityLinked { person, .. } => vec![person.public(key).as_str().to_owned()],
@@ -259,7 +259,23 @@ fn parties_changed(event: &Event, key: &IdKey) -> Vec<String> {
         | Event::Transferred { .. }
         | Event::DocumentCreated { .. }
         | Event::DocumentEdited { .. }
-        | Event::DocumentPublished { .. } => Vec::new(),
+        | Event::DocumentPublished { .. }
+        // The OpenID Provider writes one `party` row and it is not a person:
+        // `register-client` creates the client's own service party, which no
+        // list on this tier renders.
+        | Event::SessionEnded { .. }
+        | Event::HandleSet { .. }
+        | Event::ClientRegistered { .. }
+        | Event::ClientUpdated { .. }
+        | Event::ClientSecretRotated { .. }
+        | Event::ClientDeleted { .. }
+        | Event::SigningKeyRotated { .. }
+        | Event::Authorized { .. }
+        | Event::CodeExchanged { .. }
+        | Event::TokenRefreshed { .. }
+        | Event::ServiceTokenIssued { .. }
+        | Event::TokenRevoked { .. }
+        | Event::ConsentRevoked { .. } => Vec::new(),
     }
 }
 
@@ -296,7 +312,20 @@ fn identities_changed(event: &Event, key: &IdKey) -> Vec<String> {
         | Event::Transferred { .. }
         | Event::DocumentCreated { .. }
         | Event::DocumentEdited { .. }
-        | Event::DocumentPublished { .. } => Vec::new(),
+        | Event::DocumentPublished { .. }
+        | Event::SessionEnded { .. }
+        | Event::HandleSet { .. }
+        | Event::ClientRegistered { .. }
+        | Event::ClientUpdated { .. }
+        | Event::ClientSecretRotated { .. }
+        | Event::ClientDeleted { .. }
+        | Event::SigningKeyRotated { .. }
+        | Event::Authorized { .. }
+        | Event::CodeExchanged { .. }
+        | Event::TokenRefreshed { .. }
+        | Event::ServiceTokenIssued { .. }
+        | Event::TokenRevoked { .. }
+        | Event::ConsentRevoked { .. } => Vec::new(),
     }
 }
 
@@ -388,7 +417,10 @@ mod tests {
 
     #[test]
     fn the_two_events_that_name_no_key_are_re_read_whole() {
-        let disabled = committed(Event::PartyDisabled { party: Id::new(4) });
+        let disabled = committed(Event::PartyDisabled {
+            party: Id::new(4),
+            clients: Vec::new(),
+        });
         assert!(Platform::Sessions.rereads(&disabled.event));
         assert!(Platform::Sessions.changed(&disabled, &key()).is_empty());
         assert!(!Platform::Parties.rereads(&disabled.event));

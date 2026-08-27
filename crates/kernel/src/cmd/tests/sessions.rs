@@ -118,7 +118,10 @@ async fn a_platform_operator_may_revoke_anybody_and_the_audit_names_whose_it_was
     let committed = revoke_session(&harness.ctx(operator.principal.clone()), &args)
         .await
         .expect("an operator may");
-    let Event::SessionRevoked { identity, session } = committed.event else {
+    let Event::SessionRevoked {
+        identity, session, ..
+    } = committed.event
+    else {
         panic!("a revocation produces its own event");
     };
     assert_eq!(session, theirs);

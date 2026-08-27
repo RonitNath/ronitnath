@@ -160,6 +160,7 @@ async fn register_dev_operator(state: &AppState) -> Option<(Id<Identity>, Id<Per
         &context(state),
         &Register {
             display_name: DEV_DISPLAY.to_owned(),
+            handle: rn_kernel::oidc::handle::fixture(DEV_EMAIL),
             email: DEV_EMAIL.to_owned(),
             password,
         },
@@ -198,6 +199,7 @@ async fn one_id<T: rn_kernel::ids::Table>(
 
 fn context(state: &AppState) -> Ctx<'_, hiqlite::Client, rn_kernel::feed::ClusterFeed> {
     Ctx {
+        provider: state.provider.as_ref(),
         store: state.store.as_ref(),
         feed: state.feed.as_ref(),
         principal: Principal::Anonymous,

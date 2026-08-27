@@ -25,7 +25,8 @@ mod tests;
 use crate::Offset;
 use crate::domain::FactorKind;
 use crate::ids::{
-    Factor, Group, Id, Identity, Link, MatchCandidate, Organization, Person, Resource, Session,
+    Factor, Group, Id, Identity, Link, MatchCandidate, OidcClient, Organization, Person, Resource,
+    Session,
 };
 use crate::merge::LinkMethod;
 use crate::relation::Relation;
@@ -55,6 +56,15 @@ pub enum Event {
         identity: Id<Identity>,
         /// The session that ended.
         session: Id<Session>,
+        /// The relying parties that held a token under it and registered a
+        /// back-channel endpoint.
+        ///
+        /// Carried on the event rather than looked up afterwards, because the
+        /// batch that ends a session takes its tokens with it: by the time a
+        /// consumer sees this row there is nothing left to ask. It is what
+        /// lets the logout POSTs happen off the request path, on any node that
+        /// reads the feed.
+        clients: Vec<Id<OidcClient>>,
     },
     /// Another session of the same identity was ended.
     SessionRevoked {
@@ -62,6 +72,21 @@ pub enum Event {
         identity: Id<Identity>,
         /// The session that was ended.
         session: Id<Session>,
+        /// The relying parties to tell — see [`Self::SignedOut`].
+        clients: Vec<Id<OidcClient>>,
+    },
+    /// A session ended because a relying party asked it to.
+    ///
+    /// The same cascade as [`Self::SignedOut`] and a different word, because
+    /// the audit row's job is to say what happened: somebody pressed "sign
+    /// out" *at another site*, and this deployment obliged.
+    SessionEnded {
+        /// Whose.
+        identity: Id<Identity>,
+        /// The session that ended.
+        session: Id<Session>,
+        /// The relying parties to tell.
+        clients: Vec<Id<OidcClient>>,
     },
     /// A session changed the party it speaks as.
     ActingAs {
@@ -99,6 +124,10 @@ pub enum Event {
     PartyDisabled {
         /// Which.
         party: Id<Person>,
+        /// The relying parties that held a token for that party. Every
+        /// session of every registration went with the disable, so they are
+        /// told the same way a sign-out tells them.
+        clients: Vec<Id<OidcClient>>,
     },
     /// A party became usable again.
     PartyEnabled {
@@ -256,6 +285,76 @@ pub enum Event {
         /// The revision that is now published.
         rev: i64,
     },
+    /// A person chose or changed their handle.
+    HandleSet {
+        /// Whose.
+        person: Id<Person>,
+    },
+    /// A relying party was registered.
+    ClientRegistered {
+        /// The client.
+        client: Id<OidcClient>,
+        /// The party that owns it, and whose sector its subjects are under.
+        /// `None` is the deployment itself — `platform:*`, which has no
+        /// `party` row.
+        owner: Option<Id<Person>>,
+    },
+    /// A relying party's metadata was replaced.
+    ClientUpdated {
+        /// The client.
+        client: Id<OidcClient>,
+    },
+    /// A relying party got a new secret, and its old one stopped working.
+    ClientSecretRotated {
+        /// The client.
+        client: Id<OidcClient>,
+    },
+    /// A relying party was withdrawn, with its tokens and consents.
+    ClientDeleted {
+        /// The client.
+        client: Id<OidcClient>,
+    },
+    /// A new signing key became active, and the previous one began retiring.
+    SigningKeyRotated {
+        /// The `kid` a JWT header will now name.
+        kid: String,
+    },
+    /// A person consented, and an authorization code was minted.
+    Authorized {
+        /// The client they consented to.
+        client: Id<OidcClient>,
+        /// Who consented.
+        person: Id<Person>,
+    },
+    /// A code became a token pair.
+    CodeExchanged {
+        /// The client that redeemed it.
+        client: Id<OidcClient>,
+    },
+    /// A refresh token was rotated.
+    TokenRefreshed {
+        /// The client.
+        client: Id<OidcClient>,
+    },
+    /// A client minted a token for its own service principal.
+    ServiceTokenIssued {
+        /// The client.
+        client: Id<OidcClient>,
+        /// The service party the token speaks as.
+        service: Id<Person>,
+    },
+    /// A token was revoked at a client's request.
+    TokenRevoked {
+        /// The client.
+        client: Id<OidcClient>,
+    },
+    /// A person withdrew a consent, and every token it produced with it.
+    ConsentRevoked {
+        /// The client.
+        client: Id<OidcClient>,
+        /// Who withdrew it.
+        person: Id<Person>,
+    },
 }
 
 impl Event {
@@ -295,6 +394,50 @@ impl Event {
             Self::DocumentCreated { .. } => "create-document",
             Self::DocumentEdited { .. } => "edit-document",
             Self::DocumentPublished { .. } => "publish-document",
+            Self::HandleSet { .. } => "set-handle",
+            Self::ClientRegistered { .. } => "register-client",
+            Self::ClientUpdated { .. } => "update-client",
+            Self::ClientSecretRotated { .. } => "rotate-client-secret",
+            Self::ClientDeleted { .. } => "delete-client",
+            Self::SigningKeyRotated { .. } => "rotate-signing-key",
+            Self::Authorized { .. } => "authorize",
+            Self::CodeExchanged { .. } => "exchange-code",
+            Self::TokenRefreshed { .. } => "refresh-token",
+            Self::ServiceTokenIssued { .. } => "client-credentials",
+            Self::TokenRevoked { .. } => "revoke-token",
+            Self::ConsentRevoked { .. } => "revoke-consent",
+            Self::SessionEnded { .. } => "end-session",
+        }
+    }
+
+    /// The session this event ended, and the relying parties that have to be
+    /// told — the one projection the back-channel logout lane reads.
+    ///
+    /// `PartyDisabled` is absent on purpose: it ends every session of every
+    /// registration at once, so there is no single `sid` to name, and its
+    /// logout tokens carry `sub` alone. [`Self::disabled_party`] is its half.
+    #[must_use]
+    pub fn ended_session(&self) -> Option<(Id<Session>, &[Id<OidcClient>])> {
+        match self {
+            Self::SignedOut {
+                session, clients, ..
+            }
+            | Self::SessionRevoked {
+                session, clients, ..
+            }
+            | Self::SessionEnded {
+                session, clients, ..
+            } => Some((*session, clients)),
+            _ => None,
+        }
+    }
+
+    /// The party a disable took every session of, and who to tell.
+    #[must_use]
+    pub fn disabled_party(&self) -> Option<(Id<Person>, &[Id<OidcClient>])> {
+        match self {
+            Self::PartyDisabled { party, clients } => Some((*party, clients)),
+            _ => None,
         }
     }
 
@@ -311,7 +454,8 @@ impl Event {
             | Self::EmailVerified { identity, .. }
             | Self::PersonSplit { identity, .. }
             | Self::IdentityLinked { identity, .. }
-            | Self::LinkClaimed { identity, .. } => Some(*identity),
+            | Self::LinkClaimed { identity, .. }
+            | Self::SessionEnded { identity, .. } => Some(*identity),
             _ => None,
         }
     }
@@ -320,7 +464,7 @@ impl Event {
     pub const fn touches_person(&self) -> Option<Id<Person>> {
         match self {
             Self::Registered { person, .. } => Some(*person),
-            Self::PartyDisabled { party } | Self::PartyEnabled { party } => Some(*party),
+            Self::PartyDisabled { party, .. } | Self::PartyEnabled { party } => Some(*party),
             Self::ActingAs { party, .. } => Some(*party),
             Self::PersonMerged { survivor, .. } => Some(*survivor),
             Self::PersonSplit { person, .. } | Self::IdentityLinked { person, .. } => Some(*person),
@@ -332,6 +476,9 @@ impl Event {
             | Self::MemberRemoved { party, .. }
             | Self::Left { party, .. } => Some(*party),
             Self::Transferred { to, .. } => Some(*to),
+            Self::HandleSet { person }
+            | Self::Authorized { person, .. }
+            | Self::ConsentRevoked { person, .. } => Some(*person),
             _ => None,
         }
     }

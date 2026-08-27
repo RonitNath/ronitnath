@@ -34,10 +34,17 @@ impl Event {
             "sign-out" => Self::SignedOut {
                 identity: field(&json, "identity")?,
                 session: field(&json, "session")?,
+                clients: ids(&json, "clients"),
             },
             "revoke-session" => Self::SessionRevoked {
                 identity: field(&json, "identity")?,
                 session: field(&json, "session")?,
+                clients: ids(&json, "clients"),
+            },
+            "end-session" => Self::SessionEnded {
+                identity: field(&json, "identity")?,
+                session: field(&json, "session")?,
+                clients: ids(&json, "clients"),
             },
             "act-as" => Self::ActingAs {
                 identity: field(&json, "identity")?,
@@ -61,6 +68,7 @@ impl Event {
             },
             "disable" => Self::PartyDisabled {
                 party: field(&json, "party")?,
+                clients: ids(&json, "clients"),
             },
             "enable" => Self::PartyEnabled {
                 party: field(&json, "party")?,
@@ -157,6 +165,47 @@ impl Event {
                 document: field(&json, "document")?,
                 rev: json.get("rev")?.as_i64()?,
             },
+            "set-handle" => Self::HandleSet {
+                person: field(&json, "person")?,
+            },
+            "register-client" => Self::ClientRegistered {
+                client: field(&json, "client")?,
+                // Absent is the deployment's own, which has no party row.
+                owner: field(&json, "owner"),
+            },
+            "update-client" => Self::ClientUpdated {
+                client: field(&json, "client")?,
+            },
+            "rotate-client-secret" => Self::ClientSecretRotated {
+                client: field(&json, "client")?,
+            },
+            "delete-client" => Self::ClientDeleted {
+                client: field(&json, "client")?,
+            },
+            "rotate-signing-key" => Self::SigningKeyRotated {
+                kid: json.get("kid")?.as_str()?.to_owned(),
+            },
+            "authorize" => Self::Authorized {
+                client: field(&json, "client")?,
+                person: field(&json, "person")?,
+            },
+            "exchange-code" => Self::CodeExchanged {
+                client: field(&json, "client")?,
+            },
+            "refresh-token" => Self::TokenRefreshed {
+                client: field(&json, "client")?,
+            },
+            "client-credentials" => Self::ServiceTokenIssued {
+                client: field(&json, "client")?,
+                service: field(&json, "service")?,
+            },
+            "revoke-token" => Self::TokenRevoked {
+                client: field(&json, "client")?,
+            },
+            "revoke-consent" => Self::ConsentRevoked {
+                client: field(&json, "client")?,
+                person: field(&json, "person")?,
+            },
             _ => return None,
         })
     }
@@ -166,4 +215,16 @@ impl Event {
 /// would have to pick one table and every variant names a different one.
 fn field<T: Table>(json: &Json, name: &str) -> Option<Id<T>> {
     json.get(name)?.as_i64().map(Id::new)
+}
+
+/// A JSON array of rowids out of a payload, as ids.
+///
+/// Absent reads as empty rather than as a failure: an audit row written before
+/// this deployment had an OpenID Provider carries no `clients` member, and it
+/// is still a sign-out.
+fn ids<T: Table>(json: &Json, name: &str) -> Vec<Id<T>> {
+    json.get(name)
+        .and_then(Json::as_array)
+        .map(|list| list.iter().filter_map(Json::as_i64).map(Id::new).collect())
+        .unwrap_or_default()
 }

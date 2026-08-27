@@ -174,6 +174,10 @@ pub async fn build(
             public_id: public_of(acting.kind, acting_as.get(), key),
             display: acting.display_name,
         },
+        handle: match identity.person_id {
+            Some(id) => rn_kernel::oidc::handle::of_person(&reads, id).await?,
+            None => None,
+        },
         tiers: tiers(&organizations, platform),
         organizations,
         session_expires_at: expires_at,
