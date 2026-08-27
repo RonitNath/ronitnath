@@ -233,11 +233,12 @@ fn Sharing(document: Document) -> impl IntoView {
                     .collect_view()}
             </ul>
             <div class="minting">
-                <label class="choice">
-                    <span>"Person, organization or group id"</span>
+                <label class="choice wide">
+                    <span>"Share with"</span>
                     <input
                         type="text"
                         spellcheck="false"
+                        placeholder="p_… o_… g_…"
                         prop:value=move || subject.get()
                         on:input=move |event| subject.set(event_target_value(&event))
                     />
@@ -261,11 +262,12 @@ fn Sharing(document: Document) -> impl IntoView {
             </div>
             <div class="asides">
                 <Aside title="Transfer document">
-                    <label class="choice">
-                        <span>"Person or organization id"</span>
+                    <label class="choice wide">
+                        <span>"New owner"</span>
                         <input
                             type="text"
                             spellcheck="false"
+                            placeholder="p_… o_…"
                             prop:value=move || to.get()
                             on:input=move |event| to.set(event_target_value(&event))
                         />

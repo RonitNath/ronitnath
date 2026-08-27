@@ -11,6 +11,7 @@ mod documents;
 mod groups;
 mod invitations;
 mod members;
+mod minting;
 mod overview;
 mod rows;
 mod scope;

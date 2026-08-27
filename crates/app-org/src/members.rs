@@ -14,7 +14,8 @@ use rn_api::MemberRole;
 use rn_api::commands::{Leave, SetRole};
 use rn_ui::{Column, Live, PageHead, Priority, SelectField, Table, sync_with};
 
-use crate::bits::{Note, act, on, refusal};
+use crate::bits::{Aside, Note, act, on, refusal};
+use crate::minting::Mint;
 use crate::rows::Member;
 
 /// The organization's members.
@@ -23,9 +24,19 @@ pub fn Members(
     /// The organization's public id.
     org: String,
 ) -> impl IntoView {
+    let container = org.clone();
+    let roster = org.clone();
     view! {
         <PageHead title="Members" />
-        <Roster container=org.clone() container_name="organization".to_owned() org=org />
+        // An organization is its own root group, so it is invited into the
+        // same way one of its groups is — and without this there is no way to
+        // put anybody in the organization itself.
+        <div class="asides">
+            <Aside title="Invite to organization">
+                <Mint container=container />
+            </Aside>
+        </div>
+        <Roster container=roster container_name="organization".to_owned() org=org />
     }
 }
 
@@ -150,6 +161,10 @@ fn Seat(member: Member, container: String) -> impl IntoView {
                 <button
                     type="button"
                     class="commit"
+                    // The last owner of a container cannot leave it either: the
+                    // way out of that is `Transfer`, which is a decision about
+                    // who takes over rather than a decision to stop being here.
+                    disabled=move || last_owner
                     on:click={
                         let container = container.clone();
                         move |_| {

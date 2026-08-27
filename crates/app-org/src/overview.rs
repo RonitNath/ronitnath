@@ -85,11 +85,12 @@ fn Ownership(row: Org) -> impl IntoView {
         <div class="asides">
             <Show when=move || owned>
                 <Aside title="Transfer ownership">
-                    <label class="choice">
-                        <span>"Person or organization id"</span>
+                    <label class="choice wide">
+                        <span>"New owner"</span>
                         <input
                             type="text"
                             spellcheck="false"
+                            placeholder="p_… o_…"
                             prop:value=move || to.get()
                             on:input=move |event| to.set(event_target_value(&event))
                         />

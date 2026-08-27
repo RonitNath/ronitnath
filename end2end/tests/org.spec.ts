@@ -99,8 +99,19 @@ test("an organization is founded, grown, and handed on", async ({ page, browser 
     // in the change feed and the socket carried the diff.
     await expect(page.getByRole("cell", { name: "E2E Joiner" })).toBeVisible({ timeout: 15_000 });
 
-    // Promote them to admin on the organization itself.
+    // Belonging to a group of an organization is not belonging to the
+    // organization: the tier comes from a membership on the organization's own
+    // party, so that is a second invitation, minted where the roster is.
     await page.goto(`${site}/org/members`);
+    await page.locator("summary", { hasText: "Invite to organization" }).click();
+    await page.getByRole("button", { name: "Mint link" }).click();
+    const orgClaim = page.locator(".claim code");
+    await expect(orgClaim).toContainText("/links/");
+    await joiner.goto((await orgClaim.textContent())!.trim());
+    await joiner.getByRole("button", { name: "Accept" }).click();
+
+    // Promote them to admin on the organization itself.
+    await page.reload();
     await page.getByRole("row", { name: /E2E Joiner/ }).click();
     await page.locator(".panel select").selectOption("admin");
     await expect
@@ -120,13 +131,15 @@ test("an organization is founded, grown, and handed on", async ({ page, browser 
       return whoami.person.public_id as string;
     });
     await page.goto(`${site}/org`);
-    await page.getByText("Transfer ownership").click();
+    await page.locator("summary", { hasText: "Transfer ownership" }).click();
     await page.locator(".aside-body input[type='text']").fill(joinerPerson);
     await page.getByRole("button", { name: "Transfer ownership" }).click();
 
     // And loses the affordance that did it, because it is no longer theirs.
     await expect
-      .poll(async () => await page.getByText("Transfer ownership").count(), { timeout: 15_000 })
+      .poll(async () => await page.locator("summary", { hasText: "Transfer ownership" }).count(), {
+        timeout: 15_000,
+      })
       .toBe(0);
     await expect(page.locator(".facts")).toContainText("admin");
     await expect(page.locator(".facts")).toContainText("E2E Joiner");
@@ -168,7 +181,7 @@ test("a document owned by the organization is written, shared and published", as
   })).organization as string;
 
   await page.goto(`${site}/org/documents`);
-  await page.getByText("New document").click();
+  await page.locator("summary", { hasText: "New document" }).click();
   await page.locator(".aside-body input[type='text']").fill("E2E Charter");
   await page.getByRole("button", { name: "Create document" }).click();
 

@@ -6,16 +6,13 @@
 //! page already renders.
 
 use leptos::prelude::*;
-use rn_api::MemberRole;
-use rn_api::commands::{CreateGroup, Invite};
+use rn_api::commands::CreateGroup;
 use rn_ui::{Column, Live, PageHead, Priority, Table};
 
-use crate::bits::{Aside, Choice, Copyable, Note, act, on};
+use crate::bits::{Aside, Note, act, on};
 use crate::members::Roster;
+use crate::minting::Mint;
 use crate::rows::{Contact, Group, Invitation};
-
-/// A day, in seconds — the unit an invitation's life is set in.
-const DAY: i64 = 60 * 60 * 24;
 
 /// The organization's groups.
 #[component]
@@ -143,10 +140,6 @@ fn Contacts(group: String, org: String) -> impl IntoView {
 fn Links(group: String, org: String) -> impl IntoView {
     let live =
         Live::<Invitation>::subscribe("org-invitations", &[("org", &org), ("group", &group)]);
-    let role = RwSignal::new("member".to_owned());
-    let days = RwSignal::new("7".to_owned());
-    let minted = RwSignal::new(None::<String>);
-    let note = RwSignal::new(None::<String>);
     let columns = vec![
         Column::new("Role", |row: &Invitation| row.role.clone()),
         Column::new("Minted", |row: &Invitation| on(row.created_at)),
@@ -161,63 +154,7 @@ fn Links(group: String, org: String) -> impl IntoView {
     view! {
         <section class="block">
             <h3>"Invitations"</h3>
-            <div class="minting">
-                <Choice
-                    label="Role"
-                    options=vec![("member", "member"), ("admin", "admin")]
-                    value=role
-                />
-                <Choice
-                    label="Lasts"
-                    options=vec![("1", "a day"), ("7", "a week"), ("30", "a month")]
-                    value=days
-                />
-                <button
-                    type="button"
-                    class="commit"
-                    on:click=move |_| {
-                        let Ok(group) = group.parse() else {
-                            return;
-                        };
-                        let role = if role.get_untracked() == "admin" {
-                            MemberRole::Admin
-                        } else {
-                            MemberRole::Member
-                        };
-                        let lasts = days.get_untracked().parse::<i64>().unwrap_or(7) * DAY;
-                        let expires_at = (js_sys::Date::now() / 1000.0) as i64 + lasts;
-                        act(
-                            note,
-                            Invite { group, role, expires_at },
-                            move |result| {
-                                minted.set(
-                                    result["token"]
-                                        .as_str()
-                                        .map(|token| format!("/links/{token}")),
-                                );
-                            },
-                        );
-                    }
-                >
-                    "Mint link"
-                </button>
-                <Note note=note />
-            </div>
-            {move || {
-                minted
-                    .get()
-                    .map(|path| {
-                        let url = format!(
-                            "{}{path}",
-                            window().location().origin().unwrap_or_default(),
-                        );
-                        view! {
-                            <div class="claim">
-                                <Copyable value=url label="Copy the claim link" />
-                            </div>
-                        }
-                    })
-            }}
+            <Mint container=group />
             <Table
                 rows=rows
                 columns=columns
