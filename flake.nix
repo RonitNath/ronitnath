@@ -1,8 +1,8 @@
 {
-  # The reproducible build contract for CI (procedures/ci.md): the gates compile
-  # with the exact toolchain pinned here, never with whatever rustc happens to be
-  # installed on the runner. The release image pins its own toolchain in the
-  # Containerfile; keep the two in step when either moves.
+  # The reproducible build contract for CI (procedures/delivery.md): the gates
+  # compile with the exact toolchain pinned here, never with whatever rustc
+  # happens to be installed on the runner. The release image pins its own
+  # toolchain in the Containerfile; keep the two in step when either moves.
   description = "rn-site — ronitnath.com (Axum + askama + trunk CSR bundles)";
 
   inputs = {
@@ -32,9 +32,11 @@
         devShells.default = pkgs.mkShell {
           packages = [
             toolchain
-            # trunk builds every CSR bundle (crates/<bundle>/index.html) and
-            # fetches its own pinned wasm-bindgen/wasm-opt, exactly as the
-            # Containerfile does, so the devshell and the image agree.
+            # trunk builds every CSR bundle (`trunk build --release --config
+            # crates/<bundle>/Trunk.toml`) and fetches its own pinned
+            # wasm-bindgen/wasm-opt, exactly as the Containerfile does, so the
+            # devshell and the image agree. The gates ask for `trunk --version`
+            # so a devshell that lost it fails there rather than in a release.
             pkgs.trunk
             pkgs.pkg-config
           ];
