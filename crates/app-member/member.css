@@ -1,0 +1,169 @@
+/* The /app bundle's own layout, on top of the shared tokens.
+ *
+ * Nothing here re-states a token or restyles a shared component: `tokens.css`
+ * owns the palette, the type scale, the shell, the table and the fields, and
+ * this file owns only the shapes that exist because a member page has them —
+ * the two-column section grid, the label/value pairs an identity page is made
+ * of, and the small side affordances a row's commands hang off.
+ *
+ * Borderless, flat and rectangular; separation is spacing and tone.
+ */
+
+/* Sections, newspaper order: independent blocks flow left to right and wrap. */
+.sections {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr));
+  gap: var(--gap-section) 2.5rem;
+  align-items: start;
+}
+.section {
+  display: grid;
+  gap: 0.6rem;
+  min-width: 0;
+}
+.section > h2 {
+  font-family: var(--font-display);
+  letter-spacing: 0.04em;
+  text-transform: none;
+}
+.section.wide {
+  grid-column: 1 / -1;
+}
+
+/* A column of sections, for a page whose blocks are of very different heights:
+ * grid rows are as tall as their tallest cell, so a two-line block beside a
+ * roster would otherwise hold open a row of dead space. */
+.column {
+  display: grid;
+  gap: var(--gap-section);
+  align-content: start;
+  min-width: 0;
+}
+
+/* Label and value. The label is small and quiet; the value carries the page. */
+.kv {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: 1.25rem;
+  row-gap: 0.3rem;
+  align-items: baseline;
+}
+.kv dt {
+  font-size: var(--text-1);
+  color: var(--fg-subtle);
+}
+.kv dd {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* A row's commands: text, not chrome. Destructive words take the warm ink. */
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: baseline;
+}
+.act {
+  cursor: pointer;
+  padding: 0;
+  color: var(--accent);
+  font-size: var(--text-2);
+}
+.act:hover {
+  color: var(--accent-hover);
+  text-decoration: underline;
+}
+.act[data-weight="undo"] {
+  color: var(--hero-red);
+}
+.act:disabled {
+  color: var(--fg-subtle);
+  cursor: default;
+  text-decoration: none;
+}
+
+/* A table of few columns does not want the whole content column: past about
+ * this width the gap between "when" and "what" outgrows both of them, and the
+ * eye stops carrying the row across. */
+.sheet {
+  max-width: 58rem;
+}
+
+/* A table cell that holds commands rather than a value. */
+.tbl td.does {
+  width: 1%;
+  white-space: nowrap;
+}
+.tbl td.you {
+  color: var(--fg-muted);
+}
+
+/* A form that sits inside a section: the fields stack, the commit follows. */
+.inline + .inline,
+.tbl + .inline {
+  margin-top: 1rem;
+}
+.inline {
+  display: grid;
+  gap: 0.2rem;
+  max-width: 26rem;
+}
+.inline .commit {
+  justify-self: start;
+  margin-top: 0.3rem;
+}
+.inline .row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.5rem;
+  align-items: end;
+}
+
+/* The claim URL, and anything else a human has to carry by hand. */
+.carry {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.5rem;
+  align-items: center;
+  background: var(--bg-muted);
+  padding: 0.4rem 0.5rem;
+}
+.carry code {
+  overflow-wrap: anywhere;
+  color: var(--fg-muted);
+}
+
+/* The editor. One column of words; the title is a field like any other. */
+.editor textarea {
+  width: 100%;
+  min-height: 22rem;
+  padding: 0.5rem 0.6rem;
+  background: var(--bg-muted);
+  font-family: var(--font-body);
+  line-height: 1.55;
+  resize: vertical;
+}
+.editor .field {
+  max-width: none;
+}
+
+/* Quiet running text: an empty list, a count, a revision. */
+.quiet {
+  color: var(--fg-muted);
+  font-size: var(--text-2);
+}
+.figure {
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 42rem) {
+  .sections {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .carry,
+  .inline .row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
