@@ -167,6 +167,27 @@ log "starting the three-voter cluster"
 tools/cluster.sh start
 tools/cluster.sh status > "$out/cluster-before.txt"
 
+# `ping 127.0.0.1` is filtered on this host, and two of the report's budgets
+# are stated in RTTs — so the round trip is measured where it can be: a TCP
+# handshake to a node that is now listening. It is the same wire the requests
+# use, and it is the floor every measured latency sits on.
+if command -v python3 >/dev/null 2>&1; then
+    python3 - "$node" <<'PY' >> "$out/run.txt" 2>&1 || true
+import socket, statistics, sys, time
+host, port = sys.argv[1].split(":")
+samples = []
+for _ in range(200):
+    started = time.perf_counter()
+    with socket.create_connection((host, int(port))):
+        samples.append((time.perf_counter() - started) * 1000)
+samples.sort()
+print(
+    "loopback TCP handshake: min %.3f ms  p50 %.3f ms  p99 %.3f ms (200 connects)"
+    % (samples[0], statistics.median(samples), samples[int(0.99 * len(samples)) - 1])
+)
+PY
+fi
+
 log "seeding $documents documents and $subscribers subscribers through the API"
 "$perf" seed --host "$node" --documents "$documents" --subscribers "$subscribers" \
     --workers "$workers" --out "$work/seed.json" 2>&1 | tee "$out/seed.txt"

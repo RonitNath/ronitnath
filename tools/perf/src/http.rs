@@ -96,11 +96,29 @@ impl Conn {
             None => head.push_str("\r\n"),
         }
 
+        // Keep-alive is a courtesy, not a promise: a connection the seeder
+        // left idle while other connections did the bulk comes back closed,
+        // and the first sign of it is an empty read where a status line
+        // should be. Reconnecting and sending again is what a client library
+        // would do; doing it here keeps a thirteen-second pause from ending a
+        // run. Once only — a second failure is the server, not the socket.
+        match self.attempt(&head).await {
+            Ok(reply) => Ok(reply),
+            Err(error) if reusable(&error) => {
+                let stream = TcpStream::connect(&self.host).await?;
+                stream.set_nodelay(true)?;
+                self.stream = BufReader::new(stream);
+                self.attempt(&head).await
+            }
+            Err(error) => Err(error),
+        }
+    }
+
+    async fn attempt(&mut self, head: &str) -> io::Result<Reply> {
         let started = Instant::now();
         self.stream.get_mut().write_all(head.as_bytes()).await?;
         self.stream.get_mut().flush().await?;
-        let reply = self.read_reply(started).await?;
-        Ok(reply)
+        self.read_reply(started).await
     }
 
     async fn read_reply(&mut self, started: Instant) -> io::Result<Reply> {
@@ -173,4 +191,17 @@ impl Conn {
         }
         Ok(String::from_utf8_lossy(&body).into_owned())
     }
+}
+
+/// Whether an error is the socket rather than the server — the kinds a fresh
+/// connection makes go away.
+fn reusable(error: &io::Error) -> bool {
+    matches!(
+        error.kind(),
+        io::ErrorKind::UnexpectedEof
+            | io::ErrorKind::BrokenPipe
+            | io::ErrorKind::ConnectionReset
+            | io::ErrorKind::ConnectionAborted
+            | io::ErrorKind::NotConnected
+    )
 }
