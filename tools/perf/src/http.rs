@@ -20,6 +20,9 @@ pub struct Reply {
     /// Every `set-cookie` line, unparsed.
     pub cookies: Vec<String>,
     pub body: String,
+    /// The change-feed offset the reply landed at, from `x-rn-offset`. A
+    /// redirect has no body to say it in, which is why it is a header.
+    pub offset: Option<u64>,
     /// How long the request took, measured around the write and the read.
     pub took: Duration,
 }
@@ -41,9 +44,16 @@ impl Reply {
 }
 
 /// One keep-alive connection to one node.
+///
+/// It remembers the highest offset the server has told it about and sends it
+/// back on every subsequent request (`x-rn-after`), which is what stops a
+/// follower answering out of a world this connection has already seen past.
+/// The seeder needed a retry loop for exactly that (`seed::command`); with
+/// the offset threaded it does not.
 pub struct Conn {
     stream: BufReader<TcpStream>,
     host: String,
+    after: u64,
 }
 
 impl Conn {
@@ -55,12 +65,18 @@ impl Conn {
         Ok(Self {
             stream: BufReader::new(stream),
             host: host.to_owned(),
+            after: 0,
         })
     }
 
     /// GET a path with an optional session cookie.
     pub async fn get(&mut self, path: &str, cookie: Option<&str>) -> io::Result<Reply> {
         self.request("GET", path, cookie, None).await
+    }
+
+    /// The highest offset this connection has been told about.
+    pub fn after(&self) -> u64 {
+        self.after
     }
 
     /// POST a body. `body` is `(content_type, bytes)`.
@@ -88,6 +104,9 @@ impl Conn {
         if let Some(cookie) = cookie {
             head.push_str(&format!("cookie: rn_session={cookie}\r\n"));
         }
+        if self.after > 0 {
+            head.push_str(&format!("x-rn-after: {}\r\n", self.after));
+        }
         match body {
             Some((kind, payload)) => head.push_str(&format!(
                 "content-type: {kind}\r\ncontent-length: {}\r\n\r\n{payload}",
@@ -103,12 +122,21 @@ impl Conn {
         // would do; doing it here keeps a thirteen-second pause from ending a
         // run. Once only — a second failure is the server, not the socket.
         match self.attempt(&head).await {
-            Ok(reply) => Ok(reply),
+            Ok(reply) => {
+                if let Some(offset) = reply.offset {
+                    self.after = self.after.max(offset);
+                }
+                Ok(reply)
+            }
             Err(error) if reusable(&error) => {
                 let stream = TcpStream::connect(&self.host).await?;
                 stream.set_nodelay(true)?;
                 self.stream = BufReader::new(stream);
-                self.attempt(&head).await
+                let reply = self.attempt(&head).await?;
+                if let Some(offset) = reply.offset {
+                    self.after = self.after.max(offset);
+                }
+                Ok(reply)
             }
             Err(error) => Err(error),
         }
@@ -137,6 +165,7 @@ impl Conn {
             .unwrap_or(0);
 
         let mut cookies = Vec::new();
+        let mut offset: Option<u64> = None;
         let mut length: Option<usize> = None;
         let mut chunked = false;
         loop {
@@ -150,6 +179,7 @@ impl Conn {
             let value = value.trim();
             match name.to_ascii_lowercase().as_str() {
                 "set-cookie" => cookies.push(value.to_owned()),
+                "x-rn-offset" => offset = value.parse().ok(),
                 "content-length" => length = value.parse().ok(),
                 "transfer-encoding" if value.eq_ignore_ascii_case("chunked") => chunked = true,
                 _ => {}
@@ -168,6 +198,7 @@ impl Conn {
             status,
             cookies,
             body,
+            offset,
             took: started.elapsed(),
         })
     }

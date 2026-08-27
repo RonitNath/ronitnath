@@ -228,7 +228,9 @@ async fn listen(
         let Some(Ok(message)) = socket.next().await else {
             return;
         };
-        let Message::Text(text) = message else { continue };
+        let Message::Text(text) = message else {
+            continue;
+        };
         let Ok(value) = serde_json::from_str::<Value>(&text) else {
             continue;
         };

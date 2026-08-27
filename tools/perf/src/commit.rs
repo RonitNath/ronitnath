@@ -130,7 +130,9 @@ fn bucket(marks: &mut Vec<Mark>) -> (Value, Vec<String>) {
             }
             worst = worst.max(mark.took.as_secs_f64() * 1000.0);
         }
-        rows.push(json!({ "second": second, "committed": ok, "refused": refused, "slowest_ms": worst }));
+        rows.push(
+            json!({ "second": second, "committed": ok, "refused": refused, "slowest_ms": worst }),
+        );
         lines.push(format!(
             "  t+{second:<4} committed {ok:<6} refused {refused:<6} slowest {worst:>9.1} ms"
         ));
@@ -172,8 +174,15 @@ impl Worker {
             }
             let socket = conn.as_mut().expect("a connection");
 
+            // `after` is the contract's own read-your-writes field: the
+            // offset this worker's last command landed at. The node it is
+            // posted to waits until it has applied that far before reading
+            // the revision this edit guards on, which is what stops a
+            // follower declining an edit against a revision it has not seen
+            // yet (`rn_api::CommandEnvelope::after`).
             let body = json!({
                 "key": key::uuid(),
+                "after": socket.after(),
                 "document": self.document,
                 "expected_rev": self.rev,
                 "body": format!("revision {}, written by the commit profile", self.rev),

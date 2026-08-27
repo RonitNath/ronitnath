@@ -25,10 +25,8 @@ fn nanos() -> u128 {
 pub fn uuid() -> String {
     let count = COUNTER.fetch_add(1, Ordering::Relaxed);
     let high = (nanos() as u64) ^ (u64::from(std::process::id()) << 40);
-    let low = count
-        .wrapping_mul(0x9E37_79B9_7F4A_7C15)
-        .rotate_left(17)
-        ^ u64::from(std::process::id());
+    let low =
+        count.wrapping_mul(0x9E37_79B9_7F4A_7C15).rotate_left(17) ^ u64::from(std::process::id());
     let a = (high >> 32) as u32;
     let b = (high >> 16) as u16;
     let c = 0x4000 | (high as u16 & 0x0FFF);

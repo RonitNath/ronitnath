@@ -44,7 +44,10 @@ pub async fn register(conn: &mut Conn, display: &str, email: &str) -> Result<Cal
         .await
         .map_err(|error| error.to_string())?;
     if reply.status != 303 {
-        return Err(format!("register answered {} — {}", reply.status, reply.body));
+        return Err(format!(
+            "register answered {} — {}",
+            reply.status, reply.body
+        ));
     }
     let token = reply
         .session()
@@ -66,14 +69,14 @@ const PATIENCE: u32 = 100;
 
 /// Run a command and hand back its `result`, refusing anything but a 200.
 ///
-/// A decline is retried, which is not the seeder being lax. A command's
-/// preconditions are read from the *local* state machine, so a node that has
-/// not yet applied the entry the previous command committed answers "declined"
-/// to a request that is perfectly well formed — reproducibly, for a
-/// `create-document` issued on a follower right after the `register` that
-/// created the person. The retry is how the seed gets its rows; the fact that
-/// it is needed is a finding, and belongs in the report rather than in a
-/// comment nobody reads.
+/// A decline is still retried, and the retry should now never fire. Every
+/// request this connection sends carries the offset of the last reply it saw
+/// (`http::Conn`), so the node it lands on waits until it has applied that far
+/// before reading anything — which is what used to make a `create-document`
+/// issued right after the `register` that created the person a reproducible
+/// decline (finding 2, `docs/perf/2026-08-27.md`). The loop stays as the
+/// witness: it prints how many retries it took, and on a fixed build that
+/// line does not appear.
 pub async fn command(
     conn: &mut Conn,
     token: &str,
@@ -194,7 +197,10 @@ pub async fn run(plan: Plan) -> Result<(), String> {
         .await?;
         subscribers.push(json!({ "token": caller.token, "person": caller.person }));
     }
-    eprintln!("seed: {} subscribers hold the fan-out document", plan.subscribers);
+    eprintln!(
+        "seed: {} subscribers hold the fan-out document",
+        plan.subscribers
+    );
 
     let seed = json!({
         "host": plan.host,
@@ -206,8 +212,11 @@ pub async fn run(plan: Plan) -> Result<(), String> {
         "subscribers": subscribers,
         "seconds": started.elapsed().as_secs_f64(),
     });
-    std::fs::write(&plan.out, serde_json::to_string_pretty(&seed).unwrap_or_default())
-        .map_err(|error| format!("write {}: {error}", plan.out))?;
+    std::fs::write(
+        &plan.out,
+        serde_json::to_string_pretty(&seed).unwrap_or_default(),
+    )
+    .map_err(|error| format!("write {}: {error}", plan.out))?;
     // oha takes its cookie on a command line, and a shell that had to dig the
     // token out of the JSON would end up echoing it. One file, one line, no
     // parsing — and it goes away with the rest of the run's state.

@@ -138,7 +138,7 @@ async fn page(
 ) -> Response {
     let next = next::validate(query.next.as_deref());
     if matches!(session.principal, Principal::Member { .. }) {
-        return see_other(&next, None);
+        return see_other(&next, None, 0);
     }
     accept_hint(AuthPage::new(&state, &headers, next).into_response())
 }
@@ -167,7 +167,10 @@ async fn register(
         password: form.password,
     };
     match cmd::invoke(&state, Principal::Anonymous, &args).await {
-        Ok(executed) => see_other(&next, executed.cookie(state.config.mode)),
+        Ok(executed) => {
+            let offset = executed.committed.offset;
+            see_other(&next, executed.cookie(state.config.mode), offset)
+        }
         Err(error) => {
             let mut page = AuthPage::new(&state, &headers, next);
             page.focus = "register";
@@ -203,7 +206,10 @@ async fn sign_in(
         password: form.password,
     };
     match cmd::invoke(&state, Principal::Anonymous, &args).await {
-        Ok(executed) => see_other(&next, executed.cookie(state.config.mode)),
+        Ok(executed) => {
+            let offset = executed.committed.offset;
+            see_other(&next, executed.cookie(state.config.mode), offset)
+        }
         Err(error) => {
             let mut page = AuthPage::new(&state, &headers, next);
             // An empty address is worth naming; a wrong one is not.
@@ -235,7 +241,8 @@ async fn sign_out(
     match cmd::invoke(&state, session.principal, &SignOut {}).await {
         Ok(executed) => {
             session::forget(&state, &headers);
-            see_other(&next, executed.cookie(state.config.mode))
+            let offset = executed.committed.offset;
+            see_other(&next, executed.cookie(state.config.mode), offset)
         }
         Err(error) => error.response(),
     }
@@ -243,11 +250,18 @@ async fn sign_out(
 
 /// A `303`, so the browser turns a post into a get and the back button does
 /// not offer to send the form again.
-fn see_other(location: &str, cookie: Option<String>) -> Response {
+///
+/// It carries the offset the command landed at
+/// (`api::cmd::confirmed::OFFSET_HEADER`), which a redirect has no body to
+/// say it in. That is what lets a caller register on one node and immediately
+/// command another without being declined for a person that node has not
+/// applied yet.
+fn see_other(location: &str, cookie: Option<String>, offset: rn_kernel::Offset) -> Response {
     let mut response = (StatusCode::SEE_OTHER, [(header::LOCATION, location)]).into_response();
     if let Some(cookie) = cookie.and_then(|value| value.parse().ok()) {
         response.headers_mut().insert(header::SET_COOKIE, cookie);
     }
+    cmd::stamp_offset(&mut response, offset);
     response
 }
 

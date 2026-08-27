@@ -207,6 +207,12 @@ async fn session<T: Clone + DeserializeOwned + Send + Sync + 'static>(
             continue;
         };
         heard = true;
+        if let SubMessage::Diff { offset, .. } = &message {
+            // The other way a bundle learns where the feed is: the next
+            // command it sends will not be answered out of a world older
+            // than the diff it has already rendered (`api::observed`).
+            crate::api::observed(*offset);
+        }
         // A disconnect while the socket was quiet takes effect on the next
         // thing it says, which is at worst one heartbeat away.
         if !live.open.get_untracked() {

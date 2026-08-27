@@ -114,12 +114,10 @@ async fn dispatch(
 /// The host to drive: `--host` wins, otherwise the one the seed was made
 /// against, so a drill can point the load at a survivor without re-seeding.
 fn host_of(seed: &serde_json::Value, flags: &HashMap<String, String>) -> String {
-    flags.get("host").cloned().unwrap_or_else(|| {
-        seed["host"]
-            .as_str()
-            .unwrap_or("127.0.0.1:3161")
-            .to_owned()
-    })
+    flags
+        .get("host")
+        .cloned()
+        .unwrap_or_else(|| seed["host"].as_str().unwrap_or("127.0.0.1:3161").to_owned())
 }
 
 fn read_seed(flags: &HashMap<String, String>) -> Result<serde_json::Value, String> {

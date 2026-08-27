@@ -165,6 +165,30 @@ pub async fn query<T: DeserializeOwned>(
     get(&format!("/api/q/{name}"), params).await
 }
 
+/// The highest offset this bundle has been told about.
+///
+/// Sent back as the envelope's `after` so the node that runs the next command
+/// waits until it has applied at least that far before reading anything. A
+/// bundle that talks to one node through an edge is not guaranteed to keep
+/// talking to the same one, and a command whose preconditions are read one
+/// commit behind is declined for a world the caller has already seen past
+/// (finding 2, `docs/perf/2026-08-27.md`).
+///
+/// A `Cell` rather than an atomic: a bundle is one thread, and the value is a
+/// hint whose only failure mode is waiting for nothing.
+fn seen() -> &'static std::thread::LocalKey<std::cell::Cell<u64>> {
+    thread_local! {
+        static SEEN: std::cell::Cell<u64> = const { std::cell::Cell::new(0) };
+    }
+    &SEEN
+}
+
+/// Tell the client an offset it has been shown — a subscription's diff, say,
+/// which is the other way a bundle learns where the feed is.
+pub fn observed(offset: u64) {
+    seen().with(|cell| cell.set(cell.get().max(offset)));
+}
+
 /// `POST /api/cmd/<name>` with a freshly minted idempotency key.
 ///
 /// The key is minted here rather than by the caller so that every command in
@@ -174,7 +198,7 @@ pub async fn command<A: Serialize, T: DeserializeOwned>(
     name: &str,
     args: A,
 ) -> Result<Committed<T>, ApiError> {
-    let body = CommandEnvelope::new(args);
+    let body = CommandEnvelope::after(args, seen().with(std::cell::Cell::get));
     let request = same_origin(Request::post(&format!("/api/cmd/{name}")))
         .json(&body)
         .map_err(|e| ApiError::Malformed(e.to_string()))?;
@@ -185,6 +209,7 @@ pub async fn command<A: Serialize, T: DeserializeOwned>(
     let reply: CommandReply = decode(response).await?;
     let result = serde_json::from_value(reply.result)
         .map_err(|e| ApiError::Malformed(format!("command result: {e}")))?;
+    observed(reply.offset);
     Ok(Committed {
         offset: reply.offset,
         result,

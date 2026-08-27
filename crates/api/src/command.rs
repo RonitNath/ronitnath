@@ -29,16 +29,40 @@ pub trait Command {
 pub struct CommandEnvelope<T> {
     /// The idempotency key, minted by the caller.
     pub key: Uuid,
+    /// The highest offset this caller has already been told about — the
+    /// `offset` of its last [`CommandReply`], or of the last diff its
+    /// subscription applied.
+    ///
+    /// A command reads its preconditions from the node's own state machine,
+    /// and nodes apply a commit at slightly different moments. Sending the
+    /// offset back is how a caller says "do not answer me out of a world
+    /// older than the one you have already shown me"; the node waits until it
+    /// has applied that far before reading anything. Absent, a command reads
+    /// wherever the node happens to be, which is what every caller got
+    /// before.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub after: Option<u64>,
     /// The command's arguments.
     #[serde(flatten)]
     pub args: T,
 }
 
 impl<T> CommandEnvelope<T> {
-    /// Wrap arguments with a freshly minted idempotency key.
+    /// Wrap arguments with a freshly minted idempotency key, reading from
+    /// wherever the node is.
     pub fn new(args: T) -> Self {
         Self {
             key: Uuid::new_v4(),
+            after: None,
+            args,
+        }
+    }
+
+    /// The same, waiting for a world at least as new as `after`.
+    pub fn after(args: T, after: u64) -> Self {
+        Self {
+            key: Uuid::new_v4(),
+            after: (after > 0).then_some(after),
             args,
         }
     }
@@ -80,8 +104,39 @@ impl Default for Decline {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::commands::SignIn;
+    use crate::commands::{SignIn, SignOut};
     use crate::testing::round_trip;
+
+    #[test]
+    fn an_envelope_says_nothing_about_offsets_unless_it_has_something_to_say() {
+        let quiet = CommandEnvelope::new(SignIn {
+            email: "ronit@isoastra.com".into(),
+            password: "hunter2".into(),
+        });
+        let json = serde_json::to_value(&quiet).expect("serialises");
+        assert!(
+            json.get("after").is_none(),
+            "a silent envelope stays silent"
+        );
+
+        let waiting = CommandEnvelope::after(
+            SignIn {
+                email: "ronit@isoastra.com".into(),
+                password: "hunter2".into(),
+            },
+            42,
+        );
+        assert_eq!(
+            serde_json::to_value(&waiting).expect("serialises")["after"],
+            42
+        );
+        assert_eq!(
+            CommandEnvelope::after(SignOut {}, 0).after,
+            None,
+            "offset zero is not a wait"
+        );
+        round_trip(&waiting);
+    }
 
     #[test]
     fn an_envelope_flattens_its_arguments_beside_the_key() {

@@ -13,6 +13,7 @@
 //! their own transactions (`kernel::cmd`), which is why a route that forgot
 //! would be refused by the kernel rather than by a check this file could omit.
 
+pub mod confirmed;
 mod executed;
 
 pub use executed::{CommandError, Executed};
@@ -35,6 +36,8 @@ use super::decline;
 use super::origin::SameOrigin;
 use crate::auth::session;
 use crate::state::AppState;
+use axum::http::HeaderValue;
+use rn_kernel::Offset;
 
 /// Bind command names to kernel functions.
 ///
@@ -154,6 +157,10 @@ pub async fn invoke<A: Command + serde::Serialize>(
 ) -> Result<Executed, CommandError> {
     let envelope = CommandEnvelope {
         key: Uuid::new_v4(),
+        // A form post's caller waits by the header, not by the envelope: this
+        // path is reached with arguments already typed, and the wait has
+        // happened by the time one is built.
+        after: None,
         args,
     };
     let body = serde_json::to_string(&envelope)
@@ -166,19 +173,34 @@ pub fn router() -> Router<AppState> {
 }
 
 /// The route. A cookie, a same-origin browser, a body, a command.
+///
+/// The session is resolved here rather than by an extractor, and the order is
+/// the reason: a caller that presents an `after` is telling this node it has
+/// already been shown a world that includes its own `register` — and the
+/// session that `register` minted is one of the rows a stale node has not
+/// applied yet. Waiting first means the cookie is looked up in the world the
+/// caller was promised, so the answer to "who is this" cannot be "nobody"
+/// either ([`confirmed`]).
 async fn command(
     State(state): State<AppState>,
     _: SameOrigin,
-    session: session::Session,
     Path(name): Path<String>,
     headers: axum::http::HeaderMap,
     body: String,
 ) -> Response {
-    match dispatch(&state, session.principal, name, body).await {
+    if let Some(after) = confirmed::requested(&body, &headers) {
+        confirmed::catch_up(&state, after).await;
+    }
+    let principal = match session::resolve(&state, &headers).await.principal {
+        principal @ rn_kernel::Principal::Member { .. } => principal,
+        _ => return decline::forbidden(),
+    };
+    match dispatch(&state, principal, name, body).await {
         Ok(executed) => {
             if executed.rebinds_session() {
                 session::forget(&state, &headers);
             }
+            let offset = executed.committed.offset;
             let reply = executed.reply(&state.store.reads(), state.ids()).await;
             let mut response = Json(reply).into_response();
             if let Some(value) = executed
@@ -189,9 +211,24 @@ async fn command(
                     .headers_mut()
                     .insert(axum::http::header::SET_COOKIE, value);
             }
+            stamp_offset(&mut response, offset);
             response
         }
         Err(error) => error.response(),
+    }
+}
+
+/// Say where a command landed, on the response itself.
+///
+/// The JSON reply carries the offset too, and this is for the caller that
+/// cannot read it: an `/auth` form post is answered with a redirect, and the
+/// browser or harness that follows it still has to know what to send back as
+/// `after` on its next command.
+pub fn stamp_offset(response: &mut Response, offset: Offset) {
+    if let Ok(value) = HeaderValue::from_str(&offset.to_string()) {
+        response
+            .headers_mut()
+            .insert(confirmed::OFFSET_HEADER, value);
     }
 }
 
