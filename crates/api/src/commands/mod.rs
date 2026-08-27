@@ -26,9 +26,12 @@ macro_rules! command_names {
             const NAME: &'static str = $name;
         })+
 
-        #[cfg(test)]
-        /// Every command route, for tests that need the whole vocabulary.
-        pub(crate) const ALL_NAMES: &[&str] = &[$($name),+];
+        /// Every command route, in the order `docs/rebuild/plan.md` §Product
+        /// contract lists them. The server derives its router from this, the
+        /// kernel checks its events against it, and a test asserts nothing
+        /// appears twice — so "the vocabulary" is one list rather than three
+        /// that agree by inspection.
+        pub const ALL_COMMAND_NAMES: &[&str] = &[$($name),+];
     };
 }
 
@@ -67,8 +70,8 @@ mod tests {
     #[test]
     fn the_product_contract_is_covered_exactly_once() {
         // The list in docs/rebuild/plan.md §Product contract, verbatim.
-        assert_eq!(ALL_NAMES.len(), 25);
-        let mut sorted = ALL_NAMES.to_vec();
+        assert_eq!(ALL_COMMAND_NAMES.len(), 25);
+        let mut sorted = ALL_COMMAND_NAMES.to_vec();
         sorted.sort_unstable();
         let count = sorted.len();
         sorted.dedup();
@@ -77,7 +80,7 @@ mod tests {
 
     #[test]
     fn route_names_are_lowercase_kebab_case() {
-        for name in ALL_NAMES {
+        for name in ALL_COMMAND_NAMES {
             assert!(
                 name.chars().all(|c| c.is_ascii_lowercase() || c == '-')
                     && !name.starts_with('-')

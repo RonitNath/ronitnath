@@ -14,7 +14,7 @@ mod replicated;
 mod sql;
 mod sqlite;
 #[cfg(test)]
-mod tests;
+pub(crate) mod tests;
 mod value;
 
 pub use sql::{Expect, Sql, Stmt, StoreError};

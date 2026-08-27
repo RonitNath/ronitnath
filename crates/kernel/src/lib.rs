@@ -27,10 +27,23 @@
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
 
+pub mod audit;
+pub mod cmd;
+pub mod domain;
+pub mod error;
+pub mod event;
+pub mod feed;
 pub mod ids;
+pub mod observe;
+pub mod password;
+pub mod principal;
 pub mod store;
+pub mod testing;
 
+pub use error::{Decline, Invalid, KernelError, Outcome};
+pub use event::{Committed, Event};
 pub use ids::{Id, IdKey};
+pub use principal::{Principal, SubjectSet};
 pub use store::{Migrations, ReadStore, Sql, Store};
 
 /// Unix seconds. Every instant in the schema is one of these.
