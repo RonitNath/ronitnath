@@ -123,3 +123,81 @@ async fn explain_membership_expansion_rides_the_party_index() {
     .await;
     rides(&plan, "membership_party_idx");
 }
+
+// --------------------------------------------------------------- merge ---
+//
+// The two reads a merged deployment does on every request that names a person
+// or opens the queue: following an alias, and asking what is proposed about an
+// identity. Both are seeks, and both are asserted here rather than assumed,
+// because a merge-heavy deployment runs them constantly and neither would fail
+// a functional test if the index went away.
+
+#[tokio::test]
+async fn explain_alias_resolution_rides_the_primary_key() {
+    let harness = Local::new();
+    let who = harness
+        .register("Ronit", "plan-alias@example.test")
+        .await
+        .expect("registers");
+    let plan = plan(
+        &harness,
+        rn_kernel::merge::ALIAS_SQL,
+        bind![who.principal.acting_as().expect("acts as somebody")],
+    )
+    .await;
+    let joined = plan.join("\n");
+    // `old_person_id` is an INTEGER PRIMARY KEY, so it *is* the rowid: one hop
+    // of the chain is the cheapest lookup SQLite has.
+    assert!(
+        joined.contains("SEARCH person_alias USING INTEGER PRIMARY KEY"),
+        "an alias hop must be a rowid seek:\n{joined}"
+    );
+}
+
+#[tokio::test]
+async fn explain_the_match_queue_rides_the_identity_index() {
+    let harness = Local::new();
+    let who = harness
+        .register("Ronit", "plan-queue@example.test")
+        .await
+        .expect("registers");
+    let identity = who.principal.identity().expect("a member");
+    let by_identity = plan(
+        &harness,
+        rn_kernel::merge::candidate::BY_IDENTITY_SQL,
+        bind![identity],
+    )
+    .await;
+    rides(&by_identity, "match_candidate_a_idx");
+
+    // And one candidate by its row, which every proof reads first.
+    let by_id = plan(
+        &harness,
+        rn_kernel::merge::candidate::BY_ID_SQL,
+        bind![1i64],
+    )
+    .await;
+    assert!(
+        by_id.join("\n").contains("INTEGER PRIMARY KEY"),
+        "a candidate is read by its rowid:\n{}",
+        by_id.join("\n")
+    );
+}
+
+#[tokio::test]
+async fn explain_the_signal_scan_rides_the_verified_value_index() {
+    let harness = Local::new();
+    let who = harness
+        .register("Ronit", "plan-scan@example.test")
+        .await
+        .expect("registers");
+    let plan = plan(
+        &harness,
+        rn_kernel::merge::scan::SHARED_FACTOR_SQL,
+        bind![who.principal.identity().expect("a member")],
+    )
+    .await;
+    // Without this index, every registration asks "who else has proven this
+    // value" by reading every factor in the deployment.
+    rides(&plan, "factor_verified_value_idx");
+}
