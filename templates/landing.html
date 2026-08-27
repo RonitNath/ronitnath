@@ -8,6 +8,9 @@
 {#- Server clock at render: every browser draws the same instant, however
     wrong its own clock is. -#}
 <meta name="rn-server-epoch-ms" content="{{ epoch_ms }}">
+{#- The atlas's own stylesheet, built and served with the bundle that draws
+    it. Linked after site.css so the star labels' button reset wins. -#}
+<link rel="stylesheet" href="/pkg/starscape/explorer.css">
 <script type="module">
   import init from "/pkg/starscape/rn-starscape.js";
   init();
@@ -31,6 +34,10 @@
           role="application" tabindex="0"
           aria-label="Choose an observer location on the globe"></canvas>
   <p id="grounding" class="grounding"></p>
+  {#- Both controls are inert until the bundle wires them: the atlas is the
+      bundle's, and so is the observer the orbit would resume from. -#}
+  <button type="button" id="starscape-launch" class="starscape-launch"
+          data-state="idle">Open atlas</button>
   <button type="button" id="resume-orbit" class="resume-orbit" hidden>Resume orbit</button>
 </div>
 

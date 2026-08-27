@@ -1,10 +1,10 @@
 //! `window.__rnStarscape` — the sky's state, readable and drivable from JS.
 //!
 //! This exists for two callers: the end-to-end suite, which has to be able to
-//! assert on where the view is rather than on what a canvas looks like, and a
-//! later deep-zoom explorer, which will need the same view matrix this bundle
-//! draws with. It is deliberately small and deliberately named: an interop
-//! surface, not a debug hook that grew.
+//! assert on where the view is rather than on what a canvas looks like, and the
+//! deep-zoom atlas, which opens on the same view matrix this bundle draws with.
+//! It is deliberately small and deliberately named: an interop surface, not a
+//! debug hook that grew.
 
 use std::rc::Rc;
 
@@ -13,6 +13,7 @@ use wasm_bindgen::closure::Closure;
 
 use crate::app::App;
 use crate::dom;
+use crate::explorer::{self, Launch};
 use crate::sky::{sim_time_ms, view_matrix};
 
 const GLOBAL: &str = "__rnStarscape";
@@ -73,6 +74,17 @@ pub fn install(app: &Rc<App>) {
     });
     let _ = js_sys::Reflect::set(&api, &"resumeOrbit".into(), closure.as_ref());
     closure.forget();
+
+    let atlas = Rc::clone(app);
+    let closure = Closure::<dyn Fn()>::new(move || explorer::open(&atlas, Launch::Sky));
+    let _ = js_sys::Reflect::set(&api, &"openAtlas".into(), closure.as_ref());
+    closure.forget();
+
+    let closure = Closure::<dyn Fn()>::new(explorer::close);
+    let _ = js_sys::Reflect::set(&api, &"closeAtlas".into(), closure.as_ref());
+    closure.forget();
+
+    function0(&api, "atlas", explorer::state);
 
     let _ = js_sys::Reflect::set(&js_sys::global(), &GLOBAL.into(), &api);
     let _ = dom::window();

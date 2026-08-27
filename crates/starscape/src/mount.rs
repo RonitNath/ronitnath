@@ -8,14 +8,16 @@
 
 use std::rc::Rc;
 
+use wasm_bindgen::JsCast;
 use wasm_bindgen_futures::spawn_local;
 use web_sys::{Event, PointerEvent};
 
 use crate::app::App;
+use crate::explorer::{self, Launch};
 use crate::globe::Globe;
 use crate::label::UPDATE_INTERVAL_MS;
 use crate::render::Scene;
-use crate::{dom, interop, telemetry};
+use crate::{callouts, dom, interop, telemetry};
 
 /// Movement under this many pixels is a click, not a drag.
 const CLICK_SLOP_PX: f64 = 4.0;
@@ -31,6 +33,7 @@ pub fn start() {
     let app = App::new(server_epoch_ms());
     interop::install(&app);
     listen_to_the_page(&app, &canvas);
+    listen_for_the_atlas(&app);
 
     match Scene::create(canvas) {
         Ok(scene) => app.attach_sky(scene),
@@ -55,9 +58,21 @@ async fn load(app: Rc<App>) {
     match app.load_stars().await {
         Ok(bright) => {
             app.draw();
-            if let Err(error) = app.load_named(&bright).await {
-                dom::warn("star names unavailable:", &error);
+            let named = app.load_named(&bright).await;
+            if let Err(error) = &named {
+                dom::warn("star names unavailable:", error);
             }
+            // Star labels are progressive enhancement: without them the sky is
+            // unnamed, and the atlas still opens on the launcher.
+            if let Some(layer) = dom::element("star-annotations") {
+                let _ = layer.set_attribute(
+                    "data-annotations-ready",
+                    if named.is_ok() { "true" } else { "false" },
+                );
+            }
+            // The atlas opens on these same bytes. 244 KB held is a second
+            // fetch, and a first frame, saved.
+            explorer::retain_catalog(bright);
         }
         Err(error) => {
             // The CSS starfield is the picture. Nothing else on the page cares.
@@ -218,11 +233,47 @@ fn listen_to_the_globe(app: &Rc<App>, canvas: &web_sys::HtmlCanvasElement) {
 fn schedule_readouts(app: &Rc<App>) {
     let readouts = Rc::clone(app);
     dom::set_interval(UPDATE_INTERVAL_MS, move || {
-        if readouts.reduced_motion() {
+        // Nothing behind the atlas is visible, and relaying out labels that
+        // cannot be seen is the cost of the sky without the picture.
+        if readouts.reduced_motion() || explorer::is_open() {
             return;
         }
         readouts.draw_readouts();
     });
+}
+
+/// The two ways into the atlas: the launcher, and any star label.
+///
+/// The labels are handled by one listener on their container rather than one
+/// per label, because the set of labels is rebuilt whenever the sky turns far
+/// enough to change which stars are overhead.
+fn listen_for_the_atlas(app: &Rc<App>) {
+    if let Some(button) = dom::element(crate::explorer::LAUNCH_ID) {
+        let app = Rc::clone(app);
+        dom::listen::<Event>(button.as_ref(), "click", move |_| {
+            explorer::open(&app, Launch::Sky);
+        });
+    }
+    if let Some(layer) = dom::element("star-annotations") {
+        let app = Rc::clone(app);
+        dom::listen::<Event>(layer.as_ref(), "click", move |event: Event| {
+            let Some(label) = event
+                .target()
+                .and_then(|target| target.dyn_into::<web_sys::Element>().ok())
+                .and_then(|element| element.closest(".star-callout").ok().flatten())
+            else {
+                return;
+            };
+            let position = label
+                .get_attribute(callouts::POSITION_ATTRIBUTE)
+                .as_deref()
+                .and_then(callouts::parse_position);
+            let (Some(position), Some(name)) = (position, label.get_attribute("data-name")) else {
+                return;
+            };
+            explorer::open(&app, Launch::Star { name, position });
+        });
+    }
 }
 
 /// The server's clock at render, published by the askama landing so every

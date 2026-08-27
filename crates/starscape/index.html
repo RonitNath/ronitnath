@@ -4,6 +4,9 @@
     <meta charset="utf-8" />
     <title>rn-starscape</title>
     <link data-trunk rel="rust" data-bin="rn-starscape" data-cargo-profile="wasm-release" />
+    <!-- The atlas's stylesheet rides with the bundle that builds the atlas.
+         Trunk copies it into dist unhashed, and the askama landing links it. -->
+    <link data-trunk rel="copy-file" href="explorer.css" />
   </head>
   <body></body>
 </html>

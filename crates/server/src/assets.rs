@@ -9,14 +9,17 @@
 //! catalog, fetched by byte range and only by a deep-zoom client. Embedding it
 //! would put 49 MB into every binary and every layer of the image to serve a
 //! file nothing on the landing page requests. It stays on disk under
-//! `static_dir` in both modes, and 404s if the deployment did not ship it.
+//! `static_dir` in both modes, is served by [`range`], and 404s if the
+//! deployment did not ship it.
+
+mod range;
 
 use std::path::{Component, Path, PathBuf};
 
 use axum::Router;
 use axum::body::Body;
 use axum::extract::{Path as UrlPath, State};
-use axum::http::{StatusCode, header};
+use axum::http::{HeaderMap, StatusCode, header};
 use axum::response::{IntoResponse, Response};
 use axum::routing::get;
 use rust_embed::Embed;
@@ -95,7 +98,7 @@ pub fn router() -> Router<AppState> {
     Router::new()
         .route("/favicon.ico", get(favicon))
         .route("/tokens.css", get(tokens))
-        .route("/static/{*path}", get(serve(Tree::Static)))
+        .route("/static/{*path}", get(static_asset))
         .route("/pkg/starscape/{*path}", get(serve(Tree::Starscape)))
         .route("/app/pkg/{*path}", get(serve(Tree::Member)))
         .route("/org/pkg/{*path}", get(serve(Tree::Org)))
@@ -142,6 +145,23 @@ fn head_fragment(document: &str) -> Option<String> {
     let head = document.split_once("<head>")?.1.split_once("</head>")?.0;
     let start = head.find("<link").or_else(|| head.rfind("<script"))?;
     Some(head[start..].trim().to_owned())
+}
+
+/// The as-is tree. Everything in it is embedded and answered from memory
+/// except the regional catalog, which is on disk and answered by byte range.
+async fn static_asset(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    UrlPath(path): UrlPath<String>,
+) -> Response {
+    let Some(path) = sanitize(&path) else {
+        return StatusCode::NOT_FOUND.into_response();
+    };
+    if path.starts_with(range::PREFIX) {
+        let file = state.config.static_dir.join(&path);
+        return range::respond(file, content_type(&path), &headers).await;
+    }
+    respond(Tree::Static, &state, &path)
 }
 
 fn respond(tree: Tree, state: &AppState, path: &str) -> Response {

@@ -26,6 +26,7 @@ serde_json = { workspace = true }
 workspace = true
 features = [
     "Blob",
+    "CanvasRenderingContext2d",
     "CssStyleDeclaration",
     "CustomEvent",
     "Document",
@@ -34,10 +35,13 @@ features = [
     "Element",
     "Event",
     "EventTarget",
+    "Headers",
     "HtmlCanvasElement",
     "HtmlCollection",
     "HtmlElement",
     "ImageBitmap",
+    "ImageData",
+    "KeyboardEvent",
     "Location",
     "MediaQueryList",
     "MouseEvent",
@@ -55,6 +59,7 @@ features = [
     "WebGlShader",
     "WebGlTexture",
     "WebGlUniformLocation",
+    "WheelEvent",
     "Window",
     "console",
 ]

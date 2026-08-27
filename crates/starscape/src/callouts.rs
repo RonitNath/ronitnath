@@ -1,15 +1,23 @@
 //! Named-star labels drawn over the sky.
 //!
-//! These are readouts, not controls: they name what is overhead right now. The
-//! catalog is IAU names with SIMBAD classifications and distances, so every
-//! line is something the sky actually contains — which is why the label carries
-//! the constellation and the distance rather than a caption about the sky.
+//! They name what is overhead right now — the catalog is IAU names with SIMBAD
+//! classifications and distances, so every line is something the sky actually
+//! contains, which is why a label carries the constellation and the distance
+//! rather than a caption about the sky.
+//!
+//! Each one is also the way into the atlas: a label points at a star, so
+//! clicking it opens the atlas already tracking that star. That is why they are
+//! buttons carrying the star's catalog position, and not text.
 
 use web_sys::Element;
 
 use crate::annotate::Placement;
 use crate::catalog::NamedStar;
 use crate::dom;
+
+/// The attribute a label carries its J2000 position in, so the click handler
+/// can aim the atlas without a second lookup into the catalog.
+pub const POSITION_ATTRIBUTE: &str = "data-position";
 
 /// How many labels the frame carries at once. Three is what fits down one side
 /// of a phone without the sky becoming a list.
@@ -43,10 +51,17 @@ pub fn render(container: &Element, stars: &[NamedStar], placements: &[Placement]
             let Some(star) = stars.get(placement.star) else {
                 continue;
             };
-            let Ok(label) = document.create_element("div") else {
+            let Ok(label) = document.create_element("button") else {
                 continue;
             };
+            let _ = label.set_attribute("type", "button");
             let _ = label.set_attribute("data-star", &placement.star.to_string());
+            let _ = label.set_attribute("data-name", &star.name);
+            let _ = label.set_attribute(POSITION_ATTRIBUTE, &position_attribute(placement));
+            let _ = label.set_attribute(
+                "aria-label",
+                &format!("Open the atlas on {}, {}", star.name, detail(star)),
+            );
             label.set_inner_html(&format!(
                 "<strong>{}</strong><span>{}</span>",
                 escape(&star.name),
@@ -75,6 +90,27 @@ pub fn render(container: &Element, stars: &[NamedStar], placements: &[Placement]
             &format!("left:{left:.2}%;top:{top:.2}%;transform:translate(-50%,-50%)"),
         );
     }
+}
+
+/// A placement's sky direction, as the three numbers the atlas opens on.
+fn position_attribute(placement: &Placement) -> String {
+    let [x, y, z] = placement.position;
+    format!("{x},{y},{z}")
+}
+
+/// Read a position back off a label. Anything that is not three finite numbers
+/// is no position at all: the atlas would otherwise open on a NaN direction and
+/// draw an empty sky with no way to tell why.
+#[must_use]
+pub fn parse_position(value: &str) -> Option<[f64; 3]> {
+    let mut parts = value.split(',').map(str::trim).map(str::parse::<f64>);
+    let mut next = || parts.next()?.ok().filter(|value| value.is_finite());
+    let position = [next()?, next()?, next()?];
+    if parts.next().is_some() {
+        return None;
+    }
+    let norm = position[0].hypot(position[1]).hypot(position[2]);
+    (norm > 0.5).then_some(position)
 }
 
 /// Whether the container already labels exactly these stars, in this order.
@@ -123,6 +159,7 @@ mod tests {
         let at = |x, y| {
             css_position(&Placement {
                 star: 0,
+                position: [0.0, 0.0, 1.0],
                 x,
                 y,
                 forced: false,
@@ -142,6 +179,28 @@ mod tests {
         assert!(detail.contains(&star.constellation));
         assert!(detail.ends_with(" ly"));
         assert_eq!(detail.matches(" · ").count(), 2);
+    }
+
+    #[test]
+    fn a_label_carries_the_direction_the_atlas_would_open_on() {
+        let placement = Placement {
+            star: 4,
+            position: [0.5, -0.5, std::f64::consts::FRAC_1_SQRT_2],
+            x: 0.4,
+            y: -0.2,
+            forced: false,
+        };
+        assert_eq!(
+            parse_position(&position_attribute(&placement)),
+            Some(placement.position)
+        );
+    }
+
+    #[test]
+    fn a_direction_that_is_not_a_direction_opens_nothing() {
+        for junk in ["", "0,0,0", "1,2", "NaN,0,1", "a,b,c", "1,2,3,4"] {
+            assert_eq!(parse_position(junk), None, "{junk}");
+        }
     }
 
     #[test]
