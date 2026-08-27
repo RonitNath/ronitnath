@@ -1,0 +1,98 @@
+# rn-site workspace. Layout and version pins are fixed by docs/rebuild/plan.md
+# §Workspace: every dependency version is written down exactly once here and
+# every crate inherits it, so a bump is one line and no two crates can drift.
+
+[workspace]
+resolver = "3"
+members = [
+    "crates/api",
+    "crates/kernel",
+    "crates/server",
+    "crates/ui",
+    "crates/app-member",
+    "crates/app-org",
+    "crates/app-platform",
+    "crates/starscape",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.97"
+license = "UNLICENSED"
+publish = false
+
+[workspace.dependencies]
+# Internal.
+rn-api = { path = "crates/api" }
+rn-kernel = { path = "crates/kernel" }
+rn-ui = { path = "crates/ui" }
+
+# Browser. Leptos 0.8 is the latest stable line; 0.9 is still beta and a
+# CSR-only frontend has no reason to ride a beta.
+leptos = { version = "0.8.20", default-features = false }
+leptos_router = { version = "0.8.15", default-features = false }
+wasm-bindgen = "0.2.127"
+wasm-bindgen-futures = "0.4.56"
+js-sys = "0.3.104"
+web-sys = "0.3.104"
+gloo-net = "0.7.0"
+console_error_panic_hook = "0.1.7"
+
+# Server.
+axum = { version = "0.8.9", features = ["ws"] }
+tokio = { version = "1.53.1", features = ["rt-multi-thread", "signal", "macros", "sync", "time"] }
+tower-http = { version = "0.7.0", features = ["trace"] }
+askama = "0.16.0"
+# askama_axum is deprecated upstream; askama_web is the current integration and
+# carries the axum 0.8 shim behind a feature.
+askama_web = { version = "0.16.0", features = ["axum-0.8"] }
+rust-embed = "8.12.0"
+
+# Storage. The feature set is the one the pre-rebuild crate proved on the live
+# cluster: no `backup` (it needs S3 and EncKeys, which breaks a bare
+# `cargo run`) and no `shutdown-handle` (the server owns its own signals).
+hiqlite = { version = "0.14.0", default-features = false, features = [
+    "sqlite",
+    "auto-heal",
+    "cache",
+    "macros",
+    "toml",
+    "listen_notify_local",
+] }
+rusqlite = { version = "0.40.2", features = ["bundled"] }
+
+# Shared.
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.151"
+# `js` is the browser randomness source: a bundle mints its own idempotency
+# keys, so `Uuid::new_v4()` has to work on wasm32. Inert off wasm.
+uuid = { version = "1.26.0", features = ["v4", "serde", "js"] }
+futures-util = { version = "0.3.34", features = ["sink"] }
+thiserror = "2.0.20"
+tracing = { version = "0.1.44", features = ["attributes"] }
+tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
+config = "0.15.25"
+clap = { version = "4.6.6", features = ["derive"] }
+
+# Crypto: argon2 for password factors, sha2 for bearer-token hashes, aes for
+# the public-id derivation, base64 for its encoding.
+argon2 = "0.5.3"
+sha2 = "0.11.0"
+aes = "0.9.2"
+base64 = "0.23.1"
+
+# Test and measurement.
+criterion = "0.8.2"
+proptest = "1.11.0"
+axum-test = "21.1.0"
+tempfile = "3.27.0"
+
+# The wasm bundles are shipped over the wire, so they are optimised for size,
+# and a panic in a browser bundle has nothing to unwind into.
+[profile.wasm-release]
+inherits = "release"
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"

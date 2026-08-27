@@ -1,0 +1,89 @@
+//! One arguments struct per command in `docs/rebuild/plan.md` §Product
+//! contract, grouped by what the command is about.
+//!
+//! The fields are the minimum the kernel needs to execute the command; nothing
+//! the server can determine for itself is on the wire. In particular an
+//! identity's `source`, the acting principal, and every `at` timestamp are the
+//! server's to stamp, so no command accepts them.
+
+mod identity;
+mod merge;
+mod org;
+mod resource;
+
+pub use identity::{
+    AddFactor, Disable, Enable, FactorKind, Register, RemoveFactor, RevokeSession, SignIn, SignOut,
+    VerifyEmail,
+};
+pub use merge::{ConfirmMatch, MatchSignal, ProposeMatch, RuleMatch, Split};
+pub use org::{ClaimLink, CreateGroup, CreateOrganization, Invite, Leave, SetRole};
+pub use resource::{CreateDocument, EditDocument, PublishDocument, Revoke, Share, Transfer};
+
+/// Implement [`Command`](crate::command::Command) for a list of args structs.
+macro_rules! command_names {
+    ($($ty:ty => $name:literal),+ $(,)?) => {
+        $(impl $crate::command::Command for $ty {
+            const NAME: &'static str = $name;
+        })+
+
+        #[cfg(test)]
+        /// Every command route, for tests that need the whole vocabulary.
+        pub(crate) const ALL_NAMES: &[&str] = &[$($name),+];
+    };
+}
+
+command_names! {
+    Register => "register",
+    SignIn => "sign-in",
+    SignOut => "sign-out",
+    RevokeSession => "revoke-session",
+    AddFactor => "add-factor",
+    RemoveFactor => "remove-factor",
+    VerifyEmail => "verify-email",
+    CreateOrganization => "create-organization",
+    CreateGroup => "create-group",
+    Invite => "invite",
+    ClaimLink => "claim-link",
+    SetRole => "set-role",
+    Leave => "leave",
+    Share => "share",
+    Revoke => "revoke",
+    Transfer => "transfer",
+    CreateDocument => "create-document",
+    EditDocument => "edit-document",
+    PublishDocument => "publish-document",
+    ProposeMatch => "propose-match",
+    ConfirmMatch => "confirm-match",
+    RuleMatch => "rule-match",
+    Split => "split",
+    Disable => "disable",
+    Enable => "enable",
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_product_contract_is_covered_exactly_once() {
+        // The list in docs/rebuild/plan.md §Product contract, verbatim.
+        assert_eq!(ALL_NAMES.len(), 25);
+        let mut sorted = ALL_NAMES.to_vec();
+        sorted.sort_unstable();
+        let count = sorted.len();
+        sorted.dedup();
+        assert_eq!(sorted.len(), count, "two commands share a route name");
+    }
+
+    #[test]
+    fn route_names_are_lowercase_kebab_case() {
+        for name in ALL_NAMES {
+            assert!(
+                name.chars().all(|c| c.is_ascii_lowercase() || c == '-')
+                    && !name.starts_with('-')
+                    && !name.ends_with('-'),
+                "{name} is not a kebab-case route segment"
+            );
+        }
+    }
+}
