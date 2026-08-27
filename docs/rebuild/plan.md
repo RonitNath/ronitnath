@@ -35,7 +35,9 @@ Non-goals for this cut (backlog, absent from code): the hiqlite multi-raft
 fork, Zenoh, the commitlog state machine, Loro, zone migration, passkeys/OIDC
 factors beyond the schema column, events/calendar/photos products, `/metrics`.
 The fabric seam is a trait (`kernel::feed::Feed`) implemented on hiqlite
-listen/notify today so rung 6 swaps transport without touching callers.
+listen/notify today so rung 6 swaps transport without touching callers. Email
+factors are unique deployment-wide (`factor_email_unique_idx`); source-scoped
+uniqueness for imported identities is backlog with the import feature.
 
 Data lifecycle: **disposable-dev**. The live cluster's state is archived, not
 migrated, at cutover (that cutover is a separate owner decision — see §Release).
@@ -97,7 +99,9 @@ commenter < editor` on documents; `member < admin < owner` on organizations and
 groups; `contact` (person #contact @group); `operator` (platform:* #operator
 @person). Nesting in code. `check()` is one indexed query over the expanded
 subject set. Groups never own; persons and organizations own; `Transfer` is
-the only way an owner changes. Product tables reference `identity_id`, never
+the only *command* that changes an owner — a merge moves
+`resource.owner_party_id` and the `#owner` row onto the survivor, and `Split`
+moves them back, because there the owner is not changing, the person is. Product tables reference `identity_id`, never
 `person_id`.
 
 Statuses are projections: `party.status ∈ active|disabled|merged`,
