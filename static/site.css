@@ -1,4 +1,4 @@
-/* The public landing's own tokens, and the font it is set in.
+/* The public landing's own tokens.
  *
  * `crates/ui/tokens.css` is the site's palette and carries every value the
  * bundles and the askama pages share. What is here is the landing and nothing
@@ -6,15 +6,10 @@
  * that sit on top of the sky, and the two type sizes this one page uses. They
  * live beside the rules that read them rather than in the shared file, because
  * a token no other surface can use is not shared — it is this page's.
+ *
+ * The display face is declared in `fonts.css`, which every server-rendered
+ * page links.
  */
-
-@font-face {
-    font-family: "Agency Bold";
-    src: url("/static/fonts/agency-bold.ttf") format("truetype");
-    font-weight: 400 700;
-    font-style: normal;
-    font-display: swap;
-}
 
 :root {
     --topbar-height: 4.45rem;

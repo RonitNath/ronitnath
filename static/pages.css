@@ -46,9 +46,26 @@ body {
     margin-bottom: 0.5rem;
 }
 
-.pane .commit {
+/* Buttons size to their words. A commit stretched across its column reads as
+ * a banner rather than as a thing to press. */
+.commit {
     justify-self: start;
+}
+
+.pane .commit {
     margin-top: 0.5rem;
+}
+
+/* The one anchor that is a commit — signing in to accept a link is a
+ * navigation, and it must not look like a different kind of control for it. */
+a.commit {
+    display: inline-block;
+    text-decoration: none;
+}
+
+a.commit:hover {
+    color: var(--bg);
+    text-decoration: none;
 }
 
 /* A form-level refusal sits where the reader's eye already is: immediately
@@ -65,6 +82,7 @@ body {
 
 .claim {
     display: grid;
+    justify-items: start;
     gap: 1rem;
     max-width: 26rem;
 }
