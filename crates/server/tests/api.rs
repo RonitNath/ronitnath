@@ -212,7 +212,7 @@ fn the_queries_carry_a_persons_own_rows_and_none_of_their_secrets() {
         assert_ne!(theirs_rows[0]["public_id"], rows[0]["public_id"]);
 
         // A name no query serves is refused, not guessed at.
-        for absent in ["documents", "everything", "..%2fwhoami"] {
+        for absent in ["people", "everything", "..%2fwhoami"] {
             let response = server
                 .get(&format!("/api/q/{absent}"))
                 .add_header("cookie", cookie.clone())

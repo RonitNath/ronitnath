@@ -18,9 +18,10 @@ use super::{Params, Row};
 const SESSIONS: &str = "SELECT id, expires_at, created_at, last_seen_at FROM session \
                         WHERE identity_id = $1 ORDER BY created_at DESC";
 
-const MY_IDENTITY: &str = "SELECT id, source, status, created_at FROM identity WHERE id = $1";
+const MY_IDENTITY: &str =
+    "SELECT id, source, home_zone, status, created_at FROM identity WHERE id = $1";
 
-const OUR_IDENTITIES: &str = "SELECT id, source, status, created_at FROM identity \
+const OUR_IDENTITIES: &str = "SELECT id, source, home_zone, status, created_at FROM identity \
                               WHERE person_id = $1 ORDER BY created_at";
 
 const FACTORS: &str = "SELECT id, kind, verified_at FROM factor \
@@ -79,6 +80,7 @@ pub(super) async fn sessions(
 struct IdentitySummary {
     id: Id<Identity>,
     source: String,
+    home_zone: String,
     status: String,
     created_at: i64,
 }
@@ -88,6 +90,7 @@ impl FromRow for IdentitySummary {
         Ok(Self {
             id: row.id("id")?,
             source: row.text("source")?,
+            home_zone: row.text("home_zone")?,
             status: row.text("status")?,
             created_at: row.int("created_at")?,
         })
@@ -142,6 +145,10 @@ pub(super) async fn identities(
             value: json!({
                 "public_id": public_id,
                 "source": summary.source,
+                // Which zone the registration's rows live in. A deployment
+                // fact, not a secret, and the one thing on this page that says
+                // where "here" is.
+                "home_zone": summary.home_zone,
                 "status": summary.status,
                 "created_at": summary.created_at,
                 "current": summary.id == identity,

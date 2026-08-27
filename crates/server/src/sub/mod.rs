@@ -23,6 +23,7 @@ pub mod invalidate;
 pub mod limits;
 pub mod outbox;
 
+use std::collections::BTreeMap;
 use std::time::Duration;
 
 use axum::Router;
@@ -39,7 +40,7 @@ use serde_json::Value;
 pub use limits::{ConnectionGuard, Connections, Refused};
 pub use outbox::Outbox;
 
-use crate::api::query::{self, Named};
+use crate::api::query::{self, Named, Scope};
 use crate::auth::session::Session;
 use crate::state::AppState;
 
@@ -91,6 +92,7 @@ async fn serve(socket: WebSocket, state: AppState, principal: Principal, guard: 
         cursor: 0,
         outbox: Outbox::default(),
         started: false,
+        sets: BTreeMap::new(),
     };
     let (mut sink, mut stream) = socket.split();
     let mut wakes = Box::pin(connection.state.feed.subscribe());
@@ -141,6 +143,10 @@ struct Connection {
     cursor: Offset,
     outbox: Outbox,
     started: bool,
+    /// What each [`Scope::Set`] query last sent, so a row that leaves the set
+    /// can be reported as having left it. Bounded by the queries' own page
+    /// sizes, which is what a client is holding anyway.
+    sets: BTreeMap<&'static str, BTreeMap<String, Value>>,
 }
 
 impl Connection {
@@ -194,6 +200,9 @@ impl Connection {
                     continue;
                 }
             };
+            if query.scope() == Scope::Set {
+                self.sets.insert(query.as_str(), query::remember(&rows));
+            }
             let keys: Vec<String> = rows.iter().map(|row| row.key.clone()).collect();
             self.outbox.push(SubMessage::Diff {
                 offset: head,
@@ -218,10 +227,13 @@ impl Connection {
                 return;
             }
         };
-        let key = self.state.ids();
         for committed in events {
             for query in self.queries.clone() {
-                let keys = query.changed(&committed.event, &self.principal, key);
+                if query.scope() == Scope::Set {
+                    self.resend(query, &committed).await;
+                    continue;
+                }
+                let keys = query.changed(&committed.event, &self.principal, self.state.ids());
                 if keys.is_empty() {
                     continue;
                 }
@@ -247,6 +259,43 @@ impl Connection {
             }
             self.cursor = self.cursor.max(committed.offset);
         }
+    }
+
+    /// Re-read a set-scoped query and send what moved.
+    ///
+    /// The event is a hint about the *kind* of change ([`Named::watches`]);
+    /// what is sent is the difference between the set as it is now and the set
+    /// this connection last sent, which is the only form that can report a row
+    /// leaving a result set the reader shares with other people.
+    async fn resend(&mut self, query: Named, committed: &rn_kernel::Committed) {
+        if !query.watches(&committed.event) {
+            return;
+        }
+        let rows = match query::read(
+            &self.state.store.reads(),
+            query,
+            &self.principal,
+            &query::Params::default(),
+        )
+        .await
+        {
+            Ok(rows) => rows,
+            Err(error) => {
+                tracing::warn!(%error, query = query.as_str(), "a diff could not be read");
+                return;
+            }
+        };
+        let previous = self.sets.entry(query.as_str()).or_default();
+        let ops = query::diff(previous, &rows);
+        *previous = query::remember(&rows);
+        if ops.is_empty() {
+            return;
+        }
+        self.outbox.push(SubMessage::Diff {
+            offset: committed.offset,
+            query: query.as_str().to_owned(),
+            ops,
+        });
     }
 
     /// Where the feed ends, asked of the feed itself.
