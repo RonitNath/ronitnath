@@ -168,7 +168,7 @@ pub fn Editor() -> impl IntoView {
         </PageHead>
         <Note refusal=refusal />
         <div class="sections">
-            <Section title="Words" wide=true>{words}</Section>
+            <Section title="Words">{words}</Section>
             <Section title="About">{facts}</Section>
             <Sharing document=Signal::derive(move || id.get()) />
         </div>

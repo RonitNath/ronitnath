@@ -63,7 +63,8 @@ pub fn Sessions() -> impl IntoView {
 
     view! {
         <PageHead title="Sessions" />
-        <table class="tbl">
+        <div class="sheet">
+            <table class="tbl">
             <thead>
                 <tr>
                     <th class="p1" scope="col">"Signed in"</th>
@@ -73,8 +74,9 @@ pub fn Sessions() -> impl IntoView {
                     <th class="p1" scope="col">""</th>
                 </tr>
             </thead>
-            <tbody>{rows}</tbody>
-        </table>
+                <tbody>{rows}</tbody>
+            </table>
+        </div>
         <Note refusal=refusal />
     }
 }

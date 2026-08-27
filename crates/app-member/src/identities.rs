@@ -91,10 +91,13 @@ fn Proven(factor: Factor, identity: String, refusal: RwSignal<Option<Refusal>>) 
             |_| {},
         );
     });
-    let state = if factor.verified {
-        "verified"
-    } else {
-        "unverified"
+    // A password is not a thing anybody verifies: it is proven every time it
+    // is used, and `verified_at` is null on one for that reason. Saying
+    // "unverified" beside it would be reporting a state that does not exist.
+    let state = match (factor.kind.as_str(), factor.verified) {
+        ("password", _) => "set",
+        (_, true) => "verified",
+        (_, false) => "unverified",
     };
     view! {
         <Pair label=titled(&factor.kind)>

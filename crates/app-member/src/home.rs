@@ -79,7 +79,8 @@ pub fn Home() -> impl IntoView {
             <Section title="You">{identity}</Section>
             <Section title="Organizations">{organizations}</Section>
             <Section title="Your commands" wide=true>
-                <Table
+                <div class="sheet">
+                    <Table
                     rows=rows
                     columns=vec![
                         Column::new("When", |row: &Audited| when(row.at)).mono(),
@@ -88,9 +89,10 @@ pub fn Home() -> impl IntoView {
                             .mono()
                             .priority(Priority::Secondary),
                     ]
-                    empty="Nothing yet. Every command you run lands here."
-                    per_page=15
-                />
+                        empty="Nothing yet. Every command you run lands here."
+                        per_page=15
+                    />
+                </div>
             </Section>
         </div>
     }

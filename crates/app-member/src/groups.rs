@@ -76,6 +76,14 @@ pub fn Groups() -> impl IntoView {
             .into_iter()
             .filter(|member| member.group == id)
             .collect();
+        if rows.is_empty() {
+            return view! {
+                <tr>
+                    <td class="empty" colspan="4">"Nobody yet."</td>
+                </tr>
+            }
+            .into_any();
+        }
         rows.into_iter()
             .map(|member| view! { <Rostered member=member refusal=refusal /> })
             .collect_view()
@@ -101,10 +109,14 @@ pub fn Groups() -> impl IntoView {
     view! {
         <PageHead title="Groups" />
         <div class="sections">
-            <Section title="Your groups">
-                <dl class="kv">{list}</dl>
-            </Section>
-            <section class="section">
+            <div class="column">
+                <Section title="Your groups">
+                    <dl class="kv">{list}</dl>
+                </Section>
+                <Making refusal=refusal />
+            </div>
+            <div class="column">
+                <section class="section">
                 <h2>
                     {move || group_of().map_or_else(|| "Members".to_owned(), |group| group.display)}
                 </h2>
@@ -119,10 +131,10 @@ pub fn Groups() -> impl IntoView {
                     </thead>
                     <tbody>{roster}</tbody>
                 </table>
-                {leaving}
-            </section>
-            <Inviting group=current refusal=refusal />
-            <Making refusal=refusal />
+                    {leaving}
+                </section>
+                <Inviting group=current refusal=refusal />
+            </div>
         </div>
         <Note refusal=refusal />
     }

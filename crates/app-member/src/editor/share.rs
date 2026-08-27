@@ -65,7 +65,12 @@ pub fn Sharing(
             .filter(|row| row.document == id)
             .collect();
         if rows.is_empty() {
-            return view! { <p class="quiet">"Nobody else."</p> }.into_any();
+            return view! {
+                <tr>
+                    <td class="empty" colspan="4">"Nobody else."</td>
+                </tr>
+            }
+            .into_any();
         }
         rows.into_iter()
             .map(|row| {

@@ -6,9 +6,8 @@
 //! the principal's own ownership — and both branches are the ones
 //! [`list_visible`](rn_kernel::relation::list_visible) uses, over the same
 //! indexes, so the list and an authorisation cannot answer differently. The
-//! statement is written out here rather than borrowed because the list carries
-//! a title and a revision, which are `document` columns the resource registry
-//! knows nothing about.
+//! statement is written out rather than borrowed because the list carries a
+//! title and a revision, which the resource registry knows nothing about.
 //!
 //! The single-document read is the one query in this bundle that takes a
 //! parameter, so it is the one that can be *asked* about a row that is not the

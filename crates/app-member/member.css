@@ -30,6 +30,16 @@
   grid-column: 1 / -1;
 }
 
+/* A column of sections, for a page whose blocks are of very different heights:
+ * grid rows are as tall as their tallest cell, so a two-line block beside a
+ * roster would otherwise hold open a row of dead space. */
+.column {
+  display: grid;
+  gap: var(--gap-section);
+  align-content: start;
+  min-width: 0;
+}
+
 /* Label and value. The label is small and quiet; the value carries the page. */
 .kv {
   display: grid;
@@ -74,6 +84,13 @@
   text-decoration: none;
 }
 
+/* A table of few columns does not want the whole content column: past about
+ * this width the gap between "when" and "what" outgrows both of them, and the
+ * eye stops carrying the row across. */
+.sheet {
+  max-width: 58rem;
+}
+
 /* A table cell that holds commands rather than a value. */
 .tbl td.does {
   width: 1%;
@@ -84,6 +101,10 @@
 }
 
 /* A form that sits inside a section: the fields stack, the commit follows. */
+.inline + .inline,
+.tbl + .inline {
+  margin-top: 1rem;
+}
 .inline {
   display: grid;
   gap: 0.2rem;

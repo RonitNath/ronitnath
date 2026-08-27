@@ -18,7 +18,8 @@ pub fn Invitations() -> impl IntoView {
 
     view! {
         <PageHead title="Invitations" />
-        <Table
+        <div class="sheet">
+            <Table
             rows=rows
             columns=vec![
                 Column::new("Group", |row: &Invitation| row.container.display.clone()),
@@ -37,7 +38,8 @@ pub fn Invitations() -> impl IntoView {
                     .mono()
                     .priority(Priority::Tertiary),
             ]
-            empty="No invitations. Mint one from a group."
-        />
+                empty="No invitations. Mint one from a group."
+            />
+        </div>
     }
 }
