@@ -110,9 +110,24 @@ moves them back, because there the owner is not changing, the person is. Product
 `person_id`.
 
 Statuses are projections: `party.status ∈ active|disabled|merged`,
-`identity.status ∈ active|disabled`, `session` has no status (row = live),
-`resource.status ∈ draft|published|deleted`, `match_candidate.status ∈
+`identity.status ∈ active`, `session` has no status (row = live),
+`resource.status ∈ draft|published`, `match_candidate.status ∈
 proposed|confirmed|rejected`. A status no command produces does not exist.
+
+Two values in migration 1 are admitted by a CHECK constraint and produced by
+nothing: `identity.status = 'disabled'` (disabling is a decision about a
+person, so `Disable` writes `party.status` and `SignIn` reads it; no command
+writes `identity.status` after `Register`) and `resource.status = 'deleted'`
+(there is no delete in this cut; six statements filter `<> 'deleted'` and none
+writes it). Neither is a status the model has, so both are out of the Rust
+enums — `IdentityStatus`, `ResourceStatus` — and `parse` refuses them, which
+makes a row carrying one a `RowError` rather than a silently-legal state.
+They stay in the schema because migrations are hashed and this file is frozen:
+the CHECK admits them until the next fresh formation, which is disposable-dev,
+so it is this note and not an `ALTER`. The debt is declared in code as
+`Vocabulary::ADMITTED_UNPRODUCED` and the vocabulary tests read it back, so
+the day the constraint stops admitting them the declaration fails rather than
+rots.
 
 ## API (binding)
 

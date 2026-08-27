@@ -37,6 +37,24 @@ async fn the_status_vocabulary_agrees_with_the_schema() {
             .await
             .unwrap_or_else(|err| panic!("the schema refuses {}: {err:?}", status.as_str()));
     }
+    // The debt migration 1 froze: the constraint still admits `deleted` and no
+    // command writes it, so the value is declared rather than carried. It
+    // leaves the schema at the next fresh formation, and this is what will
+    // fail when it does.
+    for unproduced in <ResourceStatus as crate::domain::Vocabulary>::ADMITTED_UNPRODUCED {
+        store
+            .query::<crate::store::RowId<Resource>>(
+                INSERT_SQL,
+                bind![kinds::DOCUMENT, owner, "us-west", *unproduced, 1i64],
+            )
+            .await
+            .unwrap_or_else(|err| panic!("{unproduced} is declared admitted: {err:?}"));
+        assert!(
+            <ResourceStatus as crate::domain::Vocabulary>::parse(unproduced).is_none(),
+            "{unproduced} is declared unproduced and still parses"
+        );
+    }
+
     let refused = store
         .query::<crate::store::RowId<Resource>>(
             INSERT_SQL,

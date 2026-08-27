@@ -6,6 +6,13 @@
 //! the constraint out of `sqlite_master` and compares — so adding a status to
 //! the Rust enum without adding it to the schema fails, and so does the
 //! reverse.
+//!
+//! A CHECK constraint may admit a value the enum does not carry, but only if
+//! the vocabulary *names* it in [`Vocabulary::ADMITTED_UNPRODUCED`]. That is
+//! the case where a frozen migration lists a value no command writes: the
+//! value cannot come out of the schema until the next fresh formation
+//! (migrations are hashed), so it is declared here instead, where the same
+//! test reads it back. An undeclared surplus is still a failure.
 
 mod factor;
 mod identity;
@@ -49,6 +56,13 @@ pub trait Vocabulary: Sized + Copy + PartialEq + 'static {
     /// The table and column the constraint is on, for the schema agreement
     /// test.
     const COLUMN: (&'static str, &'static str);
+    /// Values the CHECK constraint admits and no command produces.
+    ///
+    /// Empty for every vocabulary whose schema and code say the same thing.
+    /// A non-empty list is a debt with a reason next to it, and
+    /// [`Self::parse`] still refuses everything in it: a value nothing writes
+    /// is a value nothing should be able to read back either.
+    const ADMITTED_UNPRODUCED: &'static [&'static str] = &[];
 
     /// The value as the column stores it.
     fn as_str(self) -> &'static str;

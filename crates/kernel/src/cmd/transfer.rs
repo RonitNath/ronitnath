@@ -36,7 +36,7 @@ use crate::feed::Feed;
 use crate::ids::{Id, Identity, Person, Resource};
 use crate::org::{self, MemberRole};
 use crate::relation::{Object, SubjectKind, Vocabulary};
-use crate::resource::{self, ResourceStatus};
+use crate::resource;
 use crate::store::{Cursor, FromRow, Reads, RowError, Sql, Value};
 use crate::{Timestamp, bind};
 
@@ -78,9 +78,6 @@ pub async fn transfer<S: Sql, F: Feed>(ctx: &Ctx<'_, S, F>, args: &Transfer) -> 
     let Some(row) = resource::load(ctx.store, resource_id).await? else {
         return decline();
     };
-    if row.status == ResourceStatus::Deleted {
-        return decline();
-    }
     // Only the owner transfers, and "the owner" is the party on the row —
     // either this person or an organization they belong to.
     let subjects = crate::principal::expand(ctx.store, &ctx.principal).await?;

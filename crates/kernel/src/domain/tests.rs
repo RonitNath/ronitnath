@@ -48,12 +48,34 @@ async fn agrees<V: Vocabulary>() {
     let (table, column) = V::COLUMN;
     let schema = admitted(&ddl(table).await, column);
     let code: Vec<String> = V::ALL.iter().map(|v| v.as_str().to_owned()).collect();
+    // The enum, plus whatever the vocabulary declares the constraint admits
+    // and no command writes. A surplus that is not declared is a failure; a
+    // declared one is a frozen migration's debt, written down where this test
+    // can read it.
+    let mut accounted = code.clone();
+    accounted.extend(V::ADMITTED_UNPRODUCED.iter().map(|v| (*v).to_owned()));
+    accounted.sort();
+    let mut listed = schema.clone();
+    listed.sort();
     assert_eq!(
-        schema, code,
+        listed, accounted,
         "{table}.{column}: the schema and the enum disagree"
     );
     for value in &code {
         assert!(V::parse(value).is_some());
+    }
+    // Unproduced means unreadable too: parsing one back would be reading a
+    // value no command can have written.
+    for value in V::ADMITTED_UNPRODUCED {
+        assert!(
+            V::parse(value).is_none(),
+            "{table}.{column}: {value} is declared unproduced and still parses"
+        );
+        assert!(
+            schema.iter().any(|listed| listed == value),
+            "{table}.{column}: {value} is declared unproduced and the schema \
+             does not admit it, so the declaration is stale"
+        );
     }
     assert!(V::parse("something else").is_none());
 }

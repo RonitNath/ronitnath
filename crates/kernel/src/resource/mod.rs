@@ -14,11 +14,19 @@
 //!
 //! ## Statuses
 //!
-//! `draft | published | deleted`, and they are projections of the commands
-//! that produced them. A document starts `draft` and `PublishDocument` moves
-//! it. The two party-backed kinds are created `published`: an organization is
-//! live the moment it exists, and a draft organization is not a thing any
-//! command can make.
+//! `draft | published`, and they are projections of the commands that produced
+//! them. A document starts `draft` and `PublishDocument` moves it. The two
+//! party-backed kinds are created `published`: an organization is live the
+//! moment it exists, and a draft organization is not a thing any command can
+//! make.
+//!
+//! Migration 1's CHECK also admits `deleted`, and no command writes it — there
+//! is no delete in this cut. The value cannot leave the schema before the next
+//! fresh formation, because migrations are hashed, so it is declared
+//! unproduced ([`crate::domain::Vocabulary::ADMITTED_UNPRODUCED`]) instead of
+//! carried as a variant nothing reaches. The queries that read a list keep
+//! their `status <> 'deleted'` filter: the filter costs nothing, and it is the
+//! statement rung 7's delete will already be written against.
 
 #[cfg(test)]
 mod tests;
@@ -40,26 +48,25 @@ pub mod kinds {
     pub const GROUP: &str = "group";
 }
 
-/// A resource's status.
+/// A resource's status. See the module docs for the third value the schema
+/// admits and no command writes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ResourceStatus {
     /// Made, not yet published.
     Draft,
     /// Live.
     Published,
-    /// Gone, as far as every query is concerned.
-    Deleted,
 }
 
 impl Vocabulary for ResourceStatus {
-    const ALL: &'static [Self] = &[Self::Draft, Self::Published, Self::Deleted];
+    const ALL: &'static [Self] = &[Self::Draft, Self::Published];
+    const ADMITTED_UNPRODUCED: &'static [&'static str] = &["deleted"];
     const COLUMN: (&'static str, &'static str) = ("resource", "status");
 
     fn as_str(self) -> &'static str {
         match self {
             Self::Draft => "draft",
             Self::Published => "published",
-            Self::Deleted => "deleted",
         }
     }
 }

@@ -23,7 +23,7 @@ use crate::event::Committed;
 use crate::feed::Feed;
 use crate::principal::expand;
 use crate::relation::{self, Object, Relation, Vocabulary};
-use crate::resource::{self, ResourceStatus};
+use crate::resource;
 use crate::store::{Reads, Sql, Value};
 
 const AUDIT: &str = "INSERT INTO audit \
@@ -62,9 +62,6 @@ pub(super) async fn object_of<S: Sql, F: Feed>(
     let Some(row) = resource::load(ctx.store, resource_id).await? else {
         return decline();
     };
-    if row.status == ResourceStatus::Deleted {
-        return decline();
-    }
     match Vocabulary::KERNEL.kind(&row.kind) {
         // The party-backed kinds address their `party` row, not their
         // `resource` row, so a resource id is not how they are shared.

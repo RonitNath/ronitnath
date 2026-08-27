@@ -14,22 +14,30 @@ use crate::store::{Cursor, FromRow, RowError};
 /// There is no `pending`: an identity that could not sign in until an email
 /// came back would lock every new registration out of its own session, and the
 /// verification state lives on the factor, where it belongs.
+///
+/// There is no `disabled` either, and that is the more surprising half.
+/// Disabling is a decision about a *person*: `Disable` writes `party.status`,
+/// `SignIn` reads it, and no command in this cut writes `identity.status` at
+/// all after `Register` writes `active`. Migration 1's CHECK still admits
+/// `'disabled'` and cannot stop doing so — migrations are hashed, so the value
+/// leaves the schema at the next fresh formation and not before — so it is
+/// declared as unproduced rather than carried as a variant nothing can reach.
+/// Reading such a row back is a `RowError`, which is the right noise: it would
+/// mean something wrote a status no command has.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum IdentityStatus {
     /// Signs in.
     Active,
-    /// Does not. Its sessions are deleted when it lands here.
-    Disabled,
 }
 
 impl Vocabulary for IdentityStatus {
-    const ALL: &'static [Self] = &[Self::Active, Self::Disabled];
+    const ALL: &'static [Self] = &[Self::Active];
+    const ADMITTED_UNPRODUCED: &'static [&'static str] = &["disabled"];
     const COLUMN: (&'static str, &'static str) = ("identity", "status");
 
     fn as_str(self) -> &'static str {
         match self {
             Self::Active => "active",
-            Self::Disabled => "disabled",
         }
     }
 }
