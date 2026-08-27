@@ -4,6 +4,7 @@
 //! in, because a command's contract is a story about several tables and the
 //! test that tells it belongs beside the others about the same story.
 
+mod attribution;
 mod authority;
 mod documents;
 mod factors;
