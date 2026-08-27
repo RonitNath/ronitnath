@@ -5,3 +5,61 @@ edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 publish.workspace = true
+
+# `cargo bench` compiles the lib and the integration tests as benchmark
+# targets too, and libtest's harness does not understand criterion's flags —
+# so `cargo bench -- --quick` fails before criterion ever runs. Only the
+# criterion target is a benchmark.
+[lib]
+bench = false
+
+[dependencies]
+rn-api = { workspace = true }
+
+# Storage. hiqlite is the production engine; rusqlite is the *same* SQLite
+# running in-process, used by tests and benches so they exercise the real
+# statements rather than a stand-in for them.
+hiqlite = { workspace = true }
+rusqlite = { workspace = true }
+rust-embed = { workspace = true }
+
+# Crypto.
+aes = { workspace = true }
+argon2 = { workspace = true }
+base64 = { workspace = true }
+getrandom = { workspace = true }
+sha2 = { workspace = true }
+
+# The test harness is public — a benchmark is a separate crate and an
+# integration test that built its own fixtures would be proving a second
+# registration path — so what it needs is an ordinary dependency.
+tempfile = { workspace = true }
+
+# Shared.
+futures-util = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+uuid = { workspace = true }
+
+[dev-dependencies]
+criterion = { workspace = true, features = ["async_tokio"] }
+proptest = { workspace = true }
+
+[[bench]]
+name = "kernel"
+harness = false
+
+[[test]]
+name = "properties"
+bench = false
+
+[[test]]
+name = "explain"
+bench = false
+
+[[test]]
+name = "cluster"
+bench = false
