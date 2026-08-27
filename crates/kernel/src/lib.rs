@@ -29,6 +29,16 @@
 
 pub mod audit;
 pub mod cmd;
+/// The developer sign-in bypass, in debug builds only.
+///
+/// A session minted without a password is the one thing this model must not
+/// be able to do on a deployment, so it is not a feature flag over shipped
+/// code: the module is declared under `#[cfg(debug_assertions)]` and a
+/// release binary does not contain it (`crates/server/src/auth/dev.rs` is
+/// gated the same way, and `crates/server/tests/surface.rs` proves the route
+/// answers `404` in both profiles).
+#[cfg(debug_assertions)]
+pub mod dev;
 pub mod document;
 pub mod domain;
 pub mod error;
