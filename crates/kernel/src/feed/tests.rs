@@ -92,3 +92,42 @@ async fn a_wake_up_that_nobody_is_waiting_for_is_not_an_error() {
     let harness = Local::new();
     harness.feed.notify(42).await;
 }
+
+#[tokio::test]
+async fn the_head_of_an_untouched_feed_is_zero_and_every_commit_moves_it() {
+    let harness = Local::new();
+    assert_eq!(
+        harness.feed.head().await.expect("reads the head"),
+        0,
+        "a node that has served no command is at zero, not missing"
+    );
+
+    let who = harness
+        .register("Ronit", "head@example.test")
+        .await
+        .expect("registers");
+    assert_eq!(
+        harness.feed.head().await.expect("reads the head"),
+        who.offset
+    );
+
+    harness
+        .sign_in("head@example.test")
+        .await
+        .expect("signs in");
+    let head = harness.feed.head().await.expect("reads the head");
+    assert!(head > who.offset);
+
+    // The head is exactly where a read from zero stops: a subscriber seeded
+    // at it has seen everything and has nothing to replay.
+    let events = harness.feed.read(0, READ_LIMIT).await.expect("reads");
+    assert_eq!(events.last().expect("an event").offset, head);
+    assert!(
+        harness
+            .feed
+            .read(head, READ_LIMIT)
+            .await
+            .expect("reads")
+            .is_empty()
+    );
+}

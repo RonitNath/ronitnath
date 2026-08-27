@@ -59,6 +59,10 @@ impl<S: Sql> Feed for LocalFeed<S> {
     async fn read(&self, offset: Offset, limit: usize) -> Outcome<Vec<Committed>> {
         super::read_from(self.store.as_ref(), offset, limit).await
     }
+
+    async fn head(&self) -> Outcome<Offset> {
+        super::head_of(self.store.as_ref()).await
+    }
 }
 
 /// Turn a broadcast receiver into a stream, dropping the lag notices: falling

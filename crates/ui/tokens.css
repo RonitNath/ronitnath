@@ -8,7 +8,21 @@
  * Dark and light are both authored: the pairs live inside light-dark(), which
  * resolves against the element's used color-scheme, so nothing is an inversion
  * of anything and the toggle is one attribute on <html>.
+ *
+ * The display face is declared here rather than in a stylesheet of its own.
+ * Every surface already links this file — the askama pages by URL, each bundle
+ * through its trunk build — so the face and the token that names it arrive
+ * together and no surface can link one without the other. The URL is absolute
+ * because a bundle's copy is served from its own fingerprinted path.
  */
+
+@font-face {
+  font-family: "Agency Bold";
+  src: url("/static/fonts/agency-bold.ttf") format("truetype");
+  font-weight: 400 700;
+  font-style: normal;
+  font-display: swap;
+}
 
 :root {
   color-scheme: light dark;
@@ -173,6 +187,7 @@ textarea {
 .rail-identity .who {
   font-weight: 600;
 }
+.rail-identity .registration,
 .rail-identity .acting {
   font-size: var(--text-1);
   color: var(--fg-subtle);

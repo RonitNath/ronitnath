@@ -7,7 +7,7 @@
  * live beside the rules that read them rather than in the shared file, because
  * a token no other surface can use is not shared — it is this page's.
  *
- * The display face is declared in `fonts.css`, which every server-rendered
+ * The display face is declared in `tokens.css`, which every server-rendered
  * page links.
  */
 

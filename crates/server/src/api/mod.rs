@@ -19,7 +19,9 @@
 pub mod cmd;
 pub mod decline;
 pub mod origin;
+pub mod party;
 pub mod query;
+pub mod result;
 pub mod whoami;
 
 use axum::extract::{Path, RawQuery, State};

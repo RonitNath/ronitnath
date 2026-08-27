@@ -1,11 +1,17 @@
 //! `GET /api/whoami` — the only chrome DTO, and the tier computation behind it.
 //!
-//! What is *not* here is the point. No email address: an identity is named by
-//! the source it registered at, never by the factor that proves it. No
+//! What is *not* here is the point. No email address: an identity that has
+//! resolved to a person is named by that person, and one that has not is named
+//! by its address *masked* — `r…t@` — which is enough for somebody to
+//! recognise their own registration and not enough for anybody to read it. No
 //! internal id: every identifier is derived on the way out. No relation the
 //! chrome does not draw. `whoami_leaks_nothing` reads the rendered JSON back
 //! and asserts both, so widening this type without a screen that renders the
 //! new field fails a test rather than a review.
+//!
+//! The source is never the label. `rn-site` was the display of every identity
+//! this deployment has ever minted, which named the deployment rather than the
+//! reader — a rail that said "rn-site" to everybody told nobody who they were.
 //!
 //! Tiers are computed from relations, never from a column
 //! (`docs/kernel/index.html` — platform administration is
@@ -19,18 +25,23 @@
 use axum::extract::State;
 use axum::response::{IntoResponse, Response};
 use axum::{Json, Router, routing::get};
-use rn_api::PublicId;
 use rn_api::whoami::{IdentityRef, MemberRole, OrganizationRef, PartyRef, PersonRef, Tier, Whoami};
 use rn_kernel::bind;
+use rn_kernel::cmd::is_platform_operator;
 use rn_kernel::domain::PartyRow;
-use rn_kernel::ids::{Group, Id, IdKey, Organization, Person, Service, Table};
+use rn_kernel::ids::{Id, IdKey, Organization, Person};
 use rn_kernel::principal::identity_of;
 use rn_kernel::store::{Count, Cursor, FromRow, Reads, RowError};
 use rn_kernel::{Outcome, Principal};
 
 use super::decline;
+use super::party::public_of;
 use crate::auth::session::Session;
 use crate::state::AppState;
+
+mod name;
+
+use name::{address_of, masked};
 
 pub fn router() -> Router<AppState> {
     Router::new().route("/api/whoami", get(whoami))
@@ -69,12 +80,6 @@ const ORGANIZATIONS: &str = "SELECT m.group_id, m.role, p.display_name \
                              WHERE m.party_id = $1 AND p.kind = 'organization' \
                              ORDER BY p.display_name";
 
-/// Platform administration as a relation row, which is the only form it has.
-const OPERATOR: &str = "SELECT count(*) AS n FROM relation \
-                        WHERE object_kind = 'platform' AND object_id = 0 \
-                          AND relation = 'operator' \
-                          AND subject_kind = 'person' AND subject_id = $1";
-
 const PARTY: &str = "SELECT id, kind, display_name, status, created_at FROM party WHERE id = $1";
 
 /// Whether a person operates any organization at all — the `/org` tier, asked
@@ -101,7 +106,7 @@ pub async fn tiers_of(state: &AppState, principal: &Principal) -> Outcome<Vec<Ti
     if counted(&reads, OPERATES, *person).await? {
         tiers.push(Tier::Org);
     }
-    if counted(&reads, OPERATOR, *person).await? {
+    if is_platform_operator(&reads, *person).await? {
         tiers.push(Tier::Platform);
     }
     Ok(tiers)
@@ -141,22 +146,27 @@ pub async fn build(
         }),
         None => None,
     };
+    // Only an unresolved identity costs this read, and a registration resolves
+    // in the same transaction that creates it — so in practice it is never
+    // taken at all.
+    let display = match &person {
+        Some(person) => person.display.clone(),
+        None => masked(address_of(&reads, identity_id).await?.as_deref()),
+    };
 
     let organizations = match identity.person_id {
         Some(id) => memberships(&reads, id, key).await?,
         None => Vec::new(),
     };
     let platform = match identity.person_id {
-        Some(id) => is_operator(&reads, id).await?,
+        Some(id) => is_platform_operator(&reads, id).await?,
         None => false,
     };
 
     Ok(Some(Whoami {
-        // An identity is a registration, so what names it is where it
-        // registered. Its factors are its secrets and never its label.
         identity: IdentityRef {
             public_id: identity_id.public(key),
-            display: identity.source,
+            display,
         },
         person,
         acting_as: PartyRef {
@@ -208,10 +218,6 @@ async fn memberships(
         .collect())
 }
 
-async fn is_operator(reads: &impl Reads, person: Id<Person>) -> Outcome<bool> {
-    counted(reads, OPERATOR, person).await
-}
-
 /// A membership role as the wire names it. An unknown value is dropped rather
 /// than guessed at: a role this build does not understand is not a member
 /// role it may safely round down to.
@@ -223,27 +229,6 @@ fn role(raw: &str) -> Option<MemberRole> {
         _ => None,
     }
 }
-
-/// A party's public id, derived under the tag its kind carries.
-///
-/// The four kinds share the `party` table and *must not* share a tag: one tag
-/// would make `o_…` and `p_…` decrypt to each other, which is the exact
-/// confusion the encryption exists to prevent.
-fn public_of(kind: rn_kernel::domain::PartyKind, raw: i64, key: &IdKey) -> PublicId {
-    use rn_kernel::domain::PartyKind as Kind;
-    match kind {
-        Kind::Person => Id::<Person>::new(raw).public(key),
-        Kind::Organization => Id::<Organization>::new(raw).public(key),
-        Kind::Group => Id::<Group>::new(raw).public(key),
-        Kind::Service => Id::<Service>::new(raw).public(key),
-    }
-}
-
-/// Assert at compile time that every party kind has its own tag.
-const _: () = {
-    assert!(<Person as Table>::TAG != <Organization as Table>::TAG);
-    assert!(<Group as Table>::TAG != <Service as Table>::TAG);
-};
 
 #[cfg(test)]
 mod tests {
@@ -290,31 +275,6 @@ mod tests {
         assert_eq!(role("owner"), Some(MemberRole::Owner));
         assert_eq!(role("superuser"), None);
         assert_eq!(role(""), None);
-    }
-
-    #[test]
-    fn the_same_row_gets_a_different_id_under_every_party_kind() {
-        let key = IdKey::from_hex("000102030405060708090a0b0c0d0e0f").expect("a test key");
-        let kinds = [
-            rn_kernel::domain::PartyKind::Person,
-            rn_kernel::domain::PartyKind::Organization,
-            rn_kernel::domain::PartyKind::Group,
-            rn_kernel::domain::PartyKind::Service,
-        ];
-        let ids: Vec<String> = kinds
-            .iter()
-            .map(|kind| public_of(*kind, 7, &key).as_str().to_owned())
-            .collect();
-        let mut unique = ids.clone();
-        unique.sort();
-        unique.dedup();
-        assert_eq!(
-            unique.len(),
-            ids.len(),
-            "two party kinds share an id: {ids:?}"
-        );
-        assert!(ids[0].starts_with("p_"));
-        assert!(ids[1].starts_with("o_"));
     }
 
     #[test]

@@ -320,16 +320,25 @@ fn a_command_replies_with_the_offset_its_event_landed_at() {
 }
 
 #[test]
-fn the_commands_later_legs_own_decline_rather_than_pretending() {
+fn a_name_that_is_not_a_command_is_not_a_command() {
     harness::run(async {
         let state = state().await;
         let server = harness::server(&state);
         let somebody = harness::register(&state, "Early", "unbound-command@example.invalid").await;
         let cookie = format!("rn_session={}", somebody.token);
 
-        for name in rn_site::api::cmd::unbound() {
+        // The contract is fully bound, so there is no name in it that answers
+        // a decline. `commands.rs` runs every one of them.
+        assert!(
+            rn_site::api::cmd::unbound().is_empty(),
+            "a declared command is not wired: {:?}",
+            rn_site::api::cmd::unbound()
+        );
+
+        // A name outside it reads like everything else that is not here.
+        for nonsense in ["delete-everything", "register-admin", "..%2fwhoami"] {
             let response = server
-                .post(&format!("/api/cmd/{name}"))
+                .post(&format!("/api/cmd/{nonsense}"))
                 .add_header("cookie", cookie.clone())
                 .add_header("sec-fetch-site", "same-origin")
                 .text(r#"{"key":"9c1e5a70-0000-4000-8000-000000000020"}"#)
@@ -338,21 +347,10 @@ fn the_commands_later_legs_own_decline_rather_than_pretending() {
             assert_eq!(
                 response.status_code(),
                 StatusCode::NOT_FOUND,
-                "{name} answered as though it were implemented"
+                "/api/cmd/{nonsense} answered"
             );
             assert_eq!(response.text(), r#"{"decline":"declined"}"#);
         }
-
-        // And a name that is not a command at all reads identically.
-        let nonsense = server
-            .post("/api/cmd/delete-everything")
-            .add_header("cookie", cookie)
-            .add_header("sec-fetch-site", "same-origin")
-            .text("{}")
-            .content_type("application/json")
-            .await;
-        assert_eq!(nonsense.status_code(), StatusCode::NOT_FOUND);
-        assert_eq!(nonsense.text(), r#"{"decline":"declined"}"#);
     });
 }
 
