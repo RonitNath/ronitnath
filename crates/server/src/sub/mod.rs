@@ -33,7 +33,6 @@ use axum::routing::any;
 use futures_util::{SinkExt, StreamExt};
 use rn_api::{SubMessage, SubRequest};
 use rn_kernel::feed::{Feed, READ_LIMIT};
-use rn_kernel::store::{Count, Reads};
 use rn_kernel::{Offset, Principal};
 use serde_json::Value;
 
@@ -46,10 +45,6 @@ use crate::state::AppState;
 
 /// How often a quiet socket says it is alive.
 pub const HEARTBEAT: Duration = Duration::from_secs(25);
-
-/// The current head of the change feed. `coalesce` because an empty audit
-/// table is a node that has served no command yet, not a missing row.
-const HEAD: &str = "SELECT coalesce(max(id), 0) AS n FROM audit";
 
 pub fn router() -> Router<AppState> {
     Router::new().route("/api/sub", any(subscribe))
@@ -254,15 +249,17 @@ impl Connection {
         }
     }
 
+    /// Where the feed ends, asked of the feed itself.
+    ///
+    /// Not a `SELECT` of this module's own: rung 6 swaps the transport behind
+    /// `Feed`, and a subscription that carried its own statement would go on
+    /// reading a table the new feed no longer owns. A feed that cannot answer
+    /// reads as zero, which seeds rather than skips — the safe direction.
     async fn head(&self) -> Offset {
-        self.state
-            .store
-            .reads()
-            .query::<Count>(HEAD, Vec::new())
-            .await
-            .ok()
-            .and_then(|rows| rows.first().map(|count| count.0.max(0) as Offset))
-            .unwrap_or(0)
+        self.state.feed.head().await.unwrap_or_else(|error| {
+            tracing::warn!(%error, "the change feed head could not be read");
+            0
+        })
     }
 }
 

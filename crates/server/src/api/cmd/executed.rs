@@ -2,9 +2,17 @@
 //!
 //! Three things ride back from a command besides its event. The **offset** is
 //! what a caller waits on to see its own write. The **result** is the public
-//! ids it created, derived on the way out — never a token, never an address,
-//! never an internal id. And the **cookie**: `Register` and `SignIn` mint a
-//! session, `SignOut` ends one, and every other command leaves it alone.
+//! ids it created, derived on the way out ([`result`](super::result)) — never
+//! an address, never an internal id. And the **cookie**: `Register` and
+//! `SignIn` mint a session, `SignOut` ends one, and every other command leaves
+//! it alone.
+//!
+//! One secret does ride in a result, and only one: the token `Invite` mints.
+//! A link has no public id — it *is* its token — so the reply is the only
+//! place the clear text ever exists, exactly once, on the call that minted it.
+//! It is carried in its own field rather than folded into the event mapping,
+//! so [`result`](super::result) stays a function of the event alone and cannot
+//! grow a second way to emit a secret.
 
 use axum::Json;
 use axum::response::{IntoResponse, Response};
@@ -12,10 +20,10 @@ use rn_api::CommandReply;
 use rn_kernel::cmd::Minted;
 use rn_kernel::domain::{SESSION_TTL, Token};
 use rn_kernel::ids::IdKey;
-use rn_kernel::{Committed, Event, KernelError};
-use serde_json::{Value, json};
+use rn_kernel::{Committed, KernelError};
 
 use super::decline;
+use super::result::result_of;
 use crate::auth::session;
 
 /// What a command produced, plus the two session effects a reply carries.
@@ -27,6 +35,9 @@ pub struct Executed {
     /// it — a replay has nothing to hand back, because the row keeps only the
     /// digest.
     pub token: Option<Token>,
+    /// A freshly minted *link* secret, on the same terms: `Invite` and nothing
+    /// else, once, and never on a replay.
+    pub link: Option<Token>,
     /// Whether the caller's own session is now gone.
     pub ended: bool,
 }
@@ -36,6 +47,7 @@ impl Executed {
         Self {
             committed,
             token: None,
+            link: None,
             ended: false,
         }
     }
@@ -44,6 +56,19 @@ impl Executed {
         Self {
             committed: minted.committed,
             token: minted.token,
+            link: None,
+            ended: false,
+        }
+    }
+
+    /// A command that minted a bearer *link*. The secret goes in the reply
+    /// body, never in a cookie: it is not this browser's session, it is the
+    /// thing this browser is about to send somebody else.
+    pub(super) fn linking(minted: Minted) -> Self {
+        Self {
+            committed: minted.committed,
+            token: None,
+            link: minted.token,
             ended: false,
         }
     }
@@ -52,6 +77,7 @@ impl Executed {
         Self {
             committed,
             token: None,
+            link: None,
             ended: true,
         }
     }
@@ -69,9 +95,13 @@ impl Executed {
     /// The command's reply body.
     #[must_use]
     pub fn reply(&self, key: &IdKey) -> CommandReply {
+        let mut result = result_of(&self.committed.event, key);
+        if let (Some(link), Some(fields)) = (&self.link, result.as_object_mut()) {
+            fields.insert("token".to_owned(), link.expose().into());
+        }
         CommandReply {
             offset: self.committed.offset,
-            result: result_of(&self.committed.event, key),
+            result,
         }
     }
 }
@@ -110,26 +140,6 @@ impl CommandError {
                 }),
             )
                 .into_response(),
-        }
-    }
-}
-
-/// The public ids a command produced, derived on the way out. Never a token,
-/// never an address, never an internal id.
-fn result_of(event: &Event, key: &IdKey) -> Value {
-    match event {
-        Event::Registered {
-            identity, person, ..
-        } => json!({ "identity": identity.public(key), "person": person.public(key) }),
-        Event::SignedIn { identity, .. } => json!({ "identity": identity.public(key) }),
-        Event::SignedOut { session, .. } | Event::SessionRevoked { session, .. } => {
-            json!({ "session": session.public(key) })
-        }
-        Event::FactorAdded { factor, .. }
-        | Event::FactorRemoved { factor, .. }
-        | Event::EmailVerified { factor, .. } => json!({ "factor": factor.public(key) }),
-        Event::PartyDisabled { party } | Event::PartyEnabled { party } => {
-            json!({ "party": party.public(key) })
         }
     }
 }

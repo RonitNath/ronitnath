@@ -3,16 +3,18 @@
 //!
 //! The vocabulary is `rn_api::commands::ALL_COMMAND_NAMES`: one list, shared by
 //! the kernel's event names, the browser's client and this router. The table
-//! below binds a name to a kernel function; a name in the vocabulary with no
-//! binding — every command K2 and K3 own — answers with the uniform decline,
-//! because a route that exists and does nothing is indistinguishable from a
-//! broken one. Wiring one up later is a line in [`bindings!`].
+//! below binds a name to a kernel function, and as of this leg it binds all
+//! twenty-five of them — `unbound()` is empty and
+//! `every_command_in_the_contract_is_bound` keeps it that way, so a command
+//! added to the contract without a binding fails a test rather than answering
+//! a uniform decline nobody can tell from a broken route.
 //!
 //! Nothing here authorises anything. The commands do that themselves, inside
 //! their own transactions (`kernel::cmd`), which is why a route that forgot
 //! would be refused by the kernel rather than by a check this file could omit.
 
 mod executed;
+mod result;
 
 pub use executed::{CommandError, Executed};
 
@@ -20,12 +22,14 @@ use axum::extract::{Path, State};
 use axum::response::{IntoResponse, Response};
 use axum::{Json, Router, routing::post};
 use rn_api::commands::{
-    ALL_COMMAND_NAMES, AddFactor, Disable, Enable, Register, RemoveFactor, RevokeSession, SignIn,
-    SignOut, VerifyEmail,
+    ALL_COMMAND_NAMES, AddFactor, ClaimLink, ConfirmMatch, CreateDocument, CreateGroup,
+    CreateOrganization, Disable, EditDocument, Enable, Invite, Leave, ProposeMatch,
+    PublishDocument, Register, RemoveFactor, Revoke, RevokeSession, RuleMatch, SetRole, Share,
+    SignIn, SignOut, Split, Transfer, VerifyEmail,
 };
 use rn_api::{Command, CommandEnvelope};
+use rn_kernel::Principal;
 use rn_kernel::cmd::{self, Ctx};
-use rn_kernel::{KernelError, Principal};
 use uuid::Uuid;
 
 use super::decline;
@@ -36,8 +40,9 @@ use crate::state::AppState;
 /// Bind command names to kernel functions.
 ///
 /// The kind says what the function returns and therefore what the reply does
-/// to the session cookie: `plain` nothing, `minting` a new cookie, `ending`
-/// the caller's own.
+/// with the secret it minted: `plain` nothing, `minting` a new session cookie,
+/// `ending` the caller's own, `linking` a bearer link handed back in the reply
+/// body because a link has no other name.
 macro_rules! bindings {
     ($($kind:ident $args:ty => $run:path),+ $(,)?) => {
         /// The command names this build executes. Everything else in
@@ -72,6 +77,9 @@ macro_rules! bindings {
     (@run minting $ctx:ident, $run:path, $args:expr) => {
         $run(&$ctx, &$args).await.map(Executed::minted).map_err(CommandError::Kernel)
     };
+    (@run linking $ctx:ident, $run:path, $args:expr) => {
+        $run(&$ctx, &$args).await.map(Executed::linking).map_err(CommandError::Kernel)
+    };
     (@run ending $ctx:ident, $run:path, $args:expr) => {
         $run(&$ctx, &$args).await.map(Executed::ending).map_err(CommandError::Kernel)
     };
@@ -85,46 +93,41 @@ bindings! {
     plain AddFactor => cmd::add_factor,
     plain RemoveFactor => cmd::remove_factor,
     plain VerifyEmail => cmd::verify_email,
+    plain CreateOrganization => cmd::create_organization,
+    plain CreateGroup => cmd::create_group,
+    linking Invite => cmd::invite,
+    plain ClaimLink => cmd::claim_link,
+    plain SetRole => cmd::set_role,
+    plain Leave => cmd::leave,
+    plain Share => cmd::share,
+    plain Revoke => cmd::revoke,
+    plain Transfer => cmd::transfer,
+    plain CreateDocument => cmd::create_document,
+    plain EditDocument => cmd::edit_document,
+    plain PublishDocument => cmd::publish_document,
+    plain ProposeMatch => cmd::propose_match,
+    plain ConfirmMatch => cmd::confirm_match,
+    plain RuleMatch => cmd::rule_match,
+    plain Split => cmd::split,
     plain Disable => cmd::disable,
     plain Enable => cmd::enable,
 }
 
-/// Run a command on the blocking pool.
+/// Run a command, on this handler's own task.
 ///
-/// Two reasons, and either would be enough on its own.
-///
-/// **The KDF.** `Register` and `SignIn` do an argon2id verification — tens of
-/// milliseconds of deliberate CPU. On a runtime worker that is the reactor
-/// stalled for every other connection this node is serving, which is not a
-/// tuning question but a correctness one for the heartbeat on `/api/sub`.
-///
-/// **The `Send` bound.** `rn_kernel::cmd::run` takes its plan as an
-/// `AsyncFn`, whose returned future carries no `Send` bound, so a command
-/// future is not provably `Send` for every lifetime and cannot be awaited
-/// inside an axum handler. Driving it to completion on one blocking thread
-/// means it never crosses threads and never needs to be. Listed as a kernel
-/// gap in this leg's report; when the bound lands, this wrapper is the only
-/// thing that has to go.
+/// There is no blocking-pool wrapper here any more and that is deliberate.
+/// [`rn_kernel::cmd::run`] bounds its plan future `Send`, so a command future
+/// is `Send` and can simply be awaited inside an axum handler; the argon2id
+/// verification that used to justify the wrapper now goes to the blocking pool
+/// where it happens, inside `Register` and `SignIn`, rather than dragging the
+/// whole command — its transaction, its feed notify — off the reactor with it.
 async fn dispatch(
     state: &AppState,
     principal: Principal,
     name: String,
     body: String,
 ) -> Result<Executed, CommandError> {
-    let state = state.clone();
-    let handle = tokio::runtime::Handle::current();
-    tokio::task::spawn_blocking(move || {
-        handle.block_on(dispatch_inner(&state, principal, &name, &body))
-    })
-    .await
-    .unwrap_or_else(|joined| {
-        // A panicking command is a bug in this process, never the caller's
-        // fault and never useful to them: it is logged and declined.
-        tracing::error!(%joined, "a command panicked");
-        Err(CommandError::Kernel(KernelError::Invariant(
-            "a command panicked".to_owned(),
-        )))
-    })
+    dispatch_inner(state, principal, &name, &body).await
 }
 
 /// Command names the product contract declares that this build declines.
@@ -204,35 +207,21 @@ mod tests {
     }
 
     #[test]
-    fn the_commands_later_legs_own_are_declared_and_unbound() {
+    fn every_command_in_the_contract_is_bound() {
         let unbound = unbound();
-        for name in [
-            "create-organization",
-            "invite",
-            "claim-link",
-            "share",
-            "propose-match",
-            "split",
-        ] {
-            assert!(unbound.contains(&name), "{name} should still decline");
-        }
-        assert_eq!(BOUND.len() + unbound.len(), ALL_COMMAND_NAMES.len());
+        assert!(
+            unbound.is_empty(),
+            "the contract declares commands this build declines: {unbound:?}"
+        );
+        assert_eq!(BOUND.len(), ALL_COMMAND_NAMES.len());
     }
 
     #[test]
-    fn the_identity_half_of_the_contract_is_wired() {
-        for name in [
-            "register",
-            "sign-in",
-            "sign-out",
-            "revoke-session",
-            "add-factor",
-            "remove-factor",
-            "verify-email",
-            "disable",
-            "enable",
-        ] {
-            assert!(BOUND.contains(&name), "{name} is not wired");
-        }
+    fn no_name_is_bound_twice() {
+        let mut sorted = BOUND.to_vec();
+        sorted.sort_unstable();
+        let count = sorted.len();
+        sorted.dedup();
+        assert_eq!(sorted.len(), count, "a command name is bound twice");
     }
 }

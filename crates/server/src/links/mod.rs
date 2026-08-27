@@ -218,9 +218,9 @@ async fn claim(
             )
             .await
         }
-        // K2 owns `ClaimLink`. Until it lands the dispatch table has no
-        // binding for the name and the answer is the uniform decline — not a
-        // stub that pretends to have granted something.
+        // An invitation. The bearer opened the page; `ClaimLink` reads the
+        // token again itself, because what the token grants and who the grant
+        // lands on are two separate facts and the command needs both.
         Grant::Unknown => {
             cmd::invoke(
                 &state.0,
