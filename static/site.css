@@ -483,9 +483,14 @@ body {
     font-size: 0.62rem;
 }
 
+/* The entrance carries the centring with it. `animation: … both` holds the
+   `to` frame after the animation ends, so a keyframe that says `transform:
+   none` overwrites the inline `translate(-50%, -50%)` the renderer wrote — and
+   the label ends up hung off its point by its own width instead of centred on
+   it. Every frame here states the full transform for that reason. */
 @keyframes callout-in {
-    from { opacity: 0; transform: translateY(5px); }
-    to { opacity: 1; transform: none; }
+    from { opacity: 0; transform: translate(-50%, calc(-50% + 5px)); }
+    to { opacity: 1; transform: translate(-50%, -50%); }
 }
 
 /* --------------------------------------------------------------- hero ---- */
