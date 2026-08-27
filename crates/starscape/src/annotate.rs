@@ -42,7 +42,14 @@ const MIN_ZENITH_COS: f64 = 0.12;
 /// band are passed over the way an off-frame star is; something else in the
 /// catalog is almost always available, and when nothing is, the forced
 /// placement lands on the edge, which is outside it by construction.
-const KEEP_OUT: (f64, f64) = (0.42, 0.24);
+///
+/// The band is the hero's box **grown by half a label**, because a placement
+/// is where the label is centred and not where it ends. At 1440×900 the hero
+/// card measures 369×135 and the widest callout 328×36, so the half-extents
+/// that must clear each other are `(184 + 164) / 720 = 0.483` across and
+/// `(68 + 18) / 450 = 0.19` down. A band that only cleared the card itself
+/// kept the *point* off the hero and let the text sit on it anyway.
+const KEEP_OUT: (f64, f64) = (0.52, 0.24);
 
 /// Project `stars` (J2000 unit vectors) and return up to `limit` placements,
 /// brightest-first in catalog order.
@@ -132,6 +139,32 @@ mod tests {
             }
         }
         assert!(forced_seen, "the forced-label path was never exercised");
+    }
+
+    /// Measured on the shipped landing at 1440x900: the hero card, and the
+    /// widest callout the named catalog produces (`Alkaid`, two lines).
+    const HERO_PX: (f64, f64) = (368.72, 135.39);
+    const LABEL_PX: (f64, f64) = (328.13, 36.47);
+
+    #[test]
+    fn the_keep_out_band_clears_the_hero_by_a_whole_label_and_not_by_a_point() {
+        // A placement is where a label is *centred*. Asserting that the point
+        // is outside the hero's own box says nothing about the 164 px of text
+        // that hangs off each side of it, and that is the gap an e2e run found
+        // by watching a real label sit on the hero.
+        let (view_w, view_h) = (1440.0_f64, 900.0_f64);
+        let clear_x = (HERO_PX.0 + LABEL_PX.0) / view_w;
+        let clear_y = (HERO_PX.1 + LABEL_PX.1) / view_h;
+        assert!(
+            KEEP_OUT.0 >= clear_x,
+            "a label centred at the band's edge overlaps the hero: {} < {clear_x}",
+            KEEP_OUT.0
+        );
+        assert!(
+            KEEP_OUT.1 >= clear_y,
+            "a label centred at the band's edge overlaps the hero: {} < {clear_y}",
+            KEEP_OUT.1
+        );
     }
 
     #[test]
