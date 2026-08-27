@@ -1,0 +1,265 @@
+/* The /platform bundle's own chrome.
+ *
+ * Everything shared is in crates/ui/tokens.css — the shell, the table, the
+ * fields, the five type sizes, both palettes. What is here is the one shape
+ * this bundle adds and no other has: a list of the whole deployment beside a
+ * panel about one row of it.
+ *
+ * The rules the design brief fixes and this file keeps: borderless by default,
+ * flat and rectangular, no status dot anywhere, and a state is a word in its
+ * own colour rather than a tinted capsule. Colours are stated as light-dark()
+ * pairs so the mode toggle is one attribute on <html> and nothing here is an
+ * inversion of anything.
+ */
+
+:root {
+  --state-live: light-dark(oklch(0.42 0.11 155), oklch(0.76 0.13 155));
+  --state-stopped: light-dark(oklch(0.48 0.16 27), oklch(0.72 0.16 27));
+  --state-open: light-dark(oklch(0.48 0.12 70), oklch(0.78 0.13 75));
+  --state-gone: light-dark(oklch(0.42 0.13 300), oklch(0.75 0.13 300));
+  --panel-width: 24rem;
+}
+
+/* The list and the panel. Two columns while there is room for both, and the
+ * panel below the list when there is not — a panel squeezed to a third of a
+ * phone would be neither. */
+
+.split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--panel-width);
+  gap: 1.5rem;
+  align-items: start;
+}
+.split-main {
+  min-width: 0;
+}
+
+@media (max-width: 64rem) {
+  .split {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.content > .split {
+  max-width: none;
+}
+
+/* The panel. Its ground is what separates it, not a border. */
+
+.panel {
+  background: var(--bg-muted);
+  padding: 0.9rem 1rem 1.1rem;
+  display: grid;
+  gap: 0.9rem;
+  align-content: start;
+}
+.panel-head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+.panel-head h2 {
+  color: var(--fg);
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.panel-head button {
+  cursor: pointer;
+  color: var(--fg-subtle);
+  font-size: var(--text-3);
+  line-height: 1;
+  padding: 0.1rem 0.35rem;
+}
+.panel-head button:hover {
+  color: var(--fg);
+}
+.panel-state {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-top: -0.5rem;
+}
+.panel-state .resolved {
+  font-size: var(--text-1);
+  color: var(--fg-subtle);
+}
+
+/* Facts: label left, value right, on a shared axis. */
+
+.facts {
+  display: grid;
+  gap: 0.15rem;
+}
+.fact {
+  display: grid;
+  grid-template-columns: 6.5rem minmax(0, 1fr);
+  gap: 0.75rem;
+  font-size: var(--text-1);
+}
+.fact-label {
+  color: var(--fg-subtle);
+}
+.fact-value {
+  color: var(--fg-muted);
+  overflow-wrap: anywhere;
+}
+
+/* Groups: a heading with its count folded into it, and its rows. */
+
+.group {
+  display: grid;
+  gap: 0.35rem;
+}
+.group h3 {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  color: var(--fg-subtle);
+}
+.count {
+  color: var(--fg-subtle);
+  font-size: var(--text-1);
+  font-variant-numeric: tabular-nums;
+}
+.page-head .count {
+  font-size: var(--text-2);
+}
+.group-rows {
+  display: grid;
+  gap: 0.1rem;
+}
+.none {
+  font-size: var(--text-1);
+  color: var(--fg-subtle);
+}
+
+.line {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  padding: 0.2rem 0;
+  font-size: var(--text-1);
+}
+.line-lead {
+  color: var(--fg);
+  overflow-wrap: anywhere;
+}
+.line-trail {
+  color: var(--fg-subtle);
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.line .role {
+  color: var(--fg-muted);
+}
+.line .evidence {
+  flex: 1 1 100%;
+  color: var(--fg-muted);
+  padding-left: 0.1rem;
+}
+
+/* A state is a word in its own colour. Never a capsule, never a dot. */
+
+.state {
+  font-size: var(--text-1);
+  color: var(--fg-muted);
+}
+.state[data-state="active"],
+.state[data-state="published"],
+.state[data-state="confirmed"],
+.state[data-state="proven"] {
+  color: var(--state-live);
+}
+.state[data-state="disabled"],
+.state[data-state="deleted"] {
+  color: var(--state-stopped);
+}
+.state[data-state="draft"],
+.state[data-state="proposed"],
+.state[data-state="unproven"] {
+  color: var(--state-open);
+}
+.state[data-state="merged"],
+.state[data-state="operator"],
+.state[data-state="self"],
+.state[data-state="factor"] {
+  color: var(--state-gone);
+}
+
+/* Commands. The reason one cannot run is text beside it, never silence. */
+
+.actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.act {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.4rem;
+}
+.act button {
+  cursor: pointer;
+  padding: 0.15rem 0.5rem;
+  font-size: var(--text-1);
+  color: var(--fg-muted);
+  background: var(--bg-subtle);
+}
+.act button:hover:not(:disabled) {
+  color: var(--fg);
+}
+.act button:disabled {
+  color: var(--fg-subtle);
+  cursor: default;
+}
+.act .note {
+  font-size: var(--text-1);
+  color: var(--fg-subtle);
+}
+.act .note[data-state="invalid"] {
+  color: var(--state-stopped);
+}
+
+.reason,
+.evidence-field {
+  background: var(--bg-subtle);
+  padding: 0.25rem 0.4rem;
+  font-size: var(--text-1);
+  width: 100%;
+  color: var(--fg);
+}
+.evidence-field {
+  resize: vertical;
+  font-family: inherit;
+}
+.split-act {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex: 1 1 12rem;
+}
+.split-act .reason {
+  max-width: 9rem;
+}
+
+/* The audit payload: the event as its command wrote it. */
+
+.payload {
+  margin: 0;
+  padding: 0.5rem 0.6rem;
+  background: var(--bg-subtle);
+  font-size: var(--text-1);
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* The cluster page is two dense tables and no chart. */
+
+.content > .tbl + .tbl {
+  margin-top: var(--gap-section);
+}
