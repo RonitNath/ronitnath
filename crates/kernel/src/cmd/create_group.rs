@@ -37,7 +37,7 @@ pub async fn create_group<S: Sql, F: Feed>(
     ctx: &Ctx<'_, S, F>,
     args: &CreateGroup,
 ) -> Outcome<Committed> {
-    let (identity, person) = refs::actor(&ctx.principal)?;
+    let (identity, person, acting_as) = refs::actor(&ctx.principal)?;
     let display_name = args.display_name.trim();
     if display_name.is_empty() {
         return Err(Invalid::Missing("display name").into());
@@ -94,7 +94,7 @@ pub async fn create_group<S: Sql, F: Feed>(
             vec![
                 Value::from(ctx.key.to_string()),
                 Value::from(identity),
-                Value::from(person),
+                Value::from(acting_as),
                 Value::from(now),
                 Value::from(crate::audit::digest_of(args)),
                 party.column("id"),

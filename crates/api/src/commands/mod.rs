@@ -12,8 +12,8 @@ mod org;
 mod resource;
 
 pub use identity::{
-    AddFactor, Disable, Enable, FactorKind, Register, RemoveFactor, RevokeSession, SignIn, SignOut,
-    VerifyEmail,
+    ActAs, AddFactor, Disable, Enable, FactorKind, Register, RemoveFactor, RevokeSession, SignIn,
+    SignOut, VerifyEmail,
 };
 pub use merge::{ConfirmMatch, MatchSignal, ProposeMatch, RuleMatch, Split};
 pub use org::{
@@ -42,6 +42,7 @@ command_names! {
     SignIn => "sign-in",
     SignOut => "sign-out",
     RevokeSession => "revoke-session",
+    ActAs => "act-as",
     AddFactor => "add-factor",
     RemoveFactor => "remove-factor",
     VerifyEmail => "verify-email",
@@ -74,7 +75,7 @@ mod tests {
     #[test]
     fn the_product_contract_is_covered_exactly_once() {
         // The list in docs/rebuild/plan.md §Product contract, verbatim.
-        assert_eq!(ALL_COMMAND_NAMES.len(), 27);
+        assert_eq!(ALL_COMMAND_NAMES.len(), 28);
         let mut sorted = ALL_COMMAND_NAMES.to_vec();
         sorted.sort_unstable();
         let count = sorted.len();

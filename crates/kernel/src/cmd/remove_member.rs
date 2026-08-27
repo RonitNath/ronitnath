@@ -42,7 +42,7 @@ pub async fn remove_member<S: Sql, F: Feed>(
     ctx: &Ctx<'_, S, F>,
     args: &RemoveMember,
 ) -> Outcome<Committed> {
-    let (identity, person) = refs::actor(&ctx.principal)?;
+    let (identity, person, acting_as) = refs::actor(&ctx.principal)?;
     let container: Id<Person> = Id::new(refs::container(ctx.store.ids(), &args.group)?.get());
     let subject = refs::subject(ctx.store.ids(), &args.party)?;
     let target: Id<Person> = Id::new(subject.id);
@@ -76,7 +76,7 @@ pub async fn remove_member<S: Sql, F: Feed>(
             bind![
                 ctx.key.to_string(),
                 identity,
-                person,
+                acting_as,
                 now,
                 crate::audit::digest_of(args),
                 container,

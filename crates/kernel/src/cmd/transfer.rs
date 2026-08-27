@@ -66,7 +66,7 @@ impl FromRow for PartyOf {
 
 /// Move a resource's ownership to a person or an organization.
 pub async fn transfer<S: Sql, F: Feed>(ctx: &Ctx<'_, S, F>, args: &Transfer) -> Outcome<Committed> {
-    let (identity, person) = refs::actor(&ctx.principal)?;
+    let (identity, person, acting_as) = refs::actor(&ctx.principal)?;
     let resource_id = refs::resource(ctx.store.ids(), &args.resource)?;
     let (to, to_kind) = refs::owner(ctx.store.ids(), &args.to)?;
 
@@ -124,7 +124,7 @@ pub async fn transfer<S: Sql, F: Feed>(ctx: &Ctx<'_, S, F>, args: &Transfer) -> 
             bind![
                 ctx.key.to_string(),
                 identity,
-                person,
+                acting_as,
                 now,
                 crate::audit::digest_of(args),
                 resource_id,

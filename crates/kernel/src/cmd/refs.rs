@@ -12,12 +12,19 @@ use crate::ids::{self, Group, Id, IdKey, Identity, Organization, Person, Resourc
 use crate::principal::Principal;
 use crate::relation::{Subject, SubjectKind};
 
-/// The signed-in person behind a command, and the registration that
-/// authenticated. Every command in this leg needs both: one to authorise, one
-/// to write on the audit row.
-pub(super) fn actor(principal: &Principal) -> Outcome<(Id<Identity>, Id<Person>)> {
-    let (identity, acting_as, _) = super::member(principal)?;
-    Ok((identity, acting_as))
+/// Who is running a command: the registration that authenticated, the person
+/// behind it, and the party the command is *attributed* to.
+///
+/// The last two are the same until somebody runs `ActAs`. After that they are
+/// not, and the difference is the whole of what acting as an organization
+/// means here: authority stays with the human — a person's memberships and
+/// grants are theirs, and switching a session cannot conjure any — while the
+/// audit row records the organization, which is what makes an organization's
+/// history readable as its own.
+pub(super) fn actor(principal: &Principal) -> Outcome<(Id<Identity>, Id<Person>, Id<Person>)> {
+    let (identity, person, _) = super::member(principal)?;
+    let acting_as = principal.acting_as().unwrap_or(person);
+    Ok((identity, person, acting_as))
 }
 
 /// A container's party id, from either a group id or an organization id.

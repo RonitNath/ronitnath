@@ -30,7 +30,7 @@ pub async fn create_document<S: Sql, F: Feed>(
     ctx: &Ctx<'_, S, F>,
     args: &CreateDocument,
 ) -> Outcome<Committed> {
-    let (identity, person) = refs::actor(&ctx.principal)?;
+    let (identity, person, acting_as) = refs::actor(&ctx.principal)?;
     let title = args.title.trim();
     if title.is_empty() {
         return Err(Invalid::Missing("title").into());
@@ -103,7 +103,7 @@ pub async fn create_document<S: Sql, F: Feed>(
             vec![
                 Value::from(ctx.key.to_string()),
                 Value::from(identity),
-                Value::from(person),
+                Value::from(acting_as),
                 Value::from(now),
                 Value::from(crate::audit::digest_of(args)),
                 row.column("id"),

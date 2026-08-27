@@ -31,7 +31,7 @@ const AUDIT: &str = "INSERT INTO audit \
 
 /// Change a party's role in a group or an organization.
 pub async fn set_role<S: Sql, F: Feed>(ctx: &Ctx<'_, S, F>, args: &SetRole) -> Outcome<Committed> {
-    let (identity, person) = refs::actor(&ctx.principal)?;
+    let (identity, person, acting_as) = refs::actor(&ctx.principal)?;
     let container: Id<Person> = Id::new(refs::container(ctx.store.ids(), &args.group)?.get());
     let subject = refs::subject(ctx.store.ids(), &args.party)?;
     let target: Id<Person> = Id::new(subject.id);
@@ -72,7 +72,7 @@ pub async fn set_role<S: Sql, F: Feed>(ctx: &Ctx<'_, S, F>, args: &SetRole) -> O
             bind![
                 ctx.key.to_string(),
                 identity,
-                person,
+                acting_as,
                 now,
                 crate::audit::digest_of(args),
                 container,

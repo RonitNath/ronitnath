@@ -18,7 +18,7 @@
 
 use rn_api::commands::RevokeLink;
 
-use super::{Applied, Batch, Ctx, is_platform_operator, member, run};
+use super::{Applied, Batch, Ctx, is_platform_operator, refs, run};
 use crate::bind;
 use crate::error::{Outcome, decline};
 use crate::event::Committed;
@@ -66,7 +66,7 @@ pub async fn revoke_link<S: Sql, F: Feed>(
     ctx: &Ctx<'_, S, F>,
     args: &RevokeLink,
 ) -> Outcome<Committed> {
-    let (identity, acting_as, _) = member(&ctx.principal)?;
+    let (identity, person, acting_as) = refs::actor(&ctx.principal)?;
     let Ok(link) = ids::decode::<Link>(ctx.store.ids(), &args.link) else {
         return decline();
     };
@@ -76,8 +76,8 @@ pub async fn revoke_link<S: Sql, F: Feed>(
         return decline();
     };
     let party: Id<crate::ids::Person> = Id::new(container.get());
-    if !org::holds(ctx.store, party, acting_as, MemberRole::Admin).await?
-        && !is_platform_operator(ctx.store, acting_as).await?
+    if !org::holds(ctx.store, party, person, MemberRole::Admin).await?
+        && !is_platform_operator(ctx.store, person).await?
     {
         return decline();
     }

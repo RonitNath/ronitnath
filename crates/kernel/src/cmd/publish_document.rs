@@ -33,7 +33,7 @@ pub async fn publish_document<S: Sql, F: Feed>(
     ctx: &Ctx<'_, S, F>,
     args: &PublishDocument,
 ) -> Outcome<Committed> {
-    let (identity, person) = refs::actor(&ctx.principal)?;
+    let (identity, _person, acting_as) = refs::actor(&ctx.principal)?;
     let document_id = refs::resource(ctx.store.ids(), &args.document)?;
 
     let subjects = expand(ctx.store, &ctx.principal).await?;
@@ -55,7 +55,7 @@ pub async fn publish_document<S: Sql, F: Feed>(
             bind![
                 ctx.key.to_string(),
                 identity,
-                person,
+                acting_as,
                 now,
                 crate::audit::digest_of(args),
                 document_id,

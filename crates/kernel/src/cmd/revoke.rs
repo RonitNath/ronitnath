@@ -27,7 +27,7 @@ const AUDIT: &str = "INSERT INTO audit \
 
 /// Withdraw a relation on a resource.
 pub async fn revoke<S: Sql, F: Feed>(ctx: &Ctx<'_, S, F>, args: &Revoke) -> Outcome<Committed> {
-    let (identity, person) = refs::actor(&ctx.principal)?;
+    let (identity, person, acting_as) = refs::actor(&ctx.principal)?;
     let object = object_of(ctx, &args.resource).await?;
     let subject = refs::subject(ctx.store.ids(), &args.subject)?;
     let relation = relation_of(args.relation);
@@ -45,7 +45,7 @@ pub async fn revoke<S: Sql, F: Feed>(ctx: &Ctx<'_, S, F>, args: &Revoke) -> Outc
             vec![
                 Value::from(ctx.key.to_string()),
                 Value::from(identity),
-                Value::from(person),
+                Value::from(acting_as),
                 Value::from(now),
                 Value::from(crate::audit::digest_of(args)),
                 Value::from(object.kind),

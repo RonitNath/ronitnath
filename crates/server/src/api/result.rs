@@ -49,6 +49,8 @@ pub const fn ambiguous_party(event: &Event) -> Option<i64> {
         Event::RoleSet { party, .. } => Some(party.get()),
         // Any party may be disabled, and the four kinds share no tag.
         Event::PartyDisabled { party } | Event::PartyEnabled { party } => Some(party.get()),
+        // A session may speak as a person or as an organization.
+        Event::ActingAs { party, .. } => Some(party.get()),
         _ => None,
     }
 }
@@ -72,6 +74,12 @@ pub fn result_of(event: &Event, key: &IdKey, party: Option<PublicId>) -> Value {
         Event::FactorAdded { factor, .. }
         | Event::FactorRemoved { factor, .. }
         | Event::EmailVerified { factor, .. } => json!({ "factor": factor.public(key) }),
+        // The party a session speaks as is any of the four kinds, so the
+        // caller reads back the id it sent rather than the person's.
+        Event::ActingAs { session, .. } => json!({
+            "session": session.public(key),
+            "party": ambiguous(),
+        }),
         Event::PartyDisabled { .. } | Event::PartyEnabled { .. } => {
             json!({ "party": ambiguous() })
         }

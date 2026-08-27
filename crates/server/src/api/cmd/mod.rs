@@ -21,7 +21,7 @@ use axum::extract::{Path, State};
 use axum::response::{IntoResponse, Response};
 use axum::{Json, Router, routing::post};
 use rn_api::commands::{
-    ALL_COMMAND_NAMES, AddFactor, ClaimLink, ConfirmMatch, CreateDocument, CreateGroup,
+    ALL_COMMAND_NAMES, ActAs, AddFactor, ClaimLink, ConfirmMatch, CreateDocument, CreateGroup,
     CreateOrganization, Disable, EditDocument, Enable, Invite, Leave, ProposeMatch,
     PublishDocument, Register, RemoveFactor, RemoveMember, Revoke, RevokeLink, RevokeSession,
     RuleMatch, SetRole, Share, SignIn, SignOut, Split, Transfer, VerifyEmail,
@@ -89,6 +89,7 @@ bindings! {
     minting SignIn => cmd::sign_in,
     ending SignOut => cmd::sign_out,
     plain RevokeSession => cmd::revoke_session,
+    plain ActAs => cmd::act_as,
     plain AddFactor => cmd::add_factor,
     plain RemoveFactor => cmd::remove_factor,
     plain VerifyEmail => cmd::verify_email,

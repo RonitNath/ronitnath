@@ -35,7 +35,7 @@ pub async fn edit_document<S: Sql, F: Feed>(
     ctx: &Ctx<'_, S, F>,
     args: &EditDocument,
 ) -> Outcome<Committed> {
-    let (identity, person) = refs::actor(&ctx.principal)?;
+    let (identity, _person, acting_as) = refs::actor(&ctx.principal)?;
     let document_id = refs::resource(ctx.store.ids(), &args.document)?;
     if args.title.is_none() && args.body.is_none() {
         return Err(Invalid::Missing("a title or a body").into());
@@ -95,7 +95,7 @@ pub async fn edit_document<S: Sql, F: Feed>(
             bind![
                 ctx.key.to_string(),
                 identity,
-                person,
+                acting_as,
                 now,
                 crate::audit::digest_of(args),
                 document_id,

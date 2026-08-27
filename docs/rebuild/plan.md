@@ -16,7 +16,7 @@ operator (`/platform`, audience of one today). Recurring jobs: session expiry
 sweep, observation drain (last_seen, match scanning), change-feed retention.
 
 Authoritative data and actions = the kernel commands: Register, SignIn,
-SignOut, RevokeSession, AddFactor, RemoveFactor, VerifyEmail, CreateOrganization,
+SignOut, RevokeSession, ActAs, AddFactor, RemoveFactor, VerifyEmail, CreateOrganization,
 CreateGroup, Invite (mint link), RevokeLink, ClaimLink, SetRole, RemoveMember, Leave, Share, Revoke,
 Transfer, CreateDocument, EditDocument, PublishDocument, ProposeMatch,
 ConfirmMatch (self-link merge), RuleMatch (operator merge with evidence),

@@ -106,6 +106,19 @@ pub struct Enable {
     pub party: PublicId,
 }
 
+/// Speak as an organization, or go back to speaking as yourself.
+///
+/// Attribution, not authority. Switching a session cannot conjure a grant
+/// nobody made: what changes is the party an audit row records, which is what
+/// makes an organization's history readable as its own rather than as a list
+/// of the people who happened to be signed in.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ActAs {
+    /// The organization to speak as. Absent means the person again.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub party: Option<PublicId>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -125,6 +138,10 @@ mod tests {
         });
         round_trip(&SignOut {});
         round_trip(&RevokeSession { session: id("s_") });
+        round_trip(&ActAs {
+            party: Some(id("o_")),
+        });
+        round_trip(&ActAs { party: None });
         round_trip(&AddFactor {
             kind: FactorKind::Passkey,
             value: "credential".into(),

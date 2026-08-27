@@ -210,6 +210,49 @@ fn an_organization_is_founded_grown_and_left_over_http() {
         let stale = founder.post("revoke-link", json!({ "link": link })).await;
         assert_eq!(stale.status_code(), StatusCode::FORBIDDEN);
 
+        // Speaking as the organization: attribution moves, authority does
+        // not, and the chrome says so.
+        let acted = founder
+            .run(&mut at, "act-as", json!({ "party": org }))
+            .await;
+        assert_eq!(id_of(&acted, "party", "o_"), org);
+        id_of(&acted, "session", "s_");
+        let chrome = founder.whoami().await;
+        assert_eq!(chrome["acting_as"]["public_id"], json!(org));
+        assert_eq!(chrome["acting_as"]["kind"], "organization");
+        // And back, which is always allowed: it is who they are.
+        let back = founder.run(&mut at, "act-as", json!({})).await;
+        assert_eq!(
+            id_of(&back, "party", "p_"),
+            founder.whoami().await["person"]["public_id"]
+                .as_str()
+                .expect("a person")
+        );
+
+        // An admin takes a membership away; the same write `leave` makes about
+        // yourself, about somebody else.
+        let removed = founder
+            .run(
+                &mut at,
+                "remove-member",
+                json!({ "group": group, "party": joiner_person }),
+            )
+            .await;
+        assert_eq!(id_of(&removed, "container", "g_"), group);
+        assert_eq!(id_of(&removed, "party", "p_"), joiner_person);
+        // Which leaves nothing for `leave` to remove — so it is minted again.
+        let rejoin = founder
+            .run(
+                &mut at,
+                "invite",
+                json!({ "group": group, "role": "member", "expires_at": soon() }),
+            )
+            .await;
+        let rejoin = rejoin["token"].as_str().expect("a link token").to_owned();
+        joiner
+            .run(&mut at, "claim-link", json!({ "token": rejoin }))
+            .await;
+
         let left = joiner
             .run(&mut at, "leave", json!({ "group": group }))
             .await;

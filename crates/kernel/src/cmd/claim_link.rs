@@ -42,7 +42,7 @@ pub async fn claim_link<S: Sql, F: Feed>(
     ctx: &Ctx<'_, S, F>,
     args: &ClaimLink,
 ) -> Outcome<Committed> {
-    let (identity, person) = refs::actor(&ctx.principal)?;
+    let (identity, person, acting_as) = refs::actor(&ctx.principal)?;
     let token = Token::from_wire(&args.token);
     let now = ctx.now();
 
@@ -76,7 +76,7 @@ pub async fn claim_link<S: Sql, F: Feed>(
             bind![
                 ctx.key.to_string(),
                 identity,
-                person,
+                acting_as,
                 now,
                 crate::audit::digest_of(args),
                 invitation.container

@@ -22,6 +22,7 @@
 //! tries once more; a second miss is a decline, because a third attempt would
 //! be a caller with a stale view arguing with one that is current.
 
+mod act_as;
 mod add_factor;
 mod claim_link;
 mod create_document;
@@ -49,6 +50,7 @@ mod tests;
 mod transfer;
 mod verify_email;
 
+pub use act_as::act_as;
 pub use add_factor::add_factor;
 pub use claim_link::claim_link;
 pub use create_document::create_document;
@@ -260,14 +262,20 @@ pub struct Minted {
 /// Every command that acts on "my own" anything starts here, and the decline
 /// is the same one an unauthorised member gets — being signed out and being
 /// unauthorised are not distinguishable to a caller.
+///
+/// The middle value is the *person*, not the party the session is acting as.
+/// Authority is the human's: `ActAs` moves attribution, and a command that
+/// authorised itself against the acted-as party would let switching a session
+/// grant something switching it back takes away. Where a command records the
+/// acted-as party — its audit row — it asks [`refs::actor`] instead.
 pub(crate) fn member(principal: &Principal) -> Outcome<(Id<Identity>, Id<Person>, Id<Session>)> {
     match principal {
         Principal::Member {
             identity,
+            person,
             acting_as,
             session,
-            ..
-        } => Ok((*identity, *acting_as, *session)),
+        } => Ok((*identity, person.unwrap_or(*acting_as), *session)),
         Principal::Bearer { .. } | Principal::Anonymous => decline(),
     }
 }

@@ -39,6 +39,11 @@ impl Event {
                 identity: field(&json, "identity")?,
                 session: field(&json, "session")?,
             },
+            "act-as" => Self::ActingAs {
+                identity: field(&json, "identity")?,
+                session: field(&json, "session")?,
+                party: field(&json, "party")?,
+            },
             "add-factor" => Self::FactorAdded {
                 identity: field(&json, "identity")?,
                 factor: field(&json, "factor")?,

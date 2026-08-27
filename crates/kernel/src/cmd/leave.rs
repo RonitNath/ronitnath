@@ -29,7 +29,7 @@ const AUDIT: &str = "INSERT INTO audit \
 
 /// Leave a group or an organization.
 pub async fn leave<S: Sql, F: Feed>(ctx: &Ctx<'_, S, F>, args: &Leave) -> Outcome<Committed> {
-    let (identity, person) = refs::actor(&ctx.principal)?;
+    let (identity, person, acting_as) = refs::actor(&ctx.principal)?;
     let container: Id<Person> = Id::new(refs::container(ctx.store.ids(), &args.group)?.get());
 
     let Some(role) = org::role_of(ctx.store, container, person).await? else {
@@ -48,7 +48,7 @@ pub async fn leave<S: Sql, F: Feed>(ctx: &Ctx<'_, S, F>, args: &Leave) -> Outcom
             bind![
                 ctx.key.to_string(),
                 identity,
-                person,
+                acting_as,
                 now,
                 crate::audit::digest_of(args),
                 container

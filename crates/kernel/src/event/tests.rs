@@ -17,35 +17,36 @@ const fn index(event: &Event) -> usize {
         Event::SignedIn { .. } => 1,
         Event::SignedOut { .. } => 2,
         Event::SessionRevoked { .. } => 3,
-        Event::FactorAdded { .. } => 4,
-        Event::FactorRemoved { .. } => 5,
-        Event::EmailVerified { .. } => 6,
-        Event::PartyDisabled { .. } => 7,
-        Event::PartyEnabled { .. } => 8,
-        Event::MatchProposed { .. } => 9,
-        Event::MatchRejected { .. } => 10,
-        Event::PersonMerged { .. } => 11,
-        Event::IdentityLinked { .. } => 12,
-        Event::PersonSplit { .. } => 13,
-        Event::OrganizationCreated { .. } => 14,
-        Event::GroupCreated { .. } => 15,
-        Event::Invited { .. } => 16,
-        Event::LinkRevoked { .. } => 17,
-        Event::LinkClaimed { .. } => 18,
-        Event::RoleSet { .. } => 19,
-        Event::MemberRemoved { .. } => 20,
-        Event::Left { .. } => 21,
-        Event::Shared { .. } => 22,
-        Event::Revoked { .. } => 23,
-        Event::Transferred { .. } => 24,
-        Event::DocumentCreated { .. } => 25,
-        Event::DocumentEdited { .. } => 26,
-        Event::DocumentPublished { .. } => 27,
+        Event::ActingAs { .. } => 4,
+        Event::FactorAdded { .. } => 5,
+        Event::FactorRemoved { .. } => 6,
+        Event::EmailVerified { .. } => 7,
+        Event::PartyDisabled { .. } => 8,
+        Event::PartyEnabled { .. } => 9,
+        Event::MatchProposed { .. } => 10,
+        Event::MatchRejected { .. } => 11,
+        Event::PersonMerged { .. } => 12,
+        Event::IdentityLinked { .. } => 13,
+        Event::PersonSplit { .. } => 14,
+        Event::OrganizationCreated { .. } => 15,
+        Event::GroupCreated { .. } => 16,
+        Event::Invited { .. } => 17,
+        Event::LinkRevoked { .. } => 18,
+        Event::LinkClaimed { .. } => 19,
+        Event::RoleSet { .. } => 20,
+        Event::MemberRemoved { .. } => 21,
+        Event::Left { .. } => 22,
+        Event::Shared { .. } => 23,
+        Event::Revoked { .. } => 24,
+        Event::Transferred { .. } => 25,
+        Event::DocumentCreated { .. } => 26,
+        Event::DocumentEdited { .. } => 27,
+        Event::DocumentPublished { .. } => 28,
     }
 }
 
 /// How many there are. Stated once, asserted against both lists.
-const VARIANTS: usize = 28;
+const VARIANTS: usize = 29;
 
 /// One of each, with ids that are obviously placeholders.
 fn every_variant() -> Vec<Event> {
@@ -66,6 +67,11 @@ fn every_variant() -> Vec<Event> {
         Event::SessionRevoked {
             identity: Id::new(1),
             session: Id::new(1),
+        },
+        Event::ActingAs {
+            identity: Id::new(1),
+            session: Id::new(1),
+            party: Id::new(1),
         },
         Event::FactorAdded {
             identity: Id::new(1),

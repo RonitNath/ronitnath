@@ -63,6 +63,15 @@ pub enum Event {
         /// The session that was ended.
         session: Id<Session>,
     },
+    /// A session changed the party it speaks as.
+    ActingAs {
+        /// Whose session.
+        identity: Id<Identity>,
+        /// The session that moved.
+        session: Id<Session>,
+        /// The party it now speaks as.
+        party: Id<Person>,
+    },
     /// A factor was added to an identity.
     FactorAdded {
         /// Whose.
@@ -258,6 +267,7 @@ impl Event {
             Self::SignedIn { .. } => "sign-in",
             Self::SignedOut { .. } => "sign-out",
             Self::SessionRevoked { .. } => "revoke-session",
+            Self::ActingAs { .. } => "act-as",
             Self::FactorAdded { .. } => "add-factor",
             Self::FactorRemoved { .. } => "remove-factor",
             Self::EmailVerified { .. } => "verify-email",
@@ -295,6 +305,7 @@ impl Event {
             | Self::SignedIn { identity, .. }
             | Self::SignedOut { identity, .. }
             | Self::SessionRevoked { identity, .. }
+            | Self::ActingAs { identity, .. }
             | Self::FactorAdded { identity, .. }
             | Self::FactorRemoved { identity, .. }
             | Self::EmailVerified { identity, .. }
@@ -310,6 +321,7 @@ impl Event {
         match self {
             Self::Registered { person, .. } => Some(*person),
             Self::PartyDisabled { party } | Self::PartyEnabled { party } => Some(*party),
+            Self::ActingAs { party, .. } => Some(*party),
             Self::PersonMerged { survivor, .. } => Some(*survivor),
             Self::PersonSplit { person, .. } | Self::IdentityLinked { person, .. } => Some(*person),
             Self::OrganizationCreated { owner, .. }

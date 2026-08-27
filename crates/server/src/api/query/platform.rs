@@ -221,6 +221,7 @@ fn parties_changed(event: &Event, key: &IdKey) -> Vec<String> {
         Event::SignedIn { .. }
         | Event::SignedOut { .. }
         | Event::SessionRevoked { .. }
+        | Event::ActingAs { .. }
         | Event::FactorAdded { .. }
         | Event::FactorRemoved { .. }
         | Event::EmailVerified { .. }
@@ -257,6 +258,7 @@ fn identities_changed(event: &Event, key: &IdKey) -> Vec<String> {
         Event::SignedIn { .. }
         | Event::SignedOut { .. }
         | Event::SessionRevoked { .. }
+        | Event::ActingAs { .. }
         | Event::PartyDisabled { .. }
         | Event::PartyEnabled { .. }
         | Event::MatchProposed { .. }
