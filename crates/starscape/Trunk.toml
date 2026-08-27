@@ -1,5 +1,12 @@
 # The landing's sky, built as one wasm bundle.
 #
+# Build it with `trunk build --release` from this directory, or with
+#   trunk build --release --config crates/starscape/Trunk.toml
+# from the workspace root. Trunk resolves its config from the working
+# directory or from --config, never from the path of the index it is handed —
+# `trunk build --release crates/starscape/index.html` from the root ignores
+# this file and then cannot find the crate at all.
+#
 # `filehash = false` because the server marks every asset `no-cache,
 # must-revalidate` on a stable URL: the browser revalidates and gets a 304, and
 # the askama landing can name the module in a plain <script type="module">
