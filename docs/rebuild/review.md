@@ -36,8 +36,9 @@ worktree   /Users/ronitnath/dev/worktrees/rn-site--r1
 | 16 | **low** | `crates/app-platform/src/…` (the audit table) | `/platform/audit` renders **Acting as** as a raw public id while **Actor** beside it renders a display name. | §Visual conformance V3 | no — owner's call |
 | 17 | **low** | `templates/landing.html` / `crates/ui/tokens.css` | The wordmark is red on the dark landing, amber on the light landing, white on `/auth`, near-black on the light claim page — and light mode *inverts* the name/company pair. "A wordmark is one color" (2026-06-06). | §Visual conformance V1 | no — owner's call |
 | 18 | **low** | `end2end/tests/starscape.spec.ts:217,381` | Two e2e tests read a label off a live animated sky and then act on it; both failed in one full serial run and passed alone and in a second full run. | §Golden flows | no — starscape's owner |
-| 19 | **low** | `docs/rebuild/plan.md` §Product contract, §API (pre-fix) | Three plan claims the code contradicts: a "change-feed retention" recurring job that does not exist (the lane runs the last_seen drain, match scanning, and the session and link sweeps); `/api/q` described as "cacheable `private, no-store`", which is a contradiction and the code sends `no-store`; and a command reply vocabulary of `200/409/403/404` that omits the `422` and the `503` the code sends. | read `crates/server/src/observe.rs`, `http::cache_policy`, `api::decline` | **yes** — plan text corrected, not bannered |
+| 19 | **low** | `docs/rebuild/plan.md` §Product contract, §API, §Gate manifest (pre-fix) | Four plan claims the code contradicts: a "change-feed retention" recurring job that does not exist (the lane runs the last_seen drain, match scanning, and the session and link sweeps); `/api/q` described as "cacheable `private, no-store`", which is a contradiction and the code sends `no-store`; a command reply vocabulary of `200/409/403/404` that omits the `422` and the `503` the code sends; and a negative-space row naming "`/auth/*` GET-only SSR islands" — legacy wording, since `/auth` is now a live askama form and what the test actually asserts is `/manage`, `/api/realtime`, `/pkg/*`, `/metrics` and `/dev-dashboard`. | read `crates/server/src/observe.rs`, `http::cache_policy`, `api::decline`, `surface.rs:569` | **yes** — plan text corrected, not bannered |
 | 20 | **medium** | `crates/kernel/migrations/1_kernel.sql:236` (`audit`) | The audit table is the change feed and it has **no retention, no compaction and no bound**. Every command appends a row; every subscription, the invalidator and the observation lane read it forward by `id`. It is correct to keep an audit log forever, and it is not correct for the *feed* to be the same table with no horizon — the kernel report's log group has "retention by cursor horizon" precisely because of this. Unbounded, but bounded-growth-per-command and read by an index, so it degrades in disk rather than in latency. | `rg -n "DELETE FROM audit" crates` → nothing | no — rung 7 owns it |
+| 21 | **low** | `crates/server/tests/api.rs:541` | The secrets canary pushes the password and the session token through the log pipeline and asserts the capture is non-empty — the right shape. It does **not** push the `id_key` or the two raft secrets through it. Neither is formatted anywhere today, so this is a gap in the negative proof, not a leak. | §Secrets | no — two lines, but the sentinel list is `harness`'s |
 
 ## Gate manifest — every row, with its command
 
@@ -301,6 +302,19 @@ crates/app-org      web-sys
 Checked by grepping each crate's `src`/`tests`/`benches`/`examples` for the
 underscored crate name, then re-checking the hits by hand.
 
+## Secrets
+
+Four secrets exist: the argon2id password factor, the session token, the link
+token, and the AES-128 id key (plus hiqlite's two raft secrets in a cluster).
+
+| control | verdict |
+|---|---|
+| stored form | Passwords are argon2id PHC strings; session and link tokens are **stored only as SHA-256** and the plaintext exists exactly once, in the reply that minted it. `cmd::Minted` returns `None` on a replay and says why: reproducing a token on replay would mean storing it, "which is the one thing that makes a database read enough to impersonate somebody". |
+| in transit | `HttpOnly`, `SameSite=Lax`, `Secure` in prod only (a `Secure` cookie on a loopback dev server is a cookie that is never sent). Asserted in `session.rs`'s own tests. |
+| in config | `id_key` and the two raft secrets each accept a **mounted file** (`RN_SITE__ID_KEY_FILE`, `RN_SITE_HQL_SECRET_*_FILE`) that wins over the value, so Compose hands them in without them appearing in `docker inspect`. `AppConfig` derives `Debug` and carries `id_key`, but nothing logs it — the only `Debug` of config in the tree is in tests. `IdKey`'s own `Debug` prints `IdKey(..)`. |
+| canary | **Present, and correctly shaped.** `api.rs:541` registers with a sentinel password, uses it on a good sign-in, a bad sign-in, a `whoami` and a malformed command, then asserts the captured log contains neither the sentinel nor the session token — *and* asserts the log is non-empty, so a capture that silently failed does not read as a pass. That last assertion is the "verification gates only run if they are installed" rule, in code. |
+| not covered | The canary does not push the **id key** or the raft secrets through the same pipeline. They are never formatted anywhere today, so this is a gap in the negative proof rather than a leak; adding them to the sentinel list is two lines. |
+
 ## Resource/lifecycle matrix
 
 `procedures/engineering.md` §Validation asks for one row per externally
@@ -470,7 +484,7 @@ scope`). Two observations from reading `Containerfile` and
 $ cargo fmt --check                                        # exit 0, no diff
 $ cargo clippy --workspace --all-targets -- -D warnings     # exit 0
 $ cargo test --workspace                                    # exit 0
-     588 passed, 0 failed, across 33 test binaries
+     587 passed, 0 failed, across 33 test binaries
 $ tools/size-gate.sh                                        # exit 0
      size gate: clean (16 warning(s))
 $ cargo check --target wasm32-unknown-unknown \
