@@ -47,28 +47,53 @@ pub const CHECK_SQL: &str = "SELECT r.relation AS relation \
 
 /// "Everything of this kind I can see", in one statement.
 ///
-/// The inner `UNION` is the two ways a resource becomes visible — a relation
-/// row naming one of my subjects, or my own ownership — and both sides are
-/// index seeks. The outer select then pages the survivors by
-/// `(created_at, id)`, which is the order `resource_kind_created_idx` is
-/// already in, so the page itself is not sorted — only the candidate set is,
-/// and that is the `UNION` de-duplicating the two ways in.
+/// The candidate set is the two ways a resource becomes visible — I own it,
+/// or a relation row names one of my subjects — and *both branches are
+/// bounded*, which is the property the whole statement exists to have.
 ///
-/// The `CROSS JOIN`s pin the loop order for the same reason `CHECK_SQL`'s
-/// does: driven the other way, the relation side is a scan of every grant of
-/// that kind in the deployment.
+/// The ownership branch reads `resource_owner_created_idx` (migration 5),
+/// which carries `(created_at, id)` in the direction this reads them, so it
+/// takes the newest `LIMIT` of what I own and stops. That is sound rather
+/// than approximate: a row that is in the newest N *visible* and is owned is
+/// necessarily in the newest N *owned*, and the page cursor is applied on
+/// both sides so a later page reaches further back.
+///
+/// The grant branch excludes `relation = 'owner'`, which is not a share and
+/// is the row `CreateDocument` and `Transfer` keep in step with
+/// `resource.owner_party_id` — the branch above already has those, and
+/// including them is what made this unbounded: a person who owns 10⁴
+/// documents holds 10⁴ owner grants, and the candidate set was all of them.
+///
+/// What is not bounded is the number of things actually shared with one
+/// principal, because `relation` carries no `created_at` to page on. That is
+/// the honest remaining cost of the model, and it is a cost in what somebody
+/// has been given rather than in the size of the deployment.
+///
+/// The outer select then pages the candidates by `(created_at, id)`. The
+/// `CROSS JOIN`s pin the loop order for the same reason `CHECK_SQL`'s do:
+/// driven the other way, the relation side is a scan of every grant of that
+/// kind in the deployment.
+/// SQLite reads `$1` as a *named* parameter and assigns names their index in
+/// order of first appearance, so the placeholders below are written in
+/// ascending order and [`list_visible`] binds in that order: kind, the two
+/// cursor columns, the owner ids, the limit, the subject keys. Reordering the
+/// statement without reordering the binding answers about nothing, silently.
 pub const LIST_VISIBLE_SQL: &str = "SELECT res.id, res.kind, res.owner_party_id, res.home_zone, \
             res.status, res.created_at \
      FROM resource res \
      WHERE res.kind = $1 AND res.status <> 'deleted' \
        AND (res.created_at < $2 OR (res.created_at = $2 AND res.id < $3)) \
-       AND res.id IN (SELECT r.object_id FROM json_each($4) s \
-                        CROSS JOIN relation r ON r.subject_key = s.value \
-                       WHERE r.object_kind = $1 \
+       AND res.id IN (SELECT id FROM \
+                        (SELECT o.id AS id FROM json_each($4) p \
+                           CROSS JOIN resource o ON o.owner_party_id = p.value \
+                            AND o.kind = $1 \
+                          WHERE (o.created_at < $2 OR (o.created_at = $2 AND o.id < $3)) \
+                          ORDER BY o.created_at DESC, o.id DESC LIMIT $5) \
                       UNION \
-                      SELECT o.id FROM json_each($5) p \
-                        CROSS JOIN resource o ON o.owner_party_id = p.value AND o.kind = $1) \
-     ORDER BY res.created_at DESC, res.id DESC LIMIT $6";
+                      SELECT r.object_id FROM json_each($6) s \
+                        CROSS JOIN relation r ON r.subject_key = s.value \
+                         AND r.object_kind = $1 AND r.relation <> 'owner') \
+     ORDER BY res.created_at DESC, res.id DESC LIMIT $5";
 
 /// Whose contact details are visible inside one group.
 ///
@@ -205,9 +230,9 @@ pub async fn list_visible(
                 kind,
                 created_at,
                 id,
-                subject_keys(subjects),
                 owner_ids(subjects),
-                limit
+                limit,
+                subject_keys(subjects)
             ],
         )
         .await?)

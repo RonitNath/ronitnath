@@ -36,27 +36,53 @@ const PAGE: i64 = 200;
 
 /// Every document this principal can reach, newest first.
 ///
-/// The two arms of the `IN` are the two ways a document becomes visible, and
-/// both are index seeks: the relation side rides
-/// `relation_subject_key_idx`, the ownership side `resource_owner_idx`. The
-/// `CROSS JOIN`s pin the loop order for the reason `check()` does — driven the
-/// other way the relation side is a scan of every grant in the deployment.
-pub const DOCUMENTS_SQL: &str = "SELECT res.id AS id, res.owner_party_id AS owner_id, res.status AS status, \
-     res.created_at AS created_at, d.title AS title, d.draft_rev AS draft_rev, \
-     d.published_rev AS published_rev, owner.kind AS owner_kind, \
-     owner.display_name AS owner_display \
+/// The same shape as [`list_visible`](rn_kernel::relation::list_visible), and
+/// the same two bounded branches: the newest [`PAGE`] of what the principal
+/// owns, read in order off `resource_owner_created_idx` (migration 5), and
+/// every non-`owner` grant naming one of their subjects. Owner grants are
+/// left out of the second branch because the first branch already has those
+/// rows — including them is what made the candidate set 10 004 ids to render
+/// a page of 200, and the endpoint 294 ms against a 5 ms budget (finding 1,
+/// `docs/perf/2026-08-27.md`).
+///
+/// The owner's `kind` and `display_name` are scalar subqueries rather than a
+/// third join, and that is the other half of the 294 ms: with `party` as a
+/// joined table the planner made it the *outermost* loop and ran the whole
+/// visibility question once per party in the deployment. A subquery on the
+/// primary key cannot be anything but a seek.
+///
+/// The statement is written out rather than borrowed because the list carries
+/// a title and a revision, which the resource registry knows nothing about.
+pub const DOCUMENTS_SQL: &str = "SELECT res.id AS id, res.owner_party_id AS owner_id, \
+     res.status AS status, res.created_at AS created_at, d.title AS title, \
+     d.draft_rev AS draft_rev, d.published_rev AS published_rev, \
+     (SELECT p.kind FROM party p WHERE p.id = res.owner_party_id) AS owner_kind, \
+     (SELECT p.display_name FROM party p WHERE p.id = res.owner_party_id) AS owner_display \
      FROM resource res \
-     JOIN document d ON d.resource_id = res.id \
-     JOIN party owner ON owner.id = res.owner_party_id \
+     CROSS JOIN document d ON d.resource_id = res.id \
      WHERE res.kind = 'document' AND res.status <> 'deleted' \
-       AND res.id IN (SELECT r.object_id FROM json_each($1) s \
-                        CROSS JOIN relation r ON r.subject_key = s.value \
-                       WHERE r.object_kind = 'document' \
+       AND res.id IN (SELECT id FROM \
+                        (SELECT o.id AS id FROM json_each($1) p \
+                           CROSS JOIN resource o ON o.owner_party_id = p.value \
+                            AND o.kind = 'document' \
+                          ORDER BY o.created_at DESC, o.id DESC LIMIT $2) \
                       UNION \
-                      SELECT o.id FROM json_each($2) p \
-                        CROSS JOIN resource o ON o.owner_party_id = p.value \
-                         AND o.kind = 'document') \
-     ORDER BY res.created_at DESC, res.id DESC LIMIT $3";
+                      SELECT r.object_id FROM json_each($3) s \
+                        CROSS JOIN relation r ON r.subject_key = s.value \
+                         AND r.object_kind = 'document' AND r.relation <> 'owner') \
+     ORDER BY res.created_at DESC, res.id DESC LIMIT $2";
+
+/// The parameters [`DOCUMENTS_SQL`] takes, in the order it names them.
+///
+/// SQLite reads `$1` as a *named* parameter, not a numbered one, and assigns
+/// names their index in order of first appearance — so a statement whose
+/// placeholders are not written in ascending order binds its values to the
+/// wrong slots and silently answers about nothing. The ownership branch comes
+/// first in this statement, so the owner ids are `$1`; this function is where
+/// that fact lives, rather than at each call site.
+fn documents_params(subjects: &SubjectSet) -> Vec<rn_kernel::store::Value> {
+    rn_kernel::bind![owner_ids(subjects), PAGE, subject_keys(subjects)]
+}
 
 /// One document, with its body. Addressed by its resource row's primary key.
 pub const DOCUMENT_SQL: &str = "SELECT res.id AS id, res.owner_party_id AS owner_id, \
@@ -234,10 +260,7 @@ pub(super) async fn documents(
     key: &IdKey,
 ) -> Outcome<Vec<Row>> {
     let rows = reads
-        .query::<DocumentSummary>(
-            DOCUMENTS_SQL,
-            rn_kernel::bind![subject_keys(subjects), owner_ids(subjects), PAGE],
-        )
+        .query::<DocumentSummary>(DOCUMENTS_SQL, documents_params(subjects))
         .await?;
     let ids: Vec<i64> = rows.iter().map(|row| row.id.get()).collect();
     let held = held(reads, subjects, &ids).await?;
@@ -338,10 +361,7 @@ pub(super) async fn shares(
     key: &IdKey,
 ) -> Outcome<Vec<Row>> {
     let visible = reads
-        .query::<DocumentSummary>(
-            DOCUMENTS_SQL,
-            rn_kernel::bind![subject_keys(subjects), owner_ids(subjects), PAGE],
-        )
+        .query::<DocumentSummary>(DOCUMENTS_SQL, documents_params(subjects))
         .await?;
     let ids: Vec<i64> = visible.iter().map(|row| row.id.get()).collect();
     let list = ids_json(&ids);

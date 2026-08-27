@@ -36,10 +36,20 @@ fn rides(plan: &[String], index: &str) {
     );
     for line in plan {
         assert!(
-            !line.contains("SCAN") || line.contains("VIRTUAL TABLE"),
+            !line.contains("SCAN") || scannable(line),
             "a full scan crept into a member query:\n{joined}"
         );
     }
+}
+
+/// The two things a plan may scan without it being a full table scan: a
+/// `json_each` virtual table, whose rows are the caller's own parameters, and
+/// a co-routine, whose rows are the bounded output of a subquery this
+/// statement already constrained.
+fn scannable(line: &str) -> bool {
+    line.contains("VIRTUAL TABLE")
+        || line.contains("SCAN (subquery")
+        || line.contains("CONSTANT ROW")
 }
 
 fn plan(harness: &Local, sql: &str, params: Vec<Value>) -> Vec<String> {
@@ -88,11 +98,21 @@ async fn explain_the_document_list_seeks_both_ways_a_document_becomes_visible() 
     let plan = plan(
         &harness,
         member_documents::DOCUMENTS_SQL,
-        bind![KEYS, "[1]", 200i64],
+        bind!["[1]", 200i64, KEYS],
     );
+    // Both branches of the candidate set are bounded, and the plan is where
+    // that shows. Ownership rides the index that carries `(created_at, id)`,
+    // which is what lets the branch take the newest page and stop; grants
+    // ride the subject-key index. The outer page comes off
+    // `resource_kind_created_idx`, in the order it is already in.
     rides(&plan, "resource_kind_created_idx");
     rides(&plan, "relation_subject_key_idx");
-    rides(&plan, "resource_owner_idx");
+    rides(&plan, "resource_owner_created_idx");
+    assert!(
+        !plan.join("\n").contains("SCAN resource"),
+        "the visibility branches must be seeks, not a walk of every resource:\n{}",
+        plan.join("\n")
+    );
 }
 
 #[tokio::test]

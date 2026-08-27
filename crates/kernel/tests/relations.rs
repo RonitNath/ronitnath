@@ -74,7 +74,8 @@ fn set(person: i64, groups: &[i64]) -> SubjectSet {
 
 /// Assert a plan reaches the named index and scans nothing but its own
 /// arguments. `json_each` is the principal's expanded subject set — a list the
-/// query was handed, not a table it went looking through.
+/// query was handed, not a table it went looking through — and a co-routine
+/// is the bounded output of a subquery this statement already constrained.
 fn rides(plan: &[String], index: &str) {
     let joined = plan.join("\n");
     assert!(
@@ -83,7 +84,10 @@ fn rides(plan: &[String], index: &str) {
     );
     for line in plan {
         assert!(
-            !line.contains("SCAN") || line.contains("VIRTUAL TABLE"),
+            !line.contains("SCAN")
+                || line.contains("VIRTUAL TABLE")
+                || line.contains("SCAN (subquery")
+                || line.contains("CONSTANT ROW"),
             "a full scan crept into a hot query:\n{joined}"
         );
     }
@@ -121,14 +125,20 @@ async fn explain_check_seeks_once_per_subject_and_once_per_membership() {
 async fn explain_list_visible_seeks_both_ways_a_resource_becomes_visible() {
     let harness = Local::new();
     let keys = r#"["public:0","person:1","group:7"]"#;
+    // In the order the statement names them: kind, the two cursor columns,
+    // the owner ids, the limit, the subject keys. SQLite assigns `$1` an
+    // index by first appearance, so this order is the statement's, not a
+    // convention.
     let plan = plan(
         &harness,
         relation::LIST_VISIBLE_SQL,
-        bind!["document", i64::MAX, i64::MAX, keys, "[1]", 50i64],
+        bind!["document", i64::MAX, i64::MAX, "[1]", 50i64, keys],
     );
     rides(&plan, "resource_kind_created_idx");
     rides(&plan, "relation_subject_key_idx");
-    rides(&plan, "resource_owner_idx");
+    // The ownership branch takes the newest page and stops, which is what the
+    // index carrying `(created_at, id)` is for (migration 5).
+    rides(&plan, "resource_owner_created_idx");
 }
 
 #[tokio::test]

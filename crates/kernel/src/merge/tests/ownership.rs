@@ -35,22 +35,26 @@ fn plan(harness: &Local, sql: &str, params: Vec<Value>) -> Vec<String> {
 async fn ownership_moves_by_index_seek_in_both_directions() {
     let harness = Local::new();
 
-    // Merge: everything the absorbed person owns, found through the owner
-    // index rather than by reading the registry.
+    // Merge: everything the absorbed person owns, found through an index on
+    // the owner rather than by reading the registry. Which of the two the
+    // planner picks is its business — `resource_owner_idx` is narrower and
+    // `resource_owner_created_idx` (migration 5) covers more columns, and
+    // both are a seek on the same prefix; what matters is that it is one of
+    // them and not a table scan.
     seeks(
         &plan(&harness, crate::merge::apply::RESOURCES, bind![1, 2]),
-        "resource_owner_idx",
+        "resource_owner",
     );
 
     // Split: the same seek on the way back, plus the `#owner` rows of the
     // person the identity came from — which is why the subject is asked for as
     // a `subject_key` and not as its two columns.
     let restore = plan(&harness, crate::merge::split::RESOURCES, bind![1, 2, 3]);
-    seeks(&restore, "resource_owner_idx");
+    seeks(&restore, "resource_owner");
     seeks(&restore, "relation_subject_key_idx");
 
     // And the survivor's stale `#owner` row, removed by the same index.
     let drop_owner = plan(&harness, crate::merge::split::DROP_OWNER, bind![1, 2]);
     seeks(&drop_owner, "relation_subject_key_idx");
-    seeks(&drop_owner, "resource_owner_idx");
+    seeks(&drop_owner, "resource_owner");
 }

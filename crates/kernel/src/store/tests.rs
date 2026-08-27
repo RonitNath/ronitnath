@@ -326,14 +326,16 @@ fn a_clock_a_test_owns_moves_only_when_told() {
 #[test]
 fn the_embedded_migrations_are_the_files_on_disk() {
     let sql = migrations();
-    // Four files: `1_kernel.sql` creates every table, `2_relations.sql` adds
+    // Five files: `1_kernel.sql` creates every table, `2_relations.sql` adds
     // what the relation store needs on top of them, `3_merge.sql` what merge
-    // needs, `4_invitations.sql` the index "invitations I minted" seeks on.
-    // Each is asserted below by something only that file contains.
-    assert_eq!(sql.len(), 4);
+    // needs, `4_invitations.sql` the index "invitations I minted" seeks on,
+    // `5_visibility.sql` the one that makes "the newest N I own" a bounded
+    // read. Each is asserted below by something only that file contains.
+    assert_eq!(sql.len(), 5);
     assert!(sql[0].contains("CREATE TABLE party"));
     assert!(sql[2].contains("person_link_is_append_only_update"));
     assert!(sql[3].contains("relation_granted_by_idx"));
+    assert!(sql[4].contains("resource_owner_created_idx"));
     // Order is what makes the second file able to alter the first's tables.
     assert!(sql[1].contains("ALTER TABLE relation"));
 }
