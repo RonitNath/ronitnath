@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+
+{% block title %}Sign in{% endblock %}
+
+{% block styles %}
+<link rel="stylesheet" href="/static/pages.css">
+{% endblock %}
+
+{% block body %}
+{#- Two peer forms. No copy beyond labels: the page is a door, and a door does
+    not explain itself. Errors render inside the form they came from, beside
+    the field that failed, and the password is never echoed back. -#}
+<main class="page">
+  <h1>Ronit Nath</h1>
+
+  <div class="panes">
+    <form class="pane" method="post" action="/auth/sign-in" novalidate>
+      <h2>Sign in</h2>
+      <input type="hidden" name="next" value="{{ next }}">
+
+      <div class="field">
+        <label for="sign-in-email">Email</label>
+        <input id="sign-in-email" name="email" type="email" inputmode="email"
+               autocomplete="username" value="{{ sign_in.email }}"
+               {% if focus == "sign-in" %}autofocus{% endif %}>
+        {% if !sign_in.error_email.is_empty() %}
+        <p class="note" data-state="invalid">{{ sign_in.error_email }}</p>
+        {% endif %}
+      </div>
+
+      <div class="field">
+        <label for="sign-in-password">Password</label>
+        <input id="sign-in-password" name="password" type="password"
+               autocomplete="current-password">
+        {% if !sign_in.error_password.is_empty() %}
+        <p class="note" data-state="invalid">{{ sign_in.error_password }}</p>
+        {% endif %}
+      </div>
+
+      {% if !sign_in.error_form.is_empty() %}
+      <p class="note" data-state="invalid">{{ sign_in.error_form }}</p>
+      {% endif %}
+      <button type="submit" class="commit">Sign in</button>
+    </form>
+
+    <form class="pane" method="post" action="/auth/register" novalidate>
+      <h2>Register</h2>
+      <input type="hidden" name="next" value="{{ next }}">
+
+      <div class="field">
+        <label for="register-name">Name</label>
+        <input id="register-name" name="display_name" type="text"
+               autocomplete="name" value="{{ register.display_name }}"
+               {% if focus == "register" %}autofocus{% endif %}>
+        {% if !register.error_display_name.is_empty() %}
+        <p class="note" data-state="invalid">{{ register.error_display_name }}</p>
+        {% endif %}
+      </div>
+
+      <div class="field">
+        <label for="register-email">Email</label>
+        <input id="register-email" name="email" type="email" inputmode="email"
+               autocomplete="username" value="{{ register.email }}">
+        {% if !register.error_email.is_empty() %}
+        <p class="note" data-state="invalid">{{ register.error_email }}</p>
+        {% endif %}
+      </div>
+
+      <div class="field">
+        <label for="register-password">Password</label>
+        <input id="register-password" name="password" type="password"
+               autocomplete="new-password">
+        {% if !register.error_password.is_empty() %}
+        <p class="note" data-state="invalid">{{ register.error_password }}</p>
+        {% endif %}
+      </div>
+
+      {% if !register.error_form.is_empty() %}
+      <p class="note" data-state="invalid">{{ register.error_form }}</p>
+      {% endif %}
+      <button type="submit" class="commit">Register</button>
+    </form>
+  </div>
+</main>
+{% endblock %}
