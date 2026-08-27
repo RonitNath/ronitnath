@@ -63,12 +63,17 @@ impl ApiError {
     ///
     /// This is what a field's note renders: a complaint about `email` belongs
     /// beside the email input and nowhere else.
+    ///
+    /// The comparison is on the *name*, not on the spelling of it. The kernel
+    /// writes `display name` where a form calls its control `display_name`,
+    /// and a note that rendered nowhere because of a space would be exactly
+    /// the failure the field is carried to prevent.
     #[must_use]
     pub fn about(&self, field: &str) -> Option<String> {
         match self {
             Self::Invalid(fields) => fields
                 .iter()
-                .find(|invalid| invalid.field == field)
+                .find(|invalid| same_field(&invalid.field, field))
                 .map(|invalid| invalid.message.clone()),
             _ => None,
         }
@@ -84,6 +89,18 @@ impl ApiError {
             other => other.to_string(),
         }
     }
+}
+
+/// Whether two names name the same control. A space, an underscore and a
+/// hyphen are the same separator, and case is not a distinction anybody meant.
+fn same_field(server: &str, form: &str) -> bool {
+    let plain = |name: &str| {
+        name.chars()
+            .filter(|c| !c.is_whitespace() && *c != '_' && *c != '-')
+            .flat_map(char::to_lowercase)
+            .collect::<String>()
+    };
+    plain(server) == plain(form)
 }
 
 /// Every complaint, as one sentence — the fallback when there is no field to
@@ -240,6 +257,23 @@ mod tests {
         assert_eq!(error.about("password").as_deref(), Some("Too short."));
         assert_eq!(error.about("display_name"), None, "a field nobody named");
         assert_eq!(error.message(), "That is not an address. Too short.");
+    }
+
+    #[test]
+    fn a_field_is_matched_by_name_and_not_by_spelling() {
+        // The kernel writes the human phrase; a form names its control.
+        let error =
+            invalid(r#"{"invalid":[{"field":"display name","message":"A name is required."}]}"#);
+        assert_eq!(
+            error.about("display_name").as_deref(),
+            Some("A name is required."),
+            "a space is not a different field from an underscore"
+        );
+        assert_eq!(
+            error.about("Display Name").as_deref(),
+            Some("A name is required.")
+        );
+        assert_eq!(error.about("name"), None, "and it is still the same name");
     }
 
     #[test]

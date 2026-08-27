@@ -153,7 +153,13 @@ fn Adding(refusal: RwSignal<Option<Refusal>>) -> impl IntoView {
                         prop:value=move || value.get()
                         on:input=move |event| value.set(event_target_value(&event))
                     />
-                    <Note refusal=refusal field="value" />
+                    // One control carrying either an address or a secret, and
+                    // the server names whichever it was: a note keyed on
+                    // "value" would be a note that never renders.
+                    <Note
+                        refusal=refusal
+                        field=Signal::derive(move || kind.get())
+                    />
                 </div>
                 <Commit label="Add factor" version=Signal::derive(|| 0) on_commit=add />
             </div>

@@ -110,13 +110,17 @@ pub fn Note(
     #[prop(into)]
     refusal: Signal<Option<Refusal>>,
     /// Show only what the server said about this field, if it named one.
-    #[prop(optional)]
-    field: Option<&'static str>,
+    ///
+    /// A signal rather than a string, because one control can stand for two
+    /// fields: the factor form's single input carries an address or a secret,
+    /// and which one the server will name follows the kind beside it.
+    #[prop(optional, into)]
+    field: Option<Signal<String>>,
 ) -> impl IntoView {
     let text = move || {
         let refusal = refusal.get()?;
-        match field {
-            Some(field) => refusal.about(field),
+        match &field {
+            Some(field) => refusal.about(&field.get()),
             None => Some(refusal.message()),
         }
     };

@@ -291,3 +291,37 @@ test("a merge offered the wrong credentials is refused without saying which half
     await second_context.close();
   }
 });
+
+/**
+ * A refusal about a field is drawn beside that field.
+ *
+ * The server answers a validation failure with the field it is about, which
+ * is only worth carrying if a form places it: "frontend messages should be in
+ * the appropriate location". The factor form is the sharp case — one control
+ * standing for either an address or a secret — so it is the one walked here.
+ */
+test("a refusal names a field, and the note is under that field", async ({ browser }) => {
+  const context = await browser.newContext();
+  const page = await open(context);
+  try {
+    await register(page, "Placed", address("placed"));
+    await page.goto(`${site}/app/identities`);
+
+    const value = page.getByLabel("Address or password");
+    await value.fill("not an address");
+    await page.getByRole("button", { name: "Add factor" }).click();
+
+    // Beside the control that produced it, not at the bottom of the page.
+    const beside = page.locator("#factor-value").locator("xpath=../span[@class='note']");
+    await expect(beside).toHaveText(/address/i, { timeout: 10_000 });
+    await expect(beside).toHaveAttribute("data-state", "invalid");
+
+    // The same control, the other kind, and the server names the other field.
+    await page.getByLabel("Kind").selectOption("password");
+    await value.fill("short");
+    await page.getByRole("button", { name: "Add factor" }).click();
+    await expect(beside).toHaveText(/character/i, { timeout: 10_000 });
+  } finally {
+    await context.close();
+  }
+});
