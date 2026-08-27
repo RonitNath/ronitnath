@@ -3,7 +3,6 @@
 use std::time::Duration;
 
 use rn_site::config::AppConfig;
-use rn_site::db::Migrations;
 use rn_site::{AppState, db, shutdown, telemetry};
 use tracing::info;
 
@@ -18,13 +17,16 @@ async fn main() {
     };
     telemetry::init(config.mode);
 
-    // Derived, never stored: reading it at boot is what makes a missing key in
-    // production a refusal to start rather than a page of unresolvable ids.
-    let _id_key = config.require_id_key();
-
-    // The schema is the kernel's. K1 hands over `rn_kernel::migrations()`; the
-    // seam is this value, so adopting it is this line and nothing else.
-    let migrations = Migrations::default();
+    // The schema is the kernel's, and the seam is this value: the drift check
+    // that runs before it (`db::migrations`) is the server's, the history it
+    // checks is `rn-kernel`'s, and neither knows about the other.
+    let migrations = match db::Migrations::embedded::<rn_kernel::Migrations>() {
+        Ok(migrations) => migrations,
+        Err(error) => {
+            eprintln!("rn-site: the embedded migration history is malformed: {error}");
+            std::process::exit(1);
+        }
+    };
 
     let db = match db::open(&config, &migrations).await {
         Ok(db) => db,

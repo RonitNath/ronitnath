@@ -90,7 +90,7 @@ base64 = "0.23.1"
 # Test and measurement.
 criterion = "0.8.2"
 proptest = "1.11.0"
-axum-test = "21.1.0"
+axum-test = { version = "21.1.0", features = ["ws"] }
 tempfile = "3.27.0"
 
 # The wasm bundles are shipped over the wire, so they are optimised for size,
