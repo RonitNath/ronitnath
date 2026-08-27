@@ -56,6 +56,9 @@ rather than compiled into it.
 
 ```sh
 cargo run -p rn-site                    # the server on :3004, dev mode, disk assets
+cp .env.example .env                    # then RN_SITE__DEV=1 puts a "Sign in as
+                                        # operator" button under the sign-in form
+                                        # (debug builds only; `just run-dev`)
 tools/seed.sh                           # register the first operator and grant it
 tools/cluster.sh start                  # three real voters on this host
 tools/perf/run.sh                       # oha + samply against that cluster

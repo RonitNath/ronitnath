@@ -56,6 +56,11 @@ size-gate:
 run:
     cargo run -p rn-site
 
+# The same, with the developer sign-in button under the sign-in form. Debug
+# builds only — a release binary contains no such route (`auth::dev`).
+run-dev:
+    RN_SITE__DEV=1 cargo run -p rn-site
+
 # Register the first operator through the real form, then grant it (dev only).
 seed:
     tools/seed.sh
