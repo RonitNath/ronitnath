@@ -103,8 +103,8 @@ pub const INSERT_SQL: &str = "INSERT INTO oidc_code \
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING id";
 
 /// Mark a code redeemed. The guard is the whole of "single use".
-pub const REDEEM_SQL: &str = "UPDATE oidc_code SET used_at = $2 \
-     WHERE id = $1 AND used_at IS NULL AND expires_at > $2";
+pub const REDEEM_SQL: &str = "UPDATE oidc_code SET used_at = $1 \
+     WHERE id = $2 AND used_at IS NULL AND expires_at > $1";
 
 /// Drop codes nobody can redeem any more.
 pub const SWEEP_SQL: &str = "DELETE FROM oidc_code WHERE expires_at <= $1";

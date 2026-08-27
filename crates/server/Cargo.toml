@@ -33,8 +33,16 @@ tracing-subscriber = { workspace = true }
 config = { workspace = true }
 dotenvy = { workspace = true }
 thiserror = { workspace = true }
+# The token endpoint decodes an `Authorization: Basic` credential, and the
+# back-channel logout task needs a `jti`. Both are already in the graph.
+base64 = { workspace = true }
+getrandom = { workspace = true }
 
 [dev-dependencies]
 axum-test = { workspace = true }
+# Signing a logout token by hand, to assert its claims. Test-only: the server
+# never generates a key — `rotate-signing-key` does, in the kernel.
+rsa = { workspace = true }
+rand_core = { workspace = true }
 tempfile = { workspace = true }
 futures-util = { workspace = true }

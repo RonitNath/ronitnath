@@ -26,6 +26,7 @@ async fn server() -> TestServer {
             ));
             let config = AppConfig {
                 public_origin: "http://127.0.0.1:3004".to_owned(),
+                public_name: None,
                 oidc_key: Some("00".repeat(32)),
                 mode: Mode::Dev,
                 db_path: directory.path().join("db.sqlite"),

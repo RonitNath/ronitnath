@@ -199,7 +199,8 @@ pub const RETIRE_ACTIVE_SQL: &str =
     "UPDATE oidc_key SET status = 'retiring' WHERE status = 'active'";
 
 /// Retire a key that is still published.
-pub const RETIRE_SQL: &str = "UPDATE oidc_key SET status = 'retired', retired_at = $2 WHERE kid = $1 AND status = 'retiring'";
+pub const RETIRE_SQL: &str = "UPDATE oidc_key SET status = 'retired', retired_at = $1 \
+     WHERE kid = $2 AND status = 'retiring'";
 
 struct Sealed {
     kid: String,

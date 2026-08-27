@@ -67,6 +67,15 @@ pub struct AppConfig {
     /// accepts — and loopback in dev, which is where `just run-dev` serves.
     #[serde(default = "default_public_origin")]
     pub public_origin: String,
+    /// How this deployment names itself to a reader: the word at the top of
+    /// the consent page and the sign-out confirmation.
+    ///
+    /// From config rather than a constant, because the OpenID Provider is a
+    /// feature of the platform and not of this site: a deployment that is not
+    /// ronitnath.com says its own name. Absent, the issuer's host stands in,
+    /// which is at least true.
+    #[serde(default)]
+    pub public_name: Option<String>,
     /// The key the OpenID Provider's signing keys are sealed under at rest,
     /// 64 lowercase hex characters (an AES-256 key).
     ///
@@ -192,6 +201,22 @@ impl AppConfig {
     }
 
     /// Directory that must exist for hiqlite (`data/` for the default path).
+    /// What a page calls this deployment: the configured name, or the
+    /// issuer's host.
+    #[must_use]
+    pub fn display_name(&self) -> String {
+        if let Some(name) = self.public_name.as_deref().map(str::trim)
+            && !name.is_empty()
+        {
+            return name.to_owned();
+        }
+        self.public_origin
+            .split("://")
+            .nth(1)
+            .unwrap_or(&self.public_origin)
+            .to_owned()
+    }
+
     #[must_use]
     pub fn db_dir(&self) -> PathBuf {
         self.db_path
@@ -307,6 +332,7 @@ mod tests {
             id_key: id_key.map(str::to_string),
             bootstrap_operator_email: None,
             public_origin: "https://ronitnath.com".to_owned(),
+            public_name: None,
             oidc_key: Some("a".repeat(64)),
             dev: false,
         }

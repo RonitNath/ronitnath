@@ -214,8 +214,10 @@ pub async fn update_client<S: Sql, F: Feed>(
 
     let Applied { committed, .. } = run(ctx, args, async || {
         let mut batch = Batch::new();
-        let mut params = vec![Value::from(id)];
-        params.extend(metadata_values(&args.metadata));
+        // The row's id goes *last*: the statement names it last, and a
+        // parameter's index is its first appearance in the SQL.
+        let mut params = metadata_values(&args.metadata);
+        params.push(Value::from(id));
         batch.one(registry::UPDATE_SQL, params);
         batch.one(
             UPDATE_AUDIT,
@@ -257,9 +259,9 @@ pub async fn rotate_client_secret<S: Sql, F: Feed>(
         batch.one(
             registry::ROTATE_SECRET_SQL,
             vec![
-                Value::from(client.id),
                 Value::from(registry::secret_digest(secret.expose())),
                 Value::from(now),
+                Value::from(client.id),
             ],
         );
         batch.one(
@@ -303,11 +305,11 @@ pub async fn delete_client<S: Sql, F: Feed>(
         let mut batch = Batch::new();
         batch.one(
             registry::DELETE_SQL,
-            vec![Value::from(client.id), Value::from(now)],
+            vec![Value::from(now), Value::from(client.id)],
         );
         batch.any(
             registry::REVOKE_CLIENT_TOKENS_SQL,
-            vec![Value::from(client.id), Value::from(now)],
+            vec![Value::from(now), Value::from(client.id)],
         );
         batch.any(
             registry::DELETE_CLIENT_CONSENTS_SQL,

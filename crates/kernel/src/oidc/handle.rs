@@ -109,9 +109,13 @@ pub const TAKEN_SQL: &str = "SELECT (SELECT count(*) FROM party WHERE handle = $
 /// registrations racing for one write one row rather than both.
 /// A person's own alias does not block them: a handle they gave up is one
 /// they may take back, which is the other half of never freeing it.
-pub const SET_SQL: &str = "UPDATE party SET handle = $2 WHERE id = $1 \
-     AND NOT EXISTS (SELECT 1 FROM party WHERE handle = $2 AND id <> $1) \
-     AND NOT EXISTS (SELECT 1 FROM party_handle_alias WHERE handle = $2 AND person_id <> $1)";
+/// The placeholders ascend in the order they first appear, because that is
+/// the order they are bound in: SQLite numbers `$n` by first appearance, not
+/// by the digit. A statement whose `SET` names `$2` before its `WHERE` names
+/// `$1` answers about the wrong row, silently.
+pub const SET_SQL: &str = "UPDATE party SET handle = $1 WHERE id = $2 \
+     AND NOT EXISTS (SELECT 1 FROM party WHERE handle = $1 AND id <> $2) \
+     AND NOT EXISTS (SELECT 1 FROM party_handle_alias WHERE handle = $1 AND person_id <> $2)";
 
 /// The handle a person answers to, resolving an absorbed one to the survivor.
 pub const RESOLVE_SQL: &str = "SELECT handle FROM party WHERE id = $1";

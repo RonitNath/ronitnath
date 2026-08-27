@@ -97,9 +97,9 @@ pub async fn revoke_consent<S: Sql, F: Feed>(
         batch.any(
             tokens::REVOKE_CONSENT_SQL,
             vec![
+                Value::from(now),
                 Value::from(client.id),
                 Value::from(person),
-                Value::from(now),
             ],
         );
         batch.one(

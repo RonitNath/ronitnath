@@ -224,20 +224,24 @@ pub const INSERT_SQL: &str = "INSERT INTO oidc_client \
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16) RETURNING id";
 
 /// Replace a registration's metadata. Guarded on the row being live.
-pub const UPDATE_SQL: &str = "UPDATE oidc_client SET client_name = $2, client_uri = $3, \
-     logo_uri = $4, redirect_uris = $5, post_logout_redirect_uris = $6, \
-     backchannel_logout_uri = $7, token_endpoint_auth_method = $8, jwks = $9, \
-     grant_types = $10, scopes = $11, trusted = $12, members_only = $13 \
-     WHERE id = $1 AND deleted_at IS NULL";
+/// Every statement here numbers its placeholders in the order they first
+/// appear, because that is the order they are bound in: SQLite assigns `$n` an
+/// index by first appearance rather than by the digit, so a `SET` naming `$2`
+/// before a `WHERE` names `$1` writes the wrong value to the wrong row.
+pub const UPDATE_SQL: &str = "UPDATE oidc_client SET client_name = $1, client_uri = $2, \
+     logo_uri = $3, redirect_uris = $4, post_logout_redirect_uris = $5, \
+     backchannel_logout_uri = $6, token_endpoint_auth_method = $7, jwks = $8, \
+     grant_types = $9, scopes = $10, trusted = $11, members_only = $12 \
+     WHERE id = $13 AND deleted_at IS NULL";
 
 /// Mint a new secret. The old one stops working in the same statement: an
 /// overlap would be two live credentials with no way to tell which leaked.
 pub const ROTATE_SECRET_SQL: &str =
-    "UPDATE oidc_client SET secret_hash = $2, rotated_at = $3 WHERE id = $1 AND deleted_at IS NULL";
+    "UPDATE oidc_client SET secret_hash = $1, rotated_at = $2 WHERE id = $3 AND deleted_at IS NULL";
 
 /// Withdraw a client.
 pub const DELETE_SQL: &str =
-    "UPDATE oidc_client SET deleted_at = $2 WHERE id = $1 AND deleted_at IS NULL";
+    "UPDATE oidc_client SET deleted_at = $1 WHERE id = $2 AND deleted_at IS NULL";
 
 /// The service party a client's `client_credentials` tokens speak as.
 pub const SERVICE_PARTY_SQL: &str = "INSERT INTO party (kind, display_name, status, created_at) \
@@ -385,7 +389,7 @@ pub fn decode_client_id(key: &crate::ids::IdKey, raw: &str) -> Outcome<Id<OidcCl
 
 /// The rows a withdrawal takes with it, in the order they are written.
 pub const REVOKE_CLIENT_TOKENS_SQL: &str =
-    "UPDATE oidc_token SET revoked_at = $2 WHERE client_id = $1 AND revoked_at IS NULL";
+    "UPDATE oidc_token SET revoked_at = $1 WHERE client_id = $2 AND revoked_at IS NULL";
 /// The consents a withdrawal takes with it.
 pub const DELETE_CLIENT_CONSENTS_SQL: &str = "DELETE FROM oidc_consent WHERE client_id = $1";
 /// The consent *grants* a withdrawal takes with it.

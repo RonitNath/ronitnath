@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+
+{% block title %}{{ code }}{% endblock %}
+
+{% block styles %}
+<link rel="stylesheet" href="/static/pages.css">
+{% endblock %}
+
+{% block body %}
+{#- The two failures that may not be redirected: a client this deployment does
+    not know, and a redirect_uri its registration does not name. Redirecting
+    either would be an open redirect carrying this deployment's name, so they
+    are rendered — which makes this the one place a person meets an OAuth error
+    in words instead of a query parameter. -#}
+<main class="page">
+  <h1>{{ deployment }}</h1>
+
+  <div class="claim">
+    <p class="grant">{{ message }}</p>
+    <p class="note">{{ code }}</p>
+  </div>
+</main>
+{% endblock %}

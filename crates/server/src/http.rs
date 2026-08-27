@@ -62,6 +62,21 @@ pub fn cache_policy(path: &str) -> &'static str {
         "/platform/pkg/",
         "/favicon.ico",
     ];
+    // The OpenID Provider's two public documents. Neither carries a byte of
+    // session state — the metadata is the deployment's own description and the
+    // JWKS is public keys — and both are fetched by every relying party on
+    // every start, so they are the only responses here a shared cache may
+    // hold. Five minutes, which is short enough that a key rotation reaches an
+    // RP promptly and long enough that a fleet of them is not a thundering
+    // herd; the `retiring` status is what makes even a stale copy correct.
+    const PUBLIC: &[&str] = &[
+        "/.well-known/openid-configuration",
+        "/.well-known/oauth-authorization-server",
+        "/oidc/jwks",
+    ];
+    if PUBLIC.contains(&path) {
+        return "public, max-age=300";
+    }
     if ASSETS.iter().any(|prefix| path.starts_with(prefix)) {
         "no-cache, must-revalidate"
     } else if path.starts_with("/api/") {
@@ -192,8 +207,26 @@ mod cache_tests {
         ] {
             assert_eq!(cache_policy(asset), "no-cache, must-revalidate", "{asset}");
         }
+        for public in [
+            "/.well-known/openid-configuration",
+            "/.well-known/oauth-authorization-server",
+            "/oidc/jwks",
+        ] {
+            assert_eq!(cache_policy(public), "public, max-age=300", "{public}");
+        }
         for document in [
-            "/", "/healthz", "/readyz", "/version", "/auth", "/app", "/links/x",
+            "/",
+            "/healthz",
+            "/readyz",
+            "/version",
+            "/auth",
+            "/app",
+            "/links/x",
+            // Everything else the Provider serves is a person's or a client's.
+            "/oidc/authorize",
+            "/oidc/token",
+            "/oidc/userinfo",
+            "/oidc/end_session",
         ] {
             assert_eq!(cache_policy(document), "no-store", "{document}");
         }

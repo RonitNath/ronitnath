@@ -80,6 +80,7 @@ const OK: u16 = 200;
 const FOUND: u16 = 302;
 const SEE_OTHER: u16 = 303;
 const BAD_REQUEST: u16 = 400;
+const UNAUTHORIZED: u16 = 401;
 const FORBIDDEN: u16 = 403;
 const NOT_FOUND: u16 = 404;
 const UNPROCESSABLE: u16 = 422;
@@ -261,6 +262,68 @@ const CASES: &[Case] = &[
             FORBIDDEN
         }
     }),
+    // --- the OpenID Provider -----------------------------------------------
+    // The two metadata documents and the keys are public by design: a relying
+    // party fetches them before anybody has signed in to anything.
+    case(
+        "/.well-known/openid-configuration",
+        "GET",
+        Url::Fixed("/.well-known/openid-configuration"),
+        PUBLIC,
+    ),
+    case(
+        "/.well-known/oauth-authorization-server",
+        "GET",
+        Url::Fixed("/.well-known/oauth-authorization-server"),
+        PUBLIC,
+    ),
+    case("/oidc/jwks", "GET", Url::Fixed("/oidc/jwks"), PUBLIC),
+    // A request naming no client cannot be redirected anywhere — that is the
+    // whole rule — so it renders, for everybody, whoever they are. A cookie
+    // buys nothing here, because what is missing is the client.
+    case(
+        "/oidc/authorize",
+        "GET",
+        Url::Fixed("/oidc/authorize"),
+        |_| BAD_REQUEST,
+    ),
+    // The token endpoint takes a *client* credential and nothing else. A
+    // session cookie is not one, so a signed-in browser gets the same `401`
+    // with the same challenge as a stranger.
+    Case {
+        pattern: "/oidc/token",
+        method: "POST",
+        url: Url::Fixed("/oidc/token"),
+        body: Some("grant_type=authorization_code"),
+        content_type: FORM,
+        ends_session: false,
+        expect: |_| UNAUTHORIZED,
+    },
+    // The bearer surface. A cookie does not satisfy it — this row is where
+    // that is proved for every principal at once.
+    case(
+        "/oidc/userinfo",
+        "GET",
+        Url::Fixed("/oidc/userinfo"),
+        |_| UNAUTHORIZED,
+    ),
+    Case {
+        pattern: "/oidc/revoke",
+        method: "POST",
+        url: Url::Fixed("/oidc/revoke"),
+        body: Some("token=nothing"),
+        content_type: FORM,
+        ends_session: false,
+        expect: |_| UNAUTHORIZED,
+    },
+    // Sign-out is asked rather than obeyed: a request with no `id_token_hint`
+    // gets a page and a button. Nobody signed in has nothing to confirm.
+    case(
+        "/oidc/end_session",
+        "GET",
+        Url::Fixed("/oidc/end_session"),
+        |who| if signed_in(who) { OK } else { SEE_OTHER },
+    ),
     // --- links -------------------------------------------------------------
     // The bearer surface. The token is what opens it; the cookie decides only
     // what claiming it would do.
@@ -335,6 +398,22 @@ fn every_route_has_a_matrix_row() {
             missing.is_empty(),
             "these routes have no row in the matrix: {missing:?}"
         );
+
+        // The OpenID Provider's routes are mounted from
+        // `rn_kernel::oidc::paths`, so the scan cannot see them either: the
+        // constants are the declaration, and every one of them needs a row.
+        for path in [
+            rn_kernel::oidc::paths::DISCOVERY,
+            rn_kernel::oidc::paths::OAUTH_METADATA,
+            rn_kernel::oidc::paths::JWKS,
+            rn_kernel::oidc::paths::AUTHORIZE,
+            rn_kernel::oidc::paths::TOKEN,
+            rn_kernel::oidc::paths::USERINFO,
+            rn_kernel::oidc::paths::REVOKE,
+            rn_kernel::oidc::paths::END_SESSION,
+        ] {
+            assert!(declared.contains(path), "{path} has no row in the matrix");
+        }
 
         // The shells build their wildcard routes with `format!`, so they are
         // declared by the shell table rather than found by the scan.

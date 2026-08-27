@@ -91,7 +91,44 @@ pub(super) async fn authenticated_client<S: Sql, F: Feed>(
         ctx.now(),
     )
     .await?;
+    // An assertion is single use, and the `jti` primary key is what makes it
+    // so. The row is written *here* rather than in the command's batch, and
+    // before the command does anything: a replay must collide even when the
+    // command it was replayed at goes on to fail for its own reasons, and a
+    // marker that only landed on success would let a failed attempt's
+    // assertion be tried again.
+    if let Some(assertion) = assertion.filter(|_| {
+        client.metadata.token_endpoint_auth_method == rn_api::oidc::ClientAuthMethod::PrivateKeyJwt
+    }) {
+        record_assertion(ctx, &client, assertion).await?;
+    }
     Ok(client)
+}
+
+/// Write an assertion's `jti`, refusing one that is already there.
+async fn record_assertion<S: Sql, F: Feed>(
+    ctx: &Ctx<'_, S, F>,
+    client: &ClientRow,
+    assertion: &str,
+) -> Outcome<()> {
+    let Some(parts) = crate::oidc::jwt::split(assertion) else {
+        return decline();
+    };
+    let (Some(jti), Some(exp)) = (
+        crate::oidc::jwt::claim(&parts.claims, "jti"),
+        crate::oidc::jwt::claim_int(&parts.claims, "exp"),
+    ) else {
+        return decline();
+    };
+    match ctx
+        .store
+        .execute(registry::ASSERTION_SQL, bind![jti, client.id, exp])
+        .await
+    {
+        Ok(_) => Ok(()),
+        // A UNIQUE violation is a replay, which is exactly what this is for.
+        Err(_) => decline(),
+    }
 }
 
 /// Who a token is being minted for.

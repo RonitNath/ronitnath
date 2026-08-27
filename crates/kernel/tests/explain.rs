@@ -237,3 +237,103 @@ async fn explain_describing_an_invitation_seeks_the_link_and_its_grant() {
     let plan = plan(&harness, rn_kernel::invite::DESCRIBE_SQL, bind![1_i64]).await;
     rides(&plan, "relation_subject");
 }
+
+// ---------------------------------------------------- the OpenID Provider ---
+//
+// Four lookups run on routes anybody may post a guess to, and one runs on
+// every claim the Provider makes. All four are seeks, and these are what keep
+// them so: a bearer token presented at `userinfo` costs one index probe
+// whether or not it is real, which is also what stops the endpoint being an
+// oracle that answers faster for a token that exists.
+
+#[tokio::test]
+async fn explain_an_access_token_is_found_by_its_digest_alone() {
+    let harness = Local::new();
+    let plan = plan(
+        &harness,
+        rn_kernel::oidc::token::BY_HASH_SQL,
+        bind![vec![0u8; 32]],
+    )
+    .await;
+    rides(&plan, "oidc_token");
+    assert!(
+        plan.join("\n").contains("sqlite_autoindex_oidc_token_1")
+            || plan.join("\n").contains("token_hash"),
+        "a token must be reached by its digest:\n{}",
+        plan.join("\n")
+    );
+}
+
+#[tokio::test]
+async fn explain_an_authorization_code_is_found_by_its_digest_alone() {
+    let harness = Local::new();
+    let plan = plan(
+        &harness,
+        rn_kernel::oidc::code::BY_HASH_SQL,
+        bind![vec![0u8; 32]],
+    )
+    .await;
+    rides(&plan, "oidc_code");
+    assert!(
+        plan.join("\n").contains("sqlite_autoindex_oidc_code_1")
+            || plan.join("\n").contains("code_hash"),
+        "a code must be reached by its digest:\n{}",
+        plan.join("\n")
+    );
+}
+
+#[tokio::test]
+async fn explain_a_subject_is_one_seek_on_the_sector_and_the_person() {
+    let harness = Local::new();
+    let pair = plan(
+        &harness,
+        rn_kernel::oidc::subject::BY_PAIR_SQL,
+        bind![0_i64, 1_i64],
+    )
+    .await;
+    rides(&pair, "oidc_subject_pair_idx");
+
+    // And the reverse — which person a `sub` names — rides the other unique
+    // index, with the merge join hanging off `person_alias`'s primary key.
+    let reverse = plan(&harness, rn_kernel::oidc::subject::BY_SUB_SQL, bind!["s"]).await;
+    rides(&reverse, "oidc_subject_sub_idx");
+}
+
+#[tokio::test]
+async fn explain_a_consent_is_the_primary_key_of_the_pair_it_is_about() {
+    let harness = Local::new();
+    let plan = plan(
+        &harness,
+        rn_kernel::oidc::consent::BY_PAIR_SQL,
+        bind![1_i64, 1_i64],
+    )
+    .await;
+    rides(&plan, "oidc_consent");
+}
+
+#[tokio::test]
+async fn explain_a_handle_lookup_rides_the_unique_index() {
+    let harness = Local::new();
+    let plan = plan(&harness, rn_kernel::oidc::handle::TAKEN_SQL, bind!["ronit"]).await;
+    let joined = plan.join("\n");
+    assert!(
+        joined.contains("party_handle_unique_idx"),
+        "a live handle must be a seek:\n{joined}"
+    );
+    assert!(
+        joined.contains("party_handle_alias"),
+        "and so must one a merge filed away:\n{joined}"
+    );
+}
+
+#[tokio::test]
+async fn explain_the_clients_a_session_has_to_be_told_about_is_a_seek() {
+    let harness = Local::new();
+    let plan = plan(
+        &harness,
+        rn_kernel::oidc::token::LOGOUT_TARGETS_SQL,
+        bind![1_i64],
+    )
+    .await;
+    rides(&plan, "oidc_token_session_idx");
+}

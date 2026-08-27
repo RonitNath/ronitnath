@@ -20,7 +20,7 @@ use crate::store::{Reads, Sql};
 /// may take it back. `INSERT OR IGNORE`, because a person who has held a
 /// handle before already has the row.
 const ALIAS: &str = "INSERT OR IGNORE INTO party_handle_alias (handle, person_id, at) \
-     SELECT handle, id, $2 FROM party WHERE id = $1 AND handle IS NOT NULL";
+     SELECT handle, id, $1 FROM party WHERE id = $2 AND handle IS NOT NULL";
 
 const AUDIT: &str = "INSERT INTO audit \
      (key, command, actor_identity_id, acting_as, at, request_digest, payload) \
@@ -56,10 +56,10 @@ pub async fn set_handle<S: Sql, F: Feed>(
 
     let Applied { committed, .. } = run(ctx, args, async || {
         let mut batch = Batch::new();
-        batch.any(ALIAS, bind![person, now]);
+        batch.any(ALIAS, bind![now, person]);
         // The guarded statement: the handle was free when it was read and is
         // still free here, or the whole batch writes nothing and `run` retries.
-        batch.one(handle::SET_SQL, bind![person, wanted.as_str()]);
+        batch.one(handle::SET_SQL, bind![wanted.as_str(), person]);
         batch.one(
             AUDIT,
             bind![

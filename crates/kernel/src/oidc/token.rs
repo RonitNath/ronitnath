@@ -110,11 +110,11 @@ pub const SEED_FAMILY_SQL: &str = "UPDATE oidc_token SET family_id = id WHERE id
 
 /// Revoke one token by rowid.
 pub const REVOKE_ONE_SQL: &str =
-    "UPDATE oidc_token SET revoked_at = $2 WHERE id = $1 AND revoked_at IS NULL";
+    "UPDATE oidc_token SET revoked_at = $1 WHERE id = $2 AND revoked_at IS NULL";
 
 /// Revoke a whole rotation family — what a replayed refresh token costs.
 pub const REVOKE_FAMILY_SQL: &str =
-    "UPDATE oidc_token SET revoked_at = $2 WHERE family_id = $1 AND revoked_at IS NULL";
+    "UPDATE oidc_token SET revoked_at = $1 WHERE family_id = $2 AND revoked_at IS NULL";
 
 /// Take every token a session minted with it.
 ///
@@ -138,8 +138,8 @@ pub const DELETE_PERSON_CODES_SQL: &str = "DELETE FROM oidc_code WHERE session_i
 
 /// Revoke every token one person holds at one client — what withdrawing a
 /// consent costs.
-pub const REVOKE_CONSENT_SQL: &str = "UPDATE oidc_token SET revoked_at = $3 \
-     WHERE client_id = $1 AND person_id = $2 AND revoked_at IS NULL";
+pub const REVOKE_CONSENT_SQL: &str = "UPDATE oidc_token SET revoked_at = $1 \
+     WHERE client_id = $2 AND person_id = $3 AND revoked_at IS NULL";
 
 /// Drop tokens that expired long enough ago to be of no further interest.
 pub const SWEEP_SQL: &str = "DELETE FROM oidc_token WHERE expires_at <= $1";

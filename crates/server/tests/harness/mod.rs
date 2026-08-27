@@ -153,6 +153,7 @@ async fn boot(
             id_key: Some(CANARY_ID_KEY.to_string()),
             bootstrap_operator_email,
             public_origin: PUBLIC_ORIGIN.to_string(),
+            public_name: None,
             // Fixed, so a signing key one case writes opens for the next.
             oidc_key: Some(OIDC_SEAL_KEY.to_string()),
             dev,
@@ -233,7 +234,9 @@ pub async fn sign_in(state: &AppState, email: &str) -> String {
         .to_owned()
 }
 
-fn ctx(
+/// A command context on this node, for a fixture that runs a command the
+/// route layer has no form for.
+pub fn ctx(
     state: &AppState,
     principal: Principal,
 ) -> Ctx<'_, hiqlite::Client, rn_kernel::feed::ClusterFeed> {

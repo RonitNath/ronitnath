@@ -16,8 +16,16 @@
 //! * **recipient/embed** — [`links`], and nothing else. It has its own router
 //!   state so that its bearer extractor cannot be used anywhere but there.
 //!
-//! There is no service-principal surface in this cut: the `service` party kind
-//! exists in the schema and no route accepts one.
+//! * **the OpenID Provider** — [`oidc`], which is its own boundary and its own
+//!   router, mountable by a downstream deployment as it stands. The cookie
+//!   reaches its two decision pages; a bearer access token reaches its
+//!   `userinfo` and `revoke` and nothing under `/api/*`; a client credential
+//!   reaches its token endpoint.
+//!
+//! The `service` party kind now has exactly one route that accepts it:
+//! `client_credentials` at `/oidc/token`, which mints a token whose principal
+//! is a client's own service party. What that party may *do* is whatever
+//! relations somebody granted it.
 
 pub mod api;
 pub mod assets;
@@ -28,6 +36,7 @@ pub mod db;
 pub mod http;
 pub mod links;
 pub mod observe;
+pub mod oidc;
 pub mod ops;
 pub mod presence;
 pub mod shell;
@@ -51,6 +60,7 @@ pub fn router(state: AppState) -> Router {
         .merge(assets::router())
         .merge(auth::router())
         .merge(shell::router())
+        .merge(oidc::router())
         .merge(api::router())
         .with_state(state.clone());
 

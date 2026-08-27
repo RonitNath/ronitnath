@@ -40,6 +40,7 @@ fn with_env(pairs: &[(&str, &str)]) -> MutexGuard<'static, ()> {
 fn prod() -> AppConfig {
     AppConfig {
         public_origin: "http://127.0.0.1:3004".to_owned(),
+        public_name: None,
         oidc_key: Some("00".repeat(32)),
         mode: Mode::Prod,
         db_path: PathBuf::from("/var/lib/rn-site/db.sqlite"),
@@ -238,6 +239,7 @@ fn dev_needs_no_provisioning_at_all() {
     let _guard = with_env(&[]);
     let config = AppConfig {
         public_origin: "http://127.0.0.1:3004".to_owned(),
+        public_name: None,
         oidc_key: Some("00".repeat(32)),
         mode: Mode::Dev,
         db_path: PathBuf::from("data/db.sqlite"),

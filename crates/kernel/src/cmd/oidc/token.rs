@@ -209,7 +209,7 @@ pub async fn exchange_code<S: Sql, F: Feed>(
         let mut batch = Batch::new();
         // The guarded statement of the batch: a code redeemed twice writes
         // nothing the second time, and every other statement fails with it.
-        batch.one(code::REDEEM_SQL, bind![row.id, now]);
+        batch.one(code::REDEEM_SQL, bind![now, row.id]);
         write_pair(&mut batch, &issued);
         batch.one(
             EXCHANGE_AUDIT,
@@ -265,7 +265,7 @@ pub async fn refresh_token<S: Sql, F: Feed>(
         // Reuse. Take the family, and refuse.
         if let Some(family) = row.family_id {
             ctx.store
-                .execute(tokens::REVOKE_FAMILY_SQL, bind![family, now])
+                .execute(tokens::REVOKE_FAMILY_SQL, bind![now, family])
                 .await?;
         }
         return decline();
@@ -302,7 +302,7 @@ pub async fn refresh_token<S: Sql, F: Feed>(
 
     let applied = run(ctx, args, async || {
         let mut batch = Batch::new();
-        batch.one(tokens::REVOKE_ONE_SQL, bind![row.id, now]);
+        batch.one(tokens::REVOKE_ONE_SQL, bind![now, row.id]);
         write_pair(&mut batch, &issued);
         batch.one(
             REFRESH_AUDIT,
@@ -414,10 +414,10 @@ pub async fn revoke_token<S: Sql, F: Feed>(
             // token is only itself.
             match row.family_id {
                 Some(family) if row.kind == "refresh" => {
-                    batch.any(tokens::REVOKE_FAMILY_SQL, bind![family, now]);
+                    batch.any(tokens::REVOKE_FAMILY_SQL, bind![now, family]);
                 }
                 _ => {
-                    batch.any(tokens::REVOKE_ONE_SQL, bind![row.id, now]);
+                    batch.any(tokens::REVOKE_ONE_SQL, bind![now, row.id]);
                 }
             }
         }

@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+
+{% block title %}{{ client }}{% endblock %}
+
+{% block styles %}
+<link rel="stylesheet" href="/static/pages.css">
+{% endblock %}
+
+{% block body %}
+{#- A door. The client's registered name, what it is asking for as plain
+    words, and two buttons. No explanation of what OpenID is and no reassurance
+    about what happens next: the reader is deciding, not being sold to. -#}
+<main class="page">
+  <h1>{{ deployment }}</h1>
+
+  <div class="claim">
+    {% if client_uri.is_empty() %}
+    <p class="grant">{{ client }}</p>
+    {% else %}
+    <p class="grant"><a href="{{ client_uri }}" rel="noopener noreferrer">{{ client }}</a></p>
+    {% endif %}
+
+    <ul class="scopes">
+      {% for scope in scopes %}
+      <li>{{ scope }}</li>
+      {% endfor %}
+    </ul>
+
+    <form method="post" action="/oidc/authorize">
+      {% for field in fields %}
+      <input type="hidden" name="{{ field.name }}" value="{{ field.value }}">
+      {% endfor %}
+      <div class="decision">
+        <button type="submit" name="decision" value="allow" class="commit">Allow</button>
+        <button type="submit" name="decision" value="deny" class="quiet">Deny</button>
+      </div>
+    </form>
+  </div>
+</main>
+{% endblock %}

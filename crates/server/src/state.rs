@@ -41,6 +41,9 @@ pub struct AppState {
     /// the key its signing keys are sealed under. One per process, because
     /// `iss` is one string and a second one would be a second issuer.
     pub provider: Arc<Provider>,
+    /// Failed client authentications at the token endpoint, per client. In
+    /// process and per node — see `oidc::limits`.
+    pub oidc_limits: Arc<crate::oidc::Limiter>,
     /// Resolved cookies, kept warm and invalidated from the feed.
     pub principals: Arc<PrincipalCache>,
     /// The observation lane: `last_seen`, drained on a timer, never on a read.
@@ -88,6 +91,7 @@ impl AppState {
             db,
             config: Arc::new(config),
             provider,
+            oidc_limits: Arc::new(crate::oidc::Limiter::new()),
             version: release_version().into(),
             node: node_name().into(),
             store,
