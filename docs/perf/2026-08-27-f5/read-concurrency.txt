@@ -1,0 +1,27 @@
+Does the local read path scale with concurrency? GET /api/q/documents as a subscriber who can see one document of 10 009 (finding 5).
+revision: e02fbd82d876b64e44b2ae05c14e8838dcca0b08
+
+-- 1 connection(s)
+  Requests/sec:	3687.3366
+  50.00% in 0.2375 ms
+  99.00% in 0.5968 ms
+
+-- 2 connection(s)
+  Requests/sec:	5072.0910
+  50.00% in 0.3591 ms
+  99.00% in 0.7912 ms
+
+-- 4 connection(s)
+  Requests/sec:	3844.9905
+  50.00% in 1.0535 ms
+  99.00% in 1.7342 ms
+
+-- 8 connection(s)
+  Requests/sec:	3046.2560
+  50.00% in 2.6361 ms
+  99.00% in 3.7329 ms
+
+-- 16 connection(s)
+  Requests/sec:	3337.6926
+  50.00% in 4.6371 ms
+  99.00% in 9.0595 ms

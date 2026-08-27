@@ -1,0 +1,933 @@
+{
+  "profiles": [
+    {
+      "count": 52301,
+      "errors": 197,
+      "max_ms": 5002.861,
+      "p50_ms": 1.793291,
+      "p99_ms": 5.391875,
+      "profile": "POST /api/cmd/edit-document",
+      "rps": 348.6535854013345,
+      "statuses": {
+        "200": 52104,
+        "403": 150,
+        "503": 47
+      }
+    },
+    {
+      "count": 104597,
+      "errors": 0,
+      "max_ms": 45.510000000000005,
+      "p50_ms": 7.615167,
+      "p99_ms": 13.241333,
+      "profile": "GET /api/q/documents (mixed)",
+      "rps": 697.2738393572472,
+      "statuses": {
+        "200": 104597
+      }
+    }
+  ],
+  "timeline": [
+    {
+      "committed": 444,
+      "refused": 0,
+      "second": 0,
+      "slowest_ms": 12.951208000000001
+    },
+    {
+      "committed": 457,
+      "refused": 0,
+      "second": 1,
+      "slowest_ms": 11.576875000000001
+    },
+    {
+      "committed": 456,
+      "refused": 0,
+      "second": 2,
+      "slowest_ms": 7.572083999999999
+    },
+    {
+      "committed": 439,
+      "refused": 0,
+      "second": 3,
+      "slowest_ms": 16.441750000000003
+    },
+    {
+      "committed": 464,
+      "refused": 0,
+      "second": 4,
+      "slowest_ms": 4.46875
+    },
+    {
+      "committed": 455,
+      "refused": 0,
+      "second": 5,
+      "slowest_ms": 4.905542
+    },
+    {
+      "committed": 462,
+      "refused": 0,
+      "second": 6,
+      "slowest_ms": 5.589792
+    },
+    {
+      "committed": 375,
+      "refused": 0,
+      "second": 7,
+      "slowest_ms": 196.03841699999998
+    },
+    {
+      "committed": 458,
+      "refused": 0,
+      "second": 8,
+      "slowest_ms": 7.457208
+    },
+    {
+      "committed": 451,
+      "refused": 0,
+      "second": 9,
+      "slowest_ms": 7.885290999999999
+    },
+    {
+      "committed": 464,
+      "refused": 0,
+      "second": 10,
+      "slowest_ms": 4.442
+    },
+    {
+      "committed": 455,
+      "refused": 0,
+      "second": 11,
+      "slowest_ms": 4.156042
+    },
+    {
+      "committed": 458,
+      "refused": 0,
+      "second": 12,
+      "slowest_ms": 7.595125
+    },
+    {
+      "committed": 458,
+      "refused": 0,
+      "second": 13,
+      "slowest_ms": 4.606125
+    },
+    {
+      "committed": 463,
+      "refused": 0,
+      "second": 14,
+      "slowest_ms": 7.400458
+    },
+    {
+      "committed": 447,
+      "refused": 0,
+      "second": 15,
+      "slowest_ms": 13.65675
+    },
+    {
+      "committed": 448,
+      "refused": 0,
+      "second": 16,
+      "slowest_ms": 7.693084
+    },
+    {
+      "committed": 449,
+      "refused": 0,
+      "second": 17,
+      "slowest_ms": 15.801375
+    },
+    {
+      "committed": 440,
+      "refused": 0,
+      "second": 18,
+      "slowest_ms": 6.776584000000001
+    },
+    {
+      "committed": 447,
+      "refused": 0,
+      "second": 19,
+      "slowest_ms": 7.7652090000000005
+    },
+    {
+      "committed": 467,
+      "refused": 0,
+      "second": 20,
+      "slowest_ms": 5.049625000000001
+    },
+    {
+      "committed": 464,
+      "refused": 0,
+      "second": 21,
+      "slowest_ms": 5.656874999999999
+    },
+    {
+      "committed": 457,
+      "refused": 0,
+      "second": 22,
+      "slowest_ms": 7.634250000000001
+    },
+    {
+      "committed": 454,
+      "refused": 0,
+      "second": 23,
+      "slowest_ms": 6.608375
+    },
+    {
+      "committed": 451,
+      "refused": 0,
+      "second": 24,
+      "slowest_ms": 5.513833
+    },
+    {
+      "committed": 459,
+      "refused": 0,
+      "second": 25,
+      "slowest_ms": 4.1725829999999995
+    },
+    {
+      "committed": 459,
+      "refused": 0,
+      "second": 26,
+      "slowest_ms": 6.971625
+    },
+    {
+      "committed": 457,
+      "refused": 0,
+      "second": 27,
+      "slowest_ms": 5.5478749999999994
+    },
+    {
+      "committed": 454,
+      "refused": 0,
+      "second": 28,
+      "slowest_ms": 7.183916
+    },
+    {
+      "committed": 344,
+      "refused": 0,
+      "second": 29,
+      "slowest_ms": 247.82020799999998
+    },
+    {
+      "committed": 458,
+      "refused": 0,
+      "second": 30,
+      "slowest_ms": 6.1515830000000005
+    },
+    {
+      "committed": 460,
+      "refused": 0,
+      "second": 31,
+      "slowest_ms": 4.248792000000001
+    },
+    {
+      "committed": 459,
+      "refused": 0,
+      "second": 32,
+      "slowest_ms": 4.827999999999999
+    },
+    {
+      "committed": 464,
+      "refused": 0,
+      "second": 33,
+      "slowest_ms": 4.378540999999999
+    },
+    {
+      "committed": 252,
+      "refused": 2,
+      "second": 34,
+      "slowest_ms": 9.410542
+    },
+    {
+      "committed": 0,
+      "refused": 0,
+      "second": 35,
+      "slowest_ms": 0.0
+    },
+    {
+      "committed": 0,
+      "refused": 1,
+      "second": 36,
+      "slowest_ms": 2001.5782920000001
+    },
+    {
+      "committed": 0,
+      "refused": 0,
+      "second": 37,
+      "slowest_ms": 0.0
+    },
+    {
+      "committed": 0,
+      "refused": 0,
+      "second": 38,
+      "slowest_ms": 0.0
+    },
+    {
+      "committed": 0,
+      "refused": 7,
+      "second": 39,
+      "slowest_ms": 5002.294208
+    },
+    {
+      "committed": 0,
+      "refused": 0,
+      "second": 40,
+      "slowest_ms": 0.0
+    },
+    {
+      "committed": 217,
+      "refused": 3,
+      "second": 41,
+      "slowest_ms": 4908.716875
+    },
+    {
+      "committed": 463,
+      "refused": 0,
+      "second": 42,
+      "slowest_ms": 6.966208
+    },
+    {
+      "committed": 450,
+      "refused": 0,
+      "second": 43,
+      "slowest_ms": 7.683209
+    },
+    {
+      "committed": 438,
+      "refused": 0,
+      "second": 44,
+      "slowest_ms": 18.840667
+    },
+    {
+      "committed": 454,
+      "refused": 0,
+      "second": 45,
+      "slowest_ms": 6.338500000000001
+    },
+    {
+      "committed": 461,
+      "refused": 0,
+      "second": 46,
+      "slowest_ms": 10.864084
+    },
+    {
+      "committed": 463,
+      "refused": 0,
+      "second": 47,
+      "slowest_ms": 7.628416
+    },
+    {
+      "committed": 464,
+      "refused": 0,
+      "second": 48,
+      "slowest_ms": 5.649917
+    },
+    {
+      "committed": 463,
+      "refused": 0,
+      "second": 49,
+      "slowest_ms": 4.629292
+    },
+    {
+      "committed": 465,
+      "refused": 0,
+      "second": 50,
+      "slowest_ms": 5.304834
+    },
+    {
+      "committed": 451,
+      "refused": 0,
+      "second": 51,
+      "slowest_ms": 4.933667
+    },
+    {
+      "committed": 454,
+      "refused": 0,
+      "second": 52,
+      "slowest_ms": 7.917292
+    },
+    {
+      "committed": 454,
+      "refused": 0,
+      "second": 53,
+      "slowest_ms": 8.28075
+    },
+    {
+      "committed": 457,
+      "refused": 0,
+      "second": 54,
+      "slowest_ms": 11.132292
+    },
+    {
+      "committed": 468,
+      "refused": 0,
+      "second": 55,
+      "slowest_ms": 5.564083
+    },
+    {
+      "committed": 462,
+      "refused": 0,
+      "second": 56,
+      "slowest_ms": 6.517125
+    },
+    {
+      "committed": 447,
+      "refused": 0,
+      "second": 57,
+      "slowest_ms": 7.2929580000000005
+    },
+    {
+      "committed": 355,
+      "refused": 0,
+      "second": 58,
+      "slowest_ms": 163.87375
+    },
+    {
+      "committed": 451,
+      "refused": 0,
+      "second": 59,
+      "slowest_ms": 16.715500000000002
+    },
+    {
+      "committed": 442,
+      "refused": 0,
+      "second": 60,
+      "slowest_ms": 6.162917
+    },
+    {
+      "committed": 453,
+      "refused": 0,
+      "second": 61,
+      "slowest_ms": 6.6976249999999995
+    },
+    {
+      "committed": 452,
+      "refused": 0,
+      "second": 62,
+      "slowest_ms": 7.763334
+    },
+    {
+      "committed": 449,
+      "refused": 0,
+      "second": 63,
+      "slowest_ms": 12.641082999999998
+    },
+    {
+      "committed": 448,
+      "refused": 0,
+      "second": 64,
+      "slowest_ms": 14.845167
+    },
+    {
+      "committed": 450,
+      "refused": 0,
+      "second": 65,
+      "slowest_ms": 5.929291
+    },
+    {
+      "committed": 458,
+      "refused": 0,
+      "second": 66,
+      "slowest_ms": 4.863667
+    },
+    {
+      "committed": 448,
+      "refused": 0,
+      "second": 67,
+      "slowest_ms": 10.485209000000001
+    },
+    {
+      "committed": 452,
+      "refused": 0,
+      "second": 68,
+      "slowest_ms": 5.229709
+    },
+    {
+      "committed": 460,
+      "refused": 0,
+      "second": 69,
+      "slowest_ms": 7.16775
+    },
+    {
+      "committed": 452,
+      "refused": 0,
+      "second": 70,
+      "slowest_ms": 4.211167
+    },
+    {
+      "committed": 457,
+      "refused": 0,
+      "second": 71,
+      "slowest_ms": 4.681208
+    },
+    {
+      "committed": 462,
+      "refused": 0,
+      "second": 72,
+      "slowest_ms": 4.697041
+    },
+    {
+      "committed": 463,
+      "refused": 0,
+      "second": 73,
+      "slowest_ms": 10.205250000000001
+    },
+    {
+      "committed": 457,
+      "refused": 0,
+      "second": 74,
+      "slowest_ms": 7.453791000000001
+    },
+    {
+      "committed": 452,
+      "refused": 0,
+      "second": 75,
+      "slowest_ms": 10.753459
+    },
+    {
+      "committed": 447,
+      "refused": 0,
+      "second": 76,
+      "slowest_ms": 6.588083
+    },
+    {
+      "committed": 447,
+      "refused": 0,
+      "second": 77,
+      "slowest_ms": 7.738250000000001
+    },
+    {
+      "committed": 464,
+      "refused": 0,
+      "second": 78,
+      "slowest_ms": 6.102667
+    },
+    {
+      "committed": 462,
+      "refused": 0,
+      "second": 79,
+      "slowest_ms": 5.000666
+    },
+    {
+      "committed": 379,
+      "refused": 0,
+      "second": 80,
+      "slowest_ms": 175.754416
+    },
+    {
+      "committed": 442,
+      "refused": 0,
+      "second": 81,
+      "slowest_ms": 47.611833
+    },
+    {
+      "committed": 443,
+      "refused": 0,
+      "second": 82,
+      "slowest_ms": 7.014041000000001
+    },
+    {
+      "committed": 440,
+      "refused": 0,
+      "second": 83,
+      "slowest_ms": 5.872667
+    },
+    {
+      "committed": 457,
+      "refused": 0,
+      "second": 84,
+      "slowest_ms": 7.035917
+    },
+    {
+      "committed": 459,
+      "refused": 0,
+      "second": 85,
+      "slowest_ms": 4.5173749999999995
+    },
+    {
+      "committed": 456,
+      "refused": 0,
+      "second": 86,
+      "slowest_ms": 5.177167
+    },
+    {
+      "committed": 459,
+      "refused": 0,
+      "second": 87,
+      "slowest_ms": 4.523834
+    },
+    {
+      "committed": 454,
+      "refused": 0,
+      "second": 88,
+      "slowest_ms": 6.04225
+    },
+    {
+      "committed": 345,
+      "refused": 0,
+      "second": 89,
+      "slowest_ms": 7.032
+    },
+    {
+      "committed": 0,
+      "refused": 0,
+      "second": 90,
+      "slowest_ms": 0.0
+    },
+    {
+      "committed": 0,
+      "refused": 0,
+      "second": 91,
+      "slowest_ms": 0.0
+    },
+    {
+      "committed": 0,
+      "refused": 0,
+      "second": 92,
+      "slowest_ms": 0.0
+    },
+    {
+      "committed": 0,
+      "refused": 0,
+      "second": 93,
+      "slowest_ms": 0.0
+    },
+    {
+      "committed": 0,
+      "refused": 8,
+      "second": 94,
+      "slowest_ms": 5002.861
+    },
+    {
+      "committed": 0,
+      "refused": 0,
+      "second": 95,
+      "slowest_ms": 0.0
+    },
+    {
+      "committed": 0,
+      "refused": 0,
+      "second": 96,
+      "slowest_ms": 0.0
+    },
+    {
+      "committed": 0,
+      "refused": 0,
+      "second": 97,
+      "slowest_ms": 0.0
+    },
+    {
+      "committed": 0,
+      "refused": 0,
+      "second": 98,
+      "slowest_ms": 0.0
+    },
+    {
+      "committed": 0,
+      "refused": 8,
+      "second": 99,
+      "slowest_ms": 5001.92075
+    },
+    {
+      "committed": 0,
+      "refused": 0,
+      "second": 100,
+      "slowest_ms": 0.0
+    },
+    {
+      "committed": 0,
+      "refused": 0,
+      "second": 101,
+      "slowest_ms": 0.0
+    },
+    {
+      "committed": 0,
+      "refused": 0,
+      "second": 102,
+      "slowest_ms": 0.0
+    },
+    {
+      "committed": 0,
+      "refused": 0,
+      "second": 103,
+      "slowest_ms": 0.0
+    },
+    {
+      "committed": 0,
+      "refused": 4,
+      "second": 104,
+      "slowest_ms": 5001.474209
+    },
+    {
+      "committed": 0,
+      "refused": 4,
+      "second": 105,
+      "slowest_ms": 5001.591083
+    },
+    {
+      "committed": 0,
+      "refused": 0,
+      "second": 106,
+      "slowest_ms": 0.0
+    },
+    {
+      "committed": 0,
+      "refused": 0,
+      "second": 107,
+      "slowest_ms": 0.0
+    },
+    {
+      "committed": 0,
+      "refused": 0,
+      "second": 108,
+      "slowest_ms": 0.0
+    },
+    {
+      "committed": 0,
+      "refused": 0,
+      "second": 109,
+      "slowest_ms": 0.0
+    },
+    {
+      "committed": 0,
+      "refused": 8,
+      "second": 110,
+      "slowest_ms": 5001.789916
+    },
+    {
+      "committed": 0,
+      "refused": 0,
+      "second": 111,
+      "slowest_ms": 0.0
+    },
+    {
+      "committed": 0,
+      "refused": 0,
+      "second": 112,
+      "slowest_ms": 0.0
+    },
+    {
+      "committed": 0,
+      "refused": 0,
+      "second": 113,
+      "slowest_ms": 0.0
+    },
+    {
+      "committed": 0,
+      "refused": 0,
+      "second": 114,
+      "slowest_ms": 0.0
+    },
+    {
+      "committed": 273,
+      "refused": 16,
+      "second": 115,
+      "slowest_ms": 5002.631333
+    },
+    {
+      "committed": 64,
+      "refused": 64,
+      "second": 116,
+      "slowest_ms": 3.400625
+    },
+    {
+      "committed": 0,
+      "refused": 64,
+      "second": 117,
+      "slowest_ms": 3.082375
+    },
+    {
+      "committed": 308,
+      "refused": 8,
+      "second": 118,
+      "slowest_ms": 264.903417
+    },
+    {
+      "committed": 450,
+      "refused": 0,
+      "second": 119,
+      "slowest_ms": 17.134333
+    },
+    {
+      "committed": 455,
+      "refused": 0,
+      "second": 120,
+      "slowest_ms": 7.818290999999999
+    },
+    {
+      "committed": 462,
+      "refused": 0,
+      "second": 121,
+      "slowest_ms": 9.978292
+    },
+    {
+      "committed": 464,
+      "refused": 0,
+      "second": 122,
+      "slowest_ms": 15.006125
+    },
+    {
+      "committed": 471,
+      "refused": 0,
+      "second": 123,
+      "slowest_ms": 7.080417000000001
+    },
+    {
+      "committed": 464,
+      "refused": 0,
+      "second": 124,
+      "slowest_ms": 4.736416999999999
+    },
+    {
+      "committed": 452,
+      "refused": 0,
+      "second": 125,
+      "slowest_ms": 9.920874999999999
+    },
+    {
+      "committed": 474,
+      "refused": 0,
+      "second": 126,
+      "slowest_ms": 4.750166
+    },
+    {
+      "committed": 462,
+      "refused": 0,
+      "second": 127,
+      "slowest_ms": 7.622459
+    },
+    {
+      "committed": 459,
+      "refused": 0,
+      "second": 128,
+      "slowest_ms": 12.774583000000002
+    },
+    {
+      "committed": 462,
+      "refused": 0,
+      "second": 129,
+      "slowest_ms": 3.681709
+    },
+    {
+      "committed": 464,
+      "refused": 0,
+      "second": 130,
+      "slowest_ms": 7.845958
+    },
+    {
+      "committed": 460,
+      "refused": 0,
+      "second": 131,
+      "slowest_ms": 4.310417
+    },
+    {
+      "committed": 452,
+      "refused": 0,
+      "second": 132,
+      "slowest_ms": 11.683167
+    },
+    {
+      "committed": 463,
+      "refused": 0,
+      "second": 133,
+      "slowest_ms": 9.6305
+    },
+    {
+      "committed": 466,
+      "refused": 0,
+      "second": 134,
+      "slowest_ms": 6.906792
+    },
+    {
+      "committed": 457,
+      "refused": 0,
+      "second": 135,
+      "slowest_ms": 7.5417499999999995
+    },
+    {
+      "committed": 459,
+      "refused": 0,
+      "second": 136,
+      "slowest_ms": 5.535459
+    },
+    {
+      "committed": 457,
+      "refused": 0,
+      "second": 137,
+      "slowest_ms": 5.265084
+    },
+    {
+      "committed": 461,
+      "refused": 0,
+      "second": 138,
+      "slowest_ms": 7.591457999999999
+    },
+    {
+      "committed": 454,
+      "refused": 0,
+      "second": 139,
+      "slowest_ms": 8.023333000000001
+    },
+    {
+      "committed": 326,
+      "refused": 0,
+      "second": 140,
+      "slowest_ms": 303.318417
+    },
+    {
+      "committed": 461,
+      "refused": 0,
+      "second": 141,
+      "slowest_ms": 8.742833000000001
+    },
+    {
+      "committed": 454,
+      "refused": 0,
+      "second": 142,
+      "slowest_ms": 6.8585
+    },
+    {
+      "committed": 459,
+      "refused": 0,
+      "second": 143,
+      "slowest_ms": 4.130958
+    },
+    {
+      "committed": 467,
+      "refused": 0,
+      "second": 144,
+      "slowest_ms": 3.36425
+    },
+    {
+      "committed": 470,
+      "refused": 0,
+      "second": 145,
+      "slowest_ms": 6.037667
+    },
+    {
+      "committed": 471,
+      "refused": 0,
+      "second": 146,
+      "slowest_ms": 8.190667000000001
+    },
+    {
+      "committed": 468,
+      "refused": 0,
+      "second": 147,
+      "slowest_ms": 4.252584000000001
+    },
+    {
+      "committed": 458,
+      "refused": 0,
+      "second": 148,
+      "slowest_ms": 4.4009160000000005
+    },
+    {
+      "committed": 462,
+      "refused": 0,
+      "second": 149,
+      "slowest_ms": 4.807834000000001
+    }
+  ],
+  "wall_seconds": 150.008496083
+}

@@ -1,0 +1,6 @@
+profile: commit, writes only
+load average at start: 5.34
+started: 2026-08-27T06:34:46-07:00
+
+POST /api/cmd/edit-document        n=99834   p50    2.343 ms  p99    4.912 ms  max   192.754 ms    3327.5 rps  errors 8  [200×99826 403×8]
+GET /api/q/documents (mixed)       n=0       p50    0.000 ms  p99    0.000 ms  max     0.000 ms       0.0 rps  errors 0  []

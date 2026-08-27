@@ -1,0 +1,29 @@
+{
+  "profiles": [
+    {
+      "count": 5865,
+      "errors": 0,
+      "max_ms": 9.221083,
+      "p50_ms": 1.4250420000000001,
+      "p99_ms": 4.454083,
+      "profile": "POST /api/cmd/edit-document",
+      "rps": 195.43682450576995,
+      "statuses": {
+        "200": 5865
+      }
+    },
+    {
+      "count": 23449,
+      "errors": 0,
+      "max_ms": 55.838499999999996,
+      "p50_ms": 9.662334,
+      "p99_ms": 16.177833,
+      "profile": "GET /api/q/documents (mixed)",
+      "rps": 781.3807498441261,
+      "statuses": {
+        "200": 23449
+      }
+    }
+  ],
+  "wall_seconds": 30.009697583
+}

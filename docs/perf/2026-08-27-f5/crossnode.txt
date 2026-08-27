@@ -1,0 +1,59 @@
+cross-node register then command
+started:  2026-08-27T06:38:17-0700
+revision: e02fbd82d876b64e44b2ae05c14e8838dcca0b08
+register on node 2 (127.0.0.1:3162), command on node 3 (127.0.0.1:3163)
+offset sent back as x-rn-after: yes
+
+round 1    offset 115903   create-document 200 in 4.6 ms
+round 2    offset 115905   create-document 200 in 1.3 ms
+round 3    offset 115907   create-document 200 in 1.2 ms
+round 4    offset 115909   create-document 200 in 2.1 ms
+round 5    offset 115911   create-document 200 in 1.6 ms
+round 6    offset 115913   create-document 200 in 1.3 ms
+round 7    offset 115915   create-document 200 in 1.2 ms
+round 8    offset 115917   create-document 200 in 2.2 ms
+round 9    offset 115919   create-document 200 in 2.4 ms
+round 10   offset 115921   create-document 200 in 1.1 ms
+round 11   offset 115923   create-document 200 in 1.0 ms
+round 12   offset 115925   create-document 200 in 2.3 ms
+round 13   offset 115927   create-document 200 in 1.1 ms
+round 14   offset 115929   create-document 200 in 1.0 ms
+round 15   offset 115931   create-document 200 in 1.0 ms
+round 16   offset 115933   create-document 200 in 1.2 ms
+round 17   offset 115935   create-document 200 in 0.9 ms
+round 18   offset 115937   create-document 200 in 2.2 ms
+round 19   offset 115939   create-document 200 in 1.1 ms
+round 20   offset 115941   create-document 200 in 2.3 ms
+round 21   offset 115943   create-document 200 in 1.2 ms
+round 22   offset 115945   create-document 200 in 1.4 ms
+round 23   offset 115947   create-document 200 in 1.4 ms
+round 24   offset 115949   create-document 200 in 2.2 ms
+round 25   offset 115951   create-document 200 in 2.2 ms
+round 26   offset 115953   create-document 200 in 2.0 ms
+round 27   offset 115955   create-document 200 in 2.2 ms
+round 28   offset 115957   create-document 200 in 1.1 ms
+round 29   offset 115959   create-document 200 in 2.4 ms
+round 30   offset 115961   create-document 200 in 1.1 ms
+round 31   offset 115963   create-document 200 in 1.3 ms
+round 32   offset 115965   create-document 200 in 3.6 ms
+round 33   offset 115967   create-document 200 in 2.5 ms
+round 34   offset 115969   create-document 200 in 1.0 ms
+round 35   offset 115971   create-document 200 in 1.2 ms
+round 36   offset 115973   create-document 200 in 1.1 ms
+round 37   offset 115975   create-document 200 in 2.0 ms
+round 38   offset 115977   create-document 200 in 2.6 ms
+round 39   offset 115979   create-document 200 in 2.6 ms
+round 40   offset 115981   create-document 200 in 4.1 ms
+round 41   offset 115983   create-document 200 in 1.2 ms
+round 42   offset 115985   create-document 200 in 2.4 ms
+round 43   offset 115987   create-document 200 in 1.3 ms
+round 44   offset 115989   create-document 200 in 1.2 ms
+round 45   offset 115991   create-document 200 in 2.7 ms
+round 46   offset 115993   create-document 200 in 3.9 ms
+round 47   offset 115995   create-document 200 in 1.2 ms
+round 48   offset 115997   create-document 200 in 3.5 ms
+round 49   offset 115999   create-document 200 in 1.3 ms
+round 50   offset 116001   create-document 200 in 1.2 ms
+
+50 rounds: 50 committed, 0 declined, 0 other (of which 0 were the register itself)
+create-document on the other node: p50 1.4 ms  p99 4.6 ms  max 4.6 ms

@@ -1,0 +1,201 @@
+round 1 — 2026-08-27T04:24:48-07:00
+  leader 1, load and reads on node 2, second kill node 3
+  load average at start: 3.71 4.80 6.31
+  t+25.0s  kill node 1 (the leader) — one voter down
+==> node 1 stopped
+  t+80.1s  kill node 3 — two voters down, no quorum
+==> node 3 stopped
+  t+90.2s  reads on the survivor with no quorum:
+    read /api/q/documents 200 in 0.002645s
+    read /api/q/documents 200 in 0.002002s
+    read /api/q/documents 200 in 0.002071s
+    read /api/q/documents 200 in 0.002071s
+    read /api/q/documents 200 in 0.002041s
+    read /api/q/documents 200 in 0.001922s
+    read /api/q/documents 200 in 0.002166s
+    read /api/q/documents 200 in 0.002110s
+    read /api/q/documents 200 in 0.002166s
+    read /api/q/documents 200 in 0.002062s
+    read /api/q/documents 200 in 0.001925s
+    read /api/q/documents 200 in 0.002081s
+    read /api/q/documents 200 in 0.001937s
+    read /api/q/documents 200 in 0.001954s
+    read /api/q/documents 200 in 0.001956s
+    read /api/q/documents 200 in 0.002097s
+    read /api/q/documents 200 in 0.002570s
+    read /api/q/documents 200 in 0.001995s
+    read /api/q/documents 200 in 0.002343s
+    read /api/q/documents 200 in 0.002131s
+  t+110.6s  restarting the cluster
+==> building rn-site
+==> node 1 started (pid 7085, app 127.0.0.1:3161, log /Users/ronitnath/dev/love/projects/ronit/rn-site/target/cluster/node1/rn-site.log)
+==> node 2 is already running
+==> node 3 started (pid 7093, app 127.0.0.1:3163, log /Users/ronitnath/dev/love/projects/ronit/rn-site/target/cluster/node3/rn-site.log)
+==> gave up waiting; run 'tools/cluster.sh status' and read the node logs
+  t+201.7s  a node did not come back on the first start; retrying once
+==> building rn-site
+==> node 1 started (pid 12400, app 127.0.0.1:3161, log /Users/ronitnath/dev/love/projects/ronit/rn-site/target/cluster/node1/rn-site.log)
+==> node 2 is already running
+==> node 3 is already running
+==> all 3 nodes are ready
+  t+204.7s  three voters, all /readyz ok, 94.1s after the restart was issued (retries: 1)
+    node 1: {"status":"ok","node":"local-1","version":"dev","raft":{"sqlite":{"healthy":true,"voters":3,"expected_voters":3,"leader":3},"cache":{"healthy":true,"voters":3,"expected_voters":3,"leader":3}}}
+    node 2: {"status":"ok","node":"local-2","version":"dev","raft":{"sqlite":{"healthy":true,"voters":3,"expected_voters":3,"leader":2},"cache":{"healthy":true,"voters":3,"expected_voters":3,"leader":3}}}
+    node 3: {"status":"ok","node":"local-3","version":"dev","raft":{"sqlite":{"healthy":true,"voters":3,"expected_voters":3,"leader":2},"cache":{"healthy":true,"voters":3,"expected_voters":3,"leader":3}}}
+POST /api/cmd/edit-document        n=5527    p50    2.854 ms  p99    6.599 ms  max    10.786 ms    2759.4 rps  errors 8  [200×5519 403×8]
+GET /api/q/documents (mixed)       n=0       p50    0.000 ms  p99    0.000 ms  max     0.000 ms       0.0 rps  errors 0  []
+  t+206.8s  a command committed, 2.0s after the restart returned
+  timeline (one row per second of the load):
+  t+0    committed 163    refused 69     slowest       4.7 ms
+  t+1    committed 173    refused 63     slowest       4.1 ms
+  t+2    committed 201    refused 64     slowest       3.7 ms
+  t+3    committed 185    refused 64     slowest       2.6 ms
+  t+4    committed 186    refused 66     slowest       2.5 ms
+  t+5    committed 146    refused 67     slowest       1.7 ms
+  t+6    committed 165    refused 68     slowest       3.4 ms
+  t+7    committed 168    refused 66     slowest       3.0 ms
+  t+8    committed 119    refused 68     slowest       2.6 ms
+  t+9    committed 152    refused 70     slowest       1.5 ms
+  t+10   committed 170    refused 66     slowest       6.4 ms
+  t+11   committed 118    refused 71     slowest       2.0 ms
+  t+12   committed 198    refused 66     slowest       5.1 ms
+  t+13   committed 138    refused 67     slowest       1.6 ms
+  t+14   committed 188    refused 67     slowest       1.6 ms
+  t+15   committed 140    refused 69     slowest       3.3 ms
+  t+16   committed 152    refused 67     slowest       2.1 ms
+  t+17   committed 158    refused 68     slowest       3.0 ms
+  t+18   committed 207    refused 62     slowest       2.2 ms
+  t+19   committed 140    refused 70     slowest       2.0 ms
+  t+20   committed 148    refused 69     slowest       2.6 ms
+  t+21   committed 130    refused 68     slowest       3.9 ms
+  t+22   committed 212    refused 65     slowest       2.2 ms
+  t+23   committed 187    refused 63     slowest       5.3 ms
+  t+24   committed 195    refused 67     slowest       2.1 ms
+  t+25   committed 164    refused 64     slowest       2.0 ms
+  t+26   committed 160    refused 70     slowest       2.7 ms
+  t+27   committed 180    refused 65     slowest       2.0 ms
+  t+28   committed 186    refused 67     slowest       3.0 ms
+  t+29   committed 196    refused 62     slowest       2.2 ms
+  t+30   committed 189    refused 66     slowest       1.8 ms
+  t+31   committed 175    refused 67     slowest       2.8 ms
+  t+32   committed 144    refused 66     slowest       1.7 ms
+  t+33   committed 167    refused 69     slowest       2.2 ms
+  t+34   committed 124    refused 34     slowest       3.7 ms
+  t+35   committed 0      refused 0      slowest       0.0 ms
+  t+36   committed 0      refused 0      slowest       0.0 ms
+  t+37   committed 0      refused 0      slowest       0.0 ms
+  t+38   committed 0      refused 0      slowest       0.0 ms
+  t+39   committed 0      refused 0      slowest       0.0 ms
+  t+40   committed 0      refused 0      slowest       0.0 ms
+  t+41   committed 122    refused 31     slowest    7003.1 ms
+  t+42   committed 262    refused 60     slowest       4.0 ms
+  t+43   committed 257    refused 59     slowest       4.3 ms
+  t+44   committed 217    refused 60     slowest      17.4 ms
+  t+45   committed 226    refused 56     slowest      11.8 ms
+  t+46   committed 315    refused 50     slowest       5.2 ms
+  t+47   committed 241    refused 57     slowest       3.5 ms
+  t+48   committed 273    refused 54     slowest       4.2 ms
+  t+49   committed 207    refused 60     slowest       2.2 ms
+  t+50   committed 251    refused 51     slowest      11.9 ms
+  t+51   committed 290    refused 48     slowest       4.0 ms
+  t+52   committed 275    refused 53     slowest       3.9 ms
+  t+53   committed 331    refused 47     slowest       4.9 ms
+  t+54   committed 283    refused 50     slowest       4.1 ms
+  t+55   committed 217    refused 60     slowest       3.4 ms
+  t+56   committed 282    refused 49     slowest       6.2 ms
+  t+57   committed 265    refused 56     slowest       3.0 ms
+  t+58   committed 232    refused 55     slowest       4.2 ms
+  t+59   committed 262    refused 54     slowest       3.2 ms
+  t+60   committed 213    refused 60     slowest       3.4 ms
+  t+61   committed 252    refused 56     slowest       4.7 ms
+  t+62   committed 257    refused 50     slowest       4.1 ms
+  t+63   committed 291    refused 52     slowest       5.5 ms
+  t+64   committed 281    refused 51     slowest       4.1 ms
+  t+65   committed 239    refused 59     slowest       3.1 ms
+  t+66   committed 267    refused 55     slowest       4.4 ms
+  t+67   committed 290    refused 51     slowest       3.8 ms
+  t+68   committed 240    refused 54     slowest       3.5 ms
+  t+69   committed 224    refused 60     slowest       2.7 ms
+  t+70   committed 251    refused 55     slowest      16.8 ms
+  t+71   committed 239    refused 58     slowest       3.3 ms
+  t+72   committed 198    refused 61     slowest       2.4 ms
+  t+73   committed 297    refused 48     slowest       6.8 ms
+  t+74   committed 274    refused 52     slowest       3.9 ms
+  t+75   committed 308    refused 48     slowest       4.6 ms
+  t+76   committed 261    refused 54     slowest      21.7 ms
+  t+77   committed 245    refused 58     slowest       4.6 ms
+  t+78   committed 247    refused 54     slowest       4.2 ms
+  t+79   committed 261    refused 54     slowest       4.3 ms
+  t+80   committed 283    refused 52     slowest       5.0 ms
+  t+81   committed 254    refused 51     slowest       3.3 ms
+  t+82   committed 277    refused 56     slowest       4.2 ms
+  t+83   committed 262    refused 53     slowest       3.3 ms
+  t+84   committed 250    refused 50     slowest       3.9 ms
+  t+85   committed 302    refused 51     slowest       4.2 ms
+  t+86   committed 290    refused 50     slowest       4.4 ms
+  t+87   committed 190    refused 58     slowest       2.8 ms
+  t+88   committed 240    refused 54     slowest       3.4 ms
+  t+89   committed 180    refused 33     slowest       4.0 ms
+  t+90   committed 0      refused 0      slowest       0.0 ms
+  t+91   committed 0      refused 0      slowest       0.0 ms
+  t+92   committed 0      refused 0      slowest       0.0 ms
+  t+93   committed 0      refused 0      slowest       0.0 ms
+  t+94   committed 0      refused 0      slowest       0.0 ms
+  t+95   committed 0      refused 0      slowest       0.0 ms
+  t+96   committed 0      refused 0      slowest       0.0 ms
+  t+97   committed 0      refused 0      slowest       0.0 ms
+  t+98   committed 0      refused 0      slowest       0.0 ms
+  t+99   committed 0      refused 0      slowest       0.0 ms
+  t+100  committed 0      refused 0      slowest       0.0 ms
+  t+101  committed 0      refused 0      slowest       0.0 ms
+  t+102  committed 0      refused 0      slowest       0.0 ms
+  t+103  committed 0      refused 0      slowest       0.0 ms
+  t+104  committed 0      refused 0      slowest       0.0 ms
+  t+105  committed 0      refused 0      slowest       0.0 ms
+  t+106  committed 0      refused 0      slowest       0.0 ms
+  t+107  committed 0      refused 0      slowest       0.0 ms
+  t+108  committed 0      refused 0      slowest       0.0 ms
+  t+109  committed 0      refused 0      slowest       0.0 ms
+  t+110  committed 0      refused 0      slowest       0.0 ms
+  t+111  committed 0      refused 0      slowest       0.0 ms
+  t+112  committed 0      refused 0      slowest       0.0 ms
+  t+113  committed 0      refused 0      slowest       0.0 ms
+  t+114  committed 0      refused 0      slowest       0.0 ms
+  t+115  committed 0      refused 0      slowest       0.0 ms
+  t+116  committed 0      refused 0      slowest       0.0 ms
+  t+117  committed 424    refused 0      slowest   27577.3 ms
+  t+118  committed 488    refused 0      slowest      11.3 ms
+  t+119  committed 503    refused 0      slowest       9.6 ms
+  t+120  committed 493    refused 0      slowest       8.5 ms
+  t+121  committed 498    refused 0      slowest       7.5 ms
+  t+122  committed 480    refused 0      slowest      11.4 ms
+  t+123  committed 511    refused 0      slowest       6.3 ms
+  t+124  committed 509    refused 0      slowest       6.5 ms
+  t+125  committed 509    refused 0      slowest       7.0 ms
+  t+126  committed 509    refused 0      slowest       6.9 ms
+  t+127  committed 513    refused 0      slowest   37578.6 ms
+  t+128  committed 486    refused 0      slowest      56.2 ms
+  t+129  committed 496    refused 0      slowest      10.3 ms
+  t+130  committed 501    refused 0      slowest      10.5 ms
+  t+131  committed 526    refused 0      slowest       8.3 ms
+  t+132  committed 516    refused 0      slowest       8.8 ms
+  t+133  committed 521    refused 0      slowest       8.7 ms
+  t+134  committed 496    refused 0      slowest       7.4 ms
+  t+135  committed 466    refused 0      slowest      21.0 ms
+  t+136  committed 517    refused 0      slowest       8.5 ms
+  t+137  committed 522    refused 0      slowest       9.7 ms
+  t+138  committed 511    refused 0      slowest       8.8 ms
+  t+139  committed 508    refused 0      slowest      12.8 ms
+  t+140  committed 494    refused 0      slowest      11.5 ms
+  t+141  committed 501    refused 0      slowest       9.6 ms
+  t+142  committed 513    refused 0      slowest      11.0 ms
+  t+143  committed 519    refused 0      slowest       8.1 ms
+  t+144  committed 507    refused 0      slowest      10.2 ms
+  t+145  committed 508    refused 0      slowest       8.7 ms
+  t+146  committed 512    refused 0      slowest       8.3 ms
+  t+147  committed 508    refused 0      slowest       9.1 ms
+  t+148  committed 481    refused 0      slowest      64.2 ms
+  t+149  committed 510    refused 0      slowest       6.6 ms
+  t+150  committed 4      refused 0      slowest       3.2 ms
+  round 1 done
+

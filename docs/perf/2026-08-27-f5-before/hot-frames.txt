@@ -1,0 +1,2140 @@
+# /Users/ronitnath/dev/love/projects/ronit/rn-site/docs/perf/2026-08-27-f5-before/flamegraph-whoami-and-commit.json.gz  (symbols from /Users/ronitnath/dev/love/projects/ronit/rn-site/target/release/rn-site)
+
+## thread 'tokio-rt-worker' — 26388 samples
+   self  function
+   74.0%  libsystem_kernel.dylib+0x44f8
+   12.5%  libsystem_kernel.dylib+0x39c8
+    2.5%  sqlite3VdbeExec
+    2.1%  libsystem_kernel.dylib+0x3b94
+    1.0%  vdbeRecordCompareInt
+    0.6%  sqlite3BtreeIndexMoveto
+    0.6%  libsystem_kernel.dylib+0x18b0
+    0.3%  btreeParseCellPtr
+    0.3%  balance
+    0.3%  libsystem_pthread.dylib+0x13f0
+    0.3%  sqlite3VdbeRecordCompareWithSkip
+    0.3%  libsystem_kernel.dylib+0x263c
+    0.2%  libsystem_pthread.dylib+0x1934
+    0.1%  freeSpace
+    0.1%  getPageNormal
+    0.1%  <tokio::runtime::blocking::task::BlockingTask<hiqlite::query::query_owned_local<&str>::{closure#0}::{closure#0}> as core::future::future::Future>::poll
+    0.1%  sqlite3BtreeNext
+    0.1%  sqlite3BtreeTableMoveto
+    0.1%  vdbeSorterCompareInt
+    0.1%  libsystem_pthread.dylib+0x140c
+    0.1%  pcache1Fetch
+    0.1%  getCellInfo
+    0.1%  sqlite3BtreeInsert
+    0.1%  sqlite3VdbeSerialGet
+    0.1%  libsystem_kernel.dylib+0x18ac
+  total  function
+  100.0%  <tokio::runtime::blocking::pool::Inner>::run
+  100.0%  std::sys::backtrace::__rust_begin_short_backtrace::<<tokio::runtime::blocking::pool::Spawner>::spawn_thread::{closure#0}, ()>
+  100.0%  <std::sys::thread::unix::Thread>::new::thread_start
+  100.0%  <std::thread::lifecycle::spawn_unchecked<<tokio::runtime::blocking::pool::Spawner>::spawn_thread::{closure#0}, ()>::{closure#1} as core::ops::function::FnOnce<()>>::call_once::{shim:vtable#0}
+  100.0%  libsystem_pthread.dylib+0x6c07
+   76.3%  <std::sys::sync::condvar::pthread::Condvar>::wait_timeout
+   74.0%  libsystem_pthread.dylib+0x7107
+   74.0%  libsystem_kernel.dylib+0x44f8
+   20.1%  <tokio::runtime::task::harness::Harness<tokio::runtime::blocking::task::BlockingTask<hiqlite::query::query_owned_local<&str>::{closure#0}::{closure#0}>, tokio::runtime::blocking::schedule::BlockingSchedule>>::poll
+   19.9%  <tokio::runtime::task::core::Core<tokio::runtime::blocking::task::BlockingTask<hiqlite::query::query_owned_local<&str>::{closure#0}::{closure#0}>, tokio::runtime::blocking::schedule::BlockingSchedule>>::poll
+   19.9%  <tokio::runtime::blocking::task::BlockingTask<hiqlite::query::query_owned_local<&str>::{closure#0}::{closure#0}> as core::future::future::Future>::poll
+   18.5%  sqlite3_step
+   18.4%  sqlite3VdbeExec
+   12.6%  libsystem_pthread.dylib+0x1867
+   12.6%  libsystem_pthread.dylib+0x3e3b
+   12.5%  libsystem_kernel.dylib+0x39c8
+    7.1%  getPageNormal
+    6.9%  getAndInitPage
+    6.6%  pcache1Fetch
+    6.5%  sqlite3BtreeIndexMoveto
+    3.9%  sqlite3BtreeInsert
+    3.3%  <std::sys::pal::unix::sync::mutex::Mutex>::lock
+    3.2%  balance
+    2.3%  libsystem_pthread.dylib+0x7167
+    2.2%  libsystem_pthread.dylib+0x1b2f
+
+## thread 'tokio-rt-worker' — 26156 samples
+   self  function
+   73.9%  libsystem_kernel.dylib+0x44f8
+   12.8%  libsystem_kernel.dylib+0x39c8
+    2.4%  sqlite3VdbeExec
+    2.2%  libsystem_kernel.dylib+0x3b94
+    0.9%  vdbeRecordCompareInt
+    0.6%  sqlite3BtreeIndexMoveto
+    0.6%  libsystem_kernel.dylib+0x18b0
+    0.4%  sqlite3VdbeRecordCompareWithSkip
+    0.4%  balance
+    0.3%  libsystem_pthread.dylib+0x13f0
+    0.3%  btreeParseCellPtr
+    0.2%  libsystem_kernel.dylib+0x263c
+    0.1%  getPageNormal
+    0.1%  libsystem_pthread.dylib+0x1934
+    0.1%  freeSpace
+    0.1%  libsystem_pthread.dylib+0x140c
+    0.1%  getCellInfo
+    0.1%  libsystem_malloc.dylib+0x2e394
+    0.1%  sqlite3BtreeInsert
+    0.1%  sqlite3BtreeTableMoveto
+    0.1%  pcache1Fetch
+    0.1%  <tokio::runtime::blocking::task::BlockingTask<hiqlite::query::query_owned_local<&str>::{closure#0}::{closure#0}> as core::future::future::Future>::poll
+    0.1%  vdbeSorterCompareInt
+    0.1%  libsystem_kernel.dylib+0x5a4c
+    0.1%  <argon2::Argon2>::compress
+  total  function
+  100.0%  <tokio::runtime::blocking::pool::Inner>::run
+  100.0%  std::sys::backtrace::__rust_begin_short_backtrace::<<tokio::runtime::blocking::pool::Spawner>::spawn_thread::{closure#0}, ()>
+  100.0%  <std::sys::thread::unix::Thread>::new::thread_start
+  100.0%  <std::thread::lifecycle::spawn_unchecked<<tokio::runtime::blocking::pool::Spawner>::spawn_thread::{closure#0}, ()>::{closure#1} as core::ops::function::FnOnce<()>>::call_once::{shim:vtable#0}
+  100.0%  libsystem_pthread.dylib+0x6c07
+   76.4%  <std::sys::sync::condvar::pthread::Condvar>::wait_timeout
+   74.0%  libsystem_pthread.dylib+0x7107
+   73.9%  libsystem_kernel.dylib+0x44f8
+   19.8%  <tokio::runtime::task::harness::Harness<tokio::runtime::blocking::task::BlockingTask<hiqlite::query::query_owned_local<&str>::{closure#0}::{closure#0}>, tokio::runtime::blocking::schedule::BlockingSchedule>>::poll
+   19.5%  <tokio::runtime::task::core::Core<tokio::runtime::blocking::task::BlockingTask<hiqlite::query::query_owned_local<&str>::{closure#0}::{closure#0}>, tokio::runtime::blocking::schedule::BlockingSchedule>>::poll
+   19.5%  <tokio::runtime::blocking::task::BlockingTask<hiqlite::query::query_owned_local<&str>::{closure#0}::{closure#0}> as core::future::future::Future>::poll
+   18.1%  sqlite3_step
+   17.9%  sqlite3VdbeExec
+   12.8%  libsystem_pthread.dylib+0x1867
+   12.8%  libsystem_pthread.dylib+0x3e3b
+   12.8%  libsystem_kernel.dylib+0x39c8
+    7.2%  getPageNormal
+    7.1%  getAndInitPage
+    6.8%  pcache1Fetch
+    6.6%  sqlite3BtreeIndexMoveto
+    4.1%  sqlite3BtreeInsert
+    3.5%  <std::sys::pal::unix::sync::mutex::Mutex>::lock
+    3.1%  balance
+    2.4%  libsystem_pthread.dylib+0x7167
+    2.3%  libsystem_pthread.dylib+0x3eab
+
+## thread 'tokio-rt-worker' — 26126 samples
+   self  function
+   75.2%  libsystem_kernel.dylib+0x44f8
+   11.8%  libsystem_kernel.dylib+0x39c8
+    2.2%  libsystem_kernel.dylib+0x3b94
+    2.2%  sqlite3VdbeExec
+    0.9%  vdbeRecordCompareInt
+    0.6%  sqlite3BtreeIndexMoveto
+    0.5%  libsystem_kernel.dylib+0x18b0
+    0.4%  btreeParseCellPtr
+    0.3%  libsystem_pthread.dylib+0x13f0
+    0.3%  balance
+    0.3%  sqlite3VdbeRecordCompareWithSkip
+    0.2%  libsystem_kernel.dylib+0x263c
+    0.2%  libsystem_pthread.dylib+0x1934
+    0.1%  freeSpace
+    0.1%  getPageNormal
+    0.1%  pcache1Fetch
+    0.1%  getCellInfo
+    0.1%  libsystem_pthread.dylib+0x1808
+    0.1%  pageFindSlot
+    0.1%  vdbeSorterCompareInt
+    0.1%  sqlite3BtreeNext
+    0.1%  libsystem_kernel.dylib+0x5a4c
+    0.1%  libsystem_malloc.dylib+0x2e394
+    0.1%  sqlite3MemCompare
+    0.1%  btreeParseCellPtrIndex
+  total  function
+  100.0%  <tokio::runtime::blocking::pool::Inner>::run
+  100.0%  std::sys::backtrace::__rust_begin_short_backtrace::<<tokio::runtime::blocking::pool::Spawner>::spawn_thread::{closure#0}, ()>
+  100.0%  <std::sys::thread::unix::Thread>::new::thread_start
+  100.0%  <std::thread::lifecycle::spawn_unchecked<<tokio::runtime::blocking::pool::Spawner>::spawn_thread::{closure#0}, ()>::{closure#1} as core::ops::function::FnOnce<()>>::call_once::{shim:vtable#0}
+  100.0%  libsystem_pthread.dylib+0x6c07
+   77.7%  <std::sys::sync::condvar::pthread::Condvar>::wait_timeout
+   75.2%  libsystem_pthread.dylib+0x7107
+   75.2%  libsystem_kernel.dylib+0x44f8
+   18.8%  <tokio::runtime::task::harness::Harness<tokio::runtime::blocking::task::BlockingTask<hiqlite::query::query_owned_local<&str>::{closure#0}::{closure#0}>, tokio::runtime::blocking::schedule::BlockingSchedule>>::poll
+   18.6%  <tokio::runtime::task::core::Core<tokio::runtime::blocking::task::BlockingTask<hiqlite::query::query_owned_local<&str>::{closure#0}::{closure#0}>, tokio::runtime::blocking::schedule::BlockingSchedule>>::poll
+   18.5%  <tokio::runtime::blocking::task::BlockingTask<hiqlite::query::query_owned_local<&str>::{closure#0}::{closure#0}> as core::future::future::Future>::poll
+   17.3%  sqlite3_step
+   17.1%  sqlite3VdbeExec
+   11.9%  libsystem_pthread.dylib+0x1867
+   11.8%  libsystem_pthread.dylib+0x3e3b
+   11.8%  libsystem_kernel.dylib+0x39c8
+    6.7%  getPageNormal
+    6.6%  getAndInitPage
+    6.3%  pcache1Fetch
+    6.0%  sqlite3BtreeIndexMoveto
+    3.9%  sqlite3BtreeInsert
+    3.3%  balance
+    3.1%  <std::sys::pal::unix::sync::mutex::Mutex>::lock
+    2.4%  libsystem_pthread.dylib+0x7167
+    2.3%  libsystem_pthread.dylib+0x3eab
+
+## thread 'tokio-rt-worker' — 25670 samples
+   self  function
+   76.3%  libsystem_kernel.dylib+0x44f8
+   12.1%  libsystem_kernel.dylib+0x39c8
+    2.1%  libsystem_kernel.dylib+0x3b94
+    1.9%  sqlite3VdbeExec
+    0.8%  vdbeRecordCompareInt
+    0.6%  libsystem_kernel.dylib+0x18b0
+    0.5%  sqlite3BtreeIndexMoveto
+    0.4%  btreeParseCellPtr
+    0.3%  libsystem_pthread.dylib+0x13f0
+    0.3%  balance
+    0.2%  sqlite3VdbeRecordCompareWithSkip
+    0.2%  libsystem_kernel.dylib+0x263c
+    0.1%  getPageNormal
+    0.1%  libsystem_pthread.dylib+0x1808
+    0.1%  freeSpace
+    0.1%  libsystem_pthread.dylib+0x1934
+    0.1%  libsystem_pthread.dylib+0x140c
+    0.1%  libsystem_kernel.dylib+0x5a4c
+    0.1%  getCellInfo
+    0.1%  <tokio::runtime::blocking::task::BlockingTask<hiqlite::query::query_owned_local<&str>::{closure#0}::{closure#0}> as core::future::future::Future>::poll
+    0.1%  pcache1Fetch
+    0.1%  libsystem_platform.dylib+0xfe0
+    0.1%  vdbeSorterCompareInt
+    0.1%  sqlite3BtreeTableMoveto
+    0.1%  sqlite3BtreeInsert
+  total  function
+  100.0%  <tokio::runtime::blocking::pool::Inner>::run
+  100.0%  std::sys::backtrace::__rust_begin_short_backtrace::<<tokio::runtime::blocking::pool::Spawner>::spawn_thread::{closure#0}, ()>
+  100.0%  <std::sys::thread::unix::Thread>::new::thread_start
+  100.0%  <std::thread::lifecycle::spawn_unchecked<<tokio::runtime::blocking::pool::Spawner>::spawn_thread::{closure#0}, ()>::{closure#1} as core::ops::function::FnOnce<()>>::call_once::{shim:vtable#0}
+  100.0%  libsystem_pthread.dylib+0x6c07
+   79.2%  <std::sys::sync::condvar::pthread::Condvar>::wait_timeout
+   76.4%  libsystem_pthread.dylib+0x7107
+   76.3%  libsystem_kernel.dylib+0x44f8
+   17.1%  <tokio::runtime::task::harness::Harness<tokio::runtime::blocking::task::BlockingTask<hiqlite::query::query_owned_local<&str>::{closure#0}::{closure#0}>, tokio::runtime::blocking::schedule::BlockingSchedule>>::poll
+   16.9%  <tokio::runtime::task::core::Core<tokio::runtime::blocking::task::BlockingTask<hiqlite::query::query_owned_local<&str>::{closure#0}::{closure#0}>, tokio::runtime::blocking::schedule::BlockingSchedule>>::poll
+   16.8%  <tokio::runtime::blocking::task::BlockingTask<hiqlite::query::query_owned_local<&str>::{closure#0}::{closure#0}> as core::future::future::Future>::poll
+   15.6%  sqlite3_step
+   15.4%  sqlite3VdbeExec
+   12.2%  libsystem_pthread.dylib+0x1867
+   12.1%  libsystem_pthread.dylib+0x3e3b
+   12.1%  libsystem_kernel.dylib+0x39c8
+    6.3%  getPageNormal
+    6.2%  getAndInitPage
+    6.0%  pcache1Fetch
+    5.7%  sqlite3BtreeIndexMoveto
+    3.5%  sqlite3BtreeInsert
+    3.5%  <std::sys::pal::unix::sync::mutex::Mutex>::lock
+    3.0%  balance
+    2.8%  libsystem_pthread.dylib+0x7167
+    2.1%  libsystem_pthread.dylib+0x1b2f
+
+## thread 'tokio-rt-worker' — 25603 samples
+   self  function
+   76.0%  libsystem_kernel.dylib+0x44f8
+   12.0%  libsystem_kernel.dylib+0x39c8
+    2.1%  sqlite3VdbeExec
+    2.0%  libsystem_kernel.dylib+0x3b94
+    0.8%  vdbeRecordCompareInt
+    0.5%  libsystem_kernel.dylib+0x18b0
+    0.5%  sqlite3BtreeIndexMoveto
+    0.3%  btreeParseCellPtr
+    0.3%  balance
+    0.3%  libsystem_pthread.dylib+0x13f0
+    0.3%  sqlite3VdbeRecordCompareWithSkip
+    0.2%  libsystem_kernel.dylib+0x263c
+    0.1%  getPageNormal
+    0.1%  libsystem_pthread.dylib+0x1934
+    0.1%  freeSpace
+    0.1%  libsystem_malloc.dylib+0x2e394
+    0.1%  pcache1Fetch
+    0.1%  libsystem_pthread.dylib+0x1808
+    0.1%  sqlite3VdbeSerialGet
+    0.1%  sqlite3BtreeInsert
+    0.1%  getCellInfo
+    0.1%  libsystem_platform.dylib+0xfe0
+    0.1%  <argon2::Argon2>::compress
+    0.1%  libsystem_pthread.dylib+0x140c
+    0.1%  libsystem_kernel.dylib+0x5a4c
+  total  function
+  100.0%  <tokio::runtime::blocking::pool::Inner>::run
+  100.0%  std::sys::backtrace::__rust_begin_short_backtrace::<<tokio::runtime::blocking::pool::Spawner>::spawn_thread::{closure#0}, ()>
+  100.0%  <std::sys::thread::unix::Thread>::new::thread_start
+  100.0%  <std::thread::lifecycle::spawn_unchecked<<tokio::runtime::blocking::pool::Spawner>::spawn_thread::{closure#0}, ()>::{closure#1} as core::ops::function::FnOnce<()>>::call_once::{shim:vtable#0}
+  100.0%  libsystem_pthread.dylib+0x6c07
+   78.5%  <std::sys::sync::condvar::pthread::Condvar>::wait_timeout
+   76.0%  libsystem_pthread.dylib+0x7107
+   76.0%  libsystem_kernel.dylib+0x44f8
+   17.5%  <tokio::runtime::task::harness::Harness<tokio::runtime::blocking::task::BlockingTask<hiqlite::query::query_owned_local<&str>::{closure#0}::{closure#0}>, tokio::runtime::blocking::schedule::BlockingSchedule>>::poll
+   17.2%  <tokio::runtime::task::core::Core<tokio::runtime::blocking::task::BlockingTask<hiqlite::query::query_owned_local<&str>::{closure#0}::{closure#0}>, tokio::runtime::blocking::schedule::BlockingSchedule>>::poll
+   17.1%  <tokio::runtime::blocking::task::BlockingTask<hiqlite::query::query_owned_local<&str>::{closure#0}::{closure#0}> as core::future::future::Future>::poll
+   15.8%  sqlite3_step
+   15.6%  sqlite3VdbeExec
+   12.1%  libsystem_pthread.dylib+0x1867
+   12.0%  libsystem_pthread.dylib+0x3e3b
+   12.0%  libsystem_kernel.dylib+0x39c8
+    6.0%  getPageNormal
+    5.9%  getAndInitPage
+    5.7%  pcache1Fetch
+    5.5%  sqlite3BtreeIndexMoveto
+    3.7%  <std::sys::pal::unix::sync::mutex::Mutex>::lock
+    3.4%  sqlite3BtreeInsert
+    2.8%  balance
+    2.5%  libsystem_pthread.dylib+0x7167
+    2.0%  libsystem_pthread.dylib+0x3eab
+
+## thread 'tokio-rt-worker' — 25517 samples
+   self  function
+   76.9%  libsystem_kernel.dylib+0x44f8
+   11.4%  libsystem_kernel.dylib+0x39c8
+    2.1%  libsystem_kernel.dylib+0x3b94
+    1.9%  sqlite3VdbeExec
+    0.8%  vdbeRecordCompareInt
+    0.6%  libsystem_kernel.dylib+0x18b0
+    0.5%  sqlite3BtreeIndexMoveto
+    0.4%  btreeParseCellPtr
+    0.3%  sqlite3VdbeRecordCompareWithSkip
+    0.3%  libsystem_pthread.dylib+0x13f0
+    0.2%  balance
+    0.2%  libsystem_kernel.dylib+0x263c
+    0.1%  getPageNormal
+    0.1%  freeSpace
+    0.1%  getCellInfo
+    0.1%  libsystem_pthread.dylib+0x1934
+    0.1%  libsystem_platform.dylib+0xfe0
+    0.1%  sqlite3BtreeInsert
+    0.1%  pcache1Fetch
+    0.1%  pageFindSlot
+    0.1%  libsystem_kernel.dylib+0x5a4c
+    0.1%  <tokio::runtime::blocking::task::BlockingTask<hiqlite::query::query_owned_local<&str>::{closure#0}::{closure#0}> as core::future::future::Future>::poll
+    0.1%  libsystem_malloc.dylib+0x2e394
+    0.1%  sqlite3BtreeTableMoveto
+    0.1%  vdbeSorterCompareInt
+  total  function
+  100.0%  <tokio::runtime::blocking::pool::Inner>::run
+  100.0%  std::sys::backtrace::__rust_begin_short_backtrace::<<tokio::runtime::blocking::pool::Spawner>::spawn_thread::{closure#0}, ()>
+  100.0%  <std::sys::thread::unix::Thread>::new::thread_start
+  100.0%  <std::thread::lifecycle::spawn_unchecked<<tokio::runtime::blocking::pool::Spawner>::spawn_thread::{closure#0}, ()>::{closure#1} as core::ops::function::FnOnce<()>>::call_once::{shim:vtable#0}
+  100.0%  libsystem_pthread.dylib+0x6c07
+   79.5%  <std::sys::sync::condvar::pthread::Condvar>::wait_timeout
+   76.9%  libsystem_pthread.dylib+0x7107
+   76.9%  libsystem_kernel.dylib+0x44f8
+   17.0%  <tokio::runtime::task::harness::Harness<tokio::runtime::blocking::task::BlockingTask<hiqlite::query::query_owned_local<&str>::{closure#0}::{closure#0}>, tokio::runtime::blocking::schedule::BlockingSchedule>>::poll
+   16.8%  <tokio::runtime::task::core::Core<tokio::runtime::blocking::task::BlockingTask<hiqlite::query::query_owned_local<&str>::{closure#0}::{closure#0}>, tokio::runtime::blocking::schedule::BlockingSchedule>>::poll
+   16.8%  <tokio::runtime::blocking::task::BlockingTask<hiqlite::query::query_owned_local<&str>::{closure#0}::{closure#0}> as core::future::future::Future>::poll
+   15.4%  sqlite3_step
+   15.3%  sqlite3VdbeExec
+   11.5%  libsystem_pthread.dylib+0x1867
+   11.5%  libsystem_pthread.dylib+0x3e3b
+   11.4%  libsystem_kernel.dylib+0x39c8
+    5.7%  getPageNormal
+    5.6%  getAndInitPage
+    5.4%  pcache1Fetch
+    5.4%  sqlite3BtreeIndexMoveto
+    3.3%  sqlite3BtreeInsert
+    3.3%  <std::sys::pal::unix::sync::mutex::Mutex>::lock
+    2.7%  balance
+    2.5%  libsystem_pthread.dylib+0x7167
+    2.1%  libsystem_pthread.dylib+0x3eab
+
+## thread 'tokio-rt-worker' — 25481 samples
+   self  function
+   76.2%  libsystem_kernel.dylib+0x44f8
+   12.0%  libsystem_kernel.dylib+0x39c8
+    2.0%  sqlite3VdbeExec
+    1.8%  libsystem_kernel.dylib+0x3b94
+    0.8%  vdbeRecordCompareInt
+    0.6%  libsystem_kernel.dylib+0x18b0
+    0.6%  sqlite3BtreeIndexMoveto
+    0.3%  btreeParseCellPtr
+    0.3%  libsystem_pthread.dylib+0x13f0
+    0.3%  sqlite3VdbeRecordCompareWithSkip
+    0.3%  balance
+    0.2%  libsystem_pthread.dylib+0x1934
+    0.2%  libsystem_pthread.dylib+0x140c
+    0.2%  libsystem_kernel.dylib+0x263c
+    0.1%  getCellInfo
+    0.1%  getPageNormal
+    0.1%  freeSpace
+    0.1%  libsystem_pthread.dylib+0x1808
+    0.1%  <tokio::runtime::blocking::task::BlockingTask<hiqlite::query::query_owned_local<&str>::{closure#0}::{closure#0}> as core::future::future::Future>::poll
+    0.1%  libsystem_malloc.dylib+0x2e394
+    0.1%  libsystem_kernel.dylib+0x5a4c
+    0.1%  sqlite3BtreeTableMoveto
+    0.1%  <std::sys::sync::condvar::pthread::Condvar>::wait_timeout
+    0.1%  sqlite3VdbeSerialGet
+    0.1%  vdbeSorterCompareInt
+  total  function
+  100.0%  <tokio::runtime::blocking::pool::Inner>::run
+  100.0%  std::sys::backtrace::__rust_begin_short_backtrace::<<tokio::runtime::blocking::pool::Spawner>::spawn_thread::{closure#0}, ()>
+  100.0%  <std::sys::thread::unix::Thread>::new::thread_start
+  100.0%  <std::thread::lifecycle::spawn_unchecked<<tokio::runtime::blocking::pool::Spawner>::spawn_thread::{closure#0}, ()>::{closure#1} as core::ops::function::FnOnce<()>>::call_once::{shim:vtable#0}
+  100.0%  libsystem_pthread.dylib+0x6c07
+   78.7%  <std::sys::sync::condvar::pthread::Condvar>::wait_timeout
+   76.2%  libsystem_pthread.dylib+0x7107
+   76.2%  libsystem_kernel.dylib+0x44f8
+   17.4%  <tokio::runtime::task::harness::Harness<tokio::runtime::blocking::task::BlockingTask<hiqlite::query::query_owned_local<&str>::{closure#0}::{closure#0}>, tokio::runtime::blocking::schedule::BlockingSchedule>>::poll
+   17.2%  <tokio::runtime::task::core::Core<tokio::runtime::blocking::task::BlockingTask<hiqlite::query::query_owned_local<&str>::{closure#0}::{closure#0}>, tokio::runtime::blocking::schedule::BlockingSchedule>>::poll
+   17.2%  <tokio::runtime::blocking::task::BlockingTask<hiqlite::query::query_owned_local<&str>::{closure#0}::{closure#0}> as core::future::future::Future>::poll
+   15.8%  sqlite3_step
+   15.7%  sqlite3VdbeExec
+   12.1%  libsystem_pthread.dylib+0x1867
+   12.0%  libsystem_pthread.dylib+0x3e3b
+   12.0%  libsystem_kernel.dylib+0x39c8
+    6.0%  getPageNormal
+    5.9%  getAndInitPage
+    5.7%  pcache1Fetch
+    5.4%  sqlite3BtreeIndexMoveto
+    3.8%  <std::sys::pal::unix::sync::mutex::Mutex>::lock
+    3.3%  sqlite3BtreeInsert
+    2.7%  balance
+    2.4%  libsystem_pthread.dylib+0x7167
+    1.9%  libsystem_pthread.dylib+0x3eab
+
+## thread 'tokio-rt-worker' — 25457 samples
+   self  function
+   76.7%  libsystem_kernel.dylib+0x44f8
+   11.7%  libsystem_kernel.dylib+0x39c8
+    2.0%  sqlite3VdbeExec
+    1.8%  libsystem_kernel.dylib+0x3b94
+    0.8%  vdbeRecordCompareInt
+    0.6%  sqlite3BtreeIndexMoveto
+    0.5%  libsystem_kernel.dylib+0x18b0
+    0.3%  balance
+    0.3%  btreeParseCellPtr
+    0.2%  libsystem_pthread.dylib+0x13f0
+    0.2%  sqlite3VdbeRecordCompareWithSkip
+    0.2%  libsystem_kernel.dylib+0x263c
+    0.1%  freeSpace
+    0.1%  <tokio::runtime::blocking::task::BlockingTask<hiqlite::query::query_owned_local<&str>::{closure#0}::{closure#0}> as core::future::future::Future>::poll
+    0.1%  pcache1Fetch
+    0.1%  libsystem_pthread.dylib+0x1934
+    0.1%  libsystem_kernel.dylib+0x5a4c
+    0.1%  libsystem_malloc.dylib+0x2e394
+    0.1%  getPageNormal
+    0.1%  vdbeSorterCompareInt
+    0.1%  getCellInfo
+    0.1%  libsystem_pthread.dylib+0x1808
+    0.1%  libsystem_pthread.dylib+0x140c
+    0.1%  sqlite3BtreeNext
+    0.1%  moveToRoot
+  total  function
+  100.0%  <tokio::runtime::blocking::pool::Inner>::run
+  100.0%  std::sys::backtrace::__rust_begin_short_backtrace::<<tokio::runtime::blocking::pool::Spawner>::spawn_thread::{closure#0}, ()>
+  100.0%  <std::sys::thread::unix::Thread>::new::thread_start
+  100.0%  <std::thread::lifecycle::spawn_unchecked<<tokio::runtime::blocking::pool::Spawner>::spawn_thread::{closure#0}, ()>::{closure#1} as core::ops::function::FnOnce<()>>::call_once::{shim:vtable#0}
+  100.0%  libsystem_pthread.dylib+0x6c07
+   79.4%  <std::sys::sync::condvar::pthread::Condvar>::wait_timeout
+   76.7%  libsystem_pthread.dylib+0x7107
+   76.7%  libsystem_kernel.dylib+0x44f8
+   16.9%  <tokio::runtime::task::harness::Harness<tokio::runtime::blocking::task::BlockingTask<hiqlite::query::query_owned_local<&str>::{closure#0}::{closure#0}>, tokio::runtime::blocking::schedule::BlockingSchedule>>::poll
+   16.6%  <tokio::runtime::task::core::Core<tokio::runtime::blocking::task::BlockingTask<hiqlite::query::query_owned_local<&str>::{closure#0}::{closure#0}>, tokio::runtime::blocking::schedule::BlockingSchedule>>::poll
+   16.6%  <tokio::runtime::blocking::task::BlockingTask<hiqlite::query::query_owned_local<&str>::{closure#0}::{closure#0}> as core::future::future::Future>::poll
+   15.2%  sqlite3_step
+   15.0%  sqlite3VdbeExec
+   11.8%  libsystem_pthread.dylib+0x1867
+   11.8%  libsystem_pthread.dylib+0x3e3b
+   11.7%  libsystem_kernel.dylib+0x39c8
+    5.5%  getPageNormal
+    5.4%  sqlite3BtreeIndexMoveto
+    5.4%  getAndInitPage
+    5.2%  pcache1Fetch
+    3.5%  <std::sys::pal::unix::sync::mutex::Mutex>::lock
+    3.4%  sqlite3BtreeInsert
+    2.9%  balance
+    2.6%  libsystem_pthread.dylib+0x7167
+    1.8%  libsystem_pthread.dylib+0x3eab
+
+## thread 'tokio-rt-worker' — 25361 samples
+   self  function
+   77.1%  libsystem_kernel.dylib+0x44f8
+   11.1%  libsystem_kernel.dylib+0x39c8
+    2.0%  libsystem_kernel.dylib+0x3b94
+    1.9%  sqlite3VdbeExec
+    0.8%  vdbeRecordCompareInt
+    0.6%  libsystem_kernel.dylib+0x18b0
+    0.5%  sqlite3BtreeIndexMoveto
+    0.4%  libsystem_pthread.dylib+0x13f0
+    0.3%  btreeParseCellPtr
+    0.3%  sqlite3VdbeRecordCompareWithSkip
+    0.2%  libsystem_kernel.dylib+0x263c
+    0.2%  balance
+    0.1%  getPageNormal
+    0.1%  <tokio::runtime::blocking::task::BlockingTask<hiqlite::query::query_owned_local<&str>::{closure#0}::{closure#0}> as core::future::future::Future>::poll
+    0.1%  libsystem_malloc.dylib+0x2e394
+    0.1%  libsystem_pthread.dylib+0x1934
+    0.1%  freeSpace
+    0.1%  libsystem_kernel.dylib+0x5a4c
+    0.1%  getCellInfo
+    0.1%  libsystem_platform.dylib+0x3524
+    0.1%  libsystem_pthread.dylib+0x140c
+    0.1%  sqlite3BtreeNext
+    0.1%  libsystem_pthread.dylib+0x1808
+    0.1%  <argon2::Argon2>::compress
+    0.1%  pcache1Fetch
+  total  function
+  100.0%  <tokio::runtime::blocking::pool::Inner>::run
+  100.0%  std::sys::backtrace::__rust_begin_short_backtrace::<<tokio::runtime::blocking::pool::Spawner>::spawn_thread::{closure#0}, ()>
+  100.0%  <std::sys::thread::unix::Thread>::new::thread_start
+  100.0%  <std::thread::lifecycle::spawn_unchecked<<tokio::runtime::blocking::pool::Spawner>::spawn_thread::{closure#0}, ()>::{closure#1} as core::ops::function::FnOnce<()>>::call_once::{shim:vtable#0}
+  100.0%  libsystem_pthread.dylib+0x6c07
+   79.5%  <std::sys::sync::condvar::pthread::Condvar>::wait_timeout
+   77.1%  libsystem_pthread.dylib+0x7107
+   77.1%  libsystem_kernel.dylib+0x44f8
+   16.8%  <tokio::runtime::task::harness::Harness<tokio::runtime::blocking::task::BlockingTask<hiqlite::query::query_owned_local<&str>::{closure#0}::{closure#0}>, tokio::runtime::blocking::schedule::BlockingSchedule>>::poll
+   16.6%  <tokio::runtime::task::core::Core<tokio::runtime::blocking::task::BlockingTask<hiqlite::query::query_owned_local<&str>::{closure#0}::{closure#0}>, tokio::runtime::blocking::schedule::BlockingSchedule>>::poll
+   16.6%  <tokio::runtime::blocking::task::BlockingTask<hiqlite::query::query_owned_local<&str>::{closure#0}::{closure#0}> as core::future::future::Future>::poll
+   15.0%  sqlite3_step
+   14.8%  sqlite3VdbeExec
+   11.2%  libsystem_pthread.dylib+0x1867
+   11.1%  libsystem_pthread.dylib+0x3e3b
+   11.1%  libsystem_kernel.dylib+0x39c8
+    5.6%  getPageNormal
+    5.4%  getAndInitPage
+    5.2%  pcache1Fetch
+    5.1%  sqlite3BtreeIndexMoveto
+    3.3%  <std::sys::pal::unix::sync::mutex::Mutex>::lock
+    3.2%  sqlite3BtreeInsert
+    2.6%  balance
+    2.3%  libsystem_pthread.dylib+0x7167
+    2.0%  libsystem_pthread.dylib+0x1b2f
+
+## thread 'tokio-rt-worker' — 24915 samples
+   self  function
+   72.9%  libsystem_kernel.dylib+0x44f8
+   12.7%  libsystem_kernel.dylib+0x39c8
+    2.7%  sqlite3VdbeExec
+    2.6%  libsystem_kernel.dylib+0x3b94
+    1.0%  vdbeRecordCompareInt
+    0.6%  sqlite3BtreeIndexMoveto
+    0.5%  libsystem_kernel.dylib+0x18b0
+    0.5%  btreeParseCellPtr
+    0.4%  libsystem_pthread.dylib+0x13f0
+    0.4%  sqlite3VdbeRecordCompareWithSkip
+    0.4%  balance
+    0.2%  libsystem_kernel.dylib+0x263c
+    0.2%  getPageNormal
+    0.2%  libsystem_pthread.dylib+0x1934
+    0.1%  pcache1Fetch
+    0.1%  freeSpace
+    0.1%  libsystem_pthread.dylib+0x1808
+    0.1%  getCellInfo
+    0.1%  libsystem_pthread.dylib+0x140c
+    0.1%  libsystem_kernel.dylib+0x5a4c
+    0.1%  <tokio::runtime::blocking::task::BlockingTask<hiqlite::query::query_owned_local<&str>::{closure#0}::{closure#0}> as core::future::future::Future>::poll
+    0.1%  sqlite3VdbeSerialGet
+    0.1%  libsystem_malloc.dylib+0x2e394
+    0.1%  libsystem_platform.dylib+0x3524
+    0.1%  libsystem_platform.dylib+0xfe0
+  total  function
+  100.0%  <std::sys::thread::unix::Thread>::new::thread_start
+  100.0%  std::sys::backtrace::__rust_begin_short_backtrace::<<tokio::runtime::blocking::pool::Spawner>::spawn_thread::{closure#0}, ()>
+  100.0%  <std::thread::lifecycle::spawn_unchecked<<tokio::runtime::blocking::pool::Spawner>::spawn_thread::{closure#0}, ()>::{closure#1} as core::ops::function::FnOnce<()>>::call_once::{shim:vtable#0}
+  100.0%  libsystem_pthread.dylib+0x6c07
+  100.0%  <tokio::runtime::blocking::pool::Inner>::run
+   75.4%  <std::sys::sync::condvar::pthread::Condvar>::wait_timeout
+   72.9%  libsystem_pthread.dylib+0x7107
+   72.9%  libsystem_kernel.dylib+0x44f8
+   21.2%  <tokio::runtime::task::harness::Harness<tokio::runtime::blocking::task::BlockingTask<hiqlite::query::query_owned_local<&str>::{closure#0}::{closure#0}>, tokio::runtime::blocking::schedule::BlockingSchedule>>::poll
+   21.0%  <tokio::runtime::task::core::Core<tokio::runtime::blocking::task::BlockingTask<hiqlite::query::query_owned_local<&str>::{closure#0}::{closure#0}>, tokio::runtime::blocking::schedule::BlockingSchedule>>::poll
+   20.9%  <tokio::runtime::blocking::task::BlockingTask<hiqlite::query::query_owned_local<&str>::{closure#0}::{closure#0}> as core::future::future::Future>::poll
+   19.7%  sqlite3_step
+   19.5%  sqlite3VdbeExec
+   12.8%  libsystem_pthread.dylib+0x1867
+   12.8%  libsystem_pthread.dylib+0x3e3b
+   12.7%  libsystem_kernel.dylib+0x39c8
+    7.9%  getPageNormal
+    7.8%  getAndInitPage
+    7.6%  pcache1Fetch
+    7.1%  sqlite3BtreeIndexMoveto
+    4.4%  sqlite3BtreeInsert
+    3.7%  balance
+    3.1%  <std::sys::pal::unix::sync::mutex::Mutex>::lock
+    2.6%  libsystem_pthread.dylib+0x1b2f
+    2.6%  libsystem_pthread.dylib+0x3eab
+
+## thread 'tokio-rt-worker' — 24822 samples
+   self  function
+   76.0%  libsystem_kernel.dylib+0x44f8
+   12.4%  libsystem_kernel.dylib+0x39c8
+    2.0%  libsystem_kernel.dylib+0x3b94
+    2.0%  sqlite3VdbeExec
+    0.7%  vdbeRecordCompareInt
+    0.5%  sqlite3BtreeIndexMoveto
+    0.4%  libsystem_kernel.dylib+0x18b0
+    0.3%  libsystem_pthread.dylib+0x13f0
+    0.3%  sqlite3VdbeRecordCompareWithSkip
+    0.3%  btreeParseCellPtr
+    0.2%  libsystem_kernel.dylib+0x263c
+    0.2%  balance
+    0.1%  libsystem_pthread.dylib+0x1934
+    0.1%  <tokio::runtime::blocking::task::BlockingTask<hiqlite::query::query_owned_local<&str>::{closure#0}::{closure#0}> as core::future::future::Future>::poll
+    0.1%  getPageNormal
+    0.1%  libsystem_pthread.dylib+0x1808
+    0.1%  libsystem_pthread.dylib+0x140c
+    0.1%  freeSpace
+    0.1%  libsystem_kernel.dylib+0x5a4c
+    0.1%  pcache1Fetch
+    0.1%  libsystem_malloc.dylib+0x29d34
+    0.1%  libsystem_malloc.dylib+0x2e394
+    0.1%  <std::sys::sync::condvar::pthread::Condvar>::wait_timeout
+    0.1%  getCellInfo
+    0.1%  sqlite3BtreeTableMoveto
+  total  function
+  100.0%  <tokio::runtime::blocking::pool::Inner>::run
+  100.0%  std::sys::backtrace::__rust_begin_short_backtrace::<<tokio::runtime::blocking::pool::Spawner>::spawn_thread::{closure#0}, ()>
+  100.0%  <std::sys::thread::unix::Thread>::new::thread_start
+  100.0%  <std::thread::lifecycle::spawn_unchecked<<tokio::runtime::blocking::pool::Spawner>::spawn_thread::{closure#0}, ()>::{closure#1} as core::ops::function::FnOnce<()>>::call_once::{shim:vtable#0}
+  100.0%  libsystem_pthread.dylib+0x6c07
+   79.0%  <std::sys::sync::condvar::pthread::Condvar>::wait_timeout
+   76.1%  libsystem_pthread.dylib+0x7107
+   76.0%  libsystem_kernel.dylib+0x44f8
+   17.0%  <tokio::runtime::task::harness::Harness<tokio::runtime::blocking::task::BlockingTask<hiqlite::query::query_owned_local<&str>::{closure#0}::{closure#0}>, tokio::runtime::blocking::schedule::BlockingSchedule>>::poll
+   16.7%  <tokio::runtime::task::core::Core<tokio::runtime::blocking::task::BlockingTask<hiqlite::query::query_owned_local<&str>::{closure#0}::{closure#0}>, tokio::runtime::blocking::schedule::BlockingSchedule>>::poll
+   16.7%  <tokio::runtime::blocking::task::BlockingTask<hiqlite::query::query_owned_local<&str>::{closure#0}::{closure#0}> as core::future::future::Future>::poll
+   15.5%  sqlite3_step
+   15.3%  sqlite3VdbeExec
+   12.5%  libsystem_pthread.dylib+0x1867
+   12.4%  libsystem_pthread.dylib+0x3e3b
+   12.4%  libsystem_kernel.dylib+0x39c8
+    6.5%  getPageNormal
+    6.4%  getAndInitPage
+    6.2%  pcache1Fetch
+    5.7%  sqlite3BtreeIndexMoveto
+    3.8%  <std::sys::pal::unix::sync::mutex::Mutex>::lock
+    3.4%  sqlite3BtreeInsert
+    2.9%  balance
+    2.9%  libsystem_pthread.dylib+0x7167
+    2.1%  libsystem_pthread.dylib+0x1b2f
+
+## thread 'tokio-rt-worker' — 23911 samples
+   self  function
+   72.5%  libsystem_kernel.dylib+0x44f8
+   13.5%  libsystem_kernel.dylib+0x39c8
+    2.6%  sqlite3VdbeExec
+    2.3%  libsystem_kernel.dylib+0x3b94
+    1.1%  vdbeRecordCompareInt
+    0.7%  sqlite3BtreeIndexMoveto
+    0.5%  libsystem_kernel.dylib+0x18b0
+    0.4%  btreeParseCellPtr
+    0.3%  libsystem_pthread.dylib+0x13f0
+    0.3%  balance
+    0.3%  sqlite3VdbeRecordCompareWithSkip
+    0.2%  libsystem_kernel.dylib+0x263c
+    0.2%  libsystem_pthread.dylib+0x1934
+    0.2%  getCellInfo
+    0.1%  freeSpace
+    0.1%  getPageNormal
+    0.1%  sqlite3BtreeInsert
+    0.1%  libsystem_pthread.dylib+0x1808
+    0.1%  pcache1Fetch
+    0.1%  libsystem_malloc.dylib+0x2e394
+    0.1%  libsystem_pthread.dylib+0x140c
+    0.1%  pageFindSlot
+    0.1%  btreeParseCellPtrIndex
+    0.1%  <tokio::runtime::blocking::task::BlockingTask<hiqlite::query::query_owned_local<&str>::{closure#0}::{closure#0}> as core::future::future::Future>::poll
+    0.1%  vdbeSorterCompareInt
+  total  function
+  100.0%  <tokio::runtime::blocking::pool::Inner>::run
+  100.0%  std::sys::backtrace::__rust_begin_short_backtrace::<<tokio::runtime::blocking::pool::Spawner>::spawn_thread::{closure#0}, ()>
+  100.0%  <std::sys::thread::unix::Thread>::new::thread_start
+  100.0%  <std::thread::lifecycle::spawn_unchecked<<tokio::runtime::blocking::pool::Spawner>::spawn_thread::{closure#0}, ()>::{closure#1} as core::ops::function::FnOnce<()>>::call_once::{shim:vtable#0}
+  100.0%  libsystem_pthread.dylib+0x6c07
+   75.0%  <std::sys::sync::condvar::pthread::Condvar>::wait_timeout
+   72.6%  libsystem_pthread.dylib+0x7107
+   72.5%  libsystem_kernel.dylib+0x44f8
+   21.0%  <tokio::runtime::task::harness::Harness<tokio::runtime::blocking::task::BlockingTask<hiqlite::query::query_owned_local<&str>::{closure#0}::{closure#0}>, tokio::runtime::blocking::schedule::BlockingSchedule>>::poll
+   20.7%  <tokio::runtime::task::core::Core<tokio::runtime::blocking::task::BlockingTask<hiqlite::query::query_owned_local<&str>::{closure#0}::{closure#0}>, tokio::runtime::blocking::schedule::BlockingSchedule>>::poll
+   20.7%  <tokio::runtime::blocking::task::BlockingTask<hiqlite::query::query_owned_local<&str>::{closure#0}::{closure#0}> as core::future::future::Future>::poll
+   19.3%  sqlite3_step
+   19.2%  sqlite3VdbeExec
+   13.6%  libsystem_pthread.dylib+0x1867
+   13.5%  libsystem_pthread.dylib+0x3e3b
+   13.5%  libsystem_kernel.dylib+0x39c8
+    7.5%  getPageNormal
+    7.4%  getAndInitPage
+    7.2%  pcache1Fetch
+    7.0%  sqlite3BtreeIndexMoveto
+    4.2%  sqlite3BtreeInsert
+    3.8%  <std::sys::pal::unix::sync::mutex::Mutex>::lock
+    3.5%  balance
+    2.4%  libsystem_pthread.dylib+0x7167
+    2.3%  libsystem_pthread.dylib+0x3eab
+
+## thread 'tokio-rt-worker' — 23137 samples
+   self  function
+   75.7%  libsystem_kernel.dylib+0x44f8
+   12.4%  libsystem_kernel.dylib+0x39c8
+    2.0%  sqlite3VdbeExec
+    1.7%  libsystem_kernel.dylib+0x3b94
+    0.8%  vdbeRecordCompareInt
+    0.7%  libsystem_kernel.dylib+0x18b0
+    0.5%  sqlite3BtreeIndexMoveto
+    0.3%  libsystem_pthread.dylib+0x13f0
+    0.3%  sqlite3VdbeRecordCompareWithSkip
+    0.3%  btreeParseCellPtr
+    0.2%  balance
+    0.1%  libsystem_pthread.dylib+0x1934
+    0.1%  freeSpace
+    0.1%  libsystem_kernel.dylib+0x263c
+    0.1%  <tokio::runtime::blocking::task::BlockingTask<hiqlite::query::query_owned_local<&str>::{closure#0}::{closure#0}> as core::future::future::Future>::poll
+    0.1%  libsystem_malloc.dylib+0x2e394
+    0.1%  getPageNormal
+    0.1%  getCellInfo
+    0.1%  pcache1Fetch
+    0.1%  sqlite3BtreeTableMoveto
+    0.1%  sqlite3BtreeInsert
+    0.1%  libsystem_kernel.dylib+0x5a4c
+    0.1%  libsystem_platform.dylib+0xfe0
+    0.1%  libsystem_malloc.dylib+0x29d34
+    0.1%  pageFindSlot
+  total  function
+  100.0%  <tokio::runtime::blocking::pool::Inner>::run
+  100.0%  std::sys::backtrace::__rust_begin_short_backtrace::<<tokio::runtime::blocking::pool::Spawner>::spawn_thread::{closure#0}, ()>
+  100.0%  <std::sys::thread::unix::Thread>::new::thread_start
+  100.0%  <std::thread::lifecycle::spawn_unchecked<<tokio::runtime::blocking::pool::Spawner>::spawn_thread::{closure#0}, ()>::{closure#1} as core::ops::function::FnOnce<()>>::call_once::{shim:vtable#0}
+  100.0%  libsystem_pthread.dylib+0x6c07
+   78.1%  <std::sys::sync::condvar::pthread::Condvar>::wait_timeout
+   75.8%  libsystem_pthread.dylib+0x7107
+   75.7%  libsystem_kernel.dylib+0x44f8
+   17.8%  <tokio::runtime::task::harness::Harness<tokio::runtime::blocking::task::BlockingTask<hiqlite::query::query_owned_local<&str>::{closure#0}::{closure#0}>, tokio::runtime::blocking::schedule::BlockingSchedule>>::poll
+   17.5%  <tokio::runtime::task::core::Core<tokio::runtime::blocking::task::BlockingTask<hiqlite::query::query_owned_local<&str>::{closure#0}::{closure#0}>, tokio::runtime::blocking::schedule::BlockingSchedule>>::poll
+   17.4%  <tokio::runtime::blocking::task::BlockingTask<hiqlite::query::query_owned_local<&str>::{closure#0}::{closure#0}> as core::future::future::Future>::poll
+   15.7%  sqlite3_step
+   15.6%  sqlite3VdbeExec
+   12.5%  libsystem_pthread.dylib+0x1867
+   12.4%  libsystem_pthread.dylib+0x3e3b
+   12.4%  libsystem_kernel.dylib+0x39c8
+    5.7%  getPageNormal
+    5.6%  getAndInitPage
+    5.5%  pcache1Fetch
+    5.4%  sqlite3BtreeIndexMoveto
+    4.0%  <std::sys::pal::unix::sync::mutex::Mutex>::lock
+    3.2%  sqlite3BtreeInsert
+    2.8%  balance
+    2.3%  libsystem_pthread.dylib+0x7167
+    1.8%  unixShmLock
+
+## thread 'tokio-rt-worker' — 23114 samples
+   self  function
+   71.1%  libsystem_kernel.dylib+0x44f8
+   13.8%  libsystem_kernel.dylib+0x39c8
+    2.8%  sqlite3VdbeExec
+    2.2%  libsystem_kernel.dylib+0x3b94
+    1.1%  vdbeRecordCompareInt
+    0.8%  sqlite3BtreeIndexMoveto
+    0.5%  libsystem_kernel.dylib+0x18b0
+    0.5%  btreeParseCellPtr
+    0.4%  libsystem_pthread.dylib+0x13f0
+    0.4%  sqlite3VdbeRecordCompareWithSkip
+    0.4%  balance
+    0.2%  libsystem_kernel.dylib+0x263c
+    0.2%  getPageNormal
+    0.2%  getCellInfo
+    0.2%  libsystem_pthread.dylib+0x1934
+    0.1%  freeSpace
+    0.1%  sqlite3BtreeInsert
+    0.1%  libsystem_pthread.dylib+0x140c
+    0.1%  pcache1Fetch
+    0.1%  moveToRoot
+    0.1%  libsystem_platform.dylib+0xfe0
+    0.1%  sqlite3BtreeTableMoveto
+    0.1%  libsystem_pthread.dylib+0x1808
+    0.1%  libsystem_malloc.dylib+0x2e394
+    0.1%  sqlite3BtreeNext
+  total  function
+  100.0%  <tokio::runtime::blocking::pool::Inner>::run
+  100.0%  std::sys::backtrace::__rust_begin_short_backtrace::<<tokio::runtime::blocking::pool::Spawner>::spawn_thread::{closure#0}, ()>
+  100.0%  <std::sys::thread::unix::Thread>::new::thread_start
+  100.0%  <std::thread::lifecycle::spawn_unchecked<<tokio::runtime::blocking::pool::Spawner>::spawn_thread::{closure#0}, ()>::{closure#1} as core::ops::function::FnOnce<()>>::call_once::{shim:vtable#0}
+  100.0%  libsystem_pthread.dylib+0x6c07
+   73.6%  <std::sys::sync::condvar::pthread::Condvar>::wait_timeout
+   71.2%  libsystem_pthread.dylib+0x7107
+   71.1%  libsystem_kernel.dylib+0x44f8
+   22.5%  <tokio::runtime::task::harness::Harness<tokio::runtime::blocking::task::BlockingTask<hiqlite::query::query_owned_local<&str>::{closure#0}::{closure#0}>, tokio::runtime::blocking::schedule::BlockingSchedule>>::poll
+   22.2%  <tokio::runtime::task::core::Core<tokio::runtime::blocking::task::BlockingTask<hiqlite::query::query_owned_local<&str>::{closure#0}::{closure#0}>, tokio::runtime::blocking::schedule::BlockingSchedule>>::poll
+   22.2%  <tokio::runtime::blocking::task::BlockingTask<hiqlite::query::query_owned_local<&str>::{closure#0}::{closure#0}> as core::future::future::Future>::poll
+   20.8%  sqlite3_step
+   20.7%  sqlite3VdbeExec
+   13.9%  libsystem_pthread.dylib+0x1867
+   13.9%  libsystem_pthread.dylib+0x3e3b
+   13.8%  libsystem_kernel.dylib+0x39c8
+    8.1%  getPageNormal
+    8.0%  getAndInitPage
+    7.7%  sqlite3BtreeIndexMoveto
+    7.7%  pcache1Fetch
+    4.8%  sqlite3BtreeInsert
+    3.9%  balance
+    3.6%  <std::sys::pal::unix::sync::mutex::Mutex>::lock
+    2.4%  libsystem_pthread.dylib+0x7167
+    2.3%  libsystem_pthread.dylib+0x1b2f
+
+## thread 'tokio-rt-worker' — 23100 samples
+   self  function
+   76.0%  libsystem_kernel.dylib+0x44f8
+   12.2%  libsystem_kernel.dylib+0x39c8
+    2.0%  sqlite3VdbeExec
+    1.7%  libsystem_kernel.dylib+0x3b94
+    0.8%  vdbeRecordCompareInt
+    0.6%  libsystem_kernel.dylib+0x18b0
+    0.5%  sqlite3BtreeIndexMoveto
+    0.3%  libsystem_pthread.dylib+0x13f0
+    0.3%  sqlite3VdbeRecordCompareWithSkip
+    0.3%  btreeParseCellPtr
+    0.3%  balance
+    0.1%  <tokio::runtime::blocking::task::BlockingTask<hiqlite::query::query_owned_local<&str>::{closure#0}::{closure#0}> as core::future::future::Future>::poll
+    0.1%  libsystem_pthread.dylib+0x1934
+    0.1%  getPageNormal
+    0.1%  freeSpace
+    0.1%  getCellInfo
+    0.1%  libsystem_malloc.dylib+0x2e394
+    0.1%  libsystem_kernel.dylib+0x263c
+    0.1%  <std::sys::sync::condvar::pthread::Condvar>::wait_timeout
+    0.1%  libsystem_pthread.dylib+0x140c
+    0.1%  libsystem_kernel.dylib+0x39c4
+    0.1%  vdbeSorterCompareInt
+    0.1%  libsystem_platform.dylib+0xfe0
+    0.1%  sqlite3BtreeInsert
+    0.1%  sqlite3BtreeTableMoveto
+  total  function
+  100.0%  <tokio::runtime::blocking::pool::Inner>::run
+  100.0%  std::sys::backtrace::__rust_begin_short_backtrace::<<tokio::runtime::blocking::pool::Spawner>::spawn_thread::{closure#0}, ()>
+  100.0%  <std::sys::thread::unix::Thread>::new::thread_start
+  100.0%  <std::thread::lifecycle::spawn_unchecked<<tokio::runtime::blocking::pool::Spawner>::spawn_thread::{closure#0}, ()>::{closure#1} as core::ops::function::FnOnce<()>>::call_once::{shim:vtable#0}
+  100.0%  libsystem_pthread.dylib+0x6c07
+   78.5%  <std::sys::sync::condvar::pthread::Condvar>::wait_timeout
+   76.0%  libsystem_pthread.dylib+0x7107
+   76.0%  libsystem_kernel.dylib+0x44f8
+   17.5%  <tokio::runtime::task::harness::Harness<tokio::runtime::blocking::task::BlockingTask<hiqlite::query::query_owned_local<&str>::{closure#0}::{closure#0}>, tokio::runtime::blocking::schedule::BlockingSchedule>>::poll
+   17.2%  <tokio::runtime::task::core::Core<tokio::runtime::blocking::task::BlockingTask<hiqlite::query::query_owned_local<&str>::{closure#0}::{closure#0}>, tokio::runtime::blocking::schedule::BlockingSchedule>>::poll
+   17.1%  <tokio::runtime::blocking::task::BlockingTask<hiqlite::query::query_owned_local<&str>::{closure#0}::{closure#0}> as core::future::future::Future>::poll
+   15.6%  sqlite3_step
+   15.5%  sqlite3VdbeExec
+   12.3%  libsystem_pthread.dylib+0x1867
+   12.3%  libsystem_pthread.dylib+0x3e3b
+   12.2%  libsystem_kernel.dylib+0x39c8
+    5.9%  getPageNormal
+    5.8%  getAndInitPage
+    5.7%  pcache1Fetch
+    5.4%  sqlite3BtreeIndexMoveto
+    3.8%  <std::sys::pal::unix::sync::mutex::Mutex>::lock
+    3.6%  sqlite3BtreeInsert
+    3.0%  balance
+    2.3%  libsystem_pthread.dylib+0x7167
+    1.8%  libsystem_pthread.dylib+0x1b2f
+
+## thread 'tokio-rt-worker' — 22864 samples
+   self  function
+   42.5%  libsystem_kernel.dylib+0x44f8
+   12.0%  libsystem_kernel.dylib+0x39c8
+   11.9%  rn_site::api::query::member_documents::held::<rn_kernel::store::ReadStore<hiqlite::client::Client>>::{closure#0}
+   11.6%  libsystem_kernel.dylib+0x6f30
+    4.3%  libsystem_kernel.dylib+0x5a4c
+    2.7%  libsystem_kernel.dylib+0x3b94
+    1.6%  libsystem_kernel.dylib+0x4b78
+    1.4%  libsystem_kernel.dylib+0x53a4
+    0.5%  libsystem_kernel.dylib+0x10fc
+    0.5%  <hiqlite::client::Client>::query_raw::<&str>::{closure#0}
+    0.4%  libsystem_malloc.dylib+0x2e394
+    0.4%  <rn_site::api::whoami::whoami as axum::handler::Handler<(axum_core::extract::private::ViaParts, axum::extract::state::State<rn_site::state::AppState>, rn_site::auth::session::Session), rn_site::state::AppState>>::call::{closure#0}
+    0.3%  <tokio::runtime::scheduler::multi_thread::worker::Context>::run
+    0.2%  libsystem_kernel.dylib+0x5a48
+    0.2%  <axum::middleware::from_fn::FromFn<rn_site::http::freshness, rn_site::state::AppState, axum::routing::route::Route, (axum::extract::state::State<rn_site::state::AppState>, http::request::Request<axum_core::body::Body>)> as tower_service::Service<http::request::Request<axum_core::body::Body>>>::call::{closure#0}
+    0.2%  <deduplicated_symbol>
+    0.2%  core::ptr::drop_glue::<rn_site::state::AppState>
+    0.1%  <hiqlite::query::rows::Row as rn_kernel::store::value::Cursor>::text
+    0.1%  <tower::util::oneshot::Oneshot<tower::util::boxed_clone_sync::BoxCloneSyncService<http::request::Request<axum_core::body::Body>, http::response::Response<axum_core::body::Body>, core::convert::Infallible>, http::request::Request<axum_core::body::Body>> as core::future::future::Future>::poll
+    0.1%  libsystem_kernel.dylib+0xb8c
+    0.1%  <axum::routing::route::RouteFuture<core::convert::Infallible> as core::future::future::Future>::poll
+    0.1%  libsystem_malloc.dylib+0x2a904
+    0.1%  serde_json::ser::format_escaped_str::<&mut bytes::buf::writer::Writer<bytes::bytes_mut::BytesMut>, serde_json::ser::CompactFormatter>
+    0.1%  <hyper::proto::h1::dispatch::Dispatcher<hyper::proto::h1::dispatch::Server<hyper_util::service::glue::TowerToHyperService<tower::util::map_request::MapRequest<axum::routing::Router, axum::serve::handle_connection<tokio::net::tcp::listener::TcpListener, axum::routing::Router, axum::routing::Router>::{closure#0}::{closure#2}>>, hyper::body::incoming::Incoming>, axum_core::body::Body, hyper_util::common::rewind::Rewind<hyper_util::rt::tokio::TokioIo<tokio::net::tcp::stream::TcpStream>>, hyper::proto::h1::role::Server>>::poll_write
+    0.1%  libsystem_malloc.dylib+0x29d34
+  total  function
+  100.0%  <tokio::runtime::blocking::pool::Inner>::run
+  100.0%  tokio::runtime::context::runtime::enter_runtime::<tokio::runtime::scheduler::multi_thread::worker::run::{closure#0}, ()>
+  100.0%  std::sys::backtrace::__rust_begin_short_backtrace::<<tokio::runtime::blocking::pool::Spawner>::spawn_thread::{closure#0}, ()>
+  100.0%  tokio::runtime::scheduler::multi_thread::worker::run
+  100.0%  <tokio::runtime::blocking::task::BlockingTask<<tokio::runtime::scheduler::multi_thread::worker::Launch>::launch::{closure#0}> as core::future::future::Future>::poll
+  100.0%  <tokio::runtime::task::core::Core<tokio::runtime::blocking::task::BlockingTask<<tokio::runtime::scheduler::multi_thread::worker::Launch>::launch::{closure#0}>, tokio::runtime::blocking::schedule::BlockingSchedule>>::poll
+  100.0%  <tokio::runtime::task::harness::Harness<tokio::runtime::blocking::task::BlockingTask<<tokio::runtime::scheduler::multi_thread::worker::Launch>::launch::{closure#0}>, tokio::runtime::blocking::schedule::BlockingSchedule>>::poll
+  100.0%  <std::sys::thread::unix::Thread>::new::thread_start
+  100.0%  <std::thread::lifecycle::spawn_unchecked<<tokio::runtime::blocking::pool::Spawner>::spawn_thread::{closure#0}, ()>::{closure#1} as core::ops::function::FnOnce<()>>::call_once::{shim:vtable#0}
+  100.0%  libsystem_pthread.dylib+0x6c07
+  100.0%  <tokio::runtime::context::scoped::Scoped<tokio::runtime::scheduler::Context>>::set::<tokio::runtime::scheduler::multi_thread::worker::run::{closure#0}::{closure#0}, ()>
+  100.0%  <tokio::runtime::scheduler::multi_thread::worker::Context>::run
+   54.4%  <tokio::runtime::scheduler::multi_thread::worker::Context>::park_internal
+   43.6%  <tokio::runtime::scheduler::multi_thread::worker::Context>::run_task
+   42.7%  <tokio::runtime::scheduler::multi_thread::park::Inner>::park_condvar
+   42.6%  libsystem_pthread.dylib+0x70db
+   42.5%  libsystem_kernel.dylib+0x44f8
+   41.6%  <deduplicated_symbol>
+   41.3%  <tokio::runtime::task::harness::Harness<axum::serve::handle_connection<tokio::net::tcp::listener::TcpListener, axum::routing::Router, axum::routing::Router>::{closure#0}::{closure#3}, alloc::sync::Arc<tokio::runtime::scheduler::multi_thread::handle::Handle>>>::poll
+   41.1%  axum::serve::handle_connection::<tokio::net::tcp::listener::TcpListener, axum::routing::Router, axum::routing::Router>::{closure#0}::{closure#3}
+   41.0%  <core::future::poll_fn::PollFn<axum::serve::handle_connection<tokio::net::tcp::listener::TcpListener, axum::routing::Router, axum::routing::Router>::{closure#0}::{closure#3}::{closure#0}> as core::future::future::Future>::poll
+   40.7%  <hyper_util::server::conn::auto::UpgradeableConnection<hyper_util::rt::tokio::TokioIo<tokio::net::tcp::stream::TcpStream>, hyper_util::service::glue::TowerToHyperService<tower::util::map_request::MapRequest<axum::routing::Router, axum::serve::handle_connection<tokio::net::tcp::listener::TcpListener, axum::routing::Router, axum::routing::Router>::{closure#0}::{closure#2}>>, hyper_util::rt::tokio::TokioExecutor> as core::future::future::Future>::poll
+   40.6%  <hyper::server::conn::http1::UpgradeableConnection<hyper_util::common::rewind::Rewind<hyper_util::rt::tokio::TokioIo<tokio::net::tcp::stream::TcpStream>>, hyper_util::service::glue::TowerToHyperService<tower::util::map_request::MapRequest<axum::routing::Router, axum::serve::handle_connection<tokio::net::tcp::listener::TcpListener, axum::routing::Router, axum::routing::Router>::{closure#0}::{closure#2}>>> as core::future::future::Future>::poll
+   36.4%  <hyper::proto::h1::dispatch::Dispatcher<hyper::proto::h1::dispatch::Server<hyper_util::service::glue::TowerToHyperService<tower::util::map_request::MapRequest<axum::routing::Router, axum::serve::handle_connection<tokio::net::tcp::listener::TcpListener, axum::routing::Router, axum::routing::Router>::{closure#0}::{closure#2}>>, hyper::body::incoming::Incoming>, axum_core::body::Body, hyper_util::common::rewind::Rewind<hyper_util::rt::tokio::TokioIo<tokio::net::tcp::stream::TcpStream>>, hyper::proto::h1::role::Server>>::poll_write
+   35.7%  <axum::routing::route::RouteFuture<core::convert::Infallible> as core::future::future::Future>::poll
+
+## thread 'tokio-rt-worker' — 22440 samples
+   self  function
+   43.3%  libsystem_kernel.dylib+0x44f8
+   15.5%  rn_site::api::query::member_documents::held::<rn_kernel::store::ReadStore<hiqlite::client::Client>>::{closure#0}
+   10.1%  libsystem_kernel.dylib+0x6f30
+    9.3%  libsystem_kernel.dylib+0x39c8
+    3.9%  libsystem_kernel.dylib+0x5a4c
+    2.5%  libsystem_kernel.dylib+0x3b94
+    1.7%  libsystem_kernel.dylib+0x53a4
+    1.5%  libsystem_kernel.dylib+0x4b78
+    0.5%  libsystem_malloc.dylib+0x2e394
+    0.5%  <hiqlite::client::Client>::query_raw::<&str>::{closure#0}
+    0.4%  libsystem_kernel.dylib+0x10fc
+    0.3%  <rn_site::api::whoami::whoami as axum::handler::Handler<(axum_core::extract::private::ViaParts, axum::extract::state::State<rn_site::state::AppState>, rn_site::auth::session::Session), rn_site::state::AppState>>::call::{closure#0}
+    0.3%  <tokio::runtime::scheduler::multi_thread::worker::Context>::run
+    0.3%  libsystem_kernel.dylib+0x5a48
+    0.2%  <deduplicated_symbol>
+    0.2%  <tower::util::oneshot::Oneshot<tower::util::boxed_clone_sync::BoxCloneSyncService<http::request::Request<axum_core::body::Body>, http::response::Response<axum_core::body::Body>, core::convert::Infallible>, http::request::Request<axum_core::body::Body>> as core::future::future::Future>::poll
+    0.2%  libsystem_kernel.dylib+0xb8c
+    0.2%  <axum::middleware::from_fn::FromFn<rn_site::http::freshness, rn_site::state::AppState, axum::routing::route::Route, (axum::extract::state::State<rn_site::state::AppState>, http::request::Request<axum_core::body::Body>)> as tower_service::Service<http::request::Request<axum_core::body::Body>>>::call::{closure#0}
+    0.1%  core::ptr::drop_glue::<rn_site::state::AppState>
+    0.1%  <hiqlite::query::rows::Row as rn_kernel::store::value::Cursor>::int
+    0.1%  <axum::routing::route::RouteFuture<core::convert::Infallible> as core::future::future::Future>::poll
+    0.1%  libsystem_malloc.dylib+0x2aafc
+    0.1%  <tokio::runtime::scheduler::multi_thread::worker::Context>::park_internal
+    0.1%  <hyper::proto::h1::dispatch::Dispatcher<hyper::proto::h1::dispatch::Server<hyper_util::service::glue::TowerToHyperService<tower::util::map_request::MapRequest<axum::routing::Router, axum::serve::handle_connection<tokio::net::tcp::listener::TcpListener, axum::routing::Router, axum::routing::Router>::{closure#0}::{closure#2}>>, hyper::body::incoming::Incoming>, axum_core::body::Body, hyper_util::common::rewind::Rewind<hyper_util::rt::tokio::TokioIo<tokio::net::tcp::stream::TcpStream>>, hyper::proto::h1::role::Server>>::poll_write
+    0.1%  libsystem_malloc.dylib+0x29d34
+  total  function
+  100.0%  <tokio::runtime::blocking::pool::Inner>::run
+  100.0%  tokio::runtime::context::runtime::enter_runtime::<tokio::runtime::scheduler::multi_thread::worker::run::{closure#0}, ()>
+  100.0%  std::sys::backtrace::__rust_begin_short_backtrace::<<tokio::runtime::blocking::pool::Spawner>::spawn_thread::{closure#0}, ()>
+  100.0%  tokio::runtime::scheduler::multi_thread::worker::run
+  100.0%  <tokio::runtime::blocking::task::BlockingTask<<tokio::runtime::scheduler::multi_thread::worker::Launch>::launch::{closure#0}> as core::future::future::Future>::poll
+  100.0%  <tokio::runtime::task::core::Core<tokio::runtime::blocking::task::BlockingTask<<tokio::runtime::scheduler::multi_thread::worker::Launch>::launch::{closure#0}>, tokio::runtime::blocking::schedule::BlockingSchedule>>::poll
+  100.0%  <tokio::runtime::task::harness::Harness<tokio::runtime::blocking::task::BlockingTask<<tokio::runtime::scheduler::multi_thread::worker::Launch>::launch::{closure#0}>, tokio::runtime::blocking::schedule::BlockingSchedule>>::poll
+  100.0%  <std::sys::thread::unix::Thread>::new::thread_start
+  100.0%  <std::thread::lifecycle::spawn_unchecked<<tokio::runtime::blocking::pool::Spawner>::spawn_thread::{closure#0}, ()>::{closure#1} as core::ops::function::FnOnce<()>>::call_once::{shim:vtable#0}
+  100.0%  libsystem_pthread.dylib+0x6c07
+  100.0%  <tokio::runtime::context::scoped::Scoped<tokio::runtime::scheduler::Context>>::set::<tokio::runtime::scheduler::multi_thread::worker::run::{closure#0}::{closure#0}, ()>
+  100.0%  <tokio::runtime::scheduler::multi_thread::worker::Context>::run
+   53.9%  <tokio::runtime::scheduler::multi_thread::worker::Context>::park_internal
+   44.2%  <tokio::runtime::scheduler::multi_thread::worker::Context>::run_task
+   43.5%  <tokio::runtime::scheduler::multi_thread::park::Inner>::park_condvar
+   43.4%  libsystem_pthread.dylib+0x70db
+   43.3%  libsystem_kernel.dylib+0x44f8
+   42.4%  <deduplicated_symbol>
+   42.1%  <tokio::runtime::task::harness::Harness<axum::serve::handle_connection<tokio::net::tcp::listener::TcpListener, axum::routing::Router, axum::routing::Router>::{closure#0}::{closure#3}, alloc::sync::Arc<tokio::runtime::scheduler::multi_thread::handle::Handle>>>::poll
+   41.8%  axum::serve::handle_connection::<tokio::net::tcp::listener::TcpListener, axum::routing::Router, axum::routing::Router>::{closure#0}::{closure#3}
+   41.7%  <core::future::poll_fn::PollFn<axum::serve::handle_connection<tokio::net::tcp::listener::TcpListener, axum::routing::Router, axum::routing::Router>::{closure#0}::{closure#3}::{closure#0}> as core::future::future::Future>::poll
+   41.4%  <hyper_util::server::conn::auto::UpgradeableConnection<hyper_util::rt::tokio::TokioIo<tokio::net::tcp::stream::TcpStream>, hyper_util::service::glue::TowerToHyperService<tower::util::map_request::MapRequest<axum::routing::Router, axum::serve::handle_connection<tokio::net::tcp::listener::TcpListener, axum::routing::Router, axum::routing::Router>::{closure#0}::{closure#2}>>, hyper_util::rt::tokio::TokioExecutor> as core::future::future::Future>::poll
+   41.4%  <hyper::server::conn::http1::UpgradeableConnection<hyper_util::common::rewind::Rewind<hyper_util::rt::tokio::TokioIo<tokio::net::tcp::stream::TcpStream>>, hyper_util::service::glue::TowerToHyperService<tower::util::map_request::MapRequest<axum::routing::Router, axum::serve::handle_connection<tokio::net::tcp::listener::TcpListener, axum::routing::Router, axum::routing::Router>::{closure#0}::{closure#2}>>> as core::future::future::Future>::poll
+   37.0%  <hyper::proto::h1::dispatch::Dispatcher<hyper::proto::h1::dispatch::Server<hyper_util::service::glue::TowerToHyperService<tower::util::map_request::MapRequest<axum::routing::Router, axum::serve::handle_connection<tokio::net::tcp::listener::TcpListener, axum::routing::Router, axum::routing::Router>::{closure#0}::{closure#2}>>, hyper::body::incoming::Incoming>, axum_core::body::Body, hyper_util::common::rewind::Rewind<hyper_util::rt::tokio::TokioIo<tokio::net::tcp::stream::TcpStream>>, hyper::proto::h1::role::Server>>::poll_write
+   36.3%  <axum::routing::route::RouteFuture<core::convert::Infallible> as core::future::future::Future>::poll
+
+## thread 'tokio-rt-worker' — 21807 samples
+   self  function
+   73.3%  libsystem_kernel.dylib+0x44f8
+   13.1%  libsystem_kernel.dylib+0x39c8
+    2.3%  sqlite3VdbeExec
+    2.2%  libsystem_kernel.dylib+0x3b94
+    0.9%  vdbeRecordCompareInt
+    0.7%  sqlite3BtreeIndexMoveto
+    0.5%  libsystem_kernel.dylib+0x18b0
+    0.4%  libsystem_pthread.dylib+0x13f0
+    0.4%  btreeParseCellPtr
+    0.3%  sqlite3VdbeRecordCompareWithSkip
+    0.3%  balance
+    0.2%  getPageNormal
+    0.2%  libsystem_kernel.dylib+0x263c
+    0.2%  freeSpace
+    0.1%  libsystem_pthread.dylib+0x1934
+    0.1%  getCellInfo
+    0.1%  <tokio::runtime::blocking::task::BlockingTask<hiqlite::query::query_owned_local<&str>::{closure#0}::{closure#0}> as core::future::future::Future>::poll
+    0.1%  moveToRoot
+    0.1%  libsystem_kernel.dylib+0x39c4
+    0.1%  libsystem_malloc.dylib+0x2e394
+    0.1%  pcache1Fetch
+    0.1%  sqlite3BtreeInsert
+    0.1%  libsystem_pthread.dylib+0x1808
+    0.1%  libsystem_pthread.dylib+0x140c
+    0.1%  sqlite3BtreeTableMoveto
+  total  function
+  100.0%  <tokio::runtime::blocking::pool::Inner>::run
+  100.0%  std::sys::backtrace::__rust_begin_short_backtrace::<<tokio::runtime::blocking::pool::Spawner>::spawn_thread::{closure#0}, ()>
+  100.0%  <std::sys::thread::unix::Thread>::new::thread_start
+  100.0%  <std::thread::lifecycle::spawn_unchecked<<tokio::runtime::blocking::pool::Spawner>::spawn_thread::{closure#0}, ()>::{closure#1} as core::ops::function::FnOnce<()>>::call_once::{shim:vtable#0}
+  100.0%  libsystem_pthread.dylib+0x6c07
+   75.6%  <std::sys::sync::condvar::pthread::Condvar>::wait_timeout
+   73.3%  libsystem_pthread.dylib+0x7107
+   73.3%  libsystem_kernel.dylib+0x44f8
+   20.2%  <tokio::runtime::task::harness::Harness<tokio::runtime::blocking::task::BlockingTask<hiqlite::query::query_owned_local<&str>::{closure#0}::{closure#0}>, tokio::runtime::blocking::schedule::BlockingSchedule>>::poll
+   19.9%  <tokio::runtime::task::core::Core<tokio::runtime::blocking::task::BlockingTask<hiqlite::query::query_owned_local<&str>::{closure#0}::{closure#0}>, tokio::runtime::blocking::schedule::BlockingSchedule>>::poll
+   19.9%  <tokio::runtime::blocking::task::BlockingTask<hiqlite::query::query_owned_local<&str>::{closure#0}::{closure#0}> as core::future::future::Future>::poll
+   18.4%  sqlite3_step
+   18.3%  sqlite3VdbeExec
+   13.3%  libsystem_pthread.dylib+0x1867
+   13.2%  libsystem_pthread.dylib+0x3e3b
+   13.1%  libsystem_kernel.dylib+0x39c8
+    7.2%  getPageNormal
+    7.1%  getAndInitPage
+    6.8%  pcache1Fetch
+    6.7%  sqlite3BtreeIndexMoveto
+    4.1%  sqlite3BtreeInsert
+    4.0%  <std::sys::pal::unix::sync::mutex::Mutex>::lock
+    3.4%  balance
+    2.3%  libsystem_pthread.dylib+0x7167
+    2.3%  libsystem_pthread.dylib+0x3eab
+
+## thread 'tokio-rt-worker' — 21770 samples
+   self  function
+   43.5%  libsystem_kernel.dylib+0x44f8
+   12.5%  libsystem_kernel.dylib+0x39c8
+   12.1%  rn_site::api::query::member_documents::held::<rn_kernel::store::ReadStore<hiqlite::client::Client>>::{closure#0}
+   10.6%  libsystem_kernel.dylib+0x6f30
+    4.1%  libsystem_kernel.dylib+0x5a4c
+    2.5%  libsystem_kernel.dylib+0x3b94
+    1.6%  libsystem_kernel.dylib+0x4b78
+    1.5%  libsystem_kernel.dylib+0x53a4
+    0.5%  libsystem_malloc.dylib+0x2e394
+    0.4%  <hiqlite::client::Client>::query_raw::<&str>::{closure#0}
+    0.4%  <rn_site::api::whoami::whoami as axum::handler::Handler<(axum_core::extract::private::ViaParts, axum::extract::state::State<rn_site::state::AppState>, rn_site::auth::session::Session), rn_site::state::AppState>>::call::{closure#0}
+    0.4%  libsystem_kernel.dylib+0x10fc
+    0.3%  libsystem_kernel.dylib+0x5a48
+    0.3%  <tokio::runtime::scheduler::multi_thread::worker::Context>::run
+    0.2%  <deduplicated_symbol>
+    0.2%  core::ptr::drop_glue::<rn_site::state::AppState>
+    0.2%  <tower::util::oneshot::Oneshot<tower::util::boxed_clone_sync::BoxCloneSyncService<http::request::Request<axum_core::body::Body>, http::response::Response<axum_core::body::Body>, core::convert::Infallible>, http::request::Request<axum_core::body::Body>> as core::future::future::Future>::poll
+    0.1%  <axum::middleware::from_fn::FromFn<rn_site::http::freshness, rn_site::state::AppState, axum::routing::route::Route, (axum::extract::state::State<rn_site::state::AppState>, http::request::Request<axum_core::body::Body>)> as tower_service::Service<http::request::Request<axum_core::body::Body>>>::call::{closure#0}
+    0.1%  libsystem_malloc.dylib+0x2aafc
+    0.1%  libsystem_kernel.dylib+0xb8c
+    0.1%  libsystem_malloc.dylib+0x29d34
+    0.1%  <tokio::runtime::scheduler::multi_thread::worker::Context>::park_internal
+    0.1%  <tower::util::map_future::MapFuture<axum::util::MapIntoResponse<axum::handler::service::HandlerService<rn_site::api::whoami::whoami, (axum_core::extract::private::ViaParts, axum::extract::state::State<rn_site::state::AppState>, rn_site::auth::session::Session), rn_site::state::AppState>>, <tower::util::boxed_clone_sync::BoxCloneSyncService<http::request::Request<axum_core::body::Body>, http::response::Response<axum_core::body::Body>, core::convert::Infallible>>::new<axum::util::MapIntoResponse<axum::handler::service::HandlerService<rn_site::api::whoami::whoami, (axum_core::extract::private::ViaParts, axum::extract::state::State<rn_site::state::AppState>, rn_site::auth::session::Session), rn_site::state::AppState>>>::{closure#0}> as tower::util::boxed_clone_sync::CloneService<http::request::Request<axum_core::body::Body>>>::clone_box
+    0.1%  <hiqlite::query::rows::Row as rn_kernel::store::value::Cursor>::text
+    0.1%  <tokio::runtime::task::state::State>::drop_join_handle_fast
+  total  function
+  100.0%  <tokio::runtime::blocking::pool::Inner>::run
+  100.0%  tokio::runtime::context::runtime::enter_runtime::<tokio::runtime::scheduler::multi_thread::worker::run::{closure#0}, ()>
+  100.0%  std::sys::backtrace::__rust_begin_short_backtrace::<<tokio::runtime::blocking::pool::Spawner>::spawn_thread::{closure#0}, ()>
+  100.0%  tokio::runtime::scheduler::multi_thread::worker::run
+  100.0%  <tokio::runtime::blocking::task::BlockingTask<<tokio::runtime::scheduler::multi_thread::worker::Launch>::launch::{closure#0}> as core::future::future::Future>::poll
+  100.0%  <tokio::runtime::task::core::Core<tokio::runtime::blocking::task::BlockingTask<<tokio::runtime::scheduler::multi_thread::worker::Launch>::launch::{closure#0}>, tokio::runtime::blocking::schedule::BlockingSchedule>>::poll
+  100.0%  <tokio::runtime::task::harness::Harness<tokio::runtime::blocking::task::BlockingTask<<tokio::runtime::scheduler::multi_thread::worker::Launch>::launch::{closure#0}>, tokio::runtime::blocking::schedule::BlockingSchedule>>::poll
+  100.0%  <std::sys::thread::unix::Thread>::new::thread_start
+  100.0%  <std::thread::lifecycle::spawn_unchecked<<tokio::runtime::blocking::pool::Spawner>::spawn_thread::{closure#0}, ()>::{closure#1} as core::ops::function::FnOnce<()>>::call_once::{shim:vtable#0}
+  100.0%  libsystem_pthread.dylib+0x6c07
+  100.0%  <tokio::runtime::context::scoped::Scoped<tokio::runtime::scheduler::Context>>::set::<tokio::runtime::scheduler::multi_thread::worker::run::{closure#0}::{closure#0}, ()>
+  100.0%  <tokio::runtime::scheduler::multi_thread::worker::Context>::run
+   54.6%  <tokio::runtime::scheduler::multi_thread::worker::Context>::park_internal
+   43.7%  <tokio::runtime::scheduler::multi_thread::park::Inner>::park_condvar
+   43.6%  libsystem_pthread.dylib+0x70db
+   43.5%  libsystem_kernel.dylib+0x44f8
+   43.4%  <tokio::runtime::scheduler::multi_thread::worker::Context>::run_task
+   41.7%  <deduplicated_symbol>
+   41.4%  <tokio::runtime::task::harness::Harness<axum::serve::handle_connection<tokio::net::tcp::listener::TcpListener, axum::routing::Router, axum::routing::Router>::{closure#0}::{closure#3}, alloc::sync::Arc<tokio::runtime::scheduler::multi_thread::handle::Handle>>>::poll
+   41.2%  axum::serve::handle_connection::<tokio::net::tcp::listener::TcpListener, axum::routing::Router, axum::routing::Router>::{closure#0}::{closure#3}
+   41.1%  <core::future::poll_fn::PollFn<axum::serve::handle_connection<tokio::net::tcp::listener::TcpListener, axum::routing::Router, axum::routing::Router>::{closure#0}::{closure#3}::{closure#0}> as core::future::future::Future>::poll
+   40.7%  <hyper_util::server::conn::auto::UpgradeableConnection<hyper_util::rt::tokio::TokioIo<tokio::net::tcp::stream::TcpStream>, hyper_util::service::glue::TowerToHyperService<tower::util::map_request::MapRequest<axum::routing::Router, axum::serve::handle_connection<tokio::net::tcp::listener::TcpListener, axum::routing::Router, axum::routing::Router>::{closure#0}::{closure#2}>>, hyper_util::rt::tokio::TokioExecutor> as core::future::future::Future>::poll
+   40.7%  <hyper::server::conn::http1::UpgradeableConnection<hyper_util::common::rewind::Rewind<hyper_util::rt::tokio::TokioIo<tokio::net::tcp::stream::TcpStream>>, hyper_util::service::glue::TowerToHyperService<tower::util::map_request::MapRequest<axum::routing::Router, axum::serve::handle_connection<tokio::net::tcp::listener::TcpListener, axum::routing::Router, axum::routing::Router>::{closure#0}::{closure#2}>>> as core::future::future::Future>::poll
+   36.4%  <hyper::proto::h1::dispatch::Dispatcher<hyper::proto::h1::dispatch::Server<hyper_util::service::glue::TowerToHyperService<tower::util::map_request::MapRequest<axum::routing::Router, axum::serve::handle_connection<tokio::net::tcp::listener::TcpListener, axum::routing::Router, axum::routing::Router>::{closure#0}::{closure#2}>>, hyper::body::incoming::Incoming>, axum_core::body::Body, hyper_util::common::rewind::Rewind<hyper_util::rt::tokio::TokioIo<tokio::net::tcp::stream::TcpStream>>, hyper::proto::h1::role::Server>>::poll_write
+   35.7%  <axum::routing::route::RouteFuture<core::convert::Infallible> as core::future::future::Future>::poll
+
+## thread 'tokio-rt-worker' — 21640 samples
+   self  function
+   44.1%  libsystem_kernel.dylib+0x44f8
+   11.4%  libsystem_kernel.dylib+0x39c8
+   10.8%  rn_site::api::query::member_documents::held::<rn_kernel::store::ReadStore<hiqlite::client::Client>>::{closure#0}
+   10.1%  libsystem_kernel.dylib+0x6f30
+    4.8%  libsystem_kernel.dylib+0x5a4c
+    2.7%  libsystem_kernel.dylib+0x3b94
+    1.8%  libsystem_kernel.dylib+0x53a4
+    1.8%  libsystem_kernel.dylib+0x4b78
+    0.5%  <hiqlite::client::Client>::query_raw::<&str>::{closure#0}
+    0.4%  libsystem_malloc.dylib+0x2e394
+    0.4%  libsystem_kernel.dylib+0x10fc
+    0.4%  libsystem_kernel.dylib+0x5a48
+    0.3%  <rn_site::api::whoami::whoami as axum::handler::Handler<(axum_core::extract::private::ViaParts, axum::extract::state::State<rn_site::state::AppState>, rn_site::auth::session::Session), rn_site::state::AppState>>::call::{closure#0}
+    0.3%  <tokio::runtime::scheduler::multi_thread::worker::Context>::run
+    0.2%  <deduplicated_symbol>
+    0.2%  <axum::middleware::from_fn::FromFn<rn_site::http::freshness, rn_site::state::AppState, axum::routing::route::Route, (axum::extract::state::State<rn_site::state::AppState>, http::request::Request<axum_core::body::Body>)> as tower_service::Service<http::request::Request<axum_core::body::Body>>>::call::{closure#0}
+    0.2%  <tower::util::oneshot::Oneshot<tower::util::boxed_clone_sync::BoxCloneSyncService<http::request::Request<axum_core::body::Body>, http::response::Response<axum_core::body::Body>, core::convert::Infallible>, http::request::Request<axum_core::body::Body>> as core::future::future::Future>::poll
+    0.1%  serde_json::ser::format_escaped_str::<&mut bytes::buf::writer::Writer<bytes::bytes_mut::BytesMut>, serde_json::ser::CompactFormatter>
+    0.1%  core::ptr::drop_glue::<rn_site::state::AppState>
+    0.1%  <tokio::runtime::task::state::State>::drop_join_handle_fast
+    0.1%  <tokio::runtime::scheduler::multi_thread::worker::Context>::park_internal
+    0.1%  <tokio::sync::batch_semaphore::Acquire as core::future::future::Future>::poll
+    0.1%  libsystem_malloc.dylib+0x2aafc
+    0.1%  libsystem_malloc.dylib+0x36e04
+    0.1%  <hiqlite::query::rows::Row as rn_kernel::store::value::Cursor>::int
+  total  function
+  100.0%  <tokio::runtime::blocking::pool::Inner>::run
+  100.0%  tokio::runtime::context::runtime::enter_runtime::<tokio::runtime::scheduler::multi_thread::worker::run::{closure#0}, ()>
+  100.0%  tokio::runtime::scheduler::multi_thread::worker::run
+  100.0%  <tokio::runtime::blocking::task::BlockingTask<<tokio::runtime::scheduler::multi_thread::worker::Launch>::launch::{closure#0}> as core::future::future::Future>::poll
+  100.0%  <tokio::runtime::task::core::Core<tokio::runtime::blocking::task::BlockingTask<<tokio::runtime::scheduler::multi_thread::worker::Launch>::launch::{closure#0}>, tokio::runtime::blocking::schedule::BlockingSchedule>>::poll
+  100.0%  <tokio::runtime::task::harness::Harness<tokio::runtime::blocking::task::BlockingTask<<tokio::runtime::scheduler::multi_thread::worker::Launch>::launch::{closure#0}>, tokio::runtime::blocking::schedule::BlockingSchedule>>::poll
+  100.0%  std::sys::backtrace::__rust_begin_short_backtrace::<<tokio::runtime::blocking::pool::Spawner>::spawn_thread::{closure#0}, ()>
+  100.0%  <std::thread::lifecycle::spawn_unchecked<<tokio::runtime::blocking::pool::Spawner>::spawn_thread::{closure#0}, ()>::{closure#1} as core::ops::function::FnOnce<()>>::call_once::{shim:vtable#0}
+  100.0%  <std::sys::thread::unix::Thread>::new::thread_start
+  100.0%  <tokio::runtime::context::scoped::Scoped<tokio::runtime::scheduler::Context>>::set::<tokio::runtime::scheduler::multi_thread::worker::run::{closure#0}::{closure#0}, ()>
+  100.0%  libsystem_pthread.dylib+0x6c07
+  100.0%  <tokio::runtime::scheduler::multi_thread::worker::Context>::run
+   54.6%  <tokio::runtime::scheduler::multi_thread::worker::Context>::park_internal
+   44.3%  <tokio::runtime::scheduler::multi_thread::park::Inner>::park_condvar
+   44.2%  libsystem_pthread.dylib+0x70db
+   44.1%  libsystem_kernel.dylib+0x44f8
+   43.4%  <tokio::runtime::scheduler::multi_thread::worker::Context>::run_task
+   41.3%  <deduplicated_symbol>
+   41.1%  <tokio::runtime::task::harness::Harness<axum::serve::handle_connection<tokio::net::tcp::listener::TcpListener, axum::routing::Router, axum::routing::Router>::{closure#0}::{closure#3}, alloc::sync::Arc<tokio::runtime::scheduler::multi_thread::handle::Handle>>>::poll
+   40.9%  axum::serve::handle_connection::<tokio::net::tcp::listener::TcpListener, axum::routing::Router, axum::routing::Router>::{closure#0}::{closure#3}
+   40.8%  <core::future::poll_fn::PollFn<axum::serve::handle_connection<tokio::net::tcp::listener::TcpListener, axum::routing::Router, axum::routing::Router>::{closure#0}::{closure#3}::{closure#0}> as core::future::future::Future>::poll
+   40.4%  <hyper_util::server::conn::auto::UpgradeableConnection<hyper_util::rt::tokio::TokioIo<tokio::net::tcp::stream::TcpStream>, hyper_util::service::glue::TowerToHyperService<tower::util::map_request::MapRequest<axum::routing::Router, axum::serve::handle_connection<tokio::net::tcp::listener::TcpListener, axum::routing::Router, axum::routing::Router>::{closure#0}::{closure#2}>>, hyper_util::rt::tokio::TokioExecutor> as core::future::future::Future>::poll
+   40.4%  <hyper::server::conn::http1::UpgradeableConnection<hyper_util::common::rewind::Rewind<hyper_util::rt::tokio::TokioIo<tokio::net::tcp::stream::TcpStream>>, hyper_util::service::glue::TowerToHyperService<tower::util::map_request::MapRequest<axum::routing::Router, axum::serve::handle_connection<tokio::net::tcp::listener::TcpListener, axum::routing::Router, axum::routing::Router>::{closure#0}::{closure#2}>>> as core::future::future::Future>::poll
+   35.4%  <hyper::proto::h1::dispatch::Dispatcher<hyper::proto::h1::dispatch::Server<hyper_util::service::glue::TowerToHyperService<tower::util::map_request::MapRequest<axum::routing::Router, axum::serve::handle_connection<tokio::net::tcp::listener::TcpListener, axum::routing::Router, axum::routing::Router>::{closure#0}::{closure#2}>>, hyper::body::incoming::Incoming>, axum_core::body::Body, hyper_util::common::rewind::Rewind<hyper_util::rt::tokio::TokioIo<tokio::net::tcp::stream::TcpStream>>, hyper::proto::h1::role::Server>>::poll_write
+   34.6%  <axum::routing::route::RouteFuture<core::convert::Infallible> as core::future::future::Future>::poll
+
+## thread 'tokio-rt-worker' — 21381 samples
+   self  function
+   76.2%  libsystem_kernel.dylib+0x44f8
+   11.5%  libsystem_kernel.dylib+0x39c8
+    2.2%  sqlite3VdbeExec
+    1.7%  libsystem_kernel.dylib+0x3b94
+    0.7%  vdbeRecordCompareInt
+    0.7%  sqlite3BtreeIndexMoveto
+    0.6%  libsystem_kernel.dylib+0x18b0
+    0.4%  btreeParseCellPtr
+    0.3%  sqlite3VdbeRecordCompareWithSkip
+    0.3%  libsystem_pthread.dylib+0x13f0
+    0.3%  balance
+    0.2%  libsystem_kernel.dylib+0x263c
+    0.2%  libsystem_pthread.dylib+0x1934
+    0.1%  freeSpace
+    0.1%  libsystem_malloc.dylib+0x2e394
+    0.1%  getPageNormal
+    0.1%  <tokio::runtime::blocking::task::BlockingTask<hiqlite::query::query_owned_local<&str>::{closure#0}::{closure#0}> as core::future::future::Future>::poll
+    0.1%  getCellInfo
+    0.1%  libsystem_pthread.dylib+0x1808
+    0.1%  pcache1Fetch
+    0.1%  core::str::converts::from_utf8
+    0.1%  sqlite3BtreeTableMoveto
+    0.1%  sqlite3BtreeNext
+    0.1%  libsystem_pthread.dylib+0x140c
+    0.1%  sqlite3VdbeSerialGet
+  total  function
+  100.0%  <tokio::runtime::blocking::pool::Inner>::run
+  100.0%  std::sys::backtrace::__rust_begin_short_backtrace::<<tokio::runtime::blocking::pool::Spawner>::spawn_thread::{closure#0}, ()>
+  100.0%  <std::sys::thread::unix::Thread>::new::thread_start
+  100.0%  <std::thread::lifecycle::spawn_unchecked<<tokio::runtime::blocking::pool::Spawner>::spawn_thread::{closure#0}, ()>::{closure#1} as core::ops::function::FnOnce<()>>::call_once::{shim:vtable#0}
+  100.0%  libsystem_pthread.dylib+0x6c07
+   78.5%  <std::sys::sync::condvar::pthread::Condvar>::wait_timeout
+   76.2%  libsystem_pthread.dylib+0x7107
+   76.2%  libsystem_kernel.dylib+0x44f8
+   18.1%  <tokio::runtime::task::harness::Harness<tokio::runtime::blocking::task::BlockingTask<hiqlite::query::query_owned_local<&str>::{closure#0}::{closure#0}>, tokio::runtime::blocking::schedule::BlockingSchedule>>::poll
+   17.8%  <tokio::runtime::task::core::Core<tokio::runtime::blocking::task::BlockingTask<hiqlite::query::query_owned_local<&str>::{closure#0}::{closure#0}>, tokio::runtime::blocking::schedule::BlockingSchedule>>::poll
+   17.8%  <tokio::runtime::blocking::task::BlockingTask<hiqlite::query::query_owned_local<&str>::{closure#0}::{closure#0}> as core::future::future::Future>::poll
+   16.4%  sqlite3_step
+   16.2%  sqlite3VdbeExec
+   11.6%  libsystem_pthread.dylib+0x1867
+   11.6%  libsystem_pthread.dylib+0x3e3b
+   11.5%  libsystem_kernel.dylib+0x39c8
+    6.1%  getPageNormal
+    5.9%  getAndInitPage
+    5.7%  pcache1Fetch
+    5.5%  sqlite3BtreeIndexMoveto
+    3.4%  sqlite3BtreeInsert
+    3.2%  <std::sys::pal::unix::sync::mutex::Mutex>::lock
+    2.8%  balance
+    2.2%  libsystem_pthread.dylib+0x7167
+    1.8%  libsystem_pthread.dylib+0x3eab
+
+## thread 'tokio-rt-worker' — 20914 samples
+   self  function
+   43.7%  libsystem_kernel.dylib+0x44f8
+   12.2%  rn_site::api::query::member_documents::held::<rn_kernel::store::ReadStore<hiqlite::client::Client>>::{closure#0}
+   11.2%  libsystem_kernel.dylib+0x39c8
+   10.8%  libsystem_kernel.dylib+0x6f30
+    4.3%  libsystem_kernel.dylib+0x5a4c
+    2.6%  libsystem_kernel.dylib+0x3b94
+    1.8%  libsystem_kernel.dylib+0x4b78
+    1.6%  libsystem_kernel.dylib+0x53a4
+    0.5%  <hiqlite::client::Client>::query_raw::<&str>::{closure#0}
+    0.5%  libsystem_malloc.dylib+0x2e394
+    0.4%  libsystem_kernel.dylib+0x10fc
+    0.4%  <rn_site::api::whoami::whoami as axum::handler::Handler<(axum_core::extract::private::ViaParts, axum::extract::state::State<rn_site::state::AppState>, rn_site::auth::session::Session), rn_site::state::AppState>>::call::{closure#0}
+    0.3%  libsystem_kernel.dylib+0x5a48
+    0.2%  <tokio::runtime::scheduler::multi_thread::worker::Context>::run
+    0.2%  <deduplicated_symbol>
+    0.2%  <axum::middleware::from_fn::FromFn<rn_site::http::freshness, rn_site::state::AppState, axum::routing::route::Route, (axum::extract::state::State<rn_site::state::AppState>, http::request::Request<axum_core::body::Body>)> as tower_service::Service<http::request::Request<axum_core::body::Body>>>::call::{closure#0}
+    0.2%  core::ptr::drop_glue::<rn_site::state::AppState>
+    0.2%  libsystem_kernel.dylib+0xb8c
+    0.1%  <tower::util::oneshot::Oneshot<tower::util::boxed_clone_sync::BoxCloneSyncService<http::request::Request<axum_core::body::Body>, http::response::Response<axum_core::body::Body>, core::convert::Infallible>, http::request::Request<axum_core::body::Body>> as core::future::future::Future>::poll
+    0.1%  <hiqlite::query::rows::Row as rn_kernel::store::value::Cursor>::text
+    0.1%  <tokio::runtime::scheduler::multi_thread::worker::Context>::park_internal
+    0.1%  <axum::routing::route::RouteFuture<core::convert::Infallible> as core::future::future::Future>::poll
+    0.1%  serde_json::ser::format_escaped_str::<&mut bytes::buf::writer::Writer<bytes::bytes_mut::BytesMut>, serde_json::ser::CompactFormatter>
+    0.1%  <tokio::sync::batch_semaphore::Acquire as core::future::future::Future>::poll
+    0.1%  <core::future::poll_fn::PollFn<axum::serve::handle_connection<tokio::net::tcp::listener::TcpListener, axum::routing::Router, axum::routing::Router>::{closure#0}::{closure#3}::{closure#0}> as core::future::future::Future>::poll
+  total  function
+  100.0%  <tokio::runtime::blocking::pool::Inner>::run
+  100.0%  tokio::runtime::context::runtime::enter_runtime::<tokio::runtime::scheduler::multi_thread::worker::run::{closure#0}, ()>
+  100.0%  std::sys::backtrace::__rust_begin_short_backtrace::<<tokio::runtime::blocking::pool::Spawner>::spawn_thread::{closure#0}, ()>
+  100.0%  tokio::runtime::scheduler::multi_thread::worker::run
+  100.0%  <tokio::runtime::blocking::task::BlockingTask<<tokio::runtime::scheduler::multi_thread::worker::Launch>::launch::{closure#0}> as core::future::future::Future>::poll
+  100.0%  <tokio::runtime::task::core::Core<tokio::runtime::blocking::task::BlockingTask<<tokio::runtime::scheduler::multi_thread::worker::Launch>::launch::{closure#0}>, tokio::runtime::blocking::schedule::BlockingSchedule>>::poll
+  100.0%  <tokio::runtime::task::harness::Harness<tokio::runtime::blocking::task::BlockingTask<<tokio::runtime::scheduler::multi_thread::worker::Launch>::launch::{closure#0}>, tokio::runtime::blocking::schedule::BlockingSchedule>>::poll
+  100.0%  <std::sys::thread::unix::Thread>::new::thread_start
+  100.0%  <std::thread::lifecycle::spawn_unchecked<<tokio::runtime::blocking::pool::Spawner>::spawn_thread::{closure#0}, ()>::{closure#1} as core::ops::function::FnOnce<()>>::call_once::{shim:vtable#0}
+  100.0%  libsystem_pthread.dylib+0x6c07
+  100.0%  <tokio::runtime::context::scoped::Scoped<tokio::runtime::scheduler::Context>>::set::<tokio::runtime::scheduler::multi_thread::worker::run::{closure#0}::{closure#0}, ()>
+  100.0%  <tokio::runtime::scheduler::multi_thread::worker::Context>::run
+   54.8%  <tokio::runtime::scheduler::multi_thread::worker::Context>::park_internal
+   43.9%  <tokio::runtime::scheduler::multi_thread::park::Inner>::park_condvar
+   43.7%  libsystem_pthread.dylib+0x70db
+   43.7%  libsystem_kernel.dylib+0x44f8
+   43.2%  <tokio::runtime::scheduler::multi_thread::worker::Context>::run_task
+   41.4%  <deduplicated_symbol>
+   41.1%  <tokio::runtime::task::harness::Harness<axum::serve::handle_connection<tokio::net::tcp::listener::TcpListener, axum::routing::Router, axum::routing::Router>::{closure#0}::{closure#3}, alloc::sync::Arc<tokio::runtime::scheduler::multi_thread::handle::Handle>>>::poll
+   40.8%  axum::serve::handle_connection::<tokio::net::tcp::listener::TcpListener, axum::routing::Router, axum::routing::Router>::{closure#0}::{closure#3}
+   40.7%  <core::future::poll_fn::PollFn<axum::serve::handle_connection<tokio::net::tcp::listener::TcpListener, axum::routing::Router, axum::routing::Router>::{closure#0}::{closure#3}::{closure#0}> as core::future::future::Future>::poll
+   40.3%  <hyper_util::server::conn::auto::UpgradeableConnection<hyper_util::rt::tokio::TokioIo<tokio::net::tcp::stream::TcpStream>, hyper_util::service::glue::TowerToHyperService<tower::util::map_request::MapRequest<axum::routing::Router, axum::serve::handle_connection<tokio::net::tcp::listener::TcpListener, axum::routing::Router, axum::routing::Router>::{closure#0}::{closure#2}>>, hyper_util::rt::tokio::TokioExecutor> as core::future::future::Future>::poll
+   40.3%  <hyper::server::conn::http1::UpgradeableConnection<hyper_util::common::rewind::Rewind<hyper_util::rt::tokio::TokioIo<tokio::net::tcp::stream::TcpStream>>, hyper_util::service::glue::TowerToHyperService<tower::util::map_request::MapRequest<axum::routing::Router, axum::serve::handle_connection<tokio::net::tcp::listener::TcpListener, axum::routing::Router, axum::routing::Router>::{closure#0}::{closure#2}>>> as core::future::future::Future>::poll
+   35.7%  <hyper::proto::h1::dispatch::Dispatcher<hyper::proto::h1::dispatch::Server<hyper_util::service::glue::TowerToHyperService<tower::util::map_request::MapRequest<axum::routing::Router, axum::serve::handle_connection<tokio::net::tcp::listener::TcpListener, axum::routing::Router, axum::routing::Router>::{closure#0}::{closure#2}>>, hyper::body::incoming::Incoming>, axum_core::body::Body, hyper_util::common::rewind::Rewind<hyper_util::rt::tokio::TokioIo<tokio::net::tcp::stream::TcpStream>>, hyper::proto::h1::role::Server>>::poll_write
+   35.0%  <axum::routing::route::RouteFuture<core::convert::Infallible> as core::future::future::Future>::poll
+
+## thread 'tokio-rt-worker' — 20723 samples
+   self  function
+   75.0%  libsystem_kernel.dylib+0x44f8
+   12.5%  libsystem_kernel.dylib+0x39c8
+    2.4%  sqlite3VdbeExec
+    1.8%  libsystem_kernel.dylib+0x3b94
+    0.8%  vdbeRecordCompareInt
+    0.6%  sqlite3BtreeIndexMoveto
+    0.6%  libsystem_kernel.dylib+0x18b0
+    0.3%  btreeParseCellPtr
+    0.3%  sqlite3VdbeRecordCompareWithSkip
+    0.3%  libsystem_pthread.dylib+0x13f0
+    0.2%  balance
+    0.2%  libsystem_kernel.dylib+0x263c
+    0.2%  getPageNormal
+    0.1%  libsystem_pthread.dylib+0x1934
+    0.1%  getCellInfo
+    0.1%  freeSpace
+    0.1%  libsystem_kernel.dylib+0x5a4c
+    0.1%  sqlite3VdbeSerialGet
+    0.1%  libsystem_pthread.dylib+0x140c
+    0.1%  libsystem_malloc.dylib+0x2e394
+    0.1%  pcache1Fetch
+    0.1%  pageFindSlot
+    0.1%  <tokio::runtime::blocking::task::BlockingTask<hiqlite::query::query_owned_local<&str>::{closure#0}::{closure#0}> as core::future::future::Future>::poll
+    0.1%  sqlite3BtreeTableMoveto
+    0.1%  vdbeSorterCompareInt
+  total  function
+  100.0%  <tokio::runtime::blocking::pool::Inner>::run
+  100.0%  std::sys::backtrace::__rust_begin_short_backtrace::<<tokio::runtime::blocking::pool::Spawner>::spawn_thread::{closure#0}, ()>
+  100.0%  <std::sys::thread::unix::Thread>::new::thread_start
+  100.0%  <std::thread::lifecycle::spawn_unchecked<<tokio::runtime::blocking::pool::Spawner>::spawn_thread::{closure#0}, ()>::{closure#1} as core::ops::function::FnOnce<()>>::call_once::{shim:vtable#0}
+  100.0%  libsystem_pthread.dylib+0x6c07
+   77.5%  <std::sys::sync::condvar::pthread::Condvar>::wait_timeout
+   75.0%  libsystem_pthread.dylib+0x7107
+   75.0%  libsystem_kernel.dylib+0x44f8
+   18.9%  <tokio::runtime::task::harness::Harness<tokio::runtime::blocking::task::BlockingTask<hiqlite::query::query_owned_local<&str>::{closure#0}::{closure#0}>, tokio::runtime::blocking::schedule::BlockingSchedule>>::poll
+   18.6%  <tokio::runtime::task::core::Core<tokio::runtime::blocking::task::BlockingTask<hiqlite::query::query_owned_local<&str>::{closure#0}::{closure#0}>, tokio::runtime::blocking::schedule::BlockingSchedule>>::poll
+   18.5%  <tokio::runtime::blocking::task::BlockingTask<hiqlite::query::query_owned_local<&str>::{closure#0}::{closure#0}> as core::future::future::Future>::poll
+   17.1%  sqlite3_step
+   17.0%  sqlite3VdbeExec
+   12.6%  libsystem_pthread.dylib+0x1867
+   12.6%  libsystem_pthread.dylib+0x3e3b
+   12.5%  libsystem_kernel.dylib+0x39c8
+    6.7%  getPageNormal
+    6.6%  getAndInitPage
+    6.4%  pcache1Fetch
+    6.2%  sqlite3BtreeIndexMoveto
+    3.8%  sqlite3BtreeInsert
+    3.5%  <std::sys::pal::unix::sync::mutex::Mutex>::lock
+    3.0%  balance
+    2.4%  libsystem_pthread.dylib+0x7167
+    1.8%  libsystem_pthread.dylib+0x3eab
+
+## thread 'tokio-rt-worker' — 20629 samples
+   self  function
+   42.6%  libsystem_kernel.dylib+0x44f8
+   15.1%  rn_site::api::query::member_documents::held::<rn_kernel::store::ReadStore<hiqlite::client::Client>>::{closure#0}
+   10.7%  libsystem_kernel.dylib+0x6f30
+   10.3%  libsystem_kernel.dylib+0x39c8
+    4.1%  libsystem_kernel.dylib+0x5a4c
+    2.5%  libsystem_kernel.dylib+0x3b94
+    1.6%  libsystem_kernel.dylib+0x4b78
+    1.5%  libsystem_kernel.dylib+0x53a4
+    0.5%  <hiqlite::client::Client>::query_raw::<&str>::{closure#0}
+    0.4%  libsystem_kernel.dylib+0x10fc
+    0.4%  libsystem_malloc.dylib+0x2e394
+    0.4%  libsystem_kernel.dylib+0x5a48
+    0.4%  <rn_site::api::whoami::whoami as axum::handler::Handler<(axum_core::extract::private::ViaParts, axum::extract::state::State<rn_site::state::AppState>, rn_site::auth::session::Session), rn_site::state::AppState>>::call::{closure#0}
+    0.3%  <tokio::runtime::scheduler::multi_thread::worker::Context>::run
+    0.2%  <deduplicated_symbol>
+    0.2%  <hiqlite::query::rows::Row as rn_kernel::store::value::Cursor>::int
+    0.1%  <axum::middleware::from_fn::FromFn<rn_site::http::freshness, rn_site::state::AppState, axum::routing::route::Route, (axum::extract::state::State<rn_site::state::AppState>, http::request::Request<axum_core::body::Body>)> as tower_service::Service<http::request::Request<axum_core::body::Body>>>::call::{closure#0}
+    0.1%  libsystem_malloc.dylib+0x2ab3c
+    0.1%  core::ptr::drop_glue::<rn_site::state::AppState>
+    0.1%  <tokio::runtime::scheduler::multi_thread::worker::Context>::park_internal
+    0.1%  libsystem_kernel.dylib+0xb8c
+    0.1%  <tower::util::oneshot::Oneshot<tower::util::boxed_clone_sync::BoxCloneSyncService<http::request::Request<axum_core::body::Body>, http::response::Response<axum_core::body::Body>, core::convert::Infallible>, http::request::Request<axum_core::body::Body>> as core::future::future::Future>::poll
+    0.1%  libsystem_malloc.dylib+0x2aafc
+    0.1%  libsystem_platform.dylib+0x3414
+    0.1%  <tokio::runtime::scheduler::multi_thread::park::Inner>::park_condvar
+  total  function
+  100.0%  <tokio::runtime::blocking::pool::Inner>::run
+  100.0%  tokio::runtime::context::runtime::enter_runtime::<tokio::runtime::scheduler::multi_thread::worker::run::{closure#0}, ()>
+  100.0%  std::sys::backtrace::__rust_begin_short_backtrace::<<tokio::runtime::blocking::pool::Spawner>::spawn_thread::{closure#0}, ()>
+  100.0%  tokio::runtime::scheduler::multi_thread::worker::run
+  100.0%  <tokio::runtime::blocking::task::BlockingTask<<tokio::runtime::scheduler::multi_thread::worker::Launch>::launch::{closure#0}> as core::future::future::Future>::poll
+  100.0%  <tokio::runtime::task::core::Core<tokio::runtime::blocking::task::BlockingTask<<tokio::runtime::scheduler::multi_thread::worker::Launch>::launch::{closure#0}>, tokio::runtime::blocking::schedule::BlockingSchedule>>::poll
+  100.0%  <tokio::runtime::task::harness::Harness<tokio::runtime::blocking::task::BlockingTask<<tokio::runtime::scheduler::multi_thread::worker::Launch>::launch::{closure#0}>, tokio::runtime::blocking::schedule::BlockingSchedule>>::poll
+  100.0%  <std::sys::thread::unix::Thread>::new::thread_start
+  100.0%  <std::thread::lifecycle::spawn_unchecked<<tokio::runtime::blocking::pool::Spawner>::spawn_thread::{closure#0}, ()>::{closure#1} as core::ops::function::FnOnce<()>>::call_once::{shim:vtable#0}
+  100.0%  libsystem_pthread.dylib+0x6c07
+  100.0%  <tokio::runtime::context::scoped::Scoped<tokio::runtime::scheduler::Context>>::set::<tokio::runtime::scheduler::multi_thread::worker::run::{closure#0}::{closure#0}, ()>
+  100.0%  <tokio::runtime::scheduler::multi_thread::worker::Context>::run
+   53.7%  <tokio::runtime::scheduler::multi_thread::worker::Context>::park_internal
+   44.5%  <tokio::runtime::scheduler::multi_thread::worker::Context>::run_task
+   42.8%  <tokio::runtime::scheduler::multi_thread::park::Inner>::park_condvar
+   42.6%  libsystem_pthread.dylib+0x70db
+   42.6%  <deduplicated_symbol>
+   42.6%  libsystem_kernel.dylib+0x44f8
+   42.4%  <tokio::runtime::task::harness::Harness<axum::serve::handle_connection<tokio::net::tcp::listener::TcpListener, axum::routing::Router, axum::routing::Router>::{closure#0}::{closure#3}, alloc::sync::Arc<tokio::runtime::scheduler::multi_thread::handle::Handle>>>::poll
+   42.1%  axum::serve::handle_connection::<tokio::net::tcp::listener::TcpListener, axum::routing::Router, axum::routing::Router>::{closure#0}::{closure#3}
+   42.1%  <core::future::poll_fn::PollFn<axum::serve::handle_connection<tokio::net::tcp::listener::TcpListener, axum::routing::Router, axum::routing::Router>::{closure#0}::{closure#3}::{closure#0}> as core::future::future::Future>::poll
+   41.7%  <hyper_util::server::conn::auto::UpgradeableConnection<hyper_util::rt::tokio::TokioIo<tokio::net::tcp::stream::TcpStream>, hyper_util::service::glue::TowerToHyperService<tower::util::map_request::MapRequest<axum::routing::Router, axum::serve::handle_connection<tokio::net::tcp::listener::TcpListener, axum::routing::Router, axum::routing::Router>::{closure#0}::{closure#2}>>, hyper_util::rt::tokio::TokioExecutor> as core::future::future::Future>::poll
+   41.7%  <hyper::server::conn::http1::UpgradeableConnection<hyper_util::common::rewind::Rewind<hyper_util::rt::tokio::TokioIo<tokio::net::tcp::stream::TcpStream>>, hyper_util::service::glue::TowerToHyperService<tower::util::map_request::MapRequest<axum::routing::Router, axum::serve::handle_connection<tokio::net::tcp::listener::TcpListener, axum::routing::Router, axum::routing::Router>::{closure#0}::{closure#2}>>> as core::future::future::Future>::poll
+   37.6%  <hyper::proto::h1::dispatch::Dispatcher<hyper::proto::h1::dispatch::Server<hyper_util::service::glue::TowerToHyperService<tower::util::map_request::MapRequest<axum::routing::Router, axum::serve::handle_connection<tokio::net::tcp::listener::TcpListener, axum::routing::Router, axum::routing::Router>::{closure#0}::{closure#2}>>, hyper::body::incoming::Incoming>, axum_core::body::Body, hyper_util::common::rewind::Rewind<hyper_util::rt::tokio::TokioIo<tokio::net::tcp::stream::TcpStream>>, hyper::proto::h1::role::Server>>::poll_write
+   36.9%  <axum::routing::route::RouteFuture<core::convert::Infallible> as core::future::future::Future>::poll
+
+## thread 'tokio-rt-worker' — 19594 samples
+   self  function
+   67.5%  libsystem_kernel.dylib+0x44f8
+   15.2%  libsystem_kernel.dylib+0x39c8
+    3.1%  sqlite3VdbeExec
+    2.5%  libsystem_kernel.dylib+0x3b94
+    1.4%  vdbeRecordCompareInt
+    0.9%  sqlite3BtreeIndexMoveto
+    0.6%  libsystem_pthread.dylib+0x13f0
+    0.5%  btreeParseCellPtr
+    0.5%  sqlite3VdbeRecordCompareWithSkip
+    0.5%  libsystem_kernel.dylib+0x18b0
+    0.4%  balance
+    0.3%  libsystem_kernel.dylib+0x263c
+    0.2%  freeSpace
+    0.2%  getPageNormal
+    0.2%  libsystem_pthread.dylib+0x1934
+    0.1%  getCellInfo
+    0.1%  libsystem_pthread.dylib+0x1808
+    0.1%  vdbeSorterCompareInt
+    0.1%  sqlite3BtreeNext
+    0.1%  pcache1Fetch
+    0.1%  sqlite3BtreeTableMoveto
+    0.1%  libsystem_pthread.dylib+0x140c
+    0.1%  sqlite3VdbeSerialGet
+    0.1%  pageFindSlot
+    0.1%  moveToRoot
+  total  function
+  100.0%  <tokio::runtime::blocking::pool::Inner>::run
+  100.0%  std::sys::backtrace::__rust_begin_short_backtrace::<<tokio::runtime::blocking::pool::Spawner>::spawn_thread::{closure#0}, ()>
+  100.0%  <std::sys::thread::unix::Thread>::new::thread_start
+  100.0%  <std::thread::lifecycle::spawn_unchecked<<tokio::runtime::blocking::pool::Spawner>::spawn_thread::{closure#0}, ()>::{closure#1} as core::ops::function::FnOnce<()>>::call_once::{shim:vtable#0}
+  100.0%  libsystem_pthread.dylib+0x6c07
+   69.6%  <std::sys::sync::condvar::pthread::Condvar>::wait_timeout
+   67.5%  libsystem_pthread.dylib+0x7107
+   67.5%  libsystem_kernel.dylib+0x44f8
+   27.0%  <tokio::runtime::task::harness::Harness<tokio::runtime::blocking::task::BlockingTask<hiqlite::query::query_owned_local<&str>::{closure#0}::{closure#0}>, tokio::runtime::blocking::schedule::BlockingSchedule>>::poll
+   26.7%  <tokio::runtime::task::core::Core<tokio::runtime::blocking::task::BlockingTask<hiqlite::query::query_owned_local<&str>::{closure#0}::{closure#0}>, tokio::runtime::blocking::schedule::BlockingSchedule>>::poll
+   26.7%  <tokio::runtime::blocking::task::BlockingTask<hiqlite::query::query_owned_local<&str>::{closure#0}::{closure#0}> as core::future::future::Future>::poll
+   25.4%  sqlite3_step
+   25.2%  sqlite3VdbeExec
+   15.4%  libsystem_pthread.dylib+0x1867
+   15.3%  libsystem_pthread.dylib+0x3e3b
+   15.2%  libsystem_kernel.dylib+0x39c8
+   10.3%  getPageNormal
+   10.3%  getAndInitPage
+    9.8%  pcache1Fetch
+    9.7%  sqlite3BtreeIndexMoveto
+    5.9%  sqlite3BtreeInsert
+    5.2%  balance
+    3.3%  <std::sys::pal::unix::sync::mutex::Mutex>::lock
+    2.5%  libsystem_pthread.dylib+0x3eab
+    2.5%  libsystem_pthread.dylib+0x1b2f
+
+## thread 'tokio-rt-worker' — 18393 samples
+   self  function
+   87.2%  libsystem_kernel.dylib+0x44f8
+    8.7%  libsystem_kernel.dylib+0x39c8
+    0.9%  libsystem_kernel.dylib+0x3b94
+    0.7%  libsystem_kernel.dylib+0x18b0
+    0.2%  sqlite3VdbeExec
+    0.1%  libsystem_kernel.dylib+0x5a4c
+    0.1%  <tokio::runtime::blocking::task::BlockingTask<hiqlite::query::query_owned_local<&str>::{closure#0}::{closure#0}> as core::future::future::Future>::poll
+    0.1%  <std::sys::sync::condvar::pthread::Condvar>::wait_timeout
+    0.1%  libsystem_kernel.dylib+0x18ac
+    0.1%  libsystem_malloc.dylib+0x2e394
+    0.0%  unixShmLock
+    0.0%  core::str::converts::from_utf8
+    0.0%  libsystem_platform.dylib+0xab4
+    0.0%  walIndexTryHdr
+    0.0%  libsystem_kernel.dylib+0x44f4
+    0.0%  libsystem_pthread.dylib+0x1934
+    0.0%  releaseMemArray
+    0.0%  vdbeCommit
+    0.0%  walIndexReadHdr
+    0.0%  libsystem_pthread.dylib+0x13f0
+    0.0%  <tokio::runtime::scheduler::multi_thread::handle::Handle>::push_remote_task
+    0.0%  libsystem_malloc.dylib+0x36e04
+    0.0%  <tokio::runtime::task::core::TaskIdGuard as core::ops::drop::Drop>::drop
+    0.0%  <rusqlite::cache::StatementCache>::cache_stmt
+    0.0%  <rusqlite::row::Row>::get::<usize, alloc::string::String>
+  total  function
+  100.0%  <tokio::runtime::blocking::pool::Inner>::run
+  100.0%  std::sys::backtrace::__rust_begin_short_backtrace::<<tokio::runtime::blocking::pool::Spawner>::spawn_thread::{closure#0}, ()>
+  100.0%  <std::sys::thread::unix::Thread>::new::thread_start
+  100.0%  <std::thread::lifecycle::spawn_unchecked<<tokio::runtime::blocking::pool::Spawner>::spawn_thread::{closure#0}, ()>::{closure#1} as core::ops::function::FnOnce<()>>::call_once::{shim:vtable#0}
+  100.0%  libsystem_pthread.dylib+0x6c07
+   90.4%  <std::sys::sync::condvar::pthread::Condvar>::wait_timeout
+   87.2%  libsystem_pthread.dylib+0x7107
+   87.2%  libsystem_kernel.dylib+0x44f8
+    8.8%  libsystem_pthread.dylib+0x3e3b
+    8.8%  libsystem_pthread.dylib+0x1867
+    8.7%  libsystem_kernel.dylib+0x39c8
+    4.9%  <tokio::runtime::task::harness::Harness<tokio::runtime::blocking::task::BlockingTask<hiqlite::query::query_owned_local<&str>::{closure#0}::{closure#0}>, tokio::runtime::blocking::schedule::BlockingSchedule>>::poll
+    4.6%  <tokio::runtime::task::core::Core<tokio::runtime::blocking::task::BlockingTask<hiqlite::query::query_owned_local<&str>::{closure#0}::{closure#0}>, tokio::runtime::blocking::schedule::BlockingSchedule>>::poll
+    4.5%  <std::sys::pal::unix::sync::mutex::Mutex>::lock
+    4.5%  <tokio::runtime::blocking::task::BlockingTask<hiqlite::query::query_owned_local<&str>::{closure#0}::{closure#0}> as core::future::future::Future>::poll
+    3.2%  sqlite3_step
+    3.2%  sqlite3VdbeExec
+    3.0%  libsystem_pthread.dylib+0x7167
+    2.0%  unixShmLock
+    1.9%  btreeBeginTrans
+    1.7%  sqlite3PagerSharedLock
+    1.7%  walTryBeginRead
+    0.9%  libsystem_pthread.dylib+0x3eab
+    0.9%  libsystem_pthread.dylib+0x1b2f
+    0.9%  libsystem_kernel.dylib+0x3b94
+
+## thread 'tokio-rt-worker' — 17975 samples
+   self  function
+   50.0%  libsystem_kernel.dylib+0x44f8
+   14.8%  libsystem_kernel.dylib+0x39c8
+   10.4%  libsystem_kernel.dylib+0x6f30
+    5.0%  libsystem_kernel.dylib+0x5a4c
+    3.0%  libsystem_kernel.dylib+0x3b94
+    2.2%  libsystem_kernel.dylib+0x53a4
+    2.0%  libsystem_kernel.dylib+0x4b78
+    0.6%  libsystem_kernel.dylib+0x10fc
+    0.5%  <hiqlite::client::Client>::query_raw::<&str>::{closure#0}
+    0.5%  libsystem_malloc.dylib+0x2e394
+    0.4%  libsystem_kernel.dylib+0x5a48
+    0.3%  <rn_site::api::whoami::whoami as axum::handler::Handler<(axum_core::extract::private::ViaParts, axum::extract::state::State<rn_site::state::AppState>, rn_site::auth::session::Session), rn_site::state::AppState>>::call::{closure#0}
+    0.3%  <tokio::runtime::scheduler::multi_thread::worker::Context>::run
+    0.2%  <deduplicated_symbol>
+    0.2%  core::ptr::drop_glue::<rn_site::state::AppState>
+    0.2%  libsystem_kernel.dylib+0xb8c
+    0.2%  <axum::middleware::from_fn::FromFn<rn_site::http::freshness, rn_site::state::AppState, axum::routing::route::Route, (axum::extract::state::State<rn_site::state::AppState>, http::request::Request<axum_core::body::Body>)> as tower_service::Service<http::request::Request<axum_core::body::Body>>>::call::{closure#0}
+    0.2%  <tokio::runtime::scheduler::multi_thread::worker::Context>::park_internal
+    0.2%  <tower::util::oneshot::Oneshot<tower::util::boxed_clone_sync::BoxCloneSyncService<http::request::Request<axum_core::body::Body>, http::response::Response<axum_core::body::Body>, core::convert::Infallible>, http::request::Request<axum_core::body::Body>> as core::future::future::Future>::poll
+    0.2%  <axum::routing::route::RouteFuture<core::convert::Infallible> as core::future::future::Future>::poll
+    0.1%  <tokio::sync::batch_semaphore::Acquire as core::future::future::Future>::poll
+    0.1%  rn_site::api::query::member_documents::held::<rn_kernel::store::ReadStore<hiqlite::client::Client>>::{closure#0}
+    0.1%  <tokio::runtime::scheduler::multi_thread::park::Inner>::park_condvar
+    0.1%  <futures_util::future::future::map::Map<futures_util::future::try_future::into_future::IntoFuture<tower_http::trace::future::ResponseFuture<axum::routing::route::RouteFuture<core::convert::Infallible>, tower_http::classify::ServerErrorsAsFailures>>, futures_util::fns::MapErrFn<<core::convert::Infallible as core::convert::Into<core::convert::Infallible>>::into>> as core::future::future::Future>::poll
+    0.1%  rn_site::api::whoami::party::<rn_kernel::store::ReadStore<hiqlite::client::Client>>::{closure#0}
+  total  function
+  100.0%  <tokio::runtime::blocking::pool::Inner>::run
+  100.0%  tokio::runtime::context::runtime::enter_runtime::<tokio::runtime::scheduler::multi_thread::worker::run::{closure#0}, ()>
+  100.0%  std::sys::backtrace::__rust_begin_short_backtrace::<<tokio::runtime::blocking::pool::Spawner>::spawn_thread::{closure#0}, ()>
+  100.0%  tokio::runtime::scheduler::multi_thread::worker::run
+  100.0%  <tokio::runtime::blocking::task::BlockingTask<<tokio::runtime::scheduler::multi_thread::worker::Launch>::launch::{closure#0}> as core::future::future::Future>::poll
+  100.0%  <tokio::runtime::task::core::Core<tokio::runtime::blocking::task::BlockingTask<<tokio::runtime::scheduler::multi_thread::worker::Launch>::launch::{closure#0}>, tokio::runtime::blocking::schedule::BlockingSchedule>>::poll
+  100.0%  <tokio::runtime::task::harness::Harness<tokio::runtime::blocking::task::BlockingTask<<tokio::runtime::scheduler::multi_thread::worker::Launch>::launch::{closure#0}>, tokio::runtime::blocking::schedule::BlockingSchedule>>::poll
+  100.0%  <std::sys::thread::unix::Thread>::new::thread_start
+  100.0%  <std::thread::lifecycle::spawn_unchecked<<tokio::runtime::blocking::pool::Spawner>::spawn_thread::{closure#0}, ()>::{closure#1} as core::ops::function::FnOnce<()>>::call_once::{shim:vtable#0}
+  100.0%  libsystem_pthread.dylib+0x6c07
+  100.0%  <tokio::runtime::context::scoped::Scoped<tokio::runtime::scheduler::Context>>::set::<tokio::runtime::scheduler::multi_thread::worker::run::{closure#0}::{closure#0}, ()>
+  100.0%  <tokio::runtime::scheduler::multi_thread::worker::Context>::run
+   60.9%  <tokio::runtime::scheduler::multi_thread::worker::Context>::park_internal
+   50.2%  <tokio::runtime::scheduler::multi_thread::park::Inner>::park_condvar
+   50.0%  libsystem_pthread.dylib+0x70db
+   50.0%  libsystem_kernel.dylib+0x44f8
+   36.8%  <tokio::runtime::scheduler::multi_thread::worker::Context>::run_task
+   34.9%  <deduplicated_symbol>
+   34.5%  <tokio::runtime::task::harness::Harness<axum::serve::handle_connection<tokio::net::tcp::listener::TcpListener, axum::routing::Router, axum::routing::Router>::{closure#0}::{closure#3}, alloc::sync::Arc<tokio::runtime::scheduler::multi_thread::handle::Handle>>>::poll
+   34.2%  axum::serve::handle_connection::<tokio::net::tcp::listener::TcpListener, axum::routing::Router, axum::routing::Router>::{closure#0}::{closure#3}
+   34.2%  <core::future::poll_fn::PollFn<axum::serve::handle_connection<tokio::net::tcp::listener::TcpListener, axum::routing::Router, axum::routing::Router>::{closure#0}::{closure#3}::{closure#0}> as core::future::future::Future>::poll
+   33.8%  <hyper_util::server::conn::auto::UpgradeableConnection<hyper_util::rt::tokio::TokioIo<tokio::net::tcp::stream::TcpStream>, hyper_util::service::glue::TowerToHyperService<tower::util::map_request::MapRequest<axum::routing::Router, axum::serve::handle_connection<tokio::net::tcp::listener::TcpListener, axum::routing::Router, axum::routing::Router>::{closure#0}::{closure#2}>>, hyper_util::rt::tokio::TokioExecutor> as core::future::future::Future>::poll
+   33.7%  <hyper::server::conn::http1::UpgradeableConnection<hyper_util::common::rewind::Rewind<hyper_util::rt::tokio::TokioIo<tokio::net::tcp::stream::TcpStream>>, hyper_util::service::glue::TowerToHyperService<tower::util::map_request::MapRequest<axum::routing::Router, axum::serve::handle_connection<tokio::net::tcp::listener::TcpListener, axum::routing::Router, axum::routing::Router>::{closure#0}::{closure#2}>>> as core::future::future::Future>::poll
+   28.1%  <hyper::proto::h1::dispatch::Dispatcher<hyper::proto::h1::dispatch::Server<hyper_util::service::glue::TowerToHyperService<tower::util::map_request::MapRequest<axum::routing::Router, axum::serve::handle_connection<tokio::net::tcp::listener::TcpListener, axum::routing::Router, axum::routing::Router>::{closure#0}::{closure#2}>>, hyper::body::incoming::Incoming>, axum_core::body::Body, hyper_util::common::rewind::Rewind<hyper_util::rt::tokio::TokioIo<tokio::net::tcp::stream::TcpStream>>, hyper::proto::h1::role::Server>>::poll_write
+   27.2%  <axum::routing::route::RouteFuture<core::convert::Infallible> as core::future::future::Future>::poll
+
+## thread 'tokio-rt-worker' — 17975 samples
+   self  function
+   69.4%  libsystem_kernel.dylib+0x44f8
+   14.4%  libsystem_kernel.dylib+0x39c8
+    3.3%  sqlite3VdbeExec
+    2.2%  libsystem_kernel.dylib+0x3b94
+    1.2%  vdbeRecordCompareInt
+    0.8%  sqlite3BtreeIndexMoveto
+    0.6%  btreeParseCellPtr
+    0.5%  libsystem_kernel.dylib+0x18b0
+    0.5%  libsystem_pthread.dylib+0x13f0
+    0.4%  sqlite3VdbeRecordCompareWithSkip
+    0.4%  balance
+    0.2%  freeSpace
+    0.2%  libsystem_kernel.dylib+0x263c
+    0.2%  libsystem_pthread.dylib+0x1934
+    0.2%  getPageNormal
+    0.2%  sqlite3BtreeInsert
+    0.1%  pcache1Fetch
+    0.1%  libsystem_pthread.dylib+0x1808
+    0.1%  sqlite3BtreeNext
+    0.1%  vdbeSorterCompareInt
+    0.1%  getCellInfo
+    0.1%  sqlite3BtreeTableMoveto
+    0.1%  libsystem_platform.dylib+0xfe0
+    0.1%  moveToRoot
+    0.1%  sqlite3VdbeSerialGet
+  total  function
+  100.0%  <tokio::runtime::blocking::pool::Inner>::run
+  100.0%  std::sys::backtrace::__rust_begin_short_backtrace::<<tokio::runtime::blocking::pool::Spawner>::spawn_thread::{closure#0}, ()>
+  100.0%  <std::sys::thread::unix::Thread>::new::thread_start
+  100.0%  <std::thread::lifecycle::spawn_unchecked<<tokio::runtime::blocking::pool::Spawner>::spawn_thread::{closure#0}, ()>::{closure#1} as core::ops::function::FnOnce<()>>::call_once::{shim:vtable#0}
+  100.0%  libsystem_pthread.dylib+0x6c07
+   71.5%  <std::sys::sync::condvar::pthread::Condvar>::wait_timeout
+   69.5%  libsystem_pthread.dylib+0x7107
+   69.4%  libsystem_kernel.dylib+0x44f8
+   25.1%  <tokio::runtime::task::harness::Harness<tokio::runtime::blocking::task::BlockingTask<hiqlite::query::query_owned_local<&str>::{closure#0}::{closure#0}>, tokio::runtime::blocking::schedule::BlockingSchedule>>::poll
+   24.9%  <tokio::runtime::task::core::Core<tokio::runtime::blocking::task::BlockingTask<hiqlite::query::query_owned_local<&str>::{closure#0}::{closure#0}>, tokio::runtime::blocking::schedule::BlockingSchedule>>::poll
+   24.9%  <tokio::runtime::blocking::task::BlockingTask<hiqlite::query::query_owned_local<&str>::{closure#0}::{closure#0}> as core::future::future::Future>::poll
+   23.5%  sqlite3_step
+   23.4%  sqlite3VdbeExec
+   14.4%  libsystem_pthread.dylib+0x1867
+   14.4%  libsystem_pthread.dylib+0x3e3b
+   14.4%  libsystem_kernel.dylib+0x39c8
+    9.4%  getPageNormal
+    9.3%  getAndInitPage
+    9.0%  pcache1Fetch
+    8.5%  sqlite3BtreeIndexMoveto
+    5.4%  sqlite3BtreeInsert
+    4.3%  balance
+    3.2%  <std::sys::pal::unix::sync::mutex::Mutex>::lock
+    2.3%  libsystem_pthread.dylib+0x3eab
+    2.3%  libsystem_pthread.dylib+0x1b2f
+
+## thread 'tokio-rt-worker' — 17581 samples
+   self  function
+   70.9%  libsystem_kernel.dylib+0x44f8
+   13.4%  libsystem_kernel.dylib+0x39c8
+    3.0%  sqlite3VdbeExec
+    2.2%  libsystem_kernel.dylib+0x3b94
+    1.2%  vdbeRecordCompareInt
+    0.9%  sqlite3BtreeIndexMoveto
+    0.6%  btreeParseCellPtr
+    0.6%  libsystem_kernel.dylib+0x18b0
+    0.4%  sqlite3VdbeRecordCompareWithSkip
+    0.4%  balance
+    0.3%  libsystem_pthread.dylib+0x13f0
+    0.2%  freeSpace
+    0.2%  libsystem_kernel.dylib+0x263c
+    0.2%  pcache1Fetch
+    0.2%  libsystem_pthread.dylib+0x1934
+    0.1%  libsystem_pthread.dylib+0x1808
+    0.1%  getCellInfo
+    0.1%  sqlite3BtreeInsert
+    0.1%  getPageNormal
+    0.1%  pageFindSlot
+    0.1%  sqlite3BtreeTableMoveto
+    0.1%  vdbeSorterCompareInt
+    0.1%  btreeParseCellPtrIndex
+    0.1%  libsystem_pthread.dylib+0x140c
+    0.1%  moveToRoot
+  total  function
+  100.0%  <tokio::runtime::blocking::pool::Inner>::run
+  100.0%  std::sys::backtrace::__rust_begin_short_backtrace::<<tokio::runtime::blocking::pool::Spawner>::spawn_thread::{closure#0}, ()>
+  100.0%  <std::sys::thread::unix::Thread>::new::thread_start
+  100.0%  <std::thread::lifecycle::spawn_unchecked<<tokio::runtime::blocking::pool::Spawner>::spawn_thread::{closure#0}, ()>::{closure#1} as core::ops::function::FnOnce<()>>::call_once::{shim:vtable#0}
+  100.0%  libsystem_pthread.dylib+0x6c07
+   73.1%  <std::sys::sync::condvar::pthread::Condvar>::wait_timeout
+   70.9%  libsystem_pthread.dylib+0x7107
+   70.9%  libsystem_kernel.dylib+0x44f8
+   23.2%  <tokio::runtime::task::harness::Harness<tokio::runtime::blocking::task::BlockingTask<hiqlite::query::query_owned_local<&str>::{closure#0}::{closure#0}>, tokio::runtime::blocking::schedule::BlockingSchedule>>::poll
+   23.0%  <tokio::runtime::task::core::Core<tokio::runtime::blocking::task::BlockingTask<hiqlite::query::query_owned_local<&str>::{closure#0}::{closure#0}>, tokio::runtime::blocking::schedule::BlockingSchedule>>::poll
+   23.0%  <tokio::runtime::blocking::task::BlockingTask<hiqlite::query::query_owned_local<&str>::{closure#0}::{closure#0}> as core::future::future::Future>::poll
+   21.6%  sqlite3_step
+   21.6%  sqlite3VdbeExec
+   13.6%  libsystem_pthread.dylib+0x1867
+   13.5%  libsystem_pthread.dylib+0x3e3b
+   13.4%  libsystem_kernel.dylib+0x39c8
+    8.3%  getPageNormal
+    8.3%  getAndInitPage
+    8.1%  sqlite3BtreeIndexMoveto
+    8.0%  pcache1Fetch
+    4.8%  sqlite3BtreeInsert
+    4.0%  balance
+    3.4%  <std::sys::pal::unix::sync::mutex::Mutex>::lock
+    2.2%  libsystem_pthread.dylib+0x7167
+    2.2%  libsystem_pthread.dylib+0x3eab
+
+## thread 'tokio-rt-worker' — 17378 samples
+   self  function
+   72.1%  libsystem_kernel.dylib+0x44f8
+   13.4%  libsystem_kernel.dylib+0x39c8
+    2.5%  sqlite3VdbeExec
+    2.3%  libsystem_kernel.dylib+0x3b94
+    1.2%  vdbeRecordCompareInt
+    0.7%  sqlite3BtreeIndexMoveto
+    0.6%  btreeParseCellPtr
+    0.5%  libsystem_kernel.dylib+0x18b0
+    0.5%  libsystem_pthread.dylib+0x13f0
+    0.4%  sqlite3VdbeRecordCompareWithSkip
+    0.3%  balance
+    0.2%  libsystem_kernel.dylib+0x263c
+    0.2%  freeSpace
+    0.2%  getCellInfo
+    0.2%  pcache1Fetch
+    0.1%  getPageNormal
+    0.1%  libsystem_pthread.dylib+0x140c
+    0.1%  libsystem_pthread.dylib+0x1934
+    0.1%  <tokio::runtime::blocking::task::BlockingTask<hiqlite::query::query_owned_local<&str>::{closure#0}::{closure#0}> as core::future::future::Future>::poll
+    0.1%  vdbeSorterCompareInt
+    0.1%  libsystem_pthread.dylib+0x1808
+    0.1%  libsystem_kernel.dylib+0x18ac
+    0.1%  moveToRoot
+    0.1%  libsystem_platform.dylib+0x3524
+    0.1%  pageInsertArray
+  total  function
+  100.0%  <tokio::runtime::blocking::pool::Inner>::run
+  100.0%  std::sys::backtrace::__rust_begin_short_backtrace::<<tokio::runtime::blocking::pool::Spawner>::spawn_thread::{closure#0}, ()>
+  100.0%  <std::sys::thread::unix::Thread>::new::thread_start
+  100.0%  <std::thread::lifecycle::spawn_unchecked<<tokio::runtime::blocking::pool::Spawner>::spawn_thread::{closure#0}, ()>::{closure#1} as core::ops::function::FnOnce<()>>::call_once::{shim:vtable#0}
+  100.0%  libsystem_pthread.dylib+0x6c07
+   74.3%  <std::sys::sync::condvar::pthread::Condvar>::wait_timeout
+   72.1%  libsystem_pthread.dylib+0x7107
+   72.1%  libsystem_kernel.dylib+0x44f8
+   22.1%  <tokio::runtime::task::harness::Harness<tokio::runtime::blocking::task::BlockingTask<hiqlite::query::query_owned_local<&str>::{closure#0}::{closure#0}>, tokio::runtime::blocking::schedule::BlockingSchedule>>::poll
+   21.9%  <tokio::runtime::task::core::Core<tokio::runtime::blocking::task::BlockingTask<hiqlite::query::query_owned_local<&str>::{closure#0}::{closure#0}>, tokio::runtime::blocking::schedule::BlockingSchedule>>::poll
+   21.9%  <tokio::runtime::blocking::task::BlockingTask<hiqlite::query::query_owned_local<&str>::{closure#0}::{closure#0}> as core::future::future::Future>::poll
+   20.5%  sqlite3_step
+   20.4%  sqlite3VdbeExec
+   13.4%  libsystem_pthread.dylib+0x1867
+   13.4%  libsystem_pthread.dylib+0x3e3b
+   13.4%  libsystem_kernel.dylib+0x39c8
+    8.1%  getPageNormal
+    8.0%  getAndInitPage
+    7.8%  pcache1Fetch
+    7.3%  sqlite3BtreeIndexMoveto
+    4.6%  sqlite3BtreeInsert
+    3.9%  balance
+    3.3%  <std::sys::pal::unix::sync::mutex::Mutex>::lock
+    2.3%  libsystem_pthread.dylib+0x3eab
+    2.3%  libsystem_pthread.dylib+0x1b2f
+
+## thread 'tokio-rt-worker' — 15182 samples
+   self  function
+   39.1%  libsystem_kernel.dylib+0x44f8
+   17.9%  rn_site::api::query::member_documents::held::<rn_kernel::store::ReadStore<hiqlite::client::Client>>::{closure#0}
+   11.8%  libsystem_kernel.dylib+0x39c8
+   11.0%  libsystem_kernel.dylib+0x6f30
+    3.9%  libsystem_kernel.dylib+0x5a4c
+    2.3%  libsystem_kernel.dylib+0x3b94
+    1.6%  libsystem_kernel.dylib+0x53a4
+    1.3%  libsystem_kernel.dylib+0x4b78
+    0.5%  libsystem_kernel.dylib+0x10fc
+    0.4%  <hiqlite::client::Client>::query_raw::<&str>::{closure#0}
+    0.4%  libsystem_malloc.dylib+0x2e394
+    0.3%  libsystem_kernel.dylib+0x5a48
+    0.3%  <rn_site::api::whoami::whoami as axum::handler::Handler<(axum_core::extract::private::ViaParts, axum::extract::state::State<rn_site::state::AppState>, rn_site::auth::session::Session), rn_site::state::AppState>>::call::{closure#0}
+    0.2%  <tokio::runtime::scheduler::multi_thread::worker::Context>::run
+    0.2%  <axum::middleware::from_fn::FromFn<rn_site::http::freshness, rn_site::state::AppState, axum::routing::route::Route, (axum::extract::state::State<rn_site::state::AppState>, http::request::Request<axum_core::body::Body>)> as tower_service::Service<http::request::Request<axum_core::body::Body>>>::call::{closure#0}
+    0.2%  <tower::util::oneshot::Oneshot<tower::util::boxed_clone_sync::BoxCloneSyncService<http::request::Request<axum_core::body::Body>, http::response::Response<axum_core::body::Body>, core::convert::Infallible>, http::request::Request<axum_core::body::Body>> as core::future::future::Future>::poll
+    0.1%  core::ptr::drop_glue::<rn_site::state::AppState>
+    0.1%  <deduplicated_symbol>
+    0.1%  serde_json::ser::format_escaped_str::<&mut bytes::buf::writer::Writer<bytes::bytes_mut::BytesMut>, serde_json::ser::CompactFormatter>
+    0.1%  <tokio::sync::batch_semaphore::Acquire as core::future::future::Future>::poll
+    0.1%  libsystem_malloc.dylib+0x29d34
+    0.1%  <tokio::runtime::scheduler::multi_thread::worker::Context>::park_internal
+    0.1%  <hiqlite::query::rows::Row as rn_kernel::store::value::Cursor>::int
+    0.1%  libsystem_malloc.dylib+0x36e04
+    0.1%  <hiqlite::query::rows::Row as rn_kernel::store::value::Cursor>::text
+  total  function
+  100.0%  <tokio::runtime::blocking::pool::Inner>::run
+  100.0%  tokio::runtime::context::runtime::enter_runtime::<tokio::runtime::scheduler::multi_thread::worker::run::{closure#0}, ()>
+  100.0%  std::sys::backtrace::__rust_begin_short_backtrace::<<tokio::runtime::blocking::pool::Spawner>::spawn_thread::{closure#0}, ()>
+  100.0%  tokio::runtime::scheduler::multi_thread::worker::run
+  100.0%  <tokio::runtime::blocking::task::BlockingTask<<tokio::runtime::scheduler::multi_thread::worker::Launch>::launch::{closure#0}> as core::future::future::Future>::poll
+  100.0%  <tokio::runtime::task::core::Core<tokio::runtime::blocking::task::BlockingTask<<tokio::runtime::scheduler::multi_thread::worker::Launch>::launch::{closure#0}>, tokio::runtime::blocking::schedule::BlockingSchedule>>::poll
+  100.0%  <tokio::runtime::task::harness::Harness<tokio::runtime::blocking::task::BlockingTask<<tokio::runtime::scheduler::multi_thread::worker::Launch>::launch::{closure#0}>, tokio::runtime::blocking::schedule::BlockingSchedule>>::poll
+  100.0%  <std::sys::thread::unix::Thread>::new::thread_start
+  100.0%  <std::thread::lifecycle::spawn_unchecked<<tokio::runtime::blocking::pool::Spawner>::spawn_thread::{closure#0}, ()>::{closure#1} as core::ops::function::FnOnce<()>>::call_once::{shim:vtable#0}
+  100.0%  libsystem_pthread.dylib+0x6c07
+  100.0%  <tokio::runtime::context::scoped::Scoped<tokio::runtime::scheduler::Context>>::set::<tokio::runtime::scheduler::multi_thread::worker::run::{closure#0}::{closure#0}, ()>
+  100.0%  <tokio::runtime::scheduler::multi_thread::worker::Context>::run
+   50.3%  <tokio::runtime::scheduler::multi_thread::worker::Context>::park_internal
+   47.7%  <tokio::runtime::scheduler::multi_thread::worker::Context>::run_task
+   46.3%  <tokio::runtime::task::harness::Harness<axum::serve::handle_connection<tokio::net::tcp::listener::TcpListener, axum::routing::Router, axum::routing::Router>::{closure#0}::{closure#3}, alloc::sync::Arc<tokio::runtime::scheduler::multi_thread::handle::Handle>>>::poll
+   46.2%  <deduplicated_symbol>
+   46.1%  axum::serve::handle_connection::<tokio::net::tcp::listener::TcpListener, axum::routing::Router, axum::routing::Router>::{closure#0}::{closure#3}
+   46.0%  <core::future::poll_fn::PollFn<axum::serve::handle_connection<tokio::net::tcp::listener::TcpListener, axum::routing::Router, axum::routing::Router>::{closure#0}::{closure#3}::{closure#0}> as core::future::future::Future>::poll
+   45.7%  <hyper_util::server::conn::auto::UpgradeableConnection<hyper_util::rt::tokio::TokioIo<tokio::net::tcp::stream::TcpStream>, hyper_util::service::glue::TowerToHyperService<tower::util::map_request::MapRequest<axum::routing::Router, axum::serve::handle_connection<tokio::net::tcp::listener::TcpListener, axum::routing::Router, axum::routing::Router>::{closure#0}::{closure#2}>>, hyper_util::rt::tokio::TokioExecutor> as core::future::future::Future>::poll
+   45.6%  <hyper::server::conn::http1::UpgradeableConnection<hyper_util::common::rewind::Rewind<hyper_util::rt::tokio::TokioIo<tokio::net::tcp::stream::TcpStream>>, hyper_util::service::glue::TowerToHyperService<tower::util::map_request::MapRequest<axum::routing::Router, axum::serve::handle_connection<tokio::net::tcp::listener::TcpListener, axum::routing::Router, axum::routing::Router>::{closure#0}::{closure#2}>>> as core::future::future::Future>::poll
+   41.6%  <hyper::proto::h1::dispatch::Dispatcher<hyper::proto::h1::dispatch::Server<hyper_util::service::glue::TowerToHyperService<tower::util::map_request::MapRequest<axum::routing::Router, axum::serve::handle_connection<tokio::net::tcp::listener::TcpListener, axum::routing::Router, axum::routing::Router>::{closure#0}::{closure#2}>>, hyper::body::incoming::Incoming>, axum_core::body::Body, hyper_util::common::rewind::Rewind<hyper_util::rt::tokio::TokioIo<tokio::net::tcp::stream::TcpStream>>, hyper::proto::h1::role::Server>>::poll_write
+   41.0%  <axum::routing::route::RouteFuture<core::convert::Infallible> as core::future::future::Future>::poll
+   40.9%  <tower::util::oneshot::Oneshot<tower::util::boxed_clone_sync::BoxCloneSyncService<http::request::Request<axum_core::body::Body>, http::response::Response<axum_core::body::Body>, core::convert::Infallible>, http::request::Request<axum_core::body::Body>> as core::future::future::Future>::poll
+   40.6%  <axum::util::MapIntoResponseFuture<tower::util::map_err::MapErrFuture<tower_http::trace::future::ResponseFuture<axum::routing::route::RouteFuture<core::convert::Infallible>, tower_http::classify::ServerErrorsAsFailures>, <core::convert::Infallible as core::convert::Into<core::convert::Infallible>>::into>> as core::future::future::Future>::poll
+   40.6%  <futures_util::future::future::map::Map<futures_util::future::try_future::into_future::IntoFuture<tower_http::trace::future::ResponseFuture<axum::routing::route::RouteFuture<core::convert::Infallible>, tower_http::classify::ServerErrorsAsFailures>>, futures_util::fns::MapErrFn<<core::convert::Infallible as core::convert::Into<core::convert::Infallible>>::into>> as core::future::future::Future>::poll
+
+## thread 'tokio-rt-worker' — 14788 samples
+   self  function
+   47.1%  libsystem_kernel.dylib+0x44f8
+   12.1%  rn_site::api::query::member_documents::held::<rn_kernel::store::ReadStore<hiqlite::client::Client>>::{closure#0}
+   10.6%  libsystem_kernel.dylib+0x6f30
+    8.9%  libsystem_kernel.dylib+0x39c8
+    4.1%  libsystem_kernel.dylib+0x5a4c
+    2.3%  libsystem_kernel.dylib+0x3b94
+    1.7%  libsystem_kernel.dylib+0x4b78
+    1.6%  libsystem_kernel.dylib+0x53a4
+    0.5%  <hiqlite::client::Client>::query_raw::<&str>::{closure#0}
+    0.5%  libsystem_kernel.dylib+0x10fc
+    0.4%  libsystem_malloc.dylib+0x2e394
+    0.3%  libsystem_kernel.dylib+0x5a48
+    0.3%  <rn_site::api::whoami::whoami as axum::handler::Handler<(axum_core::extract::private::ViaParts, axum::extract::state::State<rn_site::state::AppState>, rn_site::auth::session::Session), rn_site::state::AppState>>::call::{closure#0}
+    0.3%  libsystem_kernel.dylib+0xb8c
+    0.2%  <deduplicated_symbol>
+    0.2%  core::ptr::drop_glue::<rn_site::state::AppState>
+    0.2%  <tokio::runtime::scheduler::multi_thread::worker::Context>::run
+    0.2%  <tower::util::oneshot::Oneshot<tower::util::boxed_clone_sync::BoxCloneSyncService<http::request::Request<axum_core::body::Body>, http::response::Response<axum_core::body::Body>, core::convert::Infallible>, http::request::Request<axum_core::body::Body>> as core::future::future::Future>::poll
+    0.1%  <tokio::runtime::scheduler::multi_thread::worker::Context>::run_task
+    0.1%  <axum::middleware::from_fn::FromFn<rn_site::http::freshness, rn_site::state::AppState, axum::routing::route::Route, (axum::extract::state::State<rn_site::state::AppState>, http::request::Request<axum_core::body::Body>)> as tower_service::Service<http::request::Request<axum_core::body::Body>>>::call::{closure#0}
+    0.1%  <core::future::poll_fn::PollFn<axum::serve::handle_connection<tokio::net::tcp::listener::TcpListener, axum::routing::Router, axum::routing::Router>::{closure#0}::{closure#3}::{closure#0}> as core::future::future::Future>::poll
+    0.1%  <hiqlite::query::rows::Row as rn_kernel::store::value::Cursor>::text
+    0.1%  <tokio::sync::batch_semaphore::Acquire as core::future::future::Future>::poll
+    0.1%  libsystem_malloc.dylib+0x2aafc
+    0.1%  libsystem_malloc.dylib+0x2ab3c
+  total  function
+  100.0%  <tokio::runtime::blocking::pool::Inner>::run
+  100.0%  tokio::runtime::context::runtime::enter_runtime::<tokio::runtime::scheduler::multi_thread::worker::run::{closure#0}, ()>
+  100.0%  std::sys::backtrace::__rust_begin_short_backtrace::<<tokio::runtime::blocking::pool::Spawner>::spawn_thread::{closure#0}, ()>
+  100.0%  tokio::runtime::scheduler::multi_thread::worker::run
+  100.0%  <tokio::runtime::blocking::task::BlockingTask<<tokio::runtime::scheduler::multi_thread::worker::Launch>::launch::{closure#0}> as core::future::future::Future>::poll
+  100.0%  <tokio::runtime::task::core::Core<tokio::runtime::blocking::task::BlockingTask<<tokio::runtime::scheduler::multi_thread::worker::Launch>::launch::{closure#0}>, tokio::runtime::blocking::schedule::BlockingSchedule>>::poll
+  100.0%  <tokio::runtime::task::harness::Harness<tokio::runtime::blocking::task::BlockingTask<<tokio::runtime::scheduler::multi_thread::worker::Launch>::launch::{closure#0}>, tokio::runtime::blocking::schedule::BlockingSchedule>>::poll
+  100.0%  <std::sys::thread::unix::Thread>::new::thread_start
+  100.0%  <std::thread::lifecycle::spawn_unchecked<<tokio::runtime::blocking::pool::Spawner>::spawn_thread::{closure#0}, ()>::{closure#1} as core::ops::function::FnOnce<()>>::call_once::{shim:vtable#0}
+  100.0%  libsystem_pthread.dylib+0x6c07
+  100.0%  <tokio::runtime::context::scoped::Scoped<tokio::runtime::scheduler::Context>>::set::<tokio::runtime::scheduler::multi_thread::worker::run::{closure#0}::{closure#0}, ()>
+  100.0%  <tokio::runtime::scheduler::multi_thread::worker::Context>::run
+   58.1%  <tokio::runtime::scheduler::multi_thread::worker::Context>::park_internal
+   47.2%  <tokio::runtime::scheduler::multi_thread::park::Inner>::park_condvar
+   47.1%  libsystem_pthread.dylib+0x70db
+   47.1%  libsystem_kernel.dylib+0x44f8
+   40.2%  <tokio::runtime::scheduler::multi_thread::worker::Context>::run_task
+   38.4%  <deduplicated_symbol>
+   37.8%  <tokio::runtime::task::harness::Harness<axum::serve::handle_connection<tokio::net::tcp::listener::TcpListener, axum::routing::Router, axum::routing::Router>::{closure#0}::{closure#3}, alloc::sync::Arc<tokio::runtime::scheduler::multi_thread::handle::Handle>>>::poll
+   37.6%  axum::serve::handle_connection::<tokio::net::tcp::listener::TcpListener, axum::routing::Router, axum::routing::Router>::{closure#0}::{closure#3}
+   37.5%  <core::future::poll_fn::PollFn<axum::serve::handle_connection<tokio::net::tcp::listener::TcpListener, axum::routing::Router, axum::routing::Router>::{closure#0}::{closure#3}::{closure#0}> as core::future::future::Future>::poll
+   37.2%  <hyper_util::server::conn::auto::UpgradeableConnection<hyper_util::rt::tokio::TokioIo<tokio::net::tcp::stream::TcpStream>, hyper_util::service::glue::TowerToHyperService<tower::util::map_request::MapRequest<axum::routing::Router, axum::serve::handle_connection<tokio::net::tcp::listener::TcpListener, axum::routing::Router, axum::routing::Router>::{closure#0}::{closure#2}>>, hyper_util::rt::tokio::TokioExecutor> as core::future::future::Future>::poll
+   37.1%  <hyper::server::conn::http1::UpgradeableConnection<hyper_util::common::rewind::Rewind<hyper_util::rt::tokio::TokioIo<tokio::net::tcp::stream::TcpStream>>, hyper_util::service::glue::TowerToHyperService<tower::util::map_request::MapRequest<axum::routing::Router, axum::serve::handle_connection<tokio::net::tcp::listener::TcpListener, axum::routing::Router, axum::routing::Router>::{closure#0}::{closure#2}>>> as core::future::future::Future>::poll
+   32.8%  <hyper::proto::h1::dispatch::Dispatcher<hyper::proto::h1::dispatch::Server<hyper_util::service::glue::TowerToHyperService<tower::util::map_request::MapRequest<axum::routing::Router, axum::serve::handle_connection<tokio::net::tcp::listener::TcpListener, axum::routing::Router, axum::routing::Router>::{closure#0}::{closure#2}>>, hyper::body::incoming::Incoming>, axum_core::body::Body, hyper_util::common::rewind::Rewind<hyper_util::rt::tokio::TokioIo<tokio::net::tcp::stream::TcpStream>>, hyper::proto::h1::role::Server>>::poll_write
+   32.2%  <axum::routing::route::RouteFuture<core::convert::Infallible> as core::future::future::Future>::poll
+
+## thread 'tokio-rt-worker' — 12446 samples
+   self  function
+   50.7%  libsystem_kernel.dylib+0x44f8
+   14.4%  libsystem_kernel.dylib+0x39c8
+   10.8%  libsystem_kernel.dylib+0x6f30
+    5.2%  libsystem_kernel.dylib+0x5a4c
+    3.2%  libsystem_kernel.dylib+0x3b94
+    1.8%  libsystem_kernel.dylib+0x53a4
+    1.7%  libsystem_kernel.dylib+0x4b78
+    0.6%  <hiqlite::client::Client>::query_raw::<&str>::{closure#0}
+    0.5%  libsystem_malloc.dylib+0x2e394
+    0.5%  libsystem_kernel.dylib+0x10fc
+    0.4%  <rn_site::api::whoami::whoami as axum::handler::Handler<(axum_core::extract::private::ViaParts, axum::extract::state::State<rn_site::state::AppState>, rn_site::auth::session::Session), rn_site::state::AppState>>::call::{closure#0}
+    0.4%  <tokio::runtime::scheduler::multi_thread::worker::Context>::run
+    0.3%  libsystem_kernel.dylib+0x5a48
+    0.2%  libsystem_kernel.dylib+0xb8c
+    0.2%  <deduplicated_symbol>
+    0.2%  <tower::util::oneshot::Oneshot<tower::util::boxed_clone_sync::BoxCloneSyncService<http::request::Request<axum_core::body::Body>, http::response::Response<axum_core::body::Body>, core::convert::Infallible>, http::request::Request<axum_core::body::Body>> as core::future::future::Future>::poll
+    0.2%  core::ptr::drop_glue::<rn_site::state::AppState>
+    0.2%  <tokio::sync::batch_semaphore::Acquire as core::future::future::Future>::poll
+    0.1%  <axum::middleware::from_fn::FromFn<rn_site::http::freshness, rn_site::state::AppState, axum::routing::route::Route, (axum::extract::state::State<rn_site::state::AppState>, http::request::Request<axum_core::body::Body>)> as tower_service::Service<http::request::Request<axum_core::body::Body>>>::call::{closure#0}
+    0.1%  <axum::routing::route::RouteFuture<core::convert::Infallible> as core::future::future::Future>::poll
+    0.1%  <tokio::runtime::scheduler::multi_thread::worker::Context>::park_internal
+    0.1%  <tokio::runtime::scheduler::multi_thread::park::Inner>::park_condvar
+    0.1%  libsystem_platform.dylib+0x3414
+    0.1%  libsystem_malloc.dylib+0x29d34
+    0.1%  <hyper::proto::h1::dispatch::Dispatcher<hyper::proto::h1::dispatch::Server<hyper_util::service::glue::TowerToHyperService<tower::util::map_request::MapRequest<axum::routing::Router, axum::serve::handle_connection<tokio::net::tcp::listener::TcpListener, axum::routing::Router, axum::routing::Router>::{closure#0}::{closure#2}>>, hyper::body::incoming::Incoming>, axum_core::body::Body, hyper_util::common::rewind::Rewind<hyper_util::rt::tokio::TokioIo<tokio::net::tcp::stream::TcpStream>>, hyper::proto::h1::role::Server>>::poll_write
+  total  function
+  100.0%  <tokio::runtime::blocking::pool::Inner>::run
+  100.0%  tokio::runtime::context::runtime::enter_runtime::<tokio::runtime::scheduler::multi_thread::worker::run::{closure#0}, ()>
+  100.0%  std::sys::backtrace::__rust_begin_short_backtrace::<<tokio::runtime::blocking::pool::Spawner>::spawn_thread::{closure#0}, ()>
+  100.0%  tokio::runtime::scheduler::multi_thread::worker::run
+  100.0%  <tokio::runtime::blocking::task::BlockingTask<<tokio::runtime::scheduler::multi_thread::worker::Launch>::launch::{closure#0}> as core::future::future::Future>::poll
+  100.0%  <tokio::runtime::task::core::Core<tokio::runtime::blocking::task::BlockingTask<<tokio::runtime::scheduler::multi_thread::worker::Launch>::launch::{closure#0}>, tokio::runtime::blocking::schedule::BlockingSchedule>>::poll
+  100.0%  <tokio::runtime::task::harness::Harness<tokio::runtime::blocking::task::BlockingTask<<tokio::runtime::scheduler::multi_thread::worker::Launch>::launch::{closure#0}>, tokio::runtime::blocking::schedule::BlockingSchedule>>::poll
+  100.0%  <std::sys::thread::unix::Thread>::new::thread_start
+  100.0%  <std::thread::lifecycle::spawn_unchecked<<tokio::runtime::blocking::pool::Spawner>::spawn_thread::{closure#0}, ()>::{closure#1} as core::ops::function::FnOnce<()>>::call_once::{shim:vtable#0}
+  100.0%  libsystem_pthread.dylib+0x6c07
+  100.0%  <tokio::runtime::context::scoped::Scoped<tokio::runtime::scheduler::Context>>::set::<tokio::runtime::scheduler::multi_thread::worker::run::{closure#0}::{closure#0}, ()>
+  100.0%  <tokio::runtime::scheduler::multi_thread::worker::Context>::run
+   62.0%  <tokio::runtime::scheduler::multi_thread::worker::Context>::park_internal
+   50.9%  <tokio::runtime::scheduler::multi_thread::park::Inner>::park_condvar
+   50.7%  libsystem_pthread.dylib+0x70db
+   50.7%  libsystem_kernel.dylib+0x44f8
+   35.6%  <tokio::runtime::scheduler::multi_thread::worker::Context>::run_task
+   33.5%  <deduplicated_symbol>
+   33.0%  <tokio::runtime::task::harness::Harness<axum::serve::handle_connection<tokio::net::tcp::listener::TcpListener, axum::routing::Router, axum::routing::Router>::{closure#0}::{closure#3}, alloc::sync::Arc<tokio::runtime::scheduler::multi_thread::handle::Handle>>>::poll
+   32.8%  axum::serve::handle_connection::<tokio::net::tcp::listener::TcpListener, axum::routing::Router, axum::routing::Router>::{closure#0}::{closure#3}
+   32.7%  <core::future::poll_fn::PollFn<axum::serve::handle_connection<tokio::net::tcp::listener::TcpListener, axum::routing::Router, axum::routing::Router>::{closure#0}::{closure#3}::{closure#0}> as core::future::future::Future>::poll
+   32.3%  <hyper_util::server::conn::auto::UpgradeableConnection<hyper_util::rt::tokio::TokioIo<tokio::net::tcp::stream::TcpStream>, hyper_util::service::glue::TowerToHyperService<tower::util::map_request::MapRequest<axum::routing::Router, axum::serve::handle_connection<tokio::net::tcp::listener::TcpListener, axum::routing::Router, axum::routing::Router>::{closure#0}::{closure#2}>>, hyper_util::rt::tokio::TokioExecutor> as core::future::future::Future>::poll
+   32.3%  <hyper::server::conn::http1::UpgradeableConnection<hyper_util::common::rewind::Rewind<hyper_util::rt::tokio::TokioIo<tokio::net::tcp::stream::TcpStream>>, hyper_util::service::glue::TowerToHyperService<tower::util::map_request::MapRequest<axum::routing::Router, axum::serve::handle_connection<tokio::net::tcp::listener::TcpListener, axum::routing::Router, axum::routing::Router>::{closure#0}::{closure#2}>>> as core::future::future::Future>::poll
+   27.5%  <hyper::proto::h1::dispatch::Dispatcher<hyper::proto::h1::dispatch::Server<hyper_util::service::glue::TowerToHyperService<tower::util::map_request::MapRequest<axum::routing::Router, axum::serve::handle_connection<tokio::net::tcp::listener::TcpListener, axum::routing::Router, axum::routing::Router>::{closure#0}::{closure#2}>>, hyper::body::incoming::Incoming>, axum_core::body::Body, hyper_util::common::rewind::Rewind<hyper_util::rt::tokio::TokioIo<tokio::net::tcp::stream::TcpStream>>, hyper::proto::h1::role::Server>>::poll_write
+   26.7%  <axum::routing::route::RouteFuture<core::convert::Infallible> as core::future::future::Future>::poll
+
+## thread 'tokio-rt-worker' — 12289 samples
+   self  function
+   88.0%  libsystem_kernel.dylib+0x44f8
+    7.9%  libsystem_kernel.dylib+0x39c8
+    0.9%  libsystem_kernel.dylib+0x3b94
+    0.7%  libsystem_kernel.dylib+0x18b0
+    0.2%  sqlite3VdbeExec
+    0.1%  libsystem_kernel.dylib+0x263c
+    0.1%  libsystem_malloc.dylib+0x2e394
+    0.1%  libsystem_kernel.dylib+0x5a4c
+    0.1%  libsystem_pthread.dylib+0x13f0
+    0.1%  <tokio::runtime::blocking::task::BlockingTask<hiqlite::query::query_owned_local<&str>::{closure#0}::{closure#0}> as core::future::future::Future>::poll
+    0.1%  columnName
+    0.0%  walTryBeginRead
+    0.0%  core::str::converts::from_utf8
+    0.0%  <std::sys::sync::condvar::pthread::Condvar>::wait_timeout
+    0.0%  libsystem_kernel.dylib+0x44f4
+    0.0%  pcache1TruncateUnsafe
+    0.0%  foldhash::hash_bytes_long
+    0.0%  btreeBeginTrans
+    0.0%  <tokio::sync::batch_semaphore::Semaphore>::add_permits_locked
+    0.0%  <rusqlite::row::Row>::get::<usize, alloc::string::String>
+    0.0%  sqlite3_reset
+    0.0%  libsystem_kernel.dylib+0x18ac
+    0.0%  vdbeRecordCompareString
+    0.0%  <deadpool::unmanaged::Object<rusqlite::Connection> as core::ops::drop::Drop>::drop
+    0.0%  libsystem_malloc.dylib+0x36e3c
+  total  function
+  100.0%  <tokio::runtime::blocking::pool::Inner>::run
+  100.0%  std::sys::backtrace::__rust_begin_short_backtrace::<<tokio::runtime::blocking::pool::Spawner>::spawn_thread::{closure#0}, ()>
+  100.0%  <std::sys::thread::unix::Thread>::new::thread_start
+  100.0%  <std::thread::lifecycle::spawn_unchecked<<tokio::runtime::blocking::pool::Spawner>::spawn_thread::{closure#0}, ()>::{closure#1} as core::ops::function::FnOnce<()>>::call_once::{shim:vtable#0}
+  100.0%  libsystem_pthread.dylib+0x6c07
+   90.6%  <std::sys::sync::condvar::pthread::Condvar>::wait_timeout
+   88.0%  libsystem_pthread.dylib+0x7107
+   88.0%  libsystem_kernel.dylib+0x44f8
+    7.9%  libsystem_pthread.dylib+0x3e3b
+    7.9%  libsystem_pthread.dylib+0x1867
+    7.9%  libsystem_kernel.dylib+0x39c8
+    5.2%  <tokio::runtime::task::harness::Harness<tokio::runtime::blocking::task::BlockingTask<hiqlite::query::query_owned_local<&str>::{closure#0}::{closure#0}>, tokio::runtime::blocking::schedule::BlockingSchedule>>::poll
+    4.8%  <tokio::runtime::task::core::Core<tokio::runtime::blocking::task::BlockingTask<hiqlite::query::query_owned_local<&str>::{closure#0}::{closure#0}>, tokio::runtime::blocking::schedule::BlockingSchedule>>::poll
+    4.8%  <tokio::runtime::blocking::task::BlockingTask<hiqlite::query::query_owned_local<&str>::{closure#0}::{closure#0}> as core::future::future::Future>::poll
+    4.0%  <std::sys::pal::unix::sync::mutex::Mutex>::lock
+    3.4%  sqlite3_step
+    3.2%  sqlite3VdbeExec
+    2.5%  libsystem_pthread.dylib+0x7167
+    1.7%  btreeBeginTrans
+    1.7%  unixShmLock
+    1.5%  sqlite3PagerSharedLock
+    1.3%  walTryBeginRead
+    0.9%  libsystem_pthread.dylib+0x3eab
+    0.9%  libsystem_pthread.dylib+0x1b2f
+    0.9%  libsystem_kernel.dylib+0x3b94
+
+## thread 'Thread <34075588>' — 2447 samples
+   self  function
+   37.5%  libsystem_kernel.dylib+0xbb0
+   29.7%  libsystem_kernel.dylib+0x441c
+    6.4%  libsystem_kernel.dylib+0x39c8
+    3.0%  walChecksumBytes
+    1.8%  libsystem_kernel.dylib+0x18b0
+    1.5%  libsystem_kernel.dylib+0x3b94
+    1.3%  sqlite3VdbeExec
+    1.1%  libsystem_kernel.dylib+0xcb8
+    0.9%  sqlite3VdbeRecordCompareWithSkip
+    0.8%  libsystem_kernel.dylib+0x4448
+    0.8%  walIndexAppend
+    0.8%  libsystem_kernel.dylib+0x263c
+    0.6%  libsystem_platform.dylib+0x311c
+    0.6%  sqlite3BtreeIndexMoveto
+    0.6%  libsystem_kernel.dylib+0x10fc
+    0.6%  sqlite3BtreeInsert
+    0.5%  libsystem_platform.dylib+0x3414
+    0.3%  libsystem_pthread.dylib+0x1934
+    0.3%  libsystem_kernel.dylib+0x5a4c
+    0.3%  libsystem_kernel.dylib+0x4418
+    0.2%  DYLD-STUB$$memcpy
+    0.2%  hiqlite::store::state_machine::sqlite::writer::spawn_writer::{closure#0}
+    0.2%  sqlite3WalCheckpoint
+    0.2%  yy_reduce
+    0.2%  DYLD-STUB$$memcmp
+  total  function
+  100.0%  hiqlite::store::state_machine::sqlite::writer::spawn_writer::{closure#0}
+  100.0%  std::sys::backtrace::__rust_begin_short_backtrace::<hiqlite::store::state_machine::sqlite::writer::spawn_writer::{closure#0}, ()>
+  100.0%  <std::sys::thread::unix::Thread>::new::thread_start
+  100.0%  libsystem_pthread.dylib+0x6c07
+  100.0%  <std::thread::lifecycle::spawn_unchecked<hiqlite::store::state_machine::sqlite::writer::spawn_writer::{closure#0}, ()>::{closure#1} as core::ops::function::FnOnce<()>>::call_once::{shim:vtable#0}
+   59.5%  sqlite3_step
+   58.3%  sqlite3VdbeExec
+   40.1%  sqlite3VdbeHalt
+   37.9%  <rusqlite::Connection>::execute_batch
+   37.6%  libdispatch.dylib+0x398f
+   37.6%  std::thread::functions::park
+   37.6%  libdispatch.dylib+0x3f3f
+   37.5%  libsystem_kernel.dylib+0xbb0
+   36.0%  vdbeCommit
+   34.9%  sqlite3PagerCommitPhaseOne
+   34.9%  sqlite3BtreeCommitPhaseOne
+   34.1%  pagerWalFrames
+   32.6%  walWriteOneFrame
+   30.0%  unixWrite
+   29.7%  libsystem_kernel.dylib+0x441c
+   14.0%  <rusqlite::statement::Statement>::execute_with_bound_parameters
+    8.5%  <rusqlite::row::Rows as fallible_streaming_iterator::FallibleStreamingIterator>::advance
+    6.5%  libsystem_pthread.dylib+0x3e3b
+    6.5%  libsystem_pthread.dylib+0x1867
+    6.4%  libsystem_kernel.dylib+0x39c8
+
+## thread 'Thread <34075586>' — 2409 samples
+   self  function
+   87.7%  libsystem_kernel.dylib+0xbb0
+    5.4%  libsystem_kernel.dylib+0x732c
+    3.8%  hiqlite_wal::writer::run
+    1.0%  libsystem_platform.dylib+0x3414
+    0.4%  libsystem_kernel.dylib+0x5a4c
+    0.3%  libsystem_kernel.dylib+0x39c8
+    0.1%  <flume::Receiver<core::option::Option<(u64, alloc::vec::Vec<u8>)>>>::recv
+    0.1%  <flume::Chan<core::option::Option<(u64, alloc::vec::Vec<u8>)>>>::pull_pending
+    0.1%  libsystem_kernel.dylib+0x5a48
+    0.1%  libsystem_kernel.dylib+0x1684
+    0.0%  libsystem_kernel.dylib+0xbac
+    0.0%  libsystem_pthread.dylib+0x1928
+    0.0%  libsystem_kernel.dylib+0x7328
+    0.0%  libsystem_kernel.dylib+0x3b94
+    0.0%  libsystem_malloc.dylib+0x2a8c8
+    0.0%  <tokio::runtime::scheduler::multi_thread::idle::Idle>::worker_to_notify
+    0.0%  <std::sys::sync::once_box::OnceBox<std::sys::pal::unix::sync::mutex::Mutex>>::initialize::<<std::sys::sync::mutex::pthread::Mutex>::get::{closure#0}>
+    0.0%  libsystem_kernel.dylib+0x3b90
+    0.0%  __rustc::__rdl_alloc
+    0.0%  libdispatch.dylib+0x3de9c
+    0.0%  libsystem_kernel.dylib+0x6f30
+    0.0%  tokio::runtime::task::waker::wake_by_ref
+    0.0%  libsystem_pthread.dylib+0x1914
+    0.0%  <tokio::sync::oneshot::State>::set_complete
+    0.0%  core::ptr::drop_glue::<core::cell::UnsafeCell<flume::Chan<core::option::Option<(u64, alloc::vec::Vec<u8>)>>>>
+  total  function
+  100.0%  std::sys::backtrace::__rust_begin_short_backtrace::<hiqlite_wal::writer::spawn::{closure#0}, core::result::Result<(), hiqlite_wal::error::Error>>
+  100.0%  <std::thread::lifecycle::spawn_unchecked<hiqlite_wal::writer::spawn::{closure#0}, core::result::Result<(), hiqlite_wal::error::Error>>::{closure#1} as core::ops::function::FnOnce<()>>::call_once::{shim:vtable#0}
+  100.0%  <std::sys::thread::unix::Thread>::new::thread_start
+  100.0%  hiqlite_wal::writer::run
+  100.0%  libsystem_pthread.dylib+0x6c07
+   87.8%  libdispatch.dylib+0x398f
+   87.8%  std::thread::functions::park
+   87.8%  libdispatch.dylib+0x3f3f
+   87.7%  libsystem_kernel.dylib+0xbb0
+   85.8%  <flume::Receiver<hiqlite_wal::writer::Action>>::recv
+    5.5%  <memmap2::MmapRaw>::flush_async
+    5.4%  libsystem_kernel.dylib+0x732c
+    3.0%  <flume::Receiver<core::option::Option<(u64, alloc::vec::Vec<u8>)>>>::recv
+    1.0%  libsystem_platform.dylib+0x3414
+    0.8%  <alloc::sync::Arc<tokio::runtime::scheduler::multi_thread::handle::Handle> as tokio::runtime::task::Schedule>::schedule
+    0.8%  tokio::runtime::context::with_scheduler::<(), tokio::runtime::scheduler::multi_thread::worker::with_current<(), <tokio::runtime::scheduler::multi_thread::handle::Handle>::schedule_task::{closure#0}>::{closure#0}>
+    0.5%  <flume::Chan<core::option::Option<(u64, alloc::vec::Vec<u8>)>>>::pull_pending
+    0.5%  libsystem_pthread.dylib+0x5f37
+    0.4%  <tokio::sync::oneshot::Sender<core::result::Result<(), hiqlite_wal::error::Error>>>::send
+    0.4%  <std::sys::pal::unix::sync::mutex::Mutex>::lock
+    0.4%  libsystem_kernel.dylib+0x5a4c
+    0.3%  <flume::async::AsyncSignal as flume::signal::Signal>::fire
+    0.3%  libsystem_pthread.dylib+0x3e3b
+    0.3%  libsystem_kernel.dylib+0x39c8
+    0.3%  libsystem_pthread.dylib+0x1867
+
+## thread 'Thread <34075587>' — 2403 samples
+   self  function
+   92.7%  libsystem_kernel.dylib+0xbb0
+    3.6%  <hiqlite_wal::wal::WalFile>::read_logs
+    1.1%  libsystem_kernel.dylib+0x5a4c
+    0.3%  libsystem_malloc.dylib+0x2e394
+    0.2%  libsystem_kernel.dylib+0x39c8
+    0.1%  libsystem_kernel.dylib+0x5a48
+    0.1%  libsystem_pthread.dylib+0x1934
+    0.1%  libsystem_malloc.dylib+0x2a828
+    0.1%  libsystem_kernel.dylib+0xbac
+    0.1%  libsystem_malloc.dylib+0x2a834
+    0.1%  libdispatch.dylib+0x3f40
+    0.1%  libsystem_malloc.dylib+0x29d34
+    0.0%  libsystem_kernel.dylib+0x1a04
+    0.0%  DYLD-STUB$$pthread_mutex_lock
+    0.0%  libsystem_pthread.dylib+0x18ec
+    0.0%  <hiqlite_wal::wal::WalFileSet>::clone_files_from_no_mmap
+    0.0%  libsystem_malloc.dylib+0x2e28c
+    0.0%  <tokio::runtime::scheduler::multi_thread::idle::Idle>::worker_to_notify
+    0.0%  libsystem_malloc.dylib+0x2ab3c
+    0.0%  libsystem_malloc.dylib+0x29c88
+    0.0%  libsystem_malloc.dylib+0x2a874
+    0.0%  libsystem_malloc.dylib+0x29cc0
+    0.0%  libsystem_pthread.dylib+0x4148
+    0.0%  hiqlite_wal::reader::run
+    0.0%  <flume::Sender<core::option::Option<core::result::Result<alloc::vec::Vec<u8>, hiqlite_wal::error::Error>>>>::send
+  total  function
+  100.0%  <std::thread::lifecycle::spawn_unchecked<hiqlite_wal::reader::spawn::{closure#0}, ()>::{closure#1} as core::ops::function::FnOnce<()>>::call_once::{shim:vtable#0}
+  100.0%  hiqlite_wal::reader::run
+  100.0%  <std::sys::thread::unix::Thread>::new::thread_start
+  100.0%  libsystem_pthread.dylib+0x6c07
+  100.0%  std::sys::backtrace::__rust_begin_short_backtrace::<hiqlite_wal::reader::spawn::{closure#0}, ()>
+   92.9%  std::thread::functions::park
+   92.8%  libdispatch.dylib+0x398f
+   92.8%  libdispatch.dylib+0x3f3f
+   92.7%  libsystem_kernel.dylib+0xbb0
+   81.1%  <flume::Receiver<hiqlite_wal::reader::Action>>::recv
+   14.7%  <flume::Sender<core::option::Option<core::result::Result<alloc::vec::Vec<u8>, hiqlite_wal::error::Error>>>>::send
+    3.7%  <hiqlite_wal::wal::WalFile>::read_logs
+    1.6%  <flume::async::AsyncSignal as flume::signal::Signal>::fire
+    1.5%  <alloc::sync::Arc<tokio::runtime::scheduler::multi_thread::handle::Handle> as tokio::runtime::task::Schedule>::schedule
+    1.5%  tokio::runtime::context::with_scheduler::<(), tokio::runtime::scheduler::multi_thread::worker::with_current<(), <tokio::runtime::scheduler::multi_thread::handle::Handle>::schedule_task::{closure#0}>::{closure#0}>
+    1.2%  libsystem_pthread.dylib+0x5f37
+    1.1%  libsystem_kernel.dylib+0x5a4c
+    0.3%  <std::sys::pal::unix::sync::mutex::Mutex>::lock
+    0.3%  <std::sys::sync::once_box::OnceBox<std::sys::pal::unix::sync::mutex::Mutex>>::initialize::<<std::sys::sync::mutex::pthread::Mutex>::get::{closure#0}>
+    0.3%  libsystem_malloc.dylib+0x2e394
+    0.2%  <alloc::raw_vec::RawVecInner>::finish_grow
+    0.2%  <alloc::sync::Arc<flume::Hook<hiqlite_wal::reader::Action, flume::signal::SyncSignal>>>::drop_slow
+    0.2%  <std::sys::sync::mutex::pthread::Mutex as core::ops::drop::Drop>::drop
+    0.2%  libsystem_pthread.dylib+0x3e3b
+    0.2%  libsystem_kernel.dylib+0x39c8
+
+## thread 'Thread <34075673>' — 2375 samples
+   self  function
+   96.8%  libsystem_kernel.dylib+0xbb0
+    0.7%  libsystem_kernel.dylib+0x5a4c
+    0.3%  libsystem_kernel.dylib+0x39c8
+    0.2%  libsystem_kernel.dylib+0x3b94
+    0.1%  libsystem_malloc.dylib+0x2e394
+    0.1%  <hiqlite_wal::wal::WalFile>::read_logs
+    0.1%  libsystem_kernel.dylib+0x5a48
+    0.1%  <flume::Sender<core::option::Option<core::result::Result<alloc::vec::Vec<u8>, hiqlite_wal::error::Error>>>>::send
+    0.1%  libsystem_malloc.dylib+0x29cc0
+    0.1%  libsystem_pthread.dylib+0x410c
+    0.1%  libsystem_malloc.dylib+0x2ab3c
+    0.1%  <flume::Receiver<hiqlite_wal::reader::Action>>::recv
+    0.1%  libsystem_kernel.dylib+0x6f30
+    0.1%  libsystem_kernel.dylib+0xbac
+    0.1%  std::thread::functions::park
+    0.0%  <hiqlite_wal::wal::WalFileSet>::clone_files_from_no_mmap
+    0.0%  libsystem_pthread.dylib+0x26a8
+    0.0%  libsystem_kernel.dylib+0x39c4
+    0.0%  libsystem_pthread.dylib+0x5d38
+    0.0%  libsystem_pthread.dylib+0x4110
+    0.0%  libdispatch.dylib+0x3f40
+    0.0%  <alloc::sync::Arc<flume::Hook<hiqlite_wal::reader::Action, flume::signal::SyncSignal>>>::drop_slow
+    0.0%  libsystem_pthread.dylib+0x18ec
+    0.0%  <tokio::runtime::scheduler::multi_thread::handle::Handle>::push_remote_task
+    0.0%  <alloc::sync::Arc<flume::Hook<core::option::Option<core::result::Result<alloc::vec::Vec<u8>, hiqlite_wal::error::Error>>, flume::signal::SyncSignal>>>::drop_slow
+  total  function
+  100.0%  <std::thread::lifecycle::spawn_unchecked<hiqlite_wal::reader::spawn::{closure#0}, ()>::{closure#1} as core::ops::function::FnOnce<()>>::call_once::{shim:vtable#0}
+  100.0%  hiqlite_wal::reader::run
+  100.0%  <std::sys::thread::unix::Thread>::new::thread_start
+  100.0%  libsystem_pthread.dylib+0x6c07
+  100.0%  std::sys::backtrace::__rust_begin_short_backtrace::<hiqlite_wal::reader::spawn::{closure#0}, ()>
+   97.0%  std::thread::functions::park
+   96.9%  libdispatch.dylib+0x3f3f
+   96.8%  libdispatch.dylib+0x398f
+   96.8%  libsystem_kernel.dylib+0xbb0
+   86.6%  <flume::Receiver<hiqlite_wal::reader::Action>>::recv
+   12.8%  <flume::Sender<core::option::Option<core::result::Result<alloc::vec::Vec<u8>, hiqlite_wal::error::Error>>>>::send
+    1.1%  <alloc::sync::Arc<tokio::runtime::scheduler::multi_thread::handle::Handle> as tokio::runtime::task::Schedule>::schedule
+    1.1%  tokio::runtime::context::with_scheduler::<(), tokio::runtime::scheduler::multi_thread::worker::with_current<(), <tokio::runtime::scheduler::multi_thread::handle::Handle>::schedule_task::{closure#0}>::{closure#0}>
+    1.1%  <flume::async::AsyncSignal as flume::signal::Signal>::fire
+    0.8%  libsystem_pthread.dylib+0x5f37
+    0.7%  libsystem_kernel.dylib+0x5a4c
+    0.3%  libsystem_pthread.dylib+0x3e3b
+    0.3%  <std::sys::pal::unix::sync::mutex::Mutex>::lock
+    0.3%  libsystem_pthread.dylib+0x1867
+    0.3%  libsystem_kernel.dylib+0x39c8
+    0.2%  libsystem_kernel.dylib+0x3b94
+    0.2%  libsystem_pthread.dylib+0x3eab
+    0.2%  libsystem_pthread.dylib+0x1b2f
+    0.2%  <std::sys::sync::mutex::pthread::Mutex as core::ops::drop::Drop>::drop
+    0.2%  <alloc::sync::Arc<flume::Hook<hiqlite_wal::reader::Action, flume::signal::SyncSignal>>>::drop_slow
+
+## thread 'Thread <34075672>' — 2372 samples
+   self  function
+   92.3%  libsystem_kernel.dylib+0xbb0
+    5.3%  libsystem_kernel.dylib+0x732c
+    0.6%  hiqlite_wal::writer::run
+    0.5%  libsystem_kernel.dylib+0x5a4c
+    0.3%  libsystem_kernel.dylib+0x39c8
+    0.1%  libsystem_kernel.dylib+0x6f30
+    0.1%  libsystem_kernel.dylib+0x5a48
+    0.1%  <flume::Chan<core::option::Option<(u64, alloc::vec::Vec<u8>)>>>::pull_pending
+    0.1%  libsystem_kernel.dylib+0xbac
+    0.0%  libsystem_platform.dylib+0x3504
+    0.0%  <tokio::sync::oneshot::State>::set_complete
+    0.0%  libsystem_pthread.dylib+0x140c
+    0.0%  DYLD-STUB$$free
+    0.0%  libsystem_kernel.dylib+0x7328
+    0.0%  libsystem_kernel.dylib+0x3b94
+    0.0%  libsystem_malloc.dylib+0x36e7c
+    0.0%  libsystem_malloc.dylib+0x2a870
+    0.0%  libsystem_pthread.dylib+0x40e8
+    0.0%  <tokio::runtime::scheduler::multi_thread::idle::Idle>::worker_to_notify
+    0.0%  libdispatch.dylib+0x3f40
+    0.0%  libsystem_malloc.dylib+0x2a8c8
+    0.0%  libsystem_malloc.dylib+0x2a834
+    0.0%  libsystem_kernel.dylib+0x1684
+    0.0%  libsystem_kernel.dylib+0x4c98
+  total  function
+  100.0%  std::sys::backtrace::__rust_begin_short_backtrace::<hiqlite_wal::writer::spawn::{closure#0}, core::result::Result<(), hiqlite_wal::error::Error>>
+  100.0%  <std::thread::lifecycle::spawn_unchecked<hiqlite_wal::writer::spawn::{closure#0}, core::result::Result<(), hiqlite_wal::error::Error>>::{closure#1} as core::ops::function::FnOnce<()>>::call_once::{shim:vtable#0}
+  100.0%  <std::sys::thread::unix::Thread>::new::thread_start
+  100.0%  hiqlite_wal::writer::run
+  100.0%  libsystem_pthread.dylib+0x6c07
+   92.4%  std::thread::functions::park
+   92.4%  libdispatch.dylib+0x398f
+   92.4%  libdispatch.dylib+0x3f3f
+   92.3%  libsystem_kernel.dylib+0xbb0
+   90.7%  <flume::Receiver<hiqlite_wal::writer::Action>>::recv
+    5.4%  <memmap2::MmapRaw>::flush_async
+    5.3%  libsystem_kernel.dylib+0x732c
+    2.3%  <flume::Receiver<core::option::Option<(u64, alloc::vec::Vec<u8>)>>>::recv
+    1.1%  <alloc::sync::Arc<tokio::runtime::scheduler::multi_thread::handle::Handle> as tokio::runtime::task::Schedule>::schedule
+    1.1%  tokio::runtime::context::with_scheduler::<(), tokio::runtime::scheduler::multi_thread::worker::with_current<(), <tokio::runtime::scheduler::multi_thread::handle::Handle>::schedule_task::{closure#0}>::{closure#0}>
+    0.6%  libsystem_pthread.dylib+0x5f37
+    0.5%  <<hiqlite_wal::log_store::LogStore<hiqlite::store::state_machine::memory::TypeConfigKV> as openraft::storage::v2::RaftLogStorage<hiqlite::store::state_machine::memory::TypeConfigKV>>::append<alloc::vec::Vec<openraft::entry::Entry<hiqlite::store::state_machine::memory::TypeConfigKV>>>::{closure#0}::{closure#0}::{closure#0} as core::ops::function::FnOnce<()>>::call_once::{shim:vtable#0}
+    0.5%  <tokio::sync::oneshot::Sender<core::result::Result<openraft::raft_state::io_state::log_io_id::LogIOId<u64>, std::io::error::Error>>>::send
+    0.5%  <deduplicated_symbol>
+    0.5%  libsystem_kernel.dylib+0x5a4c
+    0.5%  <flume::Chan<core::option::Option<(u64, alloc::vec::Vec<u8>)>>>::pull_pending
+    0.4%  <flume::async::AsyncSignal as flume::signal::Signal>::fire
+    0.3%  <std::sys::pal::unix::sync::mutex::Mutex>::lock
+    0.3%  libsystem_pthread.dylib+0x3e3b
+    0.3%  <tokio::runtime::scheduler::multi_thread::handle::Handle>::push_remote_task
+
+## thread 'rn-site' — 33 samples
+   self  function
+   87.9%  libsystem_kernel.dylib+0x44f8
+    3.0%  libsystem_malloc.dylib+0x16b4
+    3.0%  <hiqlite::client::Client>::find_set_leader::{closure#0}
+    3.0%  libsystem_malloc.dylib+0x2e4bc
+    3.0%  libsystem_kernel.dylib+0xaa8
+  total  function
+  100.0%  rn_site::main
+  100.0%  main
+  100.0%  dyld+0x8d53
+  100.0%  std::sys::backtrace::__rust_begin_short_backtrace::<fn(), ()>
+  100.0%  std::rt::lang_start::<()>::{closure#0}
+  100.0%  std::rt::lang_start_internal
+   90.9%  <tokio::runtime::park::CachedParkThread>::block_on::<rn_site::main::{closure#0}>
+   87.9%  libsystem_pthread.dylib+0x70db
+   87.9%  libsystem_kernel.dylib+0x44f8
+   87.9%  <tokio::runtime::park::Inner>::park
+    9.1%  rn_site::main::{closure#0}
+    9.1%  core::ptr::drop_glue::<tokio::runtime::blocking::pool::BlockingPool>
+    9.1%  <tokio::runtime::blocking::pool::BlockingPool>::shutdown
+    6.1%  hiqlite::start::start_node_inner::<rn_site::db::AppCache>::{closure#0}
+    6.1%  rn_site::db::open_on::{closure#0}::{closure#0}
+    6.1%  <tokio::runtime::blocking::shutdown::Receiver>::wait
+    6.1%  <tokio::runtime::park::CachedParkThread>::block_on::<&mut tokio::sync::oneshot::Receiver<()>>
+    3.0%  hiqlite::helpers::set_path_access::{closure#0}
+    3.0%  hiqlite::store::start_raft_db::{closure#0}
+    3.0%  libsystem_malloc.dylib+0x16b4
+    3.0%  <hiqlite::store::state_machine::sqlite::state_machine::StateMachineSqlite>::new::{closure#0}
+    3.0%  <tokio::runtime::task::harness::Harness<tokio::runtime::blocking::task::BlockingTask<tokio::fs::set_permissions::set_permissions<&&str>::{closure#0}::{closure#0}>, tokio::runtime::blocking::schedule::BlockingSchedule>>::drop_join_handle_slow
+    3.0%  <hiqlite::client::Client>::find_set_leader::{closure#0}
+    3.0%  <tower::util::map_future::MapFuture<axum::util::MapIntoResponse<tower::util::map_err::MapErr<axum::middleware::from_fn::FromFn<rn_site::http::freshness, rn_site::state::AppState, axum::routing::route::Route, (axum::extract::state::State<rn_site::state::AppState>, http::request::Request<axum_core::body::Body>)>, <core::convert::Infallible as core::convert::Into<core::convert::Infallible>>::into>>, <tower::util::boxed_clone_sync::BoxCloneSyncService<http::request::Request<axum_core::body::Body>, http::response::Response<axum_core::body::Body>, core::convert::Infallible>>::new<axum::util::MapIntoResponse<tower::util::map_err::MapErr<axum::middleware::from_fn::FromFn<rn_site::http::freshness, rn_site::state::AppState, axum::routing::route::Route, (axum::extract::state::State<rn_site::state::AppState>, http::request::Request<axum_core::body::Body>)>, <core::convert::Infallible as core::convert::Into<core::convert::Infallible>>::into>>>::{closure#0}> as tower::util::boxed_clone_sync::CloneService<http::request::Request<axum_core::body::Body>>>::clone_box
+    3.0%  libsystem_malloc.dylib+0x2e4bc

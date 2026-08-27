@@ -1,0 +1,14 @@
+revision: a5154b5d6abbebdb9087abeff896a371c5127d31
+branch:   HEAD
+date:     2026-08-27T03:59:59-07:00
+machine:  Darwin 25.2.0 arm64
+cpu:      Apple M4 (10 cores)
+memory:   17179869184 bytes
+rustc:    rustc 1.97.1 (8bab26f4f 2026-07-14)
+oha:      oha 1.16.0
+samply:   samply 0.13.1
+server:   release profile (tools/cluster.sh)
+load ceiling: 6 (one-minute average; three idle voters sit above zero)
+seed:     10000 documents, 100 subscribers, 8 commit workers
+loopback TCP handshake: min 0.052 ms  p50 0.072 ms  p99 0.150 ms (200 connects)
+-rw-r--r--@ 1 ronitnath  staff   4.9M Aug 27 04:14 /Users/ronitnath/dev/love/projects/ronit/rn-site/docs/perf/2026-08-27-f5-before/flamegraph-whoami-and-commit.json.gz

@@ -1,0 +1,40 @@
+
+--- before whoami (2026-08-27T06:19:17-07:00)
+node 1  pid 71706    {"status":"ok","node":"local-1","version":"dev","raft":{"sqlite":{"healthy":true,"voters":3,"expected_voters":3,"leader":1},"cache":{"healthy":true,"voters":3,"expected_voters":3,"leader":1}}}
+node 2  pid 71712    {"status":"ok","node":"local-2","version":"dev","raft":{"sqlite":{"healthy":true,"voters":3,"expected_voters":3,"leader":1},"cache":{"healthy":true,"voters":3,"expected_voters":3,"leader":1}}}
+node 3  pid 71718    {"status":"ok","node":"local-3","version":"dev","raft":{"sqlite":{"healthy":true,"voters":3,"expected_voters":3,"leader":1},"cache":{"healthy":true,"voters":3,"expected_voters":3,"leader":1}}}
+
+--- before whoami-alone (2026-08-27T06:21:53-07:00)
+node 1  pid 71706    {"status":"ok","node":"local-1","version":"dev","raft":{"sqlite":{"healthy":true,"voters":3,"expected_voters":3,"leader":1},"cache":{"healthy":true,"voters":3,"expected_voters":3,"leader":1}}}
+node 2  pid 71712    {"status":"ok","node":"local-2","version":"dev","raft":{"sqlite":{"healthy":true,"voters":3,"expected_voters":3,"leader":1},"cache":{"healthy":true,"voters":3,"expected_voters":3,"leader":1}}}
+node 3  pid 71718    {"status":"ok","node":"local-3","version":"dev","raft":{"sqlite":{"healthy":true,"voters":3,"expected_voters":3,"leader":1},"cache":{"healthy":true,"voters":3,"expected_voters":3,"leader":1}}}
+
+--- before documents (2026-08-27T06:22:28-07:00)
+node 1  pid 71706    {"status":"ok","node":"local-1","version":"dev","raft":{"sqlite":{"healthy":true,"voters":3,"expected_voters":3,"leader":1},"cache":{"healthy":true,"voters":3,"expected_voters":3,"leader":1}}}
+node 2  pid 71712    {"status":"ok","node":"local-2","version":"dev","raft":{"sqlite":{"healthy":true,"voters":3,"expected_voters":3,"leader":1},"cache":{"healthy":true,"voters":3,"expected_voters":3,"leader":1}}}
+node 3  pid 71718    {"status":"ok","node":"local-3","version":"dev","raft":{"sqlite":{"healthy":true,"voters":3,"expected_voters":3,"leader":1},"cache":{"healthy":true,"voters":3,"expected_voters":3,"leader":1}}}
+
+--- before documents-alone (2026-08-27T06:25:04-07:00)
+node 1  pid 71706    {"status":"ok","node":"local-1","version":"dev","raft":{"sqlite":{"healthy":true,"voters":3,"expected_voters":3,"leader":1},"cache":{"healthy":true,"voters":3,"expected_voters":3,"leader":1}}}
+node 2  pid 71712    {"status":"ok","node":"local-2","version":"dev","raft":{"sqlite":{"healthy":true,"voters":3,"expected_voters":3,"leader":1},"cache":{"healthy":true,"voters":3,"expected_voters":3,"leader":1}}}
+node 3  pid 71718    {"status":"ok","node":"local-3","version":"dev","raft":{"sqlite":{"healthy":true,"voters":3,"expected_voters":3,"leader":1},"cache":{"healthy":true,"voters":3,"expected_voters":3,"leader":1}}}
+
+--- before landing (2026-08-27T06:27:39-07:00)
+node 1  pid 71706    {"status":"ok","node":"local-1","version":"dev","raft":{"sqlite":{"healthy":true,"voters":3,"expected_voters":3,"leader":1},"cache":{"healthy":true,"voters":3,"expected_voters":3,"leader":1}}}
+node 2  pid 71712    {"status":"ok","node":"local-2","version":"dev","raft":{"sqlite":{"healthy":true,"voters":3,"expected_voters":3,"leader":1},"cache":{"healthy":true,"voters":3,"expected_voters":3,"leader":1}}}
+node 3  pid 71718    {"status":"ok","node":"local-3","version":"dev","raft":{"sqlite":{"healthy":true,"voters":3,"expected_voters":3,"leader":1},"cache":{"healthy":true,"voters":3,"expected_voters":3,"leader":1}}}
+
+--- before commit (2026-08-27T06:32:15-07:00)
+node 1  pid 71706    {"status":"ok","node":"local-1","version":"dev","raft":{"sqlite":{"healthy":true,"voters":3,"expected_voters":3,"leader":1},"cache":{"healthy":true,"voters":3,"expected_voters":3,"leader":1}}}
+node 2  pid 71712    {"status":"ok","node":"local-2","version":"dev","raft":{"sqlite":{"healthy":true,"voters":3,"expected_voters":3,"leader":1},"cache":{"healthy":true,"voters":3,"expected_voters":3,"leader":1}}}
+node 3  pid 71718    {"status":"ok","node":"local-3","version":"dev","raft":{"sqlite":{"healthy":true,"voters":3,"expected_voters":3,"leader":1},"cache":{"healthy":true,"voters":3,"expected_voters":3,"leader":1}}}
+
+--- before fan-out (2026-08-27T06:34:46-07:00)
+node 1  pid 71706    {"status":"ok","node":"local-1","version":"dev","raft":{"sqlite":{"healthy":true,"voters":3,"expected_voters":3,"leader":1},"cache":{"healthy":true,"voters":3,"expected_voters":3,"leader":1}}}
+node 2  pid 71712    {"status":"ok","node":"local-2","version":"dev","raft":{"sqlite":{"healthy":true,"voters":3,"expected_voters":3,"leader":1},"cache":{"healthy":true,"voters":3,"expected_voters":3,"leader":1}}}
+node 3  pid 71718    {"status":"ok","node":"local-3","version":"dev","raft":{"sqlite":{"healthy":true,"voters":3,"expected_voters":3,"leader":1},"cache":{"healthy":true,"voters":3,"expected_voters":3,"leader":1}}}
+
+--- before commit-alone (2026-08-27T06:34:46-07:00)
+node 1  pid 71706    {"status":"ok","node":"local-1","version":"dev","raft":{"sqlite":{"healthy":true,"voters":3,"expected_voters":3,"leader":1},"cache":{"healthy":true,"voters":3,"expected_voters":3,"leader":1}}}
+node 2  pid 71712    {"status":"ok","node":"local-2","version":"dev","raft":{"sqlite":{"healthy":true,"voters":3,"expected_voters":3,"leader":1},"cache":{"healthy":true,"voters":3,"expected_voters":3,"leader":1}}}
+node 3  pid 71718    {"status":"ok","node":"local-3","version":"dev","raft":{"sqlite":{"healthy":true,"voters":3,"expected_voters":3,"leader":1},"cache":{"healthy":true,"voters":3,"expected_voters":3,"leader":1}}}

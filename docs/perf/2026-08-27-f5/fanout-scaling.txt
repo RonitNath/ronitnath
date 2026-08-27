@@ -1,0 +1,12 @@
+Fan-out scaling: commit -> diff, by subscriber count (finding 5).
+revision: e02fbd82d876b64e44b2ae05c14e8838dcca0b08
+
+  1 subscribers: WS /api/sub fan-out (1 subscribers) n=1       p50    2.680 ms  p99    2.680 ms  max     2.680 ms       1.0 rps  errors 0  [200×1]
+  5 subscribers: WS /api/sub fan-out (5 subscribers) n=5       p50    3.533 ms  p99    6.896 ms  max     6.896 ms       5.0 rps  errors 0  [200×5]
+ 10 subscribers: WS /api/sub fan-out (10 subscribers) n=10      p50    6.569 ms  p99    6.697 ms  max     6.697 ms      10.0 rps  errors 0  [200×10]
+ 25 subscribers: WS /api/sub fan-out (25 subscribers) n=25      p50   14.051 ms  p99   14.469 ms  max    14.469 ms      25.0 rps  errors 0  [200×25]
+ 50 subscribers: WS /api/sub fan-out (50 subscribers) n=50      p50   22.627 ms  p99   23.134 ms  max    23.134 ms      50.0 rps  errors 0  [200×50]
+100 subscribers: WS /api/sub fan-out (100 subscribers) n=100     p50   41.444 ms  p99   42.606 ms  max    42.620 ms     100.0 rps  errors 0  [200×100]
+
+the same, with the load generator on 8 worker threads rather than 2:
+100 subscribers: WS /api/sub fan-out (100 subscribers) n=100     p50   37.643 ms  p99   38.746 ms  max    38.750 ms     100.0 rps  errors 0  [200×100]

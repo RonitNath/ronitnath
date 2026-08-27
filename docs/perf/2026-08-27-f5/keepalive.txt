@@ -1,0 +1,10 @@
+Idle keep-alive connection to a voter (finding 8).
+revision: e02fbd82d876b64e44b2ae05c14e8838dcca0b08
+
+HTTP/1.1 200 OK
+content-type: text/plain; charset=utf-8
+cache-control: no-store
+x-rn-app-version: dev
+content-length: 2
+date: Thu, 27 Aug 2026 13:51:18 GMT
+still open after 120.00 s

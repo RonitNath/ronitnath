@@ -1,0 +1,21 @@
+Where a command's milliseconds go, on the leader, under RUST_LOG=rn_kernel::cmd=debug.
+tools/perf/target/release/rn-perf commit --seconds 20 --reads 0, three loopback voters, 200-document world.
+
+== 15e19e9 — Feed::notify awaited on the request path (59 974 commands, 2 988 writes/s)
+phase             p50 ms    p90 ms    p99 ms    max ms
+replay             0.056     0.132     0.306    11.123
+plan               0.001     0.002     0.014     1.570
+commit             1.129     1.653     2.293    63.354
+read_back          0.135     0.273     0.477    14.495
+notify             0.780     1.059     1.485     3.964
+total              2.125     2.907     3.845    65.496
+
+== e02fbd8 — the cluster notification spawned (71 943 commands, 3 586 writes/s)
+71943 commands
+phase             p50 ms    p90 ms    p99 ms    max ms
+replay             0.055     0.140     0.356    21.249
+plan               0.001     0.001     0.015     2.052
+commit             1.377     1.787     2.503    98.199
+read_back          0.170     0.299     0.580     7.888
+notify             0.001     0.002     0.029     5.021
+total              1.645     2.115     3.020    98.650

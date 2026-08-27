@@ -1,0 +1,21 @@
+{
+  "command_reply_ms": 3.193208,
+  "delivered": 100,
+  "lost": [],
+  "profiles": [
+    {
+      "count": 100,
+      "errors": 0,
+      "max_ms": 29.126165999999998,
+      "p50_ms": 28.403041,
+      "p99_ms": 29.1195,
+      "profile": "WS /api/sub fan-out (commit → diff)",
+      "rps": 100.0,
+      "statuses": {
+        "200": 100
+      }
+    }
+  ],
+  "subscribers": 100,
+  "undelivered": 0
+}

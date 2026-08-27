@@ -1,0 +1,2 @@
+POST /api/cmd/edit-document        n=4309    p50    1.110 ms  p99    3.557 ms  max    10.458 ms     215.4 rps  errors 0  [200×4309]
+GET /api/q/documents (mixed)       n=17223   p50    8.847 ms  p99   13.910 ms  max    48.207 ms     860.9 rps  errors 0  [200×17223]

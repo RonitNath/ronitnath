@@ -1,0 +1,7 @@
+cargo bench -p rn-kernel --bench list --bench merge
+revision: e02fbd82d876b64e44b2ae05c14e8838dcca0b08
+
+  budget  list_visible owner, first page: 1.013941ms per op, within 5ms
+  budget  list_visible owner, second page: 927.968µs per op, within 5ms
+  budget  list_visible reader, first page: 771.138µs per op, within 5ms
+  budget  merge at 10000 affected rows: 36.813375ms, within 50ms

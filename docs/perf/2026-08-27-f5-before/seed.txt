@@ -1,0 +1,8 @@
+seed: owner registered as p_H2cGbwNmeP0XTGk3itcDsw
+seed: 10000 documents in 4.7s
+seed: 100 subscribers hold the fan-out document
+seed: wrote /Users/ronitnath/dev/love/projects/ronit/rn-site/target/perf/seed.json in 7.9s
+seed: owner registered as p_H2cGbwNmeP0XTGk3itcDsw
+seed: 10000 documents in 2.1s
+seed: 4 subscribers hold the fan-out document
+seed: wrote /Users/ronitnath/dev/love/projects/ronit/rn-site/target/perf/samply-seed.json in 2.2s

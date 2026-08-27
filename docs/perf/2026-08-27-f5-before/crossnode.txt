@@ -1,0 +1,59 @@
+cross-node register then command
+started:  2026-08-27T04:17:43-0700
+revision: a5154b5d6abbebdb9087abeff896a371c5127d31
+register on node 2 (127.0.0.1:3162), command on node 3 (127.0.0.1:3163)
+offset sent back as x-rn-after: yes
+
+round 1    offset -        create-document 403 in 2.0 ms
+round 2    offset -        create-document 403 in 0.7 ms
+round 3    offset -        create-document 200 in 1.2 ms
+round 4    offset -        create-document 403 in 1.1 ms
+round 5    offset -        create-document 200 in 1.3 ms
+round 6    register answered 403
+round 7    offset -        create-document 200 in 4.2 ms
+round 8    offset -        create-document 403 in 1.0 ms
+round 9    offset -        create-document 200 in 1.4 ms
+round 10   offset -        create-document 200 in 1.4 ms
+round 11   offset -        create-document 200 in 1.4 ms
+round 12   register answered 403
+round 13   offset -        create-document 403 in 0.8 ms
+round 14   offset -        create-document 403 in 0.8 ms
+round 15   offset -        create-document 403 in 0.8 ms
+round 16   offset -        create-document 200 in 1.4 ms
+round 17   offset -        create-document 200 in 1.4 ms
+round 18   offset -        create-document 200 in 1.2 ms
+round 19   offset -        create-document 403 in 0.8 ms
+round 20   offset -        create-document 200 in 1.2 ms
+round 21   register answered 403
+round 22   offset -        create-document 200 in 1.2 ms
+round 23   offset -        create-document 200 in 1.1 ms
+round 24   register answered 403
+round 25   offset -        create-document 200 in 1.1 ms
+round 26   register answered 403
+round 27   offset -        create-document 200 in 1.1 ms
+round 28   register answered 403
+round 29   offset -        create-document 403 in 0.7 ms
+round 30   register answered 403
+round 31   offset -        create-document 200 in 1.2 ms
+round 32   offset -        create-document 200 in 1.3 ms
+round 33   offset -        create-document 200 in 1.2 ms
+round 34   offset -        create-document 200 in 1.1 ms
+round 35   offset -        create-document 403 in 0.8 ms
+round 36   offset -        create-document 200 in 1.1 ms
+round 37   register answered 403
+round 38   offset -        create-document 200 in 1.2 ms
+round 39   offset -        create-document 200 in 1.2 ms
+round 40   offset -        create-document 200 in 1.2 ms
+round 41   offset -        create-document 403 in 0.7 ms
+round 42   register answered 403
+round 43   offset -        create-document 200 in 0.9 ms
+round 44   offset -        create-document 200 in 1.0 ms
+round 45   offset -        create-document 200 in 1.2 ms
+round 46   offset -        create-document 200 in 1.3 ms
+round 47   offset -        create-document 200 in 1.4 ms
+round 48   offset -        create-document 200 in 1.2 ms
+round 49   offset -        create-document 200 in 1.2 ms
+round 50   offset -        create-document 200 in 1.1 ms
+
+50 rounds: 30 committed, 11 declined, 9 other (of which 9 were the register itself)
+create-document on the other node: p50 1.2 ms  p99 4.2 ms  max 4.2 ms
