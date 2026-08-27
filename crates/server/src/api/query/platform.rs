@@ -14,12 +14,19 @@
 //!
 //! [`Platform::changed`] is exhaustive over [`Event`] for every list here, so
 //! an event added to the kernel forces a decision rather than silently moving
-//! no rows. One case is a known miss and is written down rather than papered
-//! over: [`Event::PersonMerged`] names two *persons*, and the identities they
-//! are made of are not in the event. `platform-identities` therefore does not
-//! repaint its person column on a merge until the page is re-read.
-//! `platform-matches` does repaint, because a merge that came off a candidate
-//! carries that candidate's id.
+//! no rows. Two events move rows that no key off the event can name, and they
+//! are answered by [`Platform::rereads`] rather than papered over:
+//!
+//! * [`Event::PersonMerged`] names two *persons*, and the identities they are
+//!   made of are not in it. `platform-identities` re-reads its whole set, so
+//!   the person column repaints for both sides of the merge.
+//! * [`Event::PartyDisabled`] deletes every session the party's identities
+//!   held and names none of them, so `platform-sessions` re-reads too.
+//!
+//! Re-reading a set is strictly narrower than naming keys we cannot justify: a
+//! `del` can then only mention a key this connection previously sent
+//! (`query::set_ops`). `platform-matches` needs neither, because a merge that
+//! came off a candidate carries that candidate's id.
 
 use rn_api::PublicId;
 use rn_kernel::cmd::is_platform_operator;
@@ -131,6 +138,20 @@ impl Platform {
             // one.
             Self::Audit => vec![offset_key(committed.offset)],
         }
+    }
+
+    /// Whether an event moved this query's rows without naming any of them.
+    ///
+    /// The socket answers `Touch::Set` for these, re-reads the whole result
+    /// and diffs it against what it sent. See this module's own docs for the
+    /// two cases and why a key cannot cover either.
+    #[must_use]
+    pub const fn rereads(self, event: &Event) -> bool {
+        matches!(
+            (self, event),
+            (Self::Identities, Event::PersonMerged { .. })
+                | (Self::Sessions, Event::PartyDisabled { .. })
+        )
     }
 }
 
@@ -366,6 +387,23 @@ mod tests {
     }
 
     #[test]
+    fn the_two_events_that_name_no_key_are_re_read_whole() {
+        let disabled = committed(Event::PartyDisabled { party: Id::new(4) });
+        assert!(Platform::Sessions.rereads(&disabled.event));
+        assert!(Platform::Sessions.changed(&disabled, &key()).is_empty());
+        assert!(!Platform::Parties.rereads(&disabled.event));
+
+        let merged = committed(Event::PersonMerged {
+            survivor: Id::new(1),
+            absorbed: Id::new(2),
+            method: LinkMethod::Operator,
+            candidate: None,
+        });
+        assert!(Platform::Identities.rereads(&merged.event));
+        assert!(!Platform::Matches.rereads(&merged.event));
+    }
+
+    #[test]
     fn a_merge_moves_the_two_parties_it_named_and_the_candidate_it_came_off() {
         let key = key();
         let merged = committed(Event::PersonMerged {
@@ -376,8 +414,9 @@ mod tests {
         });
         assert_eq!(Platform::Parties.changed(&merged, &key).len(), 2);
         assert_eq!(Platform::Matches.changed(&merged, &key).len(), 1);
-        // The written-down miss: a merge names no identity.
+        // A merge names no identity, so the identities list re-reads instead.
         assert!(Platform::Identities.changed(&merged, &key).is_empty());
+        assert!(Platform::Identities.rereads(&merged.event));
     }
 
     #[test]

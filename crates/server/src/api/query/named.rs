@@ -210,6 +210,12 @@ impl Named {
                 }
             }
             Scope::Once => Touch::None,
+            // Two of the deployment's lists move on events that name none of
+            // their rows, so they answer in sets like a shared one does
+            // (`platform::rereads`).
+            Scope::Platform if matches!(self, Self::Platform(p) if p.rereads(&committed.event)) => {
+                Touch::Set
+            }
             Scope::Identity | Scope::Platform => match self.changed(committed, principal, key) {
                 keys if keys.is_empty() => Touch::None,
                 keys => Touch::Keys(keys),

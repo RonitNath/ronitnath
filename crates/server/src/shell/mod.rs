@@ -87,6 +87,10 @@ pub fn router() -> Router<AppState> {
             };
         router = router
             .route(shell.path, get(handler))
+            // `/app/` is the mount point with a trailing slash, and axum's
+            // wildcard does not match an empty rest — so without this row a
+            // reader who typed the slash gets a 404 from their own shell.
+            .route(&format!("{}/", shell.path), get(handler))
             .route(&format!("{}/{{*rest}}", shell.path), get(handler));
     }
     router

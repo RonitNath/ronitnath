@@ -175,12 +175,22 @@ const CASES: &[Case] = &[
     case("/app", "GET", Url::Fixed("/app"), |who| {
         if signed_in(who) { OK } else { FOUND }
     }),
+    case("/app/", "GET", Url::Fixed("/app/"), |who| {
+        if signed_in(who) { OK } else { FOUND }
+    }),
     case("/app/{*rest}", "GET", Url::Fixed("/app/sessions"), |who| {
         if signed_in(who) { OK } else { FOUND }
     }),
     case("/org", "GET", Url::Fixed("/org"), org_shell),
+    case("/org/", "GET", Url::Fixed("/org/"), org_shell),
     case("/org/{*rest}", "GET", Url::Fixed("/org/groups"), org_shell),
     case("/platform", "GET", Url::Fixed("/platform"), platform_shell),
+    case(
+        "/platform/",
+        "GET",
+        Url::Fixed("/platform/"),
+        platform_shell,
+    ),
     case(
         "/platform/{*rest}",
         "GET",
@@ -315,7 +325,11 @@ fn every_route_has_a_matrix_row() {
         // The shells build their wildcard routes with `format!`, so they are
         // declared by the shell table rather than found by the scan.
         for shell in SHELLS {
-            for pattern in [shell.path.to_owned(), format!("{}/{{*rest}}", shell.path)] {
+            for pattern in [
+                shell.path.to_owned(),
+                format!("{}/", shell.path),
+                format!("{}/{{*rest}}", shell.path),
+            ] {
                 assert!(
                     declared.contains(pattern.as_str()),
                     "{pattern} has no row in the matrix"
