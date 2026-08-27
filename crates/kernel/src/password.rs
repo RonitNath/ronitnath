@@ -14,6 +14,17 @@
 //! enumeration the uniform [`Decline`](crate::Decline) exists to prevent. So
 //! an unknown address is verified against a fixed hash whose password nobody
 //! has, and both paths pay the same.
+//!
+//! ## Why the blocking variants exist
+//!
+//! Nineteen mebibytes and three passes is tens of milliseconds of deliberate
+//! CPU. Spent on a runtime worker it is not this request that suffers but
+//! every other connection the node is serving — including the 25-second
+//! heartbeat on `/api/sub`, which makes it a correctness question rather than
+//! a tuning one. [`hash_blocking`], [`verify_blocking`] and
+//! [`verify_dummy_blocking`] put exactly the KDF on tokio's blocking pool and
+//! nothing else: the command's transaction, its audit read-back and its feed
+//! notify stay on the reactor where they belong.
 
 use argon2::Argon2;
 use argon2::password_hash::{PasswordHash, PasswordHasher, PasswordVerifier, SaltString};
@@ -52,6 +63,36 @@ pub fn verify(password: &str, phc: &str) -> bool {
             .verify_password(password.as_bytes(), &parsed)
             .is_ok()
     })
+}
+
+/// Hash a password on the blocking pool.
+///
+/// The same work as [`hash`], off the reactor. A pool thread that panics or is
+/// cancelled reads as a hashing failure, which is an invariant violation and
+/// never a caller's fault.
+pub async fn hash_blocking(password: &str) -> Result<String, HashError> {
+    let password = password.to_owned();
+    tokio::task::spawn_blocking(move || hash(&password))
+        .await
+        .unwrap_or_else(|joined| Err(HashError(joined.to_string())))
+}
+
+/// Check a password on the blocking pool.
+///
+/// A pool thread that did not finish verifies as `false`, on the same
+/// reasoning as a malformed stored hash: it authenticated nobody.
+#[must_use]
+pub async fn verify_blocking(password: &str, phc: &str) -> bool {
+    let (password, phc) = (password.to_owned(), phc.to_owned());
+    tokio::task::spawn_blocking(move || verify(&password, &phc))
+        .await
+        .unwrap_or(false)
+}
+
+/// Spend the same work as a real verification, on the blocking pool, and
+/// always refuse. The timing-uniform decline, off the reactor.
+pub async fn verify_dummy_blocking(password: &str) {
+    let _ = verify_blocking(password, DUMMY_PHC).await;
 }
 
 /// Spend the same work as a real verification, and always refuse.
@@ -96,6 +137,20 @@ mod tests {
             "a malformed dummy would return early and reintroduce the oracle"
         );
         verify_dummy("whatever");
+    }
+
+    #[tokio::test]
+    async fn a_hash_taken_off_the_reactor_is_the_same_hash() {
+        let phc = hash_blocking("correct horse battery staple")
+            .await
+            .expect("hashes");
+        assert!(phc.starts_with("$argon2id$"), "{phc}");
+        // Hashed on one pool thread, verified on another, and verified by the
+        // synchronous path too: the blocking variants are the same function.
+        assert!(verify_blocking("correct horse battery staple", &phc).await);
+        assert!(verify("correct horse battery staple", &phc));
+        assert!(!verify_blocking("Correct horse battery staple", &phc).await);
+        verify_dummy_blocking("whatever").await;
     }
 
     /// The timing property itself, measured coarsely: an unknown-address

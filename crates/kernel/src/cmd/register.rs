@@ -72,9 +72,11 @@ pub async fn register<S: Sql, F: Feed>(ctx: &Ctx<'_, S, F>, args: &Register) -> 
         return Err(Invalid::PasswordTooShort(PASSWORD_MIN).into());
     }
 
-    // Hashed once, outside the batch: argon2 is tens of milliseconds and a
-    // retry must not pay for it twice, nor hold a transaction open for it.
-    let phc = password::hash(&args.password)
+    // Hashed once, outside the batch and off the reactor: argon2 is tens of
+    // milliseconds, a retry must not pay for it twice, and no transaction is
+    // held open for it — see `password`'s note on the blocking variants.
+    let phc = password::hash_blocking(&args.password)
+        .await
         .map_err(|err| crate::KernelError::Invariant(err.to_string()))?;
     let token = Token::mint();
     let now = ctx.now();

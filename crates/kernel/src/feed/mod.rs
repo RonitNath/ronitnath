@@ -10,8 +10,10 @@
 //! it would buy is a feed that disagrees with the database.
 //!
 //! What the trait carries is everything else: [`Feed::notify`], the wake-up
-//! after a commit; [`Feed::subscribe`], a stream of offsets to wake on; and
-//! [`Feed::read`], the durable read a consumer resumes with. Wake-ups may be
+//! after a commit; [`Feed::subscribe`], a stream of offsets to wake on;
+//! [`Feed::read`], the durable read a consumer resumes with; and
+//! [`Feed::head`], where the feed currently ends, which is what a subscriber
+//! with nothing applied yet is seeded at. Wake-ups may be
 //! lost, duplicated or arrive out of order — they are a hint that there is
 //! something to read, never the thing itself. Rung 6 swaps hiqlite's
 //! listen/notify for Zenoh behind exactly this trait.
@@ -32,7 +34,7 @@ use crate::Offset;
 use crate::bind;
 use crate::error::Outcome;
 use crate::event::Committed;
-use crate::store::Reads;
+use crate::store::{Count, Reads};
 
 /// How many events a single [`Feed::read`] will hand back.
 pub const READ_LIMIT: usize = 512;
@@ -56,11 +58,27 @@ pub trait Feed: Send + Sync {
         offset: Offset,
         limit: usize,
     ) -> impl Future<Output = Outcome<Vec<Committed>>> + Send;
+
+    /// Where the feed currently ends.
+    ///
+    /// A subscriber that has applied nothing is seeded at this offset rather
+    /// than at zero: the seed carries whole result sets, so everything up to
+    /// here is already in them and replaying it as diffs would be the same
+    /// rows twice. It belongs on the trait rather than in a consumer's own
+    /// `SELECT` because rung 6 swaps the transport, and a consumer that had
+    /// its own statement would keep reading a table the new feed no longer
+    /// owns.
+    fn head(&self) -> impl Future<Output = Outcome<Offset>> + Send;
 }
 
 /// The durable read, exposed so the "no full scan" gate can assert its plan.
 pub const READ_SQL: &str =
     "SELECT id, request_digest, payload FROM audit WHERE id > $1 ORDER BY id LIMIT $2";
+
+/// Where the feed ends. `coalesce` because an empty audit table is a node that
+/// has served no command yet, not a missing row; `max(id)` over the rowid is
+/// the one row SQLite reads from the end of the primary key.
+pub const HEAD_SQL: &str = "SELECT coalesce(max(id), 0) AS n FROM audit";
 
 /// The durable read both implementations share: the audit table, in id order.
 ///
@@ -86,4 +104,13 @@ pub(crate) async fn read_from(
             })
         })
         .collect())
+}
+
+/// The head both implementations share.
+pub(crate) async fn head_of(store: &impl Reads) -> Outcome<Offset> {
+    Ok(store
+        .query::<Count>(HEAD_SQL, Vec::new())
+        .await?
+        .first()
+        .map_or(0, |count| count.0.max(0) as Offset))
 }

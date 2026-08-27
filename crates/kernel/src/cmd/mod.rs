@@ -74,6 +74,8 @@ pub use verify_email::{mint_verification, verify_email};
 // route is reachable by one name.
 pub use crate::merge::{confirm_match, propose_match, rule_match, split};
 
+use std::future::Future;
+
 use serde::Serialize;
 use uuid::Uuid;
 
@@ -160,12 +162,25 @@ impl Batch {
 ///
 /// `plan` is called at most twice, and only ever a second time when the first
 /// batch wrote nothing at all.
-pub async fn run<S, F, A, P>(ctx: &Ctx<'_, S, F>, args: &A, plan: P) -> Outcome<Applied>
+///
+/// ## Why the plan is `Fn() -> impl Future + Send` and not `AsyncFn`
+///
+/// `AsyncFn` is the shorter spelling and it cannot say this: there is no
+/// stable way to bound the future an `AsyncFn` returns, so a caller awaiting a
+/// command inside a `Send` task fails with "implementation of `Send` is not
+/// general enough" — the higher-ranked lifetime the sugar hides. Spelling the
+/// future out as its own type parameter is what lets `Send` be written down,
+/// and it is what makes a command awaitable directly inside an axum handler
+/// rather than driven to completion on a blocking thread to dodge the
+/// question. Every existing plan closure — `async || { … }` — satisfies this
+/// unchanged.
+pub async fn run<S, F, A, P, Plan>(ctx: &Ctx<'_, S, F>, args: &A, plan: P) -> Outcome<Applied>
 where
     S: Sql,
     F: Feed,
     A: Serialize,
-    P: AsyncFn() -> Outcome<Batch>,
+    P: Fn() -> Plan,
+    Plan: Future<Output = Outcome<Batch>> + Send,
 {
     let digest = audit::digest_of(args);
     if let Some(committed) = audit::replay(ctx.store, ctx.key, &digest).await? {
@@ -260,7 +275,7 @@ pub(crate) fn member(principal: &Principal) -> Outcome<(Id<Identity>, Id<Person>
 /// in this crate. The row is written by an operator seeding it or by K2's
 /// `SetRole`; K1 only reads it, which is why the operator paths here are
 /// reachable and testable before that command exists.
-pub(crate) async fn is_platform_operator(store: &impl Reads, person: Id<Person>) -> Outcome<bool> {
+pub async fn is_platform_operator(store: &impl Reads, person: Id<Person>) -> Outcome<bool> {
     let rows = store
         .query::<Count>(
             "SELECT count(*) AS n FROM relation \

@@ -5,6 +5,8 @@
 //! password: one [`Decline`](crate::Decline), and the unknown-address path
 //! spends an argon2 verification against a dummy hash so it does not answer
 //! faster than the others and tell a caller which addresses are registered.
+//! All three verifications go to the blocking pool, so the work that makes
+//! them uniform does not stall the reactor serving everybody else.
 
 use rn_api::commands::SignIn;
 
@@ -70,14 +72,14 @@ pub async fn sign_in<S: Sql, F: Feed>(ctx: &Ctx<'_, S, F>, args: &SignIn) -> Out
 
     // One shape for every refusal, and the same work done on each path.
     let Some(candidate) = candidate.filter(|c| c.status == "active") else {
-        password::verify_dummy(&args.password);
+        password::verify_dummy_blocking(&args.password).await;
         return decline();
     };
     let Some(phc) = candidate.phc.as_deref() else {
-        password::verify_dummy(&args.password);
+        password::verify_dummy_blocking(&args.password).await;
         return decline();
     };
-    if !password::verify(&args.password, phc) {
+    if !password::verify_blocking(&args.password, phc).await {
         return decline();
     }
 

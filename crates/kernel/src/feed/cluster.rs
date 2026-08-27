@@ -90,4 +90,8 @@ impl Feed for ClusterFeed {
     async fn read(&self, offset: Offset, limit: usize) -> Outcome<Vec<Committed>> {
         super::read_from(self.store.as_ref(), offset, limit).await
     }
+
+    async fn head(&self) -> Outcome<Offset> {
+        super::head_of(self.store.as_ref()).await
+    }
 }
