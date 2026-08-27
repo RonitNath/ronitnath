@@ -40,7 +40,7 @@ fn platform_names() -> Vec<&'static str> {
 #[test]
 fn every_platform_query_is_reachable_and_named_once() {
     let names = platform_names();
-    assert_eq!(names.len(), 10, "the platform surface is ten queries");
+    assert_eq!(names.len(), 18, "the platform surface is eighteen queries");
     for name in &names {
         assert!(name.starts_with("platform-"), "{name}");
         assert_eq!(Named::parse(name).map(|q| q.as_str()), Some(*name));
@@ -255,6 +255,17 @@ const WHOLE_TABLE: &[&str] = &[
     "resources.list",
     "matches.list",
     "identities.factors_of_page",
+    // One row per voter, and the deployment has three at most. The order it
+    // asks for is the primary key's, so there is no sort either.
+    "nodes.list",
+    // The four registries an operator opens whole: every signing key, every
+    // relying party, every outstanding invitation, every consent. Each asks
+    // for the order its primary key is already in, so none of them sorts, and
+    // every row they join or count through is a seek.
+    "keys.list",
+    "clients.list",
+    "links.list",
+    "consents.list",
 ];
 
 #[tokio::test]

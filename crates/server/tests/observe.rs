@@ -131,7 +131,11 @@ fn two_identities_that_proved_the_same_oidc_subject_are_proposed_as_one_person()
         let server = harness::server(&state);
         // The lane on a short interval: the same task `main` starts, asked to
         // tick often enough for a test to watch it happen.
-        let lane = rn_site::observe::spawn_every(state.clone(), Duration::from_millis(20));
+        let lane = rn_site::observe::spawn_every(
+            state.clone(),
+            Duration::from_millis(20),
+            Duration::from_millis(20),
+        );
 
         let one = harness::register(&state, "Doubled", "observe-oidc-a@example.invalid").await;
         let two = harness::register(&state, "Doubled", "observe-oidc-b@example.invalid").await;
@@ -187,7 +191,11 @@ fn the_lane_stops_when_it_is_told_to() {
     let _alone = alone();
     harness::run(async {
         let state = state().await;
-        let lane = rn_site::observe::spawn_every(state.clone(), Duration::from_millis(5));
+        let lane = rn_site::observe::spawn_every(
+            state.clone(),
+            Duration::from_millis(5),
+            Duration::from_millis(5),
+        );
         tokio::time::sleep(Duration::from_millis(30)).await;
         assert!(lane.is_running(), "the lane never started");
         // What `main` does on the way out, and the half that matters: the task

@@ -18,11 +18,11 @@ use super::platform::{page, subject};
 use super::{Params, Row};
 use crate::api::party::public_of;
 
-pub(super) const PARTIES: &str = "SELECT id, kind, display_name, status, created_at FROM party \
-                       ORDER BY id DESC LIMIT $1";
+pub(super) const PARTIES: &str = "SELECT id, kind, display_name, handle, status, created_at \
+                        FROM party ORDER BY id DESC LIMIT $1";
 
 pub(super) const ONE: &str =
-    "SELECT id, kind, display_name, status, created_at FROM party WHERE id = $1";
+    "SELECT id, kind, display_name, handle, status, created_at FROM party WHERE id = $1";
 
 pub(super) const IDENTITIES: &str = "SELECT id, source, home_zone, status, created_at FROM identity \
                           WHERE person_id = $1 ORDER BY id";
@@ -42,6 +42,10 @@ pub struct PartyRow {
     id: i64,
     kind: PartyKind,
     display_name: String,
+    /// The person's `preferred_username`. NULL on every other kind, and the
+    /// list carries it because it is the name an operator is handed on a
+    /// support call.
+    handle: Option<String>,
     status: String,
     created_at: Timestamp,
 }
@@ -56,6 +60,7 @@ impl FromRow for PartyRow {
                 wanted: "PartyKind",
             })?,
             display_name: row.text("display_name")?,
+            handle: row.text_opt("handle")?,
             status: row.text("status")?,
             created_at: row.int("created_at")?,
         })
@@ -68,6 +73,7 @@ impl PartyRow {
             "public_id": public_of(self.kind, self.id, key),
             "kind": self.kind.as_str(),
             "display": self.display_name,
+            "handle": self.handle,
             "status": self.status,
             "created_at": self.created_at,
         })
@@ -111,6 +117,13 @@ pub(super) async fn one(reads: &impl Reads, params: &Params) -> Outcome<Vec<Row>
         "relations".to_owned(),
         as_subject(reads, &row.subject_key(), key).await?,
     );
+    // The five a *person* has and no other kind does: factors, sessions,
+    // consents, merge history and absorbed names. An organization has no
+    // registrations, so it has none of them, and asking would be four seeks
+    // that can only answer nothing.
+    if row.kind == PartyKind::Person {
+        super::platform_person::extend(reads, object, Id::new(id), key).await?;
+    }
     Ok(vec![Row {
         key: public_of(row.kind, row.id, key).as_str().to_owned(),
         value,
@@ -342,6 +355,7 @@ mod tests {
             id: 3,
             kind: PartyKind::Organization,
             display_name: "Isoastra".to_owned(),
+            handle: None,
             status: "active".to_owned(),
             created_at: 0,
         };

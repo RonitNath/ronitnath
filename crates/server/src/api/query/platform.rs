@@ -76,6 +76,23 @@ pub enum Platform {
     OidcClients,
     /// The tokens one session is holding. A drill-in: it takes a `subject`.
     OidcTokens,
+    /// What every node says about itself, and the rollout verdict counted
+    /// from those rows.
+    Nodes,
+    /// Where the change feed ends, and how many commands landed today.
+    Feed,
+    /// The signing keys, with their ages and what retiring one would break.
+    Keys,
+    /// The relying-party registry, with consents and last issuance.
+    Clients,
+    /// Outstanding invitations.
+    Links,
+    /// Granted consents, all of them or one client's.
+    Consents,
+    /// What a disable would end, counted before it is run.
+    Cascade,
+    /// One box, three exact seeks.
+    Find,
 }
 
 /// Every platform query this build serves.
@@ -92,6 +109,14 @@ pub const ALL: &[Platform] = &[
     Platform::Resource,
     Platform::OidcClients,
     Platform::OidcTokens,
+    Platform::Nodes,
+    Platform::Feed,
+    Platform::Keys,
+    Platform::Clients,
+    Platform::Links,
+    Platform::Consents,
+    Platform::Cascade,
+    Platform::Find,
 ];
 
 impl Platform {
@@ -111,6 +136,14 @@ impl Platform {
             Self::Resource => "platform-resource",
             Self::OidcClients => "oidc-clients",
             Self::OidcTokens => "oidc-tokens",
+            Self::Nodes => "platform-nodes",
+            Self::Feed => "platform-feed",
+            Self::Keys => "platform-keys",
+            Self::Clients => "platform-clients",
+            Self::Links => "platform-links",
+            Self::Consents => "platform-consents",
+            Self::Cascade => "platform-cascade",
+            Self::Find => "platform-find",
         }
     }
 
@@ -143,6 +176,20 @@ impl Platform {
             // of its own keys, and the token list is a drill-in like the
             // others; both answer in sets (`rereads`).
             Self::OidcClients | Self::OidcTokens => Vec::new(),
+            // Neither of these moves on a command. `node_report` is written by
+            // the observation lane, which is off the feed by design, and the
+            // feed's own two readings are about the log rather than in it — a
+            // subscription that re-read them per commit would re-read them
+            // once per command on the deployment. Both pages poll, the way
+            // `/api/q/cluster` does.
+            Self::Nodes | Self::Feed => Vec::new(),
+            // Links and consents *do* move on commands, and the events name
+            // the client or the container rather than the row — so they answer
+            // in sets (`rereads`) for the same reason `platform-sessions`
+            // does. The other three are not lists at all: two are read for one
+            // subject the socket does not carry, and the third is a search.
+            Self::Links | Self::Consents => Vec::new(),
+            Self::Keys | Self::Clients | Self::Cascade | Self::Find => Vec::new(),
             // One row per command, keyed by the offset that command landed
             // at — which is the audit row's own id. This is the one query
             // whose key is the position rather than the subject, and the
@@ -169,6 +216,34 @@ impl Platform {
                         | Event::ClientUpdated { .. }
                         | Event::ClientSecretRotated { .. }
                         | Event::ClientDeleted { .. }
+                )
+                | (
+                    Self::Links,
+                    Event::Invited { .. }
+                        | Event::LinkRevoked { .. }
+                        | Event::LinkClaimed { .. }
+                        | Event::PartyDisabled { .. }
+                        | Event::PartyEnabled { .. }
+                )
+                | (
+                    Self::Consents,
+                    Event::Authorized { .. }
+                        | Event::ConsentRevoked { .. }
+                        | Event::ClientDeleted { .. }
+                        | Event::PartyDisabled { .. }
+                )
+                | (
+                    Self::Keys,
+                    Event::SigningKeyRotated { .. } | Event::SigningKeyRetired { .. }
+                )
+                | (
+                    Self::Clients,
+                    Event::ClientRegistered { .. }
+                        | Event::ClientUpdated { .. }
+                        | Event::ClientSecretRotated { .. }
+                        | Event::ClientDeleted { .. }
+                        | Event::Authorized { .. }
+                        | Event::ConsentRevoked { .. }
                 )
                 | (
                     Self::OidcTokens,
@@ -231,6 +306,14 @@ pub async fn read(
         Platform::Resource => super::platform_resources::one(reads, params).await,
         Platform::OidcClients => super::oidc::clients(reads, params).await,
         Platform::OidcTokens => super::oidc::tokens(reads, params).await,
+        Platform::Nodes => super::platform_nodes::list(reads, params).await,
+        Platform::Feed => super::platform_nodes::feed(reads, params).await,
+        Platform::Keys => super::platform_keys::keys(reads, params).await,
+        Platform::Clients => super::platform_keys::clients(reads, params).await,
+        Platform::Links => super::platform_links::links(reads, params).await,
+        Platform::Consents => super::platform_links::consents(reads, params).await,
+        Platform::Cascade => super::platform_links::cascade(reads, params).await,
+        Platform::Find => super::platform_find::find(reads, params).await,
     }
 }
 
@@ -550,7 +633,7 @@ mod tests {
         assert_eq!(names.len(), count, "a statement is listed twice");
         // One list statement per list query, plus every drill-in's own reads.
         assert_eq!(
-            count, 23,
+            count, 51,
             "a statement was added to a platform query and not to `statements()`"
         );
     }

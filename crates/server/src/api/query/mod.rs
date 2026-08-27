@@ -29,9 +29,15 @@ pub mod org_feed;
 pub mod org_rows;
 pub mod platform;
 mod platform_audit;
+pub mod platform_filters;
+mod platform_find;
 mod platform_identities;
+mod platform_keys;
+mod platform_links;
 mod platform_matches;
+mod platform_nodes;
 mod platform_parties;
+mod platform_person;
 mod platform_resources;
 mod platform_sessions;
 mod platform_statements;
@@ -89,6 +95,24 @@ pub struct Params {
     pub subject: Option<String>,
     /// `platform-audit`: the offset to walk backwards from.
     pub before: Option<u64>,
+    /// `platform-find`: the one box. A handle, an address or a public id —
+    /// which of the three it is, is decided by its shape and not by a mode
+    /// switch the reader has to set (`platform_find`).
+    pub q: Option<String>,
+    /// `platform-audit`: only rows this identity ran. A public id, validated
+    /// by decryption before it reaches a statement.
+    pub actor: Option<String>,
+    /// `platform-audit`: only rows attributed to this party — the *hat*,
+    /// which after `ActAs` and under impersonation is not the actor.
+    pub hat: Option<String>,
+    /// `platform-audit`: only rows that were *about* this row, read off the
+    /// `audit_object` side table.
+    pub object: Option<String>,
+    /// `platform-audit`: the start of the time range, in unix seconds.
+    pub from: Option<i64>,
+    /// `platform-audit`: the end of it. Half-open, so two adjacent ranges
+    /// neither drop a row nor count one twice.
+    pub to: Option<i64>,
 }
 
 impl Params {
@@ -116,6 +140,16 @@ impl Params {
                 // of the socket. A public id is 24 characters.
                 "subject" if value.len() <= 32 => params.subject = Some(value.to_owned()),
                 "before" => params.before = value.parse().ok(),
+                // Bounded before it reaches any of the three seeks; the seeks
+                // themselves decide which of them this shape could answer.
+                "q" if value.len() <= 320 => params.q = Some(value.to_owned()),
+                // Public ids, carried undecoded and bounded exactly like
+                // `subject` above, for the same reason.
+                "actor" if value.len() <= 32 => params.actor = Some(value.to_owned()),
+                "hat" if value.len() <= 32 => params.hat = Some(value.to_owned()),
+                "object" if value.len() <= 32 => params.object = Some(value.to_owned()),
+                "from" => params.from = value.parse().ok(),
+                "to" => params.to = value.parse().ok(),
                 _ => {}
             }
         }

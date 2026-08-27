@@ -12,28 +12,20 @@
 //! surface is the one principal the whole deployment is already visible to,
 //! and an audit row that withheld the operator's own reasoning would make the
 //! ruling unattributable to the only reader who needs to attribute it.
+//!
+//! The filters live next door (`platform_filters`), because which statement a
+//! combination of controls rides is a question about indexes and this file is
+//! about what an audit row *says*. What is shared is the row shape: every one
+//! of the six statements returns the same columns, so [`Entry`] reads them all.
 
-use rn_kernel::bind;
 use rn_kernel::ids::{Id, IdKey, Identity};
 use rn_kernel::store::{Cursor, FromRow, Reads, RowError};
 use rn_kernel::{Outcome, Timestamp};
 use serde_json::{Value, json};
 
 use super::platform::{offset_key, page};
+use super::platform_filters::Filter;
 use super::{Params, Row};
-
-/// A rowid range walked backwards from `before`, which is a seek on the
-/// primary key and no sort — `explain_platform_audit_is_a_rowid_range` holds
-/// it to that.
-pub(super) const TAIL: &str = "SELECT a.id, a.command, a.actor_identity_id, a.acting_as, a.at, \
-                               a.payload, p.display_name AS actor_display, \
-                               act.kind AS acting_kind, \
-                               act.display_name AS acting_display \
-                        FROM audit a \
-                        LEFT JOIN identity i ON i.id = a.actor_identity_id \
-                        LEFT JOIN party p ON p.id = i.person_id \
-                        LEFT JOIN party act ON act.id = a.acting_as \
-                        WHERE a.id < $1 ORDER BY a.id DESC LIMIT $2";
 
 struct Entry {
     offset: i64,
@@ -69,8 +61,9 @@ pub(super) async fn list(reads: &impl Reads, params: &Params) -> Outcome<Vec<Row
     let before = params
         .before
         .map_or(i64::MAX, |raw| i64::try_from(raw).unwrap_or(i64::MAX));
+    let (sql, args) = Filter::of(key, params).plan(before, page(params));
     Ok(reads
-        .query::<Entry>(TAIL, bind![before, page(params)])
+        .query::<Entry>(sql, args)
         .await?
         .into_iter()
         .map(|row| Row {
