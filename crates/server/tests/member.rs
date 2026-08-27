@@ -71,15 +71,14 @@ async fn explain_a_roster_is_reached_through_my_own_membership() {
 }
 
 #[tokio::test]
-async fn explain_my_invitations_ride_the_link_subject_index() {
+async fn explain_my_invitations_seek_the_minter_rather_than_filtering_for_them() {
     let harness = Local::new();
     let plan = plan(&harness, member_groups::INVITATIONS_SQL, bind![1i64]);
     // The grant is the driving row and the link hangs off its rowid. The seek
-    // is on `subject_kind` alone, because `relation.granted_by` — the only
-    // record of who minted an invitation — carries no index of its own: this
-    // reaches every link grant in the deployment and filters. Bounded by the
-    // number of invitations ever minted, which is the gap this comment is.
-    rides(&plan, "relation_subject_idx");
+    // is on `granted_by` — the record of who minted an invitation — so this
+    // reaches one person's invitations rather than every link grant in the
+    // deployment (migration 4). `subject_kind` narrows within the seek.
+    rides(&plan, "relation_granted_by_idx");
     rides(&plan, "INTEGER PRIMARY KEY");
 }
 

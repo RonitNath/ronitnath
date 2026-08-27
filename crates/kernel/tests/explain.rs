@@ -1,8 +1,8 @@
 //! The "no full scan" gate: every hot query under `EXPLAIN QUERY PLAN`,
 //! asserting the index it must ride.
 //!
-//! These are the four queries every authenticated request and every command
-//! runs. A missing index does not fail a functional test — it makes one
+//! These are the queries every authenticated request, every command and every
+//! hot page runs. A missing index does not fail a functional test — it makes one
 //! slightly slower on ten rows and unusable on ten million — so the plan is
 //! what gets asserted, not the result.
 
@@ -200,4 +200,25 @@ async fn explain_the_signal_scan_rides_the_verified_value_index() {
     // Without this index, every registration asks "who else has proven this
     // value" by reading every factor in the deployment.
     rides(&plan, "factor_verified_value_idx");
+}
+
+#[tokio::test]
+async fn explain_minted_invitations_rides_the_granted_by_index() {
+    let harness = Local::new();
+    let who = harness
+        .register("Ronit", "plan-minted@example.test")
+        .await
+        .expect("registers");
+    let identity = who.principal.identity().expect("a member has one");
+    // The member tier's "invitations I minted": the filter is `granted_by`,
+    // and without an index on it this is a scan of every relation row in the
+    // deployment — a table that grows with every share and every membership.
+    let plan = plan(
+        &harness,
+        "SELECT l.id FROM relation rel JOIN link l ON l.id = rel.subject_id \
+         WHERE rel.subject_kind = 'link' AND rel.granted_by = $1",
+        bind![identity],
+    )
+    .await;
+    rides(&plan, "relation_granted_by_idx");
 }
