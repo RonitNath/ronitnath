@@ -157,6 +157,8 @@ async fn boot(
             // Fixed, so a signing key one case writes opens for the next.
             oidc_key: Some(OIDC_SEAL_KEY.to_string()),
             dev,
+            impersonation: None,
+            admin_addr: None,
         };
         let migrations = Migrations::embedded::<rn_kernel::Migrations>()
             .expect("the kernel's migration history");

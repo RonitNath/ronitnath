@@ -32,6 +32,8 @@ async fn state() -> AppState {
             id_key: Some("000102030405060708090a0b0c0d0e0f".to_string()),
             bootstrap_operator_email: None,
             dev: false,
+            impersonation: None,
+            admin_addr: None,
         };
         let db = db::open_on(
             &config,

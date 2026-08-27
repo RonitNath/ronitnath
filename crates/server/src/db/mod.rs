@@ -260,6 +260,8 @@ mod tests {
             id_key: Some("0".repeat(32)),
             bootstrap_operator_email: None,
             dev: false,
+            impersonation: None,
+            admin_addr: None,
         }
     }
 

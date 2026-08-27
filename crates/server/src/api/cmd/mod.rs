@@ -78,11 +78,10 @@ macro_rules! bindings {
                     let envelope: CommandEnvelope<$args> = serde_json::from_str(body)
                         .map_err(|error| CommandError::Malformed(error.to_string()))?;
                     let ctx = Ctx {
-                        // C11.3, until P5's `RN_SITE__IMPERSONATION` lands:
-                        // on in dev, off in prod, which is the default the
-                        // requirement names. A deployment that wants it on in
-                        // prod turns the config key on when it exists.
-                        impersonation: state.config.mode == crate::config::Mode::Dev,
+                        // C11.3: `RN_SITE__IMPERSONATION`, resolved against
+                        // the mode when the deployment did not say — on in
+                        // dev, off in prod (`crate::config`).
+                        impersonation: state.config.impersonation(),
                         store: state.store.as_ref(),
                         feed: state.feed.as_ref(),
                         provider: state.provider.as_ref(),

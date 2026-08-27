@@ -100,6 +100,31 @@ pub struct AppConfig {
     /// the tree spell differently.
     #[serde(default)]
     pub dev: bool,
+    /// Whether an operator may sign in as a person on this deployment
+    /// (`RN_SITE__IMPERSONATION`, requirement C11.3).
+    ///
+    /// An `Option` because the requirement's default is not a constant: on in
+    /// dev, **off** in prod. `None` is "this deployment did not say", which
+    /// [`Self::impersonation`] resolves against the mode; `Some` is a
+    /// deployment that stated it either way, and a production deployment that
+    /// wants the control is the one that has to say so.
+    ///
+    /// It is not a review of `crates/kernel`. The kernel reads no
+    /// configuration — the server hands the resolved flag to every command as
+    /// [`rn_kernel::cmd::Ctx::impersonation`] — so a deployment that never
+    /// wants an operator able to become a person turns this off and the
+    /// refusal is a value in the context rather than a promise about a code
+    /// path.
+    #[serde(default)]
+    pub impersonation: Option<bool>,
+    /// A second listener, serving `/admin/*` on a *running* node
+    /// (`RN_SITE__ADMIN_ADDR`, requirement G21.2). Absent by default.
+    ///
+    /// It must be loopback, and [`Self::validate`] refuses anything else at
+    /// boot in both modes. See [`crate::admin`] for why that is the whole of
+    /// the authorisation.
+    #[serde(default)]
+    pub admin_addr: Option<SocketAddr>,
 }
 
 /// Everything that can go wrong turning the environment into an [`AppConfig`].
@@ -144,6 +169,20 @@ impl AppConfig {
     }
 
     fn validate(&self) -> Result<(), ConfigError> {
+        // Before anything else, because it is the one field whose failure mode
+        // is a hole rather than an outage: `/admin/*` has no cookie and no
+        // session, so an address that is reachable from anywhere is full
+        // authority reachable from anywhere. In both modes — a dev deployment
+        // that published it would be a laptop on a coffee-shop network.
+        if let Some(addr) = self.admin_addr
+            && !addr.ip().is_loopback()
+        {
+            return Err(ConfigError::Invalid(format!(
+                "RN_SITE__ADMIN_ADDR must be a loopback address; {addr} is not. Reaching that \
+                 socket is the whole authorisation for /admin/*, which is defensible only \
+                 because the socket cannot be reached from off the host"
+            )));
+        }
         match &self.oidc_key {
             Some(key) if !is_seal_key(key) => {
                 return Err(ConfigError::Invalid(
@@ -198,6 +237,16 @@ impl AppConfig {
                 generated
             }
         }
+    }
+
+    /// Whether an operator may become a person here (C11.3).
+    ///
+    /// The resolved answer, and the only one anything outside this module
+    /// asks: a deployment that stated the key gets what it stated, and one
+    /// that did not gets dev's yes and production's no.
+    #[must_use]
+    pub fn impersonation(&self) -> bool {
+        self.impersonation.unwrap_or(self.mode == Mode::Dev)
     }
 
     /// Directory that must exist for hiqlite (`data/` for the default path).
@@ -335,6 +384,8 @@ mod tests {
             public_name: None,
             oidc_key: Some("a".repeat(64)),
             dev: false,
+            impersonation: None,
+            admin_addr: None,
         }
     }
 
@@ -438,6 +489,51 @@ mod tests {
         assert!(build(Some(1.into())).dev, "RN_SITE__DEV=1");
         assert!(build(Some(true.into())).dev, "RN_SITE__DEV=true");
         assert!(!build(Some(0.into())).dev);
+    }
+
+    /// G21.2's boot refusal. `/admin/*` has no cookie and no session —
+    /// reaching the socket *is* the authority — so an address that is not
+    /// loopback is full authority published to whatever the interface can
+    /// reach. It is refused in **both** modes, because a dev laptop on a
+    /// shared network is the case a mode check would wave through.
+    #[test]
+    fn a_non_loopback_admin_address_is_refused_at_boot_in_either_mode() {
+        for mode in [Mode::Dev, Mode::Prod] {
+            let mut config = cfg(mode, Some(&"a".repeat(32)));
+            for reachable in ["0.0.0.0:3399", "192.168.1.10:3399", "[::]:3399"] {
+                config.admin_addr = Some(reachable.parse().expect("an address"));
+                let refused = config
+                    .validate()
+                    .expect_err(&format!("{reachable} in {mode:?}"));
+                assert!(
+                    refused.to_string().contains("loopback"),
+                    "the refusal must say why: {refused}"
+                );
+            }
+            for loopback in ["127.0.0.1:3399", "127.0.0.2:3399", "[::1]:3399"] {
+                config.admin_addr = Some(loopback.parse().expect("an address"));
+                config
+                    .validate()
+                    .unwrap_or_else(|error| panic!("{loopback} in {mode:?}: {error}"));
+            }
+            config.admin_addr = None;
+            config.validate().expect("absent is the default");
+        }
+    }
+
+    /// C11.3. The key's default is not a constant — it is the mode — and a
+    /// deployment that states it gets what it stated either way.
+    #[test]
+    fn impersonation_is_on_in_dev_off_in_prod_and_whatever_the_deployment_said() {
+        let mut dev = cfg(Mode::Dev, None);
+        let mut prod = cfg(Mode::Prod, Some(&"a".repeat(32)));
+        assert!(dev.impersonation(), "unset in dev is on");
+        assert!(!prod.impersonation(), "unset in prod is off");
+
+        dev.impersonation = Some(false);
+        prod.impersonation = Some(true);
+        assert!(!dev.impersonation(), "a dev deployment may turn it off");
+        assert!(prod.impersonation(), "and a production one may turn it on");
     }
 
     #[test]
