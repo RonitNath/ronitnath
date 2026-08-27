@@ -228,6 +228,12 @@ impl Event {
             "revoke-token" => Self::TokenRevoked {
                 client: field(&json, "client")?,
             },
+            "enable-product" => Self::ProductEnabled {
+                slug: json.get("slug")?.as_str()?.to_owned(),
+            },
+            "disable-product" => Self::ProductDisabled {
+                slug: json.get("slug")?.as_str()?.to_owned(),
+            },
             "revoke-consent" => Self::ConsentRevoked {
                 client: field(&json, "client")?,
                 person: field(&json, "person")?,

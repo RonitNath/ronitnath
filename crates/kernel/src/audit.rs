@@ -80,12 +80,75 @@ pub fn object_stmt(key: Uuid, kind: &'static str, id: i64) -> crate::store::Stmt
 pub const OBJECT_SQL: &str = "INSERT OR IGNORE INTO audit_object (audit_id, kind, id) \
      SELECT a.id, $1, $2 FROM audit a WHERE a.key = $3";
 
+/// The argument names whose values never reach a digest.
+///
+/// `audit.request_digest` is a SHA-256 over a command's arguments, and the
+/// audit table is also the change feed and has no retention — so a command
+/// that carried a password would leave a permanent offline-guessable digest of
+/// it in the deployment's most-read table. `ReAuthenticate` already answered
+/// this for itself by handing [`digest_of`] a redacted struct
+/// (`cmd::reauthenticate::Redacted`); this list is the same answer for the
+/// commands that hand over their real arguments, made where it cannot be
+/// forgotten by the next one.
+///
+/// A *name* list rather than a type-level opt-in, because the alternative is a
+/// trait implemented forty-nine times, forty-seven of which would say
+/// "nothing", and the one that mattered would be the one somebody left out.
+///
+/// The cost of a false positive is small and bounded: two calls under one
+/// idempotency key that differ *only* in a credential replay the first
+/// instead of conflicting, which is the safer of the two answers for a retry.
+pub const REDACTED_FIELDS: &[&str] = &[
+    "client_secret",
+    "code",
+    "other_password",
+    "password",
+    "refresh_token",
+    "secret",
+    "token",
+    // `AddFactor.value` — the address, the password, the credential.
+    "value",
+];
+
+/// What a redacted value reads as. A marker rather than a removal, so the
+/// shape of the arguments still separates two different commands.
+const REDACTED: &str = "[redacted]";
+
 /// A digest of a command's arguments, for telling a replay from a reuse.
+///
+/// Credentials are stripped on the way in ([`REDACTED_FIELDS`]). Every writer
+/// of `audit.request_digest` goes through this one function — `cmd::run` for
+/// the replay lookup and each command's own audit statement for the stored
+/// value — so the two cannot disagree about what was hashed.
 pub fn digest_of<T: Serialize>(args: &T) -> String {
-    let canonical = serde_json::to_vec(args).unwrap_or_default();
+    let canonical = match serde_json::to_value(args) {
+        Ok(json) => serde_json::to_vec(&redact(json)).unwrap_or_default(),
+        Err(_) => Vec::new(),
+    };
     let mut hasher = Sha256::new();
     hasher.update(&canonical);
     B64.encode(hasher.finalize())
+}
+
+/// Replace every credential-bearing member, at any depth.
+fn redact(json: serde_json::Value) -> serde_json::Value {
+    use serde_json::Value;
+    match json {
+        Value::Object(members) => Value::Object(
+            members
+                .into_iter()
+                .map(|(name, value)| {
+                    if REDACTED_FIELDS.contains(&name.as_str()) {
+                        (name, Value::String(REDACTED.to_owned()))
+                    } else {
+                        (name, redact(value))
+                    }
+                })
+                .collect(),
+        ),
+        Value::Array(items) => Value::Array(items.into_iter().map(redact).collect()),
+        other => other,
+    }
 }
 
 /// The idempotency lookup, exposed so the "no full scan" gate can assert that
@@ -154,6 +217,40 @@ mod tests {
     struct Args {
         email: &'static str,
         display: &'static str,
+    }
+
+    #[test]
+    fn a_password_never_reaches_the_digest() {
+        // The addendum's test, spelled as the finding states it: the digest of
+        // a SignIn with password A equals the digest with password B.
+        let a = digest_of(&rn_api::commands::SignIn {
+            email: "a@b.co".into(),
+            password: "hunter2".into(),
+        });
+        let b = digest_of(&rn_api::commands::SignIn {
+            email: "a@b.co".into(),
+            password: "an entirely different password".into(),
+        });
+        assert_eq!(a, b, "the password is part of the digest input");
+        // And the arguments that are not credentials still separate two calls.
+        let c = digest_of(&rn_api::commands::SignIn {
+            email: "somebody-else@b.co".into(),
+            password: "hunter2".into(),
+        });
+        assert_ne!(a, c);
+    }
+
+    #[test]
+    fn a_nested_credential_is_redacted_too() {
+        let with = digest_of(&serde_json::json!({
+            "outer": { "password": "one" },
+            "list": [{ "secret": "two" }],
+        }));
+        let without = digest_of(&serde_json::json!({
+            "outer": { "password": "three" },
+            "list": [{ "secret": "four" }],
+        }));
+        assert_eq!(with, without);
     }
 
     #[test]

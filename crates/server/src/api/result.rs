@@ -234,6 +234,14 @@ pub fn result_of(event: &Event, key: &IdKey, party: Option<PublicId>) -> Value {
             "person": person.public(key),
             "session": session.public(key),
         }),
+
+        // --- products -----------------------------------------------------
+        // The slug, which is what the caller sent and what the catalogue is
+        // keyed on. There is no id: a product is an entry in the binary, not
+        // a row somebody created.
+        Event::ProductEnabled { slug } | Event::ProductDisabled { slug } => {
+            json!({ "slug": slug })
+        }
     }
 }
 

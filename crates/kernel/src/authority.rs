@@ -179,6 +179,8 @@ pub const PLATFORM_REAUTH_WINDOW: crate::Timestamp = 15 * 60;
 pub const SENSITIVE: &[&str] = &[
     "delete-client",
     "disable",
+    "disable-product",
+    "enable-product",
     "grant-operator",
     "retire-key",
     "revoke-operator",

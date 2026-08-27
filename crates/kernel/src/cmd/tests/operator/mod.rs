@@ -153,6 +153,8 @@ const GATED: &[&str] = &[
     "revoke-operator",
     "sign-in-as",
     "retire-key",
+    "enable-product",
+    "disable-product",
 ];
 
 #[test]

@@ -36,6 +36,7 @@ mod invite;
 mod leave;
 pub(crate) mod oidc;
 mod operator;
+mod product;
 mod publish_document;
 mod reauthenticate;
 pub(crate) mod refs;
@@ -73,6 +74,7 @@ pub use oidc::{
     update_client,
 };
 pub use operator::{grant_operator, revoke_operator};
+pub use product::{disable_product, enable_product};
 pub use publish_document::publish_document;
 pub use reauthenticate::reauthenticate;
 pub use register::register;
@@ -224,6 +226,12 @@ where
     Plan: Future<Output = Outcome<Batch>> + Send,
 {
     let started = std::time::Instant::now();
+    // Redacted on the way in: `audit::digest_of` strips the credential-bearing
+    // members ([`audit::REDACTED_FIELDS`]) before it hashes, so no password
+    // ever enters `audit.request_digest` — a column in a table that is also
+    // the change feed and has no retention. Every command's own audit
+    // statement calls the same function, which is what keeps the stored digest
+    // and this lookup the same string.
     let digest = audit::digest_of(args);
     if let Some(committed) = audit::replay(ctx.store, ctx.key, &digest).await? {
         return Ok(Applied {

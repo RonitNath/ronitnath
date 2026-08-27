@@ -23,12 +23,13 @@ use axum::response::{IntoResponse, Response};
 use axum::{Json, Router, routing::post};
 use rn_api::commands::{
     ALL_COMMAND_NAMES, ActAs, AddFactor, Authorize, ClaimLink, ClientCredentials, ConfirmMatch,
-    CreateDocument, CreateGroup, CreateOrganization, DeleteClient, Disable, EditDocument, Enable,
-    EndImpersonation, EndSession, ExchangeCode, GrantOperator, Invite, Leave, ProposeMatch,
-    PublishDocument, ReAuthenticate, RefreshToken, Register, RegisterClient, RemoveFactor,
-    RemoveMember, RetireKey, Revoke, RevokeConsent, RevokeLink, RevokeOperator, RevokeSession,
-    RevokeToken, RotateClientSecret, RotateSigningKey, RuleMatch, SetHandle, SetRole, Share,
-    SignIn, SignInAs, SignOut, Split, Transfer, UpdateClient, VerifyEmail,
+    CreateDocument, CreateGroup, CreateOrganization, DeleteClient, Disable, DisableProduct,
+    EditDocument, Enable, EnableProduct, EndImpersonation, EndSession, ExchangeCode, GrantOperator,
+    Invite, Leave, ProposeMatch, PublishDocument, ReAuthenticate, RefreshToken, Register,
+    RegisterClient, RemoveFactor, RemoveMember, RetireKey, Revoke, RevokeConsent, RevokeLink,
+    RevokeOperator, RevokeSession, RevokeToken, RotateClientSecret, RotateSigningKey, RuleMatch,
+    SetHandle, SetRole, Share, SignIn, SignInAs, SignOut, Split, Transfer, UpdateClient,
+    VerifyEmail,
 };
 use rn_api::{Command, CommandEnvelope};
 use rn_kernel::Principal;
@@ -172,6 +173,11 @@ bindings! {
     // `ending`, because the session that ran it is the session it deleted.
     ending EndImpersonation => cmd::end_impersonation,
     plain RetireKey => cmd::retire_key,
+    // The deployment's own surface. Nothing is minted and nothing is handed
+    // back: what the caller gets is the offset, which is the barrier they
+    // present to the node they read the result from.
+    plain EnableProduct => cmd::enable_product,
+    plain DisableProduct => cmd::disable_product,
 }
 
 /// Run a command, on this handler's own task.

@@ -9,10 +9,10 @@
 use rn_api::commands::MatchSignal;
 use rn_api::commands::{
     AddFactor, CreateDocument, CreateGroup, CreateOrganization, DeleteClient, Disable,
-    EditDocument, Enable, FactorKind, GrantOperator, Invite, Leave, ProposeMatch, PublishDocument,
-    RegisterClient, RemoveFactor, RemoveMember, RetireKey, Revoke, RevokeLink, RevokeOperator,
-    RevokeSession, RotateClientSecret, RotateSigningKey, RuleMatch, SetRole, Share, SignInAs,
-    Split, Transfer, UpdateClient,
+    DisableProduct, EditDocument, Enable, EnableProduct, FactorKind, GrantOperator, Invite, Leave,
+    ProposeMatch, PublishDocument, RegisterClient, RemoveFactor, RemoveMember, RetireKey, Revoke,
+    RevokeLink, RevokeOperator, RevokeSession, RotateClientSecret, RotateSigningKey, RuleMatch,
+    SetRole, Share, SignInAs, Split, Transfer, UpdateClient,
 };
 use rn_api::whoami::{DocRole, MemberRole as WireRole};
 
@@ -274,6 +274,23 @@ async fn an_operator_reaches_every_command_a_principal_authorises() {
     )
     .await;
 
+    let enable_product = EnableProduct {
+        slug: crate::product::CATALOGUE[0].slug.to_owned(),
+    };
+    refused(
+        "enable-product",
+        cmd::enable_product(&ctx(), &enable_product).await,
+    )
+    .await;
+    let disable_product = DisableProduct {
+        slug: crate::product::CATALOGUE[0].slug.to_owned(),
+    };
+    refused(
+        "disable-product",
+        cmd::disable_product(&ctx(), &disable_product).await,
+    )
+    .await;
+
     // ------------------------------------------------------- the operator ---
 
     make_operator(&harness, agent_person).await;
@@ -499,6 +516,19 @@ async fn an_operator_reaches_every_command_a_principal_authorises() {
     };
     sweep(&mut seen, "retire-key", Then::Works, || async {
         cmd::retire_key(&ctx(), &retire).await.map(|_| ())
+    })
+    .await;
+
+    // The deployment's own surface: on, then off again, so the world the next
+    // command sees is the world this one found.
+    sweep(&mut seen, "enable-product", Then::Works, || async {
+        cmd::enable_product(&ctx(), &enable_product).await.map(|_| ())
+    })
+    .await;
+    sweep(&mut seen, "disable-product", Then::Works, || async {
+        cmd::disable_product(&ctx(), &disable_product)
+            .await
+            .map(|_| ())
     })
     .await;
 

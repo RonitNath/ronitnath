@@ -61,11 +61,13 @@ const fn index(event: &Event) -> usize {
         Event::Impersonated { .. } => 45,
         Event::ImpersonationEnded { .. } => 46,
         Event::SigningKeyRetired { .. } => 47,
+        Event::ProductEnabled { .. } => 48,
+        Event::ProductDisabled { .. } => 49,
     }
 }
 
 /// How many there are. Stated once, asserted against both lists.
-const VARIANTS: usize = 48;
+const VARIANTS: usize = 50;
 
 /// One of each, with ids that are obviously placeholders.
 fn every_variant() -> Vec<Event> {
@@ -244,6 +246,12 @@ fn every_variant() -> Vec<Event> {
         Event::SigningKeyRetired {
             kid: "a-kid".to_owned(),
             forced: true,
+        },
+        Event::ProductEnabled {
+            slug: "a-product".to_owned(),
+        },
+        Event::ProductDisabled {
+            slug: "a-product".to_owned(),
         },
     ]
 }

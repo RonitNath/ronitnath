@@ -314,6 +314,10 @@ fn parties_changed(event: &Event, key: &IdKey) -> Vec<String> {
         | Event::Impersonated { .. }
         | Event::ImpersonationEnded { .. }
         | Event::SigningKeyRetired { .. }
+        // A product toggle writes one `product` row and no party row. What
+        // changes for a list of parties is nothing.
+        | Event::ProductEnabled { .. }
+        | Event::ProductDisabled { .. }
         | Event::ConsentRevoked { .. } => Vec::new(),
     }
 }
@@ -372,6 +376,8 @@ fn identities_changed(event: &Event, key: &IdKey) -> Vec<String> {
         | Event::Impersonated { .. }
         | Event::ImpersonationEnded { .. }
         | Event::SigningKeyRetired { .. }
+        | Event::ProductEnabled { .. }
+        | Event::ProductDisabled { .. }
         | Event::ConsentRevoked { .. } => Vec::new(),
     }
 }

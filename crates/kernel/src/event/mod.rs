@@ -405,6 +405,19 @@ pub enum Event {
         /// of retire it was and the payload carries the reason.
         forced: bool,
     },
+    /// A product was turned on for this deployment. Every node re-reads its
+    /// [`crate::product::ProductSet`] and starts answering the product's
+    /// routes; nothing restarts.
+    ProductEnabled {
+        /// The catalogue slug.
+        slug: String,
+    },
+    /// A product was turned off. Its routes answer the uniform decline again
+    /// and everything it wrote stays where it is.
+    ProductDisabled {
+        /// The catalogue slug.
+        slug: String,
+    },
     /// A person withdrew a consent, and every token it produced with it.
     ConsentRevoked {
         /// The client.
@@ -470,6 +483,8 @@ impl Event {
             Self::Impersonated { .. } => "sign-in-as",
             Self::ImpersonationEnded { .. } => "end-impersonation",
             Self::SigningKeyRetired { .. } => "retire-key",
+            Self::ProductEnabled { .. } => "enable-product",
+            Self::ProductDisabled { .. } => "disable-product",
         }
     }
 

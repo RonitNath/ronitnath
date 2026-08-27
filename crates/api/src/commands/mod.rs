@@ -10,6 +10,7 @@ mod identity;
 mod merge;
 mod org;
 mod platform;
+mod product;
 mod resource;
 
 pub use crate::oidc::{
@@ -28,6 +29,7 @@ pub use org::{
 pub use platform::{
     EndImpersonation, GrantOperator, ReAuthenticate, RetireKey, RevokeOperator, SignInAs,
 };
+pub use product::{DisableProduct, EnableProduct};
 pub use resource::{CreateDocument, EditDocument, PublishDocument, Revoke, Share, Transfer};
 
 /// Implement [`Command`](crate::command::Command) for a list of args structs.
@@ -101,6 +103,11 @@ command_names! {
     SignInAs => "sign-in-as",
     EndImpersonation => "end-impersonation",
     RetireKey => "retire-key",
+    // Products, enabled and disabled at runtime (leg P2). The catalogue is
+    // compiled in and the row is only this deployment's decision about it, so
+    // the argument is a slug rather than an id.
+    EnableProduct => "enable-product",
+    DisableProduct => "disable-product",
 }
 
 #[cfg(test)]
@@ -110,7 +117,7 @@ mod tests {
     #[test]
     fn the_product_contract_is_covered_exactly_once() {
         // The list in docs/rebuild/plan.md §Product contract, verbatim.
-        assert_eq!(ALL_COMMAND_NAMES.len(), 47);
+        assert_eq!(ALL_COMMAND_NAMES.len(), 49);
         let mut sorted = ALL_COMMAND_NAMES.to_vec();
         sorted.sort_unstable();
         let count = sorted.len();
