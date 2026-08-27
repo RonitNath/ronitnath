@@ -137,7 +137,7 @@ async fn execute(state: &AppState, request: Request) -> Result<Report, AdminErro
     match request {
         Request::Act { action, who } => super::run(state, who.as_deref(), &action).await,
         Request::Backup(dir) => super::backup::write(state, &dir).await,
-        Request::Restore(dir) => super::restore::read(state, &dir).await,
+        Request::Restore(dir) => super::restore::apply(state, &dir).await,
         Request::Wipe => wipe(state).await,
     }
 }

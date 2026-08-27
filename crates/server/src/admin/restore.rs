@@ -46,7 +46,7 @@ const CHUNK: usize = 500;
 /// [`AdminError::Usage`] when the directory is not a backup,
 /// [`AdminError::Refused`] for each of the three refusals above, and
 /// [`AdminError::Store`] when an insert fails.
-pub async fn read(state: &AppState, dir: &Path) -> Result<super::Report, AdminError> {
+pub async fn apply(state: &AppState, dir: &Path) -> Result<super::Report, AdminError> {
     let path = dir.join("manifest.json");
     let raw = std::fs::read_to_string(&path)
         .map_err(|error| AdminError::Usage(format!("cannot read {}: {error}", path.display())))?;

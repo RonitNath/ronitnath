@@ -143,7 +143,7 @@ pub async fn run(state: &AppState, action: &Action) -> Result<Report, AdminError
             if rows.is_empty() {
                 text.push_str("no operators — this deployment has nobody who can grant one\n");
             }
-            Ok(Report::read(text, json!({ "operators": body })))
+            Ok(Report::answer(text, json!({ "operators": body })))
         }
         Action::Sessions { person } => {
             let now = reads.now();
@@ -177,7 +177,7 @@ pub async fn run(state: &AppState, action: &Action) -> Result<Report, AdminError
             if rows.is_empty() {
                 text.push_str("no live sessions\n");
             }
-            Ok(Report::read(text, json!({ "sessions": body })))
+            Ok(Report::answer(text, json!({ "sessions": body })))
         }
         Action::Audit { tail } => {
             let limit = i64::try_from(*tail).unwrap_or(i64::MAX).clamp(1, 1_000);
@@ -205,7 +205,7 @@ pub async fn run(state: &AppState, action: &Action) -> Result<Report, AdminError
                     "payload": serde_json::from_str::<Value>(&row.payload).unwrap_or(Value::Null),
                 }));
             }
-            Ok(Report::read(text, json!({ "audit": body })))
+            Ok(Report::answer(text, json!({ "audit": body })))
         }
         Action::Products => products(state).await,
         Action::GrantOperator { .. }
@@ -253,7 +253,7 @@ async fn products(state: &AppState) -> Result<Report, AdminError> {
         ));
         body.push(json!({ "slug": row.slug, "enabled": row.enabled != 0 }));
     }
-    Ok(Report::read(text, json!({ "products": body })))
+    Ok(Report::answer(text, json!({ "products": body })))
 }
 
 struct ProductRow {

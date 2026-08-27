@@ -151,7 +151,9 @@ pub struct Report {
 }
 
 impl Report {
-    fn read(text: String, body: Value) -> Self {
+    /// A read's answer: text for a terminal, JSON for the listener, and no
+    /// offset, because nothing was committed.
+    fn answer(text: String, body: Value) -> Self {
         Self {
             text,
             body,
