@@ -1,8 +1,9 @@
 //! `SignIn` — exchange a password factor for a session.
 //!
 //! Every way this can fail produces the same answer and, as near as matters,
-//! the same latency. An unknown address, a disabled identity, a wrong
-//! password: one [`Decline`](crate::Decline), and the unknown-address path
+//! the same latency. An unknown address, a disabled identity, a disabled
+//! person, a wrong password: one [`Decline`](crate::Decline), and the
+//! unknown-address path
 //! spends an argon2 verification against a dummy hash so it does not answer
 //! faster than the others and tell a caller which addresses are registered.
 //! All three verifications go to the blocking pool, so the work that makes
@@ -23,16 +24,27 @@ use crate::store::{Cursor, FromRow, Reads, RowError, Sql, Value};
 ///
 /// The partial unique index on `factor(value) WHERE kind = 'email'` is what
 /// makes this a seek; `explain_sign_in` asserts it.
-pub const LOOKUP: &str = "SELECT i.id AS identity_id, i.person_id, i.status, p.value AS phc \
+pub const LOOKUP: &str = "SELECT i.id AS identity_id, i.person_id, \
+                             CASE WHEN i.status = 'active' \
+                                   AND coalesce(who.status, 'active') = 'active' \
+                                  THEN 'active' ELSE 'disabled' END AS status, \
+                             p.value AS phc \
                       FROM factor e \
                       JOIN identity i ON i.id = e.identity_id \
+                      LEFT JOIN party who ON who.id = i.person_id \
                       LEFT JOIN factor p ON p.identity_id = i.id AND p.kind = 'password' \
                       WHERE e.kind = 'email' AND e.value = $1";
 
+/// The guard is the whole rule, restated where it is transactional: the read
+/// above decides, and this is what makes the decision hold against a `Disable`
+/// that commits between the two.
 const SESSION: &str = "INSERT INTO session \
                        (identity_id, acting_as, token_hash, expires_at, created_at, last_seen_at) \
                        SELECT $1, $2, $3, $4, $5, $5 \
-                       WHERE EXISTS (SELECT 1 FROM identity WHERE id = $1 AND status = 'active') \
+                       WHERE EXISTS (SELECT 1 FROM identity i \
+                                     LEFT JOIN party who ON who.id = i.person_id \
+                                     WHERE i.id = $1 AND i.status = 'active' \
+                                       AND coalesce(who.status, 'active') = 'active') \
                        RETURNING id";
 
 const AUDIT: &str = "INSERT INTO audit \
@@ -71,6 +83,11 @@ pub async fn sign_in<S: Sql, F: Feed>(ctx: &Ctx<'_, S, F>, args: &SignIn) -> Out
         .await?;
 
     // One shape for every refusal, and the same work done on each path.
+    // `status` is the *pair*: `Disable` moves `party.status`, never
+    // `identity.status`, so an identity that reads active on its own row can
+    // still belong to a person this deployment has disabled — and a disable
+    // that only deleted the open sessions would be an account that signs
+    // straight back in.
     let Some(candidate) = candidate.filter(|c| c.status == "active") else {
         password::verify_dummy_blocking(&args.password).await;
         return decline();

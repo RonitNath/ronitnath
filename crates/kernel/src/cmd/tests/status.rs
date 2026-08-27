@@ -283,3 +283,61 @@ async fn a_platform_operator_may_disable_an_organization_they_have_nothing_to_do
     .await
     .expect("an operator may");
 }
+
+#[tokio::test]
+async fn a_disabled_person_cannot_sign_back_in() {
+    let harness = Local::new();
+    let who = harness
+        .register("Ronit", "disabled-signin@example.test")
+        .await
+        .expect("registers");
+    let party = who
+        .principal
+        .acting_as()
+        .expect("a member acts as somebody")
+        .public(harness.store().ids());
+
+    disable(
+        &harness.ctx(who.principal.clone()),
+        &Disable {
+            party,
+            reason: "leaving".into(),
+        },
+    )
+    .await
+    .expect("disables");
+
+    // Taking the open sessions is only half of it. `Disable` moves
+    // `party.status`, and nothing about `identity.status` — so an account
+    // whose sign-in only asked the identity was an account that signed
+    // straight back in, one form post after being disabled.
+    let refused = harness.sign_in("disabled-signin@example.test").await;
+    assert!(
+        matches!(refused, Err(ref error) if error.is_decline()),
+        "a disabled person signed in again"
+    );
+    assert_eq!(
+        count(&harness, "SELECT count(*) AS n FROM session").await,
+        0,
+        "and no session was minted"
+    );
+
+    // Enable puts it back, which is what makes the pair a lifecycle rather
+    // than a deletion.
+    enable(
+        &harness.ctx(who.principal.clone()),
+        &Enable {
+            party: who
+                .principal
+                .acting_as()
+                .expect("acts as somebody")
+                .public(harness.store().ids()),
+        },
+    )
+    .await
+    .expect("an operator-less self-enable is still permitted");
+    harness
+        .sign_in("disabled-signin@example.test")
+        .await
+        .expect("and then they can sign in");
+}
