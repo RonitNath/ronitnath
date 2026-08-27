@@ -775,3 +775,86 @@ fn a_client_secret_cannot_be_ground_down_at_the_token_endpoint() {
         );
     });
 }
+
+/// `prompt=login` and a stale `max_age` both ask for a fresh authentication,
+/// and asking must not be a loop.
+///
+/// The round trip is `/oidc/authorize` → `/auth?next=…&reauth=1` → the form.
+/// Without `reauth`, `/auth` sends a signed-in reader straight back to the
+/// endpoint, which asks again — forever.
+#[test]
+fn asking_somebody_to_sign_in_again_is_a_form_and_not_a_loop() {
+    harness::run(async {
+        let world = world("reauth").await;
+        let cookie = format!("rn_session={}", world.person.token);
+        let base = format!(
+            "/oidc/authorize?response_type=code&client_id={}&redirect_uri={}&scope=openid\
+             &code_challenge={CHALLENGE}&code_challenge_method=S256",
+            world.client.id,
+            encode(&world.client.redirect_uri)
+        );
+
+        // The session is aged so `max_age` has something to refuse: minted a
+        // moment ago, `now - created_at` is zero, and `max_age=0` is
+        // literally satisfied by it.
+        world
+            .state
+            .store
+            .execute(
+                "UPDATE session SET created_at = created_at - 3600 WHERE identity_id = $1",
+                rn_kernel::bind![world.person.identity],
+            )
+            .await
+            .expect("the update");
+
+        for url in [format!("{base}&prompt=login"), format!("{base}&max_age=60")] {
+            let sent = world
+                .server
+                .get(&url)
+                .add_header("cookie", cookie.clone())
+                .await;
+            assert_eq!(sent.status_code(), StatusCode::SEE_OTHER, "{url}");
+            let location = sent.headers()["location"]
+                .to_str()
+                .expect("ascii")
+                .to_owned();
+            assert!(location.starts_with("/auth?"), "{location}");
+            assert!(location.contains("reauth=1"), "{location}");
+
+            // And `/auth` shows the form rather than sending them back.
+            let form = world
+                .server
+                .get(&location)
+                .add_header("cookie", cookie.clone())
+                .await;
+            form.assert_status_ok();
+            assert!(
+                form.text().contains("/auth/sign-in"),
+                "the form, not a redirect"
+            );
+        }
+
+        // `login_hint` arrives in the field, so the reader is not asked to
+        // retype an address the relying party already knows.
+        let hinted = world
+            .server
+            .get(&format!(
+                "{base}&prompt=login&login_hint=someone%40example.test"
+            ))
+            .add_header("cookie", cookie.clone())
+            .await;
+        let location = hinted.headers()["location"]
+            .to_str()
+            .expect("ascii")
+            .to_owned();
+        let form = world
+            .server
+            .get(&location)
+            .add_header("cookie", cookie)
+            .await;
+        assert!(
+            form.text().contains("someone@example.test"),
+            "the hinted address is prefilled"
+        );
+    });
+}

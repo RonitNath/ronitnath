@@ -182,9 +182,25 @@ impl AuthPage {
     }
 }
 
+/// What `GET /auth` reads off its own query.
 #[derive(Debug, Deserialize)]
 struct Next {
     next: Option<String>,
+    /// Show the form even to somebody who is already signed in.
+    ///
+    /// One caller: the OpenID authorization endpoint, for `prompt=login` and
+    /// for a `max_age` this session is older than. Without it that endpoint
+    /// loops — it sends the reader here, this page sends a member straight on,
+    /// and the endpoint asks for a fresh authentication again, forever.
+    ///
+    /// It is not a way to sign in as somebody else while signed in: the form
+    /// posts to `/auth/sign-in` like any other, which mints a new session and
+    /// hands back a new cookie.
+    reauth: Option<String>,
+    /// The address to prefill, from the authorization endpoint's `login_hint`.
+    /// A suggestion in a field the reader may overwrite, and nothing else —
+    /// it proves nothing and it is not remembered.
+    email: Option<String>,
 }
 
 async fn page(
@@ -194,10 +210,17 @@ async fn page(
     headers: HeaderMap,
 ) -> Response {
     let next = next::validate(query.next.as_deref());
-    if matches!(session.principal, Principal::Member { .. }) {
+    let reauth = query.reauth.is_some();
+    if !reauth && matches!(session.principal, Principal::Member { .. }) {
         return see_other(&next, None, 0);
     }
-    accept_hint(AuthPage::new(&state, &headers, next).into_response())
+    let mut page = AuthPage::new(&state, &headers, next);
+    if let Some(email) = query.email.as_deref().map(str::trim)
+        && !email.is_empty()
+    {
+        page.sign_in.email = email.to_owned();
+    }
+    accept_hint(page.into_response())
 }
 
 #[derive(Debug, Deserialize)]
