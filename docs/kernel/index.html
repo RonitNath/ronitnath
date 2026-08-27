@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kernel report</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #f7f7f9; --fg: #16171d; --muted: #5d606b; --line: #d9dbe3; --card: #ffffff;
+    --blue: #2f5fd6; --green: #1f8a5b; --orange: #c2620a; --red: #c23a3a; --violet: #7a4fc9;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #0f1117; --fg: #e8e9ee; --muted: #9b9fad; --line: #2a2d38; --card: #161923;
+            --blue: #7aa2ff; --green: #5ccb95; --orange: #f0a04b; --red: #ff7b7b; --violet: #b79cff; }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.55 var(--sans); }
+  main { max-width: 78rem; margin: 0 auto; padding: 3rem 1.5rem 6rem; }
+  h1 { font-size: 2.2rem; line-height: 1.15; margin: 0 0 .25rem; letter-spacing: -.01em; text-wrap: balance; }
+  h2 { font-size: 1.45rem; margin: 3rem 0 .75rem; letter-spacing: -.005em; }
+  h3 { font-size: 1.05rem; margin: 1.75rem 0 .5rem; }
+  p, li { max-width: 68ch; }
+  .lede { font-size: 1.15rem; color: var(--muted); margin: 0 0 1.5rem; max-width: 60ch; }
+  .nav { display: flex; flex-wrap: wrap; gap: .5rem 1.25rem; font-size: .9rem; margin: 1.5rem 0 0; padding: 1rem 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+  .nav a { color: var(--fg); text-decoration: none; border-bottom: 1px solid var(--line); }
+  .nav a.board { color: var(--violet); border-color: var(--violet); font-weight: 600; }
+  a { color: var(--blue); }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr)); gap: 1rem; margin: 1rem 0; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: .25rem; padding: 1rem 1.1rem; }
+  .card h3 { margin: 0 0 .4rem; font-size: 1rem; }
+  .card p { margin: 0; color: var(--muted); font-size: .95rem; }
+  .card.blue { border-left: 3px solid var(--blue); } .card.green { border-left: 3px solid var(--green); }
+  .card.orange { border-left: 3px solid var(--orange); } .card.red { border-left: 3px solid var(--red); }
+  ol.rules { counter-reset: r; list-style: none; padding: 0; }
+  ol.rules li { counter-increment: r; padding: .5rem 0 .5rem 2.6rem; position: relative; border-bottom: 1px solid var(--line); max-width: none; }
+  ol.rules li::before { content: counter(r); position: absolute; left: 0; top: .45rem; width: 1.8rem; height: 1.8rem; border: 1px solid var(--line); border-radius: .25rem; display: grid; place-items: center; font: 600 .85rem var(--mono); }
+  table { border-collapse: collapse; width: 100%; font-size: .92rem; margin: .75rem 0 1.25rem; }
+  th, td { text-align: left; vertical-align: top; padding: .5rem .6rem; border-bottom: 1px solid var(--line); }
+  th { font-weight: 600; color: var(--muted); font-size: .8rem; letter-spacing: .04em; text-transform: uppercase; }
+  td.num, td code { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+  code, pre { font-family: var(--mono); font-size: .88em; }
+  pre { background: var(--card); border: 1px solid var(--line); border-radius: .25rem; padding: .9rem 1rem; overflow-x: auto; line-height: 1.5; }
+  .ruling { border-left: 3px solid var(--violet); padding: .25rem 0 .25rem 1rem; color: var(--muted); }
+  .tag { font: 600 .72rem/1 var(--mono); letter-spacing: .05em; text-transform: uppercase; color: var(--muted); }
+  .wrap { overflow-x: auto; }
+  dl { display: grid; grid-template-columns: max-content 1fr; gap: .35rem 1.25rem; max-width: 68ch; }
+  dt { font-family: var(--mono); font-size: .9rem; }
+  dd { margin: 0; color: var(--muted); }
+  small { color: var(--muted); }
+</style>
+</head>
+<body>
+<main>
+  <p class="tag">isoastra core model · rn-site kernel · 2026-08-26</p>
+  <h1>The kernel</h1>
+  <p class="lede">One Rust binary is the application, the database, the message fabric and the realtime layer. It runs on three small VMs per zone, spread across sites far enough apart to survive a city-scale disaster, and is partitioned by region so writes are local and data stays where the law says. Products are plug-ins on this model.</p>
+  <nav class="nav">
+    <a class="board" href="board.html">Open the diagrams (tldraw) →</a>
+    <a href="#rules">Rules</a><a href="#rulings">Rulings</a><a href="#people">People, orgs, groups</a><a href="#fabric">Storage &amp; fabric</a><a href="#placement">Placement</a><a href="#surfaces">Surfaces</a><a href="#perf">Performance gates</a><a href="#patches">hiqlite patches</a><a href="#ladder">Ladder</a><a href="#diagrams">What the board shows</a>
+  </nav>
+
+  <h2 id="rules">Five rules</h2>
+  <ol class="rules">
+    <li>Persons and organizations own; groups are granted. Ownership transfer is a command.</li>
+    <li>Every change is a command; its audit row is in the same transaction; events come from commands.</li>
+    <li>Read paths never write. Observations go on the async lane.</li>
+    <li>A row lives in exactly one home zone. Moving it is a supported command.</li>
+    <li>Budgets are gates, measured on the real cluster, before a rung ships.</li>
+  </ol>
+
+  <h2 id="rulings">Rulings, 2026-08-26</h2>
+  <p class="ruling">hiqlite fork as patches intended upstream · change feed is command-emitted events · an encrypted out-of-region voter is admissible in principle, not built until a region needs it · persons and organizations own, groups are granted, transfer is a command · zone migration is a supported operation · frontend rebuilt as askama pages plus Leptos CSR bundles per capability tier · groups <em>and</em> organizations are first class: this is the model every isoastra platform product launches on · deliverables are never Claude artifacts; tldraw carries diagrams, this page carries the words.</p>
+
+  <h2 id="people">People, organizations, groups</h2>
+  <div class="grid">
+    <div class="card blue"><h3>Party</h3><p>Anything that can own, be granted, or belong. <code>person</code> — the human, global, one per human eventually. <code>organization</code> — a tenant and ownership boundary (a dental practice, isoastra itself). <code>group</code> — a set of parties; never owns, is granted: invitations, cohorts, audiences. <code>service</code> — a machine principal.</p></div>
+    <div class="card blue"><h3>Identity</h3><p>A registration, not a human. Source-scoped ("registered at rinity", "imported from AcquiredCo", "guest at event E"), holds the factors proven for that source, lives in one home zone, <code>person_id</code> NULL until resolved. Product data references the identity — never the person — so merging humans never rewrites product tables.</p></div>
+    <div class="card blue"><h3>Merge is first class</h3><p>Signals propose (same verified phone, same OIDC subject, same claimed link, name plus a shared group). Proof disposes: sign in to both, a shared verified factor, or an operator ruling with evidence. Never silent, always reversible — <code>person_link</code> is append-only and <code>person_alias</code> keeps old URLs alive. Merge is also recovery: from the merged person you can rotate the lost identity's factors.</p></div>
+    <div class="card blue"><h3>One relation store</h3><p><code>object #relation @subject</code> answers every "may X do Y to Z": <code>document:D #editor @person:P</code>, <code>group:X #member @link:T</code> (an invitation), <code>photo:F #viewer @group:X</code>, <code>person:P #contact @group:X</code>, <code>platform:* #operator @person:R</code>. Leaking across groups would need a written row. Roles nest in code, not in SQL.</p></div>
+    <div class="card blue"><h3>Principal</h3><p>The one input to every check: <code>Member { identity, acting_as: person | organization }</code>, <code>Bearer { link }</code>, <code>Anonymous</code>. Expanded once per request into a subject set — the person, its groups, the org, <code>authenticated</code>, <code>public</code>.</p></div>
+    <div class="card blue"><h3>Resource registry</h3><p>Every ownable thing has a row: kind, public id, owner (person or organization), home zone, status; kind tables hang off it 1:1. Relations, links and audit FK here, so deletion cascades and "everything I can see" is one query.</p></div>
+    <div class="card blue"><h3>Products plug in</h3><p>A product registers resource kinds and a relation vocabulary (which relations a kind admits, which subjects each accepts — a patient record never accepts <code>@public</code>). It gets persons, organizations, groups, invitations, sharing, merge, sessions, placement and the fabric from the kernel.</p></div>
+    <div class="card blue"><h3>Commands</h3><p>Register · Merge · Split · Transfer · Share · Revoke · Disable · Migrate. One transaction each, audit row inside, typed event out. Status columns are projections of the commands that produced them; a status no command can produce does not exist.</p></div>
+  </div>
+
+  <h3>Schema</h3>
+<pre>party           id, public_id, kind person|organization|group|service, display_name, status, created_at
+identity        id, public_id, source, person_id?, home_zone, status, created_at
+factor          id, identity_id, kind email|password|passkey|oidc, value/secret, verified_at
+person_link     id, identity_id, person_id, method self|factor|operator|import, evidence, asserted_by, at   (append-only)
+person_alias    old_person_id → person_id
+match_candidate identity_a, identity_b, signal, score, status proposed|confirmed|rejected
+membership      group_id, party_id, role member|admin|owner, at                    PK (group_id, party_id)
+session         id, identity_id, acting_as party_id, token_hash UNIQUE, expires_at, created_at
+link            id, token_hash UNIQUE, expires_at, claimed_by_identity_id?
+resource        id, kind, public_id, owner_party_id, home_zone, status, created_at   ← 1:1 kind tables
+relation        object_kind, object_id, relation, subject_kind, subject_id, granted_by, at
+                UNIQUE(object, relation, subject)   idx (object)   idx (subject)
+audit           id, command, actor_identity_id, acting_as, at, payload, event_offset</pre>
+
+  <h3>check()</h3>
+<pre>check(principal, relation, object) -> bool
+  subjects = expand(principal)                        // once per request, cached per session digest
+  rows     = SELECT relation FROM relation
+             WHERE object = ? AND subject IN subjects  // one indexed query
+  return any(row.relation ⊇ relation)                 // nesting in code: viewer&lt;commenter&lt;editor · member&lt;admin&lt;owner · hidden&lt;busy&lt;summary&lt;full</pre>
+
+  <h3>Merge(absorbed → survivor), one transaction in the global group</h3>
+  <ol>
+    <li><code>person_link</code> rows for every identity of the absorbed person → survivor (method, evidence)</li>
+    <li>memberships: union, strongest role wins</li>
+    <li>relations with subject <code>person:absorbed</code> → <code>person:survivor</code>, union, strongest wins</li>
+    <li><code>person_alias(absorbed → survivor)</code>; absorbed status <code>merged</code>; display fields kept on the link row</li>
+    <li>audit and event <code>person.merged</code>; products apply step 3 to their own relation tables, idempotently</li>
+  </ol>
+  <p><small>Split is the inverse with a fresh person. Sessions are untouched — they bind the identity. The older person survives. Invariants to test: product tables reference <code>identity_id</code>, never <code>person_id</code>; a merge on a weak signal alone is unrepresentable; groups never appear as <code>owner_party_id</code>; transfer is the only way an owner changes.</small></p>
+
+  <h2 id="fabric">Storage &amp; fabric</h2>
+  <div class="grid">
+    <div class="card green"><h3>hiqlite, forked — multi-raft</h3><p>Several raft groups in one process, each with its own membership: regional groups (SQLite state machines, voters across ≥3 sites in one zone), the global group (persons, groups, merges, routing; spread across regions; write-rare), and a log group per zone. Writes cost one intra-zone RTT plus one fsync; reads are local.</p></div>
+    <div class="card green"><h3>Zenoh, embedded</h3><p>Notifications, cache invalidations, presence, CRDT update transport. Peers join and leave at runtime; geo-native; publisher caches let a reconnecting subscriber recover what it missed. Never a queue: nothing durable rides here. Later, the signalling plane for audio (str0m carries media).</p></div>
+    <div class="card green"><h3>The log group</h3><p>The durable async lane and the change feed. Commands append typed events; the append returns immediately with a durable-offset watch; acks and reads wait for the offset they need (confirmed reads). Consumers hold cursors in the same state machine. Subscriptions read this log.</p></div>
+    <div class="card green"><h3>Two write lanes</h3><p>Authoritative: anything an authz decision reads — synchronous, one transaction, audit inside. Observation: <code>last_seen</code>, telemetry, match scanning, mail, merge fan-out — asynchronous on the log, batched, idempotent, loss-tolerant by definition.</p></div>
+    <div class="card green"><h3>Loro CRDTs</h3><p>Shared state across zones — documents edited from two regions, call rosters, presence. Each zone applies locally, appends the update to its own log, publishes it on Zenoh; the other zone imports it. Nobody waits on a foreign quorum. Never for invariants: money, uniqueness, capacity and permissions go through the object's home leader.</p></div>
+    <div class="card"><h3>Not chosen</h3><p>NATS stays for company products. Iggy is a server on compio with a static roster. SpacetimeDB is BSL (one production instance) with replication closed. io_uring stays outside the process until a flame graph asks for it.</p></div>
+  </div>
+
+  <h3>Commitlog (per zone log group; clean-room, SpacetimeDB-shaped)</h3>
+<pre>segment  {offset:020}.log + .idx   max 1 GiB, rotate → snapshot on rollover, zstd on sealed segments
+header   magic · format_version · checksum_algo (crc32c)
+commit   min_tx_offset u64 · epoch u64 · n u16 · len u32 · records · crc32c
+record   event { command, actor, acting_as, kind, payload (rkyv) }   — same bytes on the wire and on disk
+index    offset → file position every 4 KiB, mmap, best effort, rebuilt on open
+tail     the last commit may be torn: truncate to the last valid crc; the next append heals
+cursors  { consumer → offset, delivery_count, in_flight }   compacts aggressively; payload retention by cursor horizon
+durable  append(tx) is non-blocking; a DurableOffset watch says what is covered; a read or ack waits for offset ≥ its own commit</pre>
+
+  <h2 id="placement">Placement</h2>
+  <table>
+    <thead><tr><th>level</th><th>answers</th><th>example</th></tr></thead>
+    <tbody>
+      <tr><td>residency region</td><td>may this data live here? (compliance boundary)</td><td><code>in · eu · us · kr</code></td></tr>
+      <tr><td>locality zone</td><td>which raft group do I write to? (≈ ≤ 30 ms inside)</td><td><code>us-west · us-east · in</code></td></tr>
+      <tr><td>site</td><td>what fails together? (separate city, grid, provider)</td><td>Mumbai · Hyderabad · Bangalore</td></tr>
+    </tbody>
+  </table>
+  <p>A group's voters sit on at least three sites of one zone: any one city can vanish and the zone keeps committing after one election timeout. The global group is the current nexus · nyc · delenda triangle, spread across regions and holding only what must cross borders. Residency is the voter <em>and learner</em> set — learners receive the full log, so an EU group with a learner in Virginia is a violation with a nice name; the group registry refuses out-of-region members, and snapshots, backups and keys stay in-region. Sharing across regions is a policy event recorded as a relation: it authorises a replica and revoking it deletes one. West-vs-east coast is the <code>us</code> region growing a second zone. Small countries get three domestic sites on separate providers; an encrypted out-of-region voter is admissible in principle and not built yet.</p>
+
+  <table>
+    <thead><tr><th>failure</th><th>effect</th><th>recovery</th><th>RPO / RTO</th></tr></thead>
+    <tbody>
+      <tr><td>node</td><td>none visible; the edge drops it in seconds</td><td>replace; learner → voter</td><td class="num">0 / 0</td></tr>
+      <tr><td>site (city)</td><td>≈ one election timeout of stalled zone writes</td><td>provision a site</td><td class="num">0 / ~1 s</td></tr>
+      <tr><td>two sites of a zone</td><td>zone unavailable; refuses to commit (correct)</td><td>restore the in-region backup to new sites</td><td class="num">snapshot cadence / hours</td></tr>
+      <tr><td>region</td><td>its users are down; identity resolves globally</td><td>as above</td><td class="num">same</td></tr>
+      <tr><td>global group majority</td><td>no merges or joins; zones keep serving</td><td>restore global from any region's copy</td><td class="num">minutes</td></tr>
+    </tbody>
+  </table>
+  <p>Quorum shapes: 3 voters on 3 sites (default, tolerates one site loss); 5 voters as 2-2-1 buys node slack, not disaster slack; a witness voter is not in openraft/hiqlite and relaxes raft's safety argument — do not build. Efficiency first: one binary per node (app, raft groups, Zenoh peer, log); a zone is three small VMs and a config file; learners are the read-scaling knob; SQLite until a zone's working set stops fitting a small node, with managed Postgres as the stopgap the plain-SQL discipline keeps open.</p>
+
+  <h2 id="surfaces">Surfaces</h2>
+  <div class="grid">
+    <div class="card red"><h3>askama</h3><p>Static, fast, no JS needed: the landing page, public pages, public event pages (the RSVP form posts a command and the page re-renders), auth forms, and the shell page that loads a bundle. Cached hard, no hydration.</p></div>
+    <div class="card red"><h3>Leptos CSR, one bundle per tier</h3><p><code>/app</code> member — what any signed-in person gets. <code>/org</code> operator — organization administration. <code>/platform</code> — the old <code>/manage</code>, platform operators only. The server picks the bundle from the principal's relations and serves an askama shell; a bundle you cannot hold is never sent. No role-routed <code>/</code>, no nav filtered by capability — the tier is the app.</p></div>
+    <div class="card red"><h3>Live data</h3><p>The bundle subscribes; the server derives row diffs from the change feed and pushes them over one WebSocket; the bundle's store applies them and resumes by offset after a reconnect. Invalidate-and-refetch survives only as the resync after a release.</p></div>
+    <div class="card red"><h3>API shape</h3><p>Commands: <code>POST /api/cmd/&lt;name&gt;</code>, JSON, idempotency key, returns the event offset. Queries: <code>GET /api/q/&lt;name&gt;</code>, cacheable, never write. Subscribe: <code>WS /api/sub</code>. <code>whoami</code> stays the only chrome DTO — public ids, display names, the relations the bundle needs, expiry; never emails or internal ids.</p></div>
+  </div>
+
+  <h2 id="perf">Performance gates</h2>
+  <div class="wrap"><table>
+    <thead><tr><th>path</th><th>budget (p99, real cluster)</th><th>proof</th></tr></thead>
+    <tbody>
+      <tr><td>principal resolution</td><td class="num">≤ 2 ms cold · 50 µs warm</td><td>criterion + oha on <code>/api/whoami</code></td></tr>
+      <tr><td>check()</td><td class="num">≤ 300 µs cold · 20 µs warm</td><td>criterion, 10⁶ relations, adversarial shapes</td></tr>
+      <tr><td>list visible</td><td class="num">≤ 5 ms for 10⁴ objects</td><td>criterion + EXPLAIN-asserting test</td></tr>
+      <tr><td>command commit</td><td class="num">≤ 1 intra-zone RTT + 1 ms</td><td>raft commit histogram per command</td></tr>
+      <tr><td>notification delivery</td><td class="num">≤ one-way RTT + 1 ms</td><td>Zenoh probe per zone</td></tr>
+      <tr><td>spool append</td><td class="num">≤ 200 µs</td><td>criterion on the writer thread</td></tr>
+      <tr><td>spool → raft lag</td><td class="num">≤ 2 RTT at 10k msg/s</td><td>drain-lag gauge under oha</td></tr>
+      <tr><td>merge</td><td class="num">≤ 50 ms at 10⁴ affected rows</td><td>criterion</td></tr>
+    </tbody>
+  </table></div>
+  <p>Harness, checked in and re-runnable: "no full scan" tests (every hot query under <code>EXPLAIN QUERY PLAN</code> asserting its index); oha load profiles with samply flame graphs on staging and <code>latency_ms</code> spans aggregated per operation; deterministic simulation (openraft turmoil) for the log group — partitions, clock skew, disk faults — landing with rung 8, not after; dated site-kill drills per zone; a lint that nothing reachable from a GET calls <code>execute()</code>. Physics: a global-group commit is one WAN RTT (60–120 ms) and that is fine because it is write-rare; a zone commit is one intra-zone RTT plus fsync; a naive io_uring swap is 1.06–1.10× and only an architecture built around the ring gets 2× — fsync is still a worker-thread op.</p>
+
+  <h2 id="patches">hiqlite patches, intended upstream, in order</h2>
+  <ol>
+    <li><code>RaftType</code> → a dynamic group registry: <code>{ name, sm_kind sqlite|cache|log, region, zone, members: voters/learners with site }</code></li>
+    <li>Log state machine with cursors and a retention-aware snapshot policy (never snapshot away unread records)</li>
+    <li>Group-scoped client: <code>db.group("us-west").execute(…)</code>, <code>db.log("us-west").append(…)</code></li>
+    <li>Registry refuses out-of-region voters and learners; per-group backup target</li>
+    <li>Network: separate heartbeat / append / snapshot channels (openraft #1170 head-of-line blocking)</li>
+    <li>Later: quinn <code>RaftNetworkV2</code> — 0-RTT never for appends; windows tuned for WAN</li>
+  </ol>
+  <p><small>openraft facts to design around: election timeout ≫ RTT + max append; 3–5 voters, the rest learners; <code>add_learner</code> (blocking) then <code>change_membership</code>; per-follower AppendEntries is one-in-flight; a WAL is the right log store, RocksDB is not; failed formation state is poison — archive and start empty; a lone new voter never forms a quorum.</small></p>
+
+  <h2 id="ladder">The ladder — single-feature rungs</h2>
+  <dl>
+    <dt>A · model</dt><dd>1 resource registry + relation store, Principal, platform-admin as a relation · 2 commands with in-transaction audit, atomic Register, status transitions as commands · 3 person/identity split, person_link, alias, match queue, self-link merge · 4 organizations and groups as parties, invitations, documents as the first registered resource · 5 doc reconciliation (uuid + type prefix, dead PublicIdIndex out, whoami email leak, last_seen throttled)</dd>
+    <dt>B · fabric</dt><dd>6 Zenoh replaces hiqlite listen/notify · 7 commitlog state machine single-node with durable-offset acks; observations move to the async lane · 8 hiqlite multi-raft patches; the log becomes a group across the three voters; simulation harness lands with it · 9 subscriptions from the change feed; bundles consume row diffs</dd>
+    <dt>C · placement</dt><dd>10 first regional zone (three <code>us</code> sites, separate providers); the triangle becomes the global group; home zone; edge routing; in-region backup; site-kill drill · 11 learners for local reads; migration saga; a second zone when locality warrants · 12 Loro shared documents across zones; cross-region share as a relation</dd>
+    <dt>D · earned</dt><dd>13 quinn transport for raft groups, after measuring WebSocket heartbeat coupling under load · 14 io_uring on the log writer thread, only if profiled syscall-bound</dd>
+    <dt>beside A/B</dt><dd>the frontend rebuild: askama pages and the member bundle first (rung 4 needs a surface), the org bundle with organizations, the platform bundle replacing <code>/manage</code> at rung 9. Spike before rung 8: prove hiqlite's internals take a third group kind without rewriting its network layer — go/no-go for the fork versus a sibling openraft 0.10 stack.</dd>
+  </dl>
+
+  <h2 id="diagrams">What the board shows</h2>
+  <p>Twelve frames on <a href="board.html">board.html</a>, arranged in three rows. Row 1, state machines drawn as loops: identity and person (register → active → match candidate → merged → split), the session row, a resource (created → shared → transferred → migrating → deleted), and a zone (serving → electing → degraded → unavailable → restoring). Row 2, call-waterfall sequences: Register; a guarded request from cookie to principal to <code>check()</code>; command → change feed → row diff; merge with proof; a shared document across zones over Loro and Zenoh; migrating an identity to another zone; plus the placement topology (regions, zones, sites, which raft groups each site hosts, the global triangle). Row 3, UI mocks: the askama landing page, the shell's bundle selection, and the <code>/app</code>, <code>/org</code> and <code>/platform</code> bundles.</p>
+</main>
+</body>
+</html>
