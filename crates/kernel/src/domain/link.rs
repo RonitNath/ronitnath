@@ -1,9 +1,10 @@
 //! `link` — a bearer secret with an expiry.
 //!
-//! A link is claimed, once, by whoever holds the token. What claiming it
-//! *grants* is a relation row (`group:X #member @link:T`) from K2 onwards; the
-//! one purpose this leg mints links for is proving an email address, which is
-//! what `verifies_factor_id` carries until that vocabulary exists.
+//! A link is claimed, once, by whoever holds the token. What claiming an
+//! invitation *grants* is a relation row (`group:X #member @link:T`). The
+//! other purpose a link is minted for is proving an email address, and that
+//! one has no relation to express it, so it stays the `verifies_factor_id`
+//! column.
 
 use crate::Timestamp;
 use crate::ids::{Factor, Id, Identity, Link};

@@ -326,8 +326,9 @@ fn a_clock_a_test_owns_moves_only_when_told() {
 #[test]
 fn the_embedded_migrations_are_the_files_on_disk() {
     let sql = migrations();
-    // K1's schema, K2's relations, K3's merge. hiqlite refuses a gap in the
-    // ids, so every leg's file is present even when its own is a placeholder.
+    // Three files: `1_kernel.sql` creates every table, `2_relations.sql` adds
+    // what the relation store needs on top of them, `3_merge.sql` what merge
+    // needs. Each is asserted below by something only that file contains.
     assert_eq!(sql.len(), 3);
     assert!(sql[0].contains("CREATE TABLE party"));
     assert!(sql[2].contains("person_link_is_append_only_update"));

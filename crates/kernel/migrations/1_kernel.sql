@@ -9,14 +9,14 @@
 --   * every instant is `INTEGER` unix **seconds**.
 --   * every status vocabulary is a CHECK constraint, so a status no command
 --     produces cannot be written by any route, including a future one.
---   * later legs add tables by new migration files (2_relations.sql,
---     3_merge.sql); this file is frozen once it has been applied anywhere.
+--   * anything added after this file was first applied goes in a new migration
+--     file (2_relations.sql, 3_merge.sql); this file is frozen.
 --
--- The tables K2 and K3 own (membership, resource, relation, person_link,
--- person_alias, match_candidate) are created here because the schema is one
--- artefact and hiqlite hashes migration files: a leg that appended columns to
--- this file would invalidate every already-migrated node. Their *modules* are
--- not in this leg.
+-- Every table the model has is created here — membership, resource, relation,
+-- person_link, person_alias and match_candidate included — because the schema
+-- is one artefact and hiqlite hashes migration files: appending a column here
+-- would invalidate every already-migrated node. The later files hold the
+-- columns, indexes and triggers that arrived after the freeze.
 
 -- Foreign keys are on: hiqlite sets the pragma on every state-machine
 -- connection, and so does the in-process engine. A PRAGMA in this file would
@@ -158,10 +158,11 @@ CREATE INDEX session_identity_idx ON session (identity_id);
 CREATE INDEX session_expires_idx ON session (expires_at);
 
 -- ----------------------------------------------------------------- link ----
--- A bearer secret with an expiry. K2 gives a link its grant as a relation row
--- (`group:X #member @link:T`); until that table has a vocabulary,
--- `verifies_factor_id` carries the one purpose this leg mints links for, and
--- migration 2 drops it in favour of the relation row.
+-- A bearer secret with an expiry. An invitation carries its grant as a relation
+-- row (`group:X #member @link:T`), which is why there is no role column here.
+-- `verifies_factor_id` is the other purpose a link is minted for — proving an
+-- email address — and it stays a column because there is no relation to
+-- express "this token verifies that factor".
 CREATE TABLE link
 (
     id                    INTEGER PRIMARY KEY,
