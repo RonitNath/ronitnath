@@ -9,14 +9,17 @@
 //! catalog, fetched by byte range and only by a deep-zoom client. Embedding it
 //! would put 49 MB into every binary and every layer of the image to serve a
 //! file nothing on the landing page requests. It stays on disk under
-//! `static_dir` in both modes, and 404s if the deployment did not ship it.
+//! `static_dir` in both modes, is served by [`range`], and 404s if the
+//! deployment did not ship it.
+
+mod range;
 
 use std::path::{Component, Path, PathBuf};
 
 use axum::Router;
 use axum::body::Body;
 use axum::extract::{Path as UrlPath, State};
-use axum::http::{StatusCode, header};
+use axum::http::{HeaderMap, StatusCode, header};
 use axum::response::{IntoResponse, Response};
 use axum::routing::get;
 use rust_embed::Embed;
@@ -82,7 +85,7 @@ impl Tree {
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/favicon.ico", get(favicon))
-        .route("/static/{*path}", get(serve(Tree::Static)))
+        .route("/static/{*path}", get(static_asset))
         .route("/pkg/starscape/{*path}", get(serve(Tree::Starscape)))
         .route("/app/pkg/{*path}", get(serve(Tree::Member)))
         .route("/org/pkg/{*path}", get(serve(Tree::Org)))
@@ -99,16 +102,39 @@ async fn favicon(State(state): State<AppState>) -> Response {
     respond(Tree::Static, &state, "favicon.ico")
 }
 
-fn respond(tree: Tree, state: &AppState, path: &str) -> Response {
-    let Some(path) = sanitize(path) else {
+/// The as-is tree. Everything in it is embedded and answered from memory
+/// except the regional catalog, which is on disk and answered by byte range.
+async fn static_asset(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    UrlPath(path): UrlPath<String>,
+) -> Response {
+    let Some(path) = sanitize(&path) else {
         return StatusCode::NOT_FOUND.into_response();
     };
-    let content_type = content_type(&path);
+    if path.starts_with(range::PREFIX) {
+        let file = state.config.static_dir.join(&path);
+        return range::respond(file, content_type(&path), &headers).await;
+    }
+    deliver(Tree::Static, &state, &path)
+}
+
+fn respond(tree: Tree, state: &AppState, path: &str) -> Response {
+    match sanitize(path) {
+        Some(path) => deliver(tree, state, &path),
+        None => StatusCode::NOT_FOUND.into_response(),
+    }
+}
+
+/// Serve an already-sanitised path out of a tree's embedded set or its
+/// directory on disk.
+fn deliver(tree: Tree, state: &AppState, path: &str) -> Response {
+    let content_type = content_type(path);
 
     // Dev reads disk first so an edit is visible on reload; release reads the
     // embedded copy first and falls back to disk for the excluded LOD tree.
-    let disk = || std::fs::read(tree.on_disk(state).join(&path)).ok();
-    let embedded = || tree.embedded(&path).map(|file| file.data.into_owned());
+    let disk = || std::fs::read(tree.on_disk(state).join(path)).ok();
+    let embedded = || tree.embedded(path).map(|file| file.data.into_owned());
     let bytes = if state.config.mode == Mode::Dev {
         disk().or_else(embedded)
     } else {
