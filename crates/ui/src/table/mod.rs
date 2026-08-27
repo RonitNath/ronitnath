@@ -45,6 +45,10 @@ impl Priority {
 /// what a cell *looks* like without changing what the table knows.
 pub type Render = Arc<dyn Fn(&str) -> AnyView + Send + Sync>;
 
+/// The machine value behind a cell, for `title`. Absent means the cell is the
+/// whole of what the column has to say.
+pub type Titled<R> = Option<Arc<dyn Fn(&R) -> String + Send + Sync>>;
+
 /// Whether a row admits a control. Absent means every row does.
 pub type Offered<R> = Option<Arc<dyn Fn(&R) -> bool + Send + Sync>>;
 
@@ -55,6 +59,7 @@ pub struct Column<R> {
     priority: Priority,
     mono: bool,
     render: Option<Render>,
+    title: Titled<R>,
 }
 
 impl<R> Clone for Column<R> {
@@ -65,6 +70,7 @@ impl<R> Clone for Column<R> {
             priority: self.priority,
             mono: self.mono,
             render: self.render.clone(),
+            title: self.title.clone(),
         }
     }
 }
@@ -80,6 +86,7 @@ impl<R> Column<R> {
             priority: Priority::Always,
             mono: false,
             render: None,
+            title: None,
         }
     }
 
@@ -93,6 +100,17 @@ impl<R> Column<R> {
     /// What this column gives up first.
     pub fn priority(mut self, priority: Priority) -> Self {
         self.priority = priority;
+        self
+    }
+
+    /// The machine value behind a cell, on hover and to a screen reader.
+    ///
+    /// For the column that shows a *name* where the row also carries an *id*:
+    /// the name is what the reader recognises, the id is what they quote, and
+    /// only one of them belongs in the cell. It is a `title`, not a second
+    /// column, because it is never what the table is read for.
+    pub fn titled(mut self, title: impl Fn(&R) -> String + Send + Sync + 'static) -> Self {
+        self.title = Some(Arc::new(title));
         self
     }
 
@@ -304,7 +322,12 @@ where
                                         Some(render) => render(text),
                                         None => text.clone().into_any(),
                                     };
-                                    view! { <td class=class>{body}</td> }
+                                    let title = column
+                                        .title
+                                        .as_ref()
+                                        .map(|title| title(&source[index]))
+                                        .filter(|title| !title.is_empty());
+                                    view! { <td class=class title=title>{body}</td> }
                                 })
                                 .collect_view()
                         });

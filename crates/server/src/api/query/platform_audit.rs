@@ -27,7 +27,8 @@ use super::{Params, Row};
 /// it to that.
 pub(super) const TAIL: &str = "SELECT a.id, a.command, a.actor_identity_id, a.acting_as, a.at, \
                                a.payload, p.display_name AS actor_display, \
-                               act.kind AS acting_kind \
+                               act.kind AS acting_kind, \
+                               act.display_name AS acting_display \
                         FROM audit a \
                         LEFT JOIN identity i ON i.id = a.actor_identity_id \
                         LEFT JOIN party p ON p.id = i.person_id \
@@ -41,6 +42,7 @@ struct Entry {
     actor_display: Option<String>,
     acting_as: Option<i64>,
     acting_kind: Option<String>,
+    acting_display: Option<String>,
     at: Timestamp,
     payload: String,
 }
@@ -54,6 +56,7 @@ impl FromRow for Entry {
             actor_display: row.text_opt("actor_display")?,
             acting_as: row.int_opt("acting_as")?,
             acting_kind: row.text_opt("acting_kind")?,
+            acting_display: row.text_opt("acting_display")?,
             at: row.int("at")?,
             payload: row.text("payload")?,
         })
@@ -78,6 +81,7 @@ pub(super) async fn list(reads: &impl Reads, params: &Params) -> Outcome<Vec<Row
                 "actor": row.actor.map(|id| id.public(key)),
                 "actor_display": row.actor_display,
                 "acting_as": acting_as(row.acting_as, row.acting_kind.as_deref(), key),
+                "acting_display": row.acting_display,
                 "at": row.at,
                 // Stored as JSON text by the command's own statement; handed
                 // over parsed so the panel renders a shape rather than a

@@ -40,12 +40,21 @@ pub fn AuditLog() -> impl IntoView {
         Column::new("At", |row: &Audit| when(row.at))
             .mono()
             .priority(Priority::Secondary),
+        // The name, the way the Actor column beside it reads: an operator
+        // console that shows an id where a name is available, in the same row,
+        // is the interface failing to state. The id is still one hover away,
+        // because it is what an operator quotes.
         Column::new("Acting as", |row: &Audit| {
+            row.acting_display
+                .clone()
+                .or_else(|| row.acting_as.as_ref().map(ToString::to_string))
+                .unwrap_or_else(|| "\u{2014}".to_owned())
+        })
+        .titled(|row: &Audit| {
             row.acting_as
                 .as_ref()
-                .map_or_else(|| "\u{2014}".to_owned(), ToString::to_string)
+                .map_or_else(String::new, ToString::to_string)
         })
-        .mono()
         .priority(Priority::Tertiary),
     ];
     let open = Callback::new(move |row: Audit| selected.set(Some(row)));
@@ -85,10 +94,13 @@ fn Detail(entry: Audit, selected: RwSignal<Option<Audit>>) -> impl IntoView {
         ),
         (
             "Acting as",
-            entry
-                .acting_as
-                .as_ref()
-                .map_or_else(|| "\u{2014}".to_owned(), ToString::to_string),
+            match (&entry.acting_display, &entry.acting_as) {
+                // The panel is the drill-in, so it carries both: the name to
+                // read and the id to copy.
+                (Some(display), Some(id)) => format!("{display} · {id}"),
+                (None, Some(id)) => id.to_string(),
+                _ => "\u{2014}".to_owned(),
+            },
         ),
     ];
     let payload =

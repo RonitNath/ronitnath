@@ -163,6 +163,56 @@ fn an_operator_who_loses_the_relation_loses_the_surface_on_the_next_request() {
     });
 }
 
+#[test]
+fn the_audit_log_names_the_acting_party_rather_than_only_its_id() {
+    harness::run(async {
+        let state = state().await;
+        let server = harness::server(&state);
+        let operator =
+            harness::register(&state, "Named Operator", "plat-audit@example.invalid").await;
+        harness::operate_platform(&state, operator.person).await;
+
+        // A command run *as* somebody, so `audit.acting_as` names a party: a
+        // registration is run by nobody, so its own row names none.
+        server
+            .post("/api/cmd/create-document")
+            .add_header("cookie", format!("rn_session={}", operator.token))
+            .add_header("sec-fetch-site", "same-origin")
+            .text(r#"{"key":"6f1a0f7e-0000-4000-8000-0000000000a1","title":"Audit","body":"x"}"#)
+            .content_type("application/json")
+            .await
+            .assert_status_ok();
+
+        let rows: Vec<serde_json::Value> = server
+            .get("/api/q/platform-audit")
+            .add_header("cookie", format!("rn_session={}", operator.token))
+            .await
+            .json();
+        assert!(!rows.is_empty(), "the commands are on the log");
+
+        // Acting as is a party id, and a party has a display name in the same
+        // table the id came from — so a row that can name the actor can name
+        // the party it acted as, and the console has no reason to print one of
+        // them as a name and the other as an id.
+        let named = rows
+            .iter()
+            .filter(|row| !row["acting_as"].is_null())
+            .inspect(|row| {
+                assert!(
+                    row["acting_display"].is_string(),
+                    "an acting party with no display name: {row}"
+                );
+            })
+            .count();
+        assert!(named > 0, "no audit row named an acting party at all");
+        assert!(
+            rows.iter()
+                .any(|row| row["acting_display"] == "Named Operator"),
+            "the operator's own command is not attributed to them by name"
+        );
+    });
+}
+
 // ------------------------------------------------------------- explain ---
 
 /// A deployment with one registration in it, which is all a plan needs.

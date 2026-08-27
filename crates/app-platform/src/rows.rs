@@ -149,6 +149,9 @@ pub struct Audit {
     pub actor: Option<PublicId>,
     pub actor_display: Option<String>,
     pub acting_as: Option<PublicId>,
+    /// The acting party's display name. A name is what a reader recognises;
+    /// the id above it is what they quote.
+    pub acting_display: Option<String>,
     pub at: i64,
     /// The typed event the command's own transaction wrote.
     pub payload: serde_json::Value,
