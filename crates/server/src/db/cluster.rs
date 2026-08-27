@@ -31,8 +31,11 @@ pub const DEFAULT_ADDR_API: &str = "127.0.0.1:8200";
 /// Secrets a dev node uses. They are not secret and are not meant to be: a
 /// single loopback node has no peer to authenticate, and inventing a value here
 /// would only make `cargo run` need a keyring.
-const DEV_SECRET_RAFT: &str = "rn-site-dev-raft-secret";
-const DEV_SECRET_API: &str = "rn-site-dev-api-secret";
+/// Public so the secrets canary can ask the log pipeline whether either of
+/// them ever came out the other end: a test that hunted for its own literal
+/// could go on passing after these changed.
+pub const DEV_SECRET_RAFT: &str = "rn-site-dev-raft-secret";
+pub const DEV_SECRET_API: &str = "rn-site-dev-api-secret";
 
 /// The parts of a hiqlite `NodeConfig` that come from the environment.
 #[derive(Debug, Clone, PartialEq, Eq)]

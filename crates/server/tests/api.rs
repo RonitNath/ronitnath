@@ -593,14 +593,20 @@ fn a_secret_never_reaches_a_log_line() {
             .await;
 
         let log = captured.text();
-        assert!(
-            !log.contains(harness::CANARY),
-            "the sentinel password reached a log line"
-        );
-        assert!(
-            !log.contains(&cookie),
-            "the session token reached a log line"
-        );
+        // Four secrets, not two. The password and the session token are the
+        // ones a request carries; the id key and the two raft secrets are the
+        // ones the *process* holds, and nothing formats them today — which is
+        // exactly the claim worth having a test for, since the day something
+        // does it will be a `Debug` of a config struct in a hurry.
+        for (secret, what) in [
+            (harness::CANARY, "the sentinel password"),
+            (cookie.as_str(), "the session token"),
+            (harness::CANARY_ID_KEY, "the id key"),
+            (rn_site::db::cluster::DEV_SECRET_RAFT, "the raft secret"),
+            (rn_site::db::cluster::DEV_SECRET_API, "the raft API secret"),
+        ] {
+            assert!(!log.contains(secret), "{what} reached a log line");
+        }
         assert!(
             !log.is_empty(),
             "nothing was captured at all, so the canary proved nothing"

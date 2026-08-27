@@ -31,6 +31,15 @@ pub const PASSWORD: &str = "an obviously fake test password";
 /// sends it, so finding it anywhere is finding it somewhere it does not belong.
 pub const CANARY: &str = "canary-8f3a1c9e-never-logged-never-echoed";
 
+/// The id key every node in this suite runs on, and the second sentinel.
+///
+/// It is a real key — sixteen bytes of hex, which is what `AppConfig` accepts
+/// — chosen so that it is also a string nothing else in the tree contains.
+/// The key derives every public id in the deployment, so a build that
+/// formatted it anywhere would be a build where one log line is enough to mint
+/// ids for rows the reader may not address.
+pub const CANARY_ID_KEY: &str = "5ecbe7a11deadbeef0d1e5ca1ab1e999";
+
 /// The runtime every test in a binary shares.
 ///
 /// A `#[tokio::test]` builds and drops a runtime per test, and hiqlite's raft
@@ -89,7 +98,7 @@ pub async fn node_with(
             db_path: directory.path().join("db.sqlite"),
             addr: "127.0.0.1:0".parse().expect("a loopback address"),
             static_dir: PathBuf::from("../../static"),
-            id_key: Some("000102030405060708090a0b0c0d0e0f".to_string()),
+            id_key: Some(CANARY_ID_KEY.to_string()),
             bootstrap_operator_email,
         };
         let migrations = Migrations::embedded::<rn_kernel::Migrations>()
