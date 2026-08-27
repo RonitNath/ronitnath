@@ -11,6 +11,8 @@
 //! *is*, and continuing would apply the next migration onto a shape nobody has
 //! described. It refuses to start instead.
 
+use std::time::Duration;
+
 use hiqlite::{AppliedMigration, Client, Params, params};
 use tracing::info;
 
@@ -83,8 +85,52 @@ impl Migrations {
     }
 }
 
+/// How long boot will keep trying to migrate a cluster that is still forming.
+const PATIENCE: Duration = Duration::from_secs(30);
+
+/// How long between attempts. An election is a second or two, so this is
+/// several tries per election rather than one.
+const RETRY: Duration = Duration::from_millis(500);
+
 /// Apply everything not yet applied, refusing if the history has drifted.
+///
+/// Retried, because a node booting into a cluster meets two races that are
+/// not failures: a write forwarded to a leader that is mid-election
+/// (`ClientWriteError: has to forward request to: None, None`) and a read of
+/// a table this node's own state machine has not applied yet (`no such table:
+/// _migrations`). Both were seen during harness development, and both took
+/// the process down on boot — which needs a supervisor to undo, and
+/// `tools/cluster.sh` is not one (finding 7, `docs/perf/2026-08-27.md`).
 pub async fn apply(client: &Client, migrations: &Migrations) -> Result<(), MigrateError> {
+    let deadline = std::time::Instant::now() + PATIENCE;
+    loop {
+        match apply_once(client, migrations).await {
+            Ok(()) => return Ok(()),
+            Err(MigrateError::Hiqlite(error))
+                if forming(&error) && std::time::Instant::now() < deadline =>
+            {
+                info!(%error, "the cluster is still forming; retrying the migration");
+                tokio::time::sleep(RETRY).await;
+            }
+            Err(error) => return Err(error),
+        }
+    }
+}
+
+/// Whether an error is a cluster that has not settled rather than one that
+/// has refused. Matched on the message because hiqlite passes most of these
+/// through as strings, and guessing the other way — treating an unrecognised
+/// error as transient — would turn a real schema refusal into a 30-second
+/// hang followed by the same refusal.
+fn forming(error: &hiqlite::Error) -> bool {
+    let message = error.to_string();
+    message.contains("forward request to")
+        || message.contains("no such table: _migrations")
+        || message.contains("has no leader")
+        || message.contains("Leader vote is in progress")
+}
+
+async fn apply_once(client: &Client, migrations: &Migrations) -> Result<(), MigrateError> {
     client
         .execute(
             "CREATE TABLE IF NOT EXISTS _migrations (
@@ -97,8 +143,13 @@ pub async fn apply(client: &Client, migrations: &Migrations) -> Result<(), Migra
         )
         .await?;
 
+    // Read back through the leader, which is where the `CREATE TABLE` above
+    // was applied. A local read here asks this node's own state machine about
+    // a table it may not have applied yet, and answers "no such table" for a
+    // statement that has already committed — the same write and the same
+    // read, disagreeing, because they were not the same consistency path.
     let applied: Vec<AppliedMigration> = client
-        .query_map("SELECT * FROM _migrations ORDER BY id ASC", Params::new())
+        .query_consistent_map("SELECT * FROM _migrations ORDER BY id ASC", Params::new())
         .await?;
     check(&migrations.0, &applied)?;
 
