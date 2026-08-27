@@ -10,11 +10,11 @@ Rulings that shape these (2026-08-27):
 - **Paste-link is the general pathway.** The platform mints links; the host
   pastes them wherever they already talk to people. No outbound SMS/Telegram
   to guests in the first cut.
-- **The host works through an AI coding agent in chat** — creating the event,
-  and before/on the day telling it things about guests ("Sam is a maybe now",
-  "Priya's bringing a cake"). The agent must therefore be a real, audited actor
-  acting as the host, with the same authority and the same record as a
-  browser session. The host then adjusts wording and copy by hand in the UI.
+- **The host works through an AI coding agent in a terminal** — creating the
+  event, and before/on the day telling it things about guests ("Sam is a maybe
+  now", "Priya's bringing a cake"). The agent is a first-class actor of its own
+  (`docs/stories/agents.md`): the host's authority, its own name in the record,
+  no auth dance. The host then adjusts wording and copy by hand in the UI.
 - **Partiful-like experience.** The guest page is the product. A blurred
   "who's coming" list is social proof — visible before answering, sharpened
   after — and it puts people from circles the viewer shares first.
@@ -98,14 +98,10 @@ Rulings that shape these (2026-08-27):
 
 ## F. The agent as an actor (cross-cutting)
 
-20. I mint an **agent session** for a named agent from my own sessions page:
-    a real session with a bearer credential for the command/query API only,
-    a name ("claude-code on the Mac"), an expiry, and a scope (this deployment,
-    acting as me). I revoke it like any session.
-21. Every command the agent runs is audited as *me, via <agent>*; my own view
-    shows what the agent did today.
-22. The agent can do exactly what I can — no more, no less — and cannot mint
-    other agents or change my factors.
+See `docs/stories/agents.md` — an agent is its own party, delegated by the
+host, with the host's authority exactly and its own name in the audit; enrolled
+once per machine, no sign-in. For this event: the host says what to do in a
+terminal, the agent runs `rn` commands, the guest page shows the host.
 
 ## What this asks of the platform
 
@@ -120,10 +116,8 @@ Rulings that shape these (2026-08-27):
 - Redaction by stage (address behind yes; list visibility per host setting).
 - Host notifications on answer changes (channel: Telegram to the host, later).
 - Calendar entry per guest that follows edits.
-- **Agent sessions** as a session kind: bearer to `/api/cmd|q` only, audited
-  "via agent". This is the one trust-boundary change: today no bearer enters
-  `/api`. The agent credential is a *session*, not an OIDC token — it is the
-  person, not a service.
+- **Agents as parties** (`docs/stories/agents.md`): the agent credential is
+  the one non-cookie principal `/api` admits.
 - Phone-first host view for the day; guest page designed in Figma first.
 - Attendance as a first-class fact feeding group creation.
 - Events as a runtime-enabled product.
