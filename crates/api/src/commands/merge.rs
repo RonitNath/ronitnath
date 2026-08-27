@@ -46,6 +46,14 @@ pub struct ProposeMatch {
 pub struct ConfirmMatch {
     /// The queued candidate.
     pub candidate: PublicId,
+    /// The session token held on the *other* identity of the pair, when that
+    /// is what the caller is proving with. Holding two live sessions at once
+    /// is the same evidence as signing in twice.
+    ///
+    /// Omitted when the proof is a factor both identities have verified. It is
+    /// a bearer secret, so it is sent and never returned.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub other_session: Option<String>,
 }
 
 /// A platform operator rules on a candidate the person cannot prove
@@ -88,6 +96,11 @@ mod tests {
         });
         round_trip(&ConfirmMatch {
             candidate: id("m_"),
+            other_session: None,
+        });
+        round_trip(&ConfirmMatch {
+            candidate: id("m_"),
+            other_session: Some("an obviously fake token".into()),
         });
         round_trip(&RuleMatch {
             candidate: id("m_"),

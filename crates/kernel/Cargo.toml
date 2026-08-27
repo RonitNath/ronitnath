@@ -52,8 +52,16 @@ proptest = { workspace = true }
 name = "kernel"
 harness = false
 
+[[bench]]
+name = "merge"
+harness = false
+
 [[test]]
 name = "properties"
+bench = false
+
+[[test]]
+name = "merge_properties"
 bench = false
 
 [[test]]

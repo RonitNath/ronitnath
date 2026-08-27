@@ -34,6 +34,7 @@ pub mod error;
 pub mod event;
 pub mod feed;
 pub mod ids;
+pub mod merge;
 pub mod observe;
 pub mod password;
 pub mod principal;

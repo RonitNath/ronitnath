@@ -118,6 +118,7 @@ async fn an_anonymous_principal_cannot_run_a_member_command() {
             &AddFactor {
                 kind: FactorKind::Email,
                 value: "x@example.test".into(),
+                identity: None,
             },
         )
         .await
@@ -147,6 +148,7 @@ async fn every_command_writes_exactly_one_audit_row_inside_its_own_transaction()
         &AddFactor {
             kind: FactorKind::Email,
             value: "more@example.test".into(),
+            identity: None,
         },
     )
     .await
