@@ -68,6 +68,19 @@ pub const WAIT: Duration = Duration::from_secs(2);
 /// waiting for.
 const POLL: Duration = Duration::from_millis(2);
 
+/// How far ahead of this node an offset may be and still be worth waiting for.
+///
+/// A caller presents an offset it has *been told about*, so a legitimate one
+/// is at most this node's replication lag ahead — a handful of entries, and
+/// generously a batch of them. An offset far beyond that is not a world
+/// anything has committed, so waiting [`WAIT`] for it buys nothing and costs
+/// a request slot: `x-rn-after: 9999999999` is two seconds of this node,
+/// taken before the cookie is even looked at, by anybody who can set a
+/// header. Past this lead the barrier is skipped and the command answers from
+/// where the node is, which is the same thing the wait would have done two
+/// seconds later.
+const MAX_LEAD: Offset = 10_000;
+
 /// The `after` field of a command envelope, read without knowing which command
 /// this is.
 ///
@@ -112,6 +125,16 @@ pub async fn catch_up(state: &AppState, after: Offset) -> Caught {
     let started = Instant::now();
     let mut first = true;
     loop {
+        if let Ok(head) = state.feed.head().await
+            && after > head.saturating_add(MAX_LEAD)
+        {
+            tracing::warn!(
+                after,
+                head,
+                "an offset further ahead than this cluster has ever been was not waited for"
+            );
+            return Caught::Gave(started.elapsed());
+        }
         // A feed that cannot answer reads as zero and would spin here, so a
         // failed read is treated as "cannot know", which ends the wait.
         match state.feed.head().await {
@@ -160,6 +183,18 @@ mod tests {
         );
         assert_eq!(requested("not json", &HeaderMap::new()), None);
         assert_eq!(requested(r#"{"after":0}"#, &HeaderMap::new()), None);
+    }
+
+    #[test]
+    fn the_lead_bound_is_generous_about_lag_and_not_about_a_forged_header() {
+        // Replication lag is entries, not billions of them. The bound has to
+        // sit above anything a real follower is behind by and below what a
+        // caller can type into a header to buy two seconds of a node.
+        assert!(
+            MAX_LEAD >= 1_000,
+            "a batch of entries must still be waited for"
+        );
+        assert!(u64::from(u32::MAX) > MAX_LEAD, "and a forged one must not");
     }
 
     #[test]

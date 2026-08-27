@@ -551,3 +551,56 @@ fn the_status_commands_act_on_a_party_and_say_which() {
         assert_eq!(id_of(&enabled, "party", "p_"), party);
     });
 }
+
+#[test]
+fn a_stranger_cannot_buy_two_seconds_of_a_node_with_a_header() {
+    harness::run(async {
+        let state = state().await;
+        let server = harness::server(&state);
+
+        // `x-rn-after` is the read-your-writes barrier: this node waits until
+        // its own feed has reached the offset the caller says it has already
+        // been shown. It runs before the cookie is looked at, on purpose —
+        // the cookie may name a session this node has not applied yet. What
+        // that must not become is a tarpit anybody can set: an offset no
+        // cluster has ever committed, presented without a session, used to
+        // hold a request slot for the whole of `confirmed::WAIT`.
+        let started = std::time::Instant::now();
+        let refused = server
+            .post("/api/cmd/create-document")
+            .add_header("sec-fetch-site", "same-origin")
+            .add_header("x-rn-after", "9999999999")
+            .text(r#"{"key":"6f1a0f7e-0000-4000-8000-000000000001","title":"x","body":""}"#)
+            .content_type("application/json")
+            .await;
+        let spent = started.elapsed();
+
+        assert_eq!(refused.status_code(), StatusCode::FORBIDDEN);
+        assert!(
+            spent < rn_site::api::cmd::confirmed::WAIT,
+            "an anonymous command with a forged offset held the node for {spent:?}"
+        );
+
+        // And the same header on a real session is answered rather than
+        // waited out, because the offset is further ahead than this cluster
+        // has ever been.
+        let somebody = harness::register(&state, "Barrier", "after-bound@example.invalid").await;
+        let started = std::time::Instant::now();
+        let answered = server
+            .post("/api/cmd/create-document")
+            .add_header("cookie", format!("rn_session={}", somebody.token))
+            .add_header("sec-fetch-site", "same-origin")
+            .text(
+                r#"{"key":"6f1a0f7e-0000-4000-8000-000000000002","after":9999999999,
+                    "title":"Charter","body":""}"#,
+            )
+            .content_type("application/json")
+            .await;
+        let spent = started.elapsed();
+        assert_eq!(answered.status_code(), StatusCode::OK);
+        assert!(
+            spent < rn_site::api::cmd::confirmed::WAIT,
+            "a forged offset on a real session held the node for {spent:?}"
+        );
+    });
+}

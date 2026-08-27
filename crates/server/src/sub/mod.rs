@@ -47,6 +47,18 @@ use crate::state::AppState;
 /// How often a quiet socket says it is alive.
 pub const HEARTBEAT: Duration = Duration::from_secs(25);
 
+/// How many distinct queries one socket may hold at once.
+///
+/// A subscription is re-asked of the database once per feed event, so the
+/// work a socket costs the node is this number times the commit rate. The
+/// client side is a bundle rendering one page: the busiest of them subscribes
+/// to a handful. Nothing about the wire stops a client naming a query a
+/// thousand times with a thousand different parameters, and the sockets-per-
+/// identity cap ([`limits::PER_IDENTITY`]) does not bound it — sixteen
+/// sockets holding a thousand queries each is sixteen thousand reads per
+/// commit from one account.
+pub const PER_SOCKET: usize = 32;
+
 pub fn router() -> Router<AppState> {
     Router::new().route("/api/sub", any(subscribe))
 }
@@ -212,6 +224,13 @@ impl Connection {
             );
             if !wanted.iter().any(|held| *held == (named, params.clone())) {
                 wanted.push((named, params));
+            }
+            if wanted.len() >= PER_SOCKET {
+                tracing::info!(
+                    cap = PER_SOCKET,
+                    "a subscription request named more queries than a socket carries"
+                );
+                break;
             }
         }
         self.queries = wanted

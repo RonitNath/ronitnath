@@ -109,7 +109,11 @@ impl Params {
                 "org" => params.org = value.parse().ok(),
                 "group" => params.group = value.parse().ok(),
                 "command" => params.command = command_name(value),
-                "subject" => params.subject = Some(value.to_owned()),
+                // Bounded like `id` above and for the same reason: it is
+                // carried until `platform::subject` decrypts it, and a
+                // subscription holds one per subscribed query for the life
+                // of the socket. A public id is 24 characters.
+                "subject" if value.len() <= 32 => params.subject = Some(value.to_owned()),
                 "before" => params.before = value.parse().ok(),
                 _ => {}
             }

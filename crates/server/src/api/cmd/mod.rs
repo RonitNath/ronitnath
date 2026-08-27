@@ -188,7 +188,15 @@ async fn command(
     headers: axum::http::HeaderMap,
     body: String,
 ) -> Response {
-    if let Some(after) = confirmed::requested(&body, &headers) {
+    // Only for a caller that presents a cookie. The reason the barrier comes
+    // before the session lookup is that the cookie may name a session this
+    // node has not applied yet — which presupposes there is a cookie. Without
+    // one the command is declined below whatever this node's offset is, so
+    // waiting for an offset first is [`confirmed::WAIT`] seconds of this node
+    // spent on a request that was never going to be authorised.
+    if session::cookie(&headers, session::COOKIE).is_some()
+        && let Some(after) = confirmed::requested(&body, &headers)
+    {
         confirmed::catch_up(&state, after).await;
     }
     let principal = match session::resolve(&state, &headers).await.principal {
