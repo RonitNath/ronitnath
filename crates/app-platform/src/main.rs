@@ -1,7 +1,7 @@
 //! `/platform` bundle: platform operators only.
 //!
 //! The surface that replaces the old operator console, and an audience of one
-//! today. Seven pages, and each of them is the same shape: a live table of the
+//! today. Eight pages, and each of them is the same shape: a live table of the
 //! whole deployment, and a panel about the row being looked at.
 //!
 //! The tier *is* the app (`docs/kernel/index.html` §Surfaces), so nothing here
@@ -16,6 +16,7 @@ mod identities;
 mod matches;
 mod panel;
 mod parties;
+mod products;
 mod resources;
 mod rows;
 mod sessions;
@@ -28,7 +29,8 @@ use rn_api::Tier;
 use rn_ui::{Decline, NavItem, Shell};
 
 /// The rail, in order: who exists, how they signed up, who is here now, what
-/// happened, what is unresolved, what is owned, and what the node is.
+/// happened, what is unresolved, what is owned, what this deployment serves,
+/// and what the node is.
 const NAV: &[NavItem] = &[
     NavItem::new("", "Parties"),
     NavItem::new("/identities", "Identities"),
@@ -36,6 +38,7 @@ const NAV: &[NavItem] = &[
     NavItem::new("/audit", "Audit"),
     NavItem::new("/matches", "Matches"),
     NavItem::new("/resources", "Resources"),
+    NavItem::new("/products", "Products"),
     NavItem::new("/cluster", "Cluster"),
 ];
 
@@ -55,6 +58,7 @@ fn App() -> impl IntoView {
                 <Route path=path!("/audit") view=audit::AuditLog />
                 <Route path=path!("/matches") view=matches::Matches />
                 <Route path=path!("/resources") view=resources::Resources />
+                <Route path=path!("/products") view=products::Products />
                 <Route path=path!("/cluster") view=cluster::Cluster />
             </Routes>
         </Shell>

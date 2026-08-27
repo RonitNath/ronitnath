@@ -393,6 +393,14 @@ async fn no_table_outside_the_kernel_references_a_person() {
             "person_alias.person_id",
             "person_link.from_person_id",
             "person_link.person_id",
+            // P2, and not a product *table* in the sense this test is about:
+            // `product` holds one row per catalogue entry and no product data
+            // at all, and this column is the accountability half of it — who
+            // decided, recorded exactly as `audit.acting_as` records it. It
+            // names the party the audit row names for the same reason and with
+            // the same consequence under a merge: what it says is who acted at
+            // the time, which a later merge does not change.
+            "product.changed_by",
             "resource.owner_party_id",
             "session.acting_as",
         ],

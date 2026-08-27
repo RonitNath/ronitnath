@@ -40,7 +40,7 @@ fn platform_names() -> Vec<&'static str> {
 #[test]
 fn every_platform_query_is_reachable_and_named_once() {
     let names = platform_names();
-    assert_eq!(names.len(), 10, "the platform surface is ten queries");
+    assert_eq!(names.len(), 11, "the platform surface is eleven queries");
     for name in &names {
         assert!(name.starts_with("platform-"), "{name}");
         assert_eq!(Named::parse(name).map(|q| q.as_str()), Some(*name));
@@ -255,6 +255,9 @@ const WHOLE_TABLE: &[&str] = &[
     "resources.list",
     "matches.list",
     "identities.factors_of_page",
+    // The catalogue's own table: at most one row per product this build
+    // carries, which is a page by construction rather than by a LIMIT.
+    "products.list",
 ];
 
 #[tokio::test]

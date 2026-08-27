@@ -186,8 +186,18 @@ mod tests {
         )
         .await;
         assert!(matches!(refused, Err(ref e) if e.is_decline()));
-        assert_eq!(count(&harness, "SELECT count(*) AS n FROM product").await, 0);
-        assert_eq!(count(&harness, "SELECT count(*) AS n FROM audit WHERE command = 'enable-product'").await, 0);
+        assert_eq!(
+            count(&harness, "SELECT count(*) AS n FROM product").await,
+            0
+        );
+        assert_eq!(
+            count(
+                &harness,
+                "SELECT count(*) AS n FROM audit WHERE command = 'enable-product'"
+            )
+            .await,
+            0
+        );
     }
 
     #[tokio::test]
@@ -203,7 +213,10 @@ mod tests {
         )
         .await;
         assert!(matches!(refused, Err(ref e) if e.is_decline()));
-        assert_eq!(count(&harness, "SELECT count(*) AS n FROM product").await, 0);
+        assert_eq!(
+            count(&harness, "SELECT count(*) AS n FROM product").await,
+            0
+        );
     }
 
     #[tokio::test]
@@ -240,7 +253,10 @@ mod tests {
         .expect("enables again");
 
         // One row per product, however many times it has been decided about.
-        assert_eq!(count(&harness, "SELECT count(*) AS n FROM product").await, 1);
+        assert_eq!(
+            count(&harness, "SELECT count(*) AS n FROM product").await,
+            1
+        );
         assert_eq!(
             count(
                 &harness,
@@ -261,7 +277,11 @@ mod tests {
         // And nothing the product owns was touched by the disable: the
         // deployment's own rows are all still there.
         assert_eq!(
-            count(&harness, "SELECT count(*) AS n FROM party WHERE kind = 'person'").await,
+            count(
+                &harness,
+                "SELECT count(*) AS n FROM party WHERE kind = 'person'"
+            )
+            .await,
             1
         );
     }
@@ -347,6 +367,9 @@ mod tests {
             refused,
             Err(crate::error::KernelError::ReAuthRequired)
         ));
-        assert_eq!(count(&harness, "SELECT count(*) AS n FROM product").await, 0);
+        assert_eq!(
+            count(&harness, "SELECT count(*) AS n FROM product").await,
+            0
+        );
     }
 }

@@ -522,7 +522,9 @@ async fn an_operator_reaches_every_command_a_principal_authorises() {
     // The deployment's own surface: on, then off again, so the world the next
     // command sees is the world this one found.
     sweep(&mut seen, "enable-product", Then::Works, || async {
-        cmd::enable_product(&ctx(), &enable_product).await.map(|_| ())
+        cmd::enable_product(&ctx(), &enable_product)
+            .await
+            .map(|_| ())
     })
     .await;
     sweep(&mut seen, "disable-product", Then::Works, || async {

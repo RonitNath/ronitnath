@@ -38,7 +38,12 @@ fn a_slug() -> &'static str {
 }
 
 /// Post a command as a signed-in caller.
-async fn command(server: &TestServer, token: &str, name: &str, args: Value) -> axum_test::TestResponse {
+async fn command(
+    server: &TestServer,
+    token: &str,
+    name: &str,
+    args: Value,
+) -> axum_test::TestResponse {
     let mut body = args.as_object().cloned().unwrap_or_default();
     body.insert("key".to_owned(), json!(uuid::Uuid::new_v4().to_string()));
     server
@@ -144,8 +149,7 @@ fn a_slug_this_build_does_not_carry_is_declined() {
     harness::run(async {
         let state = state().await;
         let server = harness::server(&state);
-        let operator =
-            harness::register(&state, "Operator", "products-typo@example.invalid").await;
+        let operator = harness::register(&state, "Operator", "products-typo@example.invalid").await;
         harness::operate_platform(&state, operator.person).await;
 
         let refused = command(

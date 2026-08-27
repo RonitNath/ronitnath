@@ -117,5 +117,6 @@ pub fn statements() -> Vec<(&'static str, &'static str, Vec<Value>)> {
             super::platform_resources::AS_OBJECT,
             bind!["document", 1i64],
         ),
+        ("products.list", super::platform_products::PRODUCTS, bind![]),
     ]
 }

@@ -123,6 +123,7 @@ pub const ALL: &[Named] = &[
     Named::Platform(Platform::Match),
     Named::Platform(Platform::Resources),
     Named::Platform(Platform::Resource),
+    Named::Platform(Platform::Products),
 ];
 
 impl Named {

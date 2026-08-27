@@ -72,6 +72,9 @@ pub enum Platform {
     Resources,
     /// One resource, with the relations held on it.
     Resource,
+    /// Every product this build carries, and what this deployment has
+    /// decided about each.
+    Products,
     /// The OpenID client registry.
     OidcClients,
     /// The tokens one session is holding. A drill-in: it takes a `subject`.
@@ -90,6 +93,7 @@ pub const ALL: &[Platform] = &[
     Platform::Match,
     Platform::Resources,
     Platform::Resource,
+    Platform::Products,
     Platform::OidcClients,
     Platform::OidcTokens,
 ];
@@ -109,6 +113,7 @@ impl Platform {
             Self::Match => "platform-match",
             Self::Resources => "platform-resources",
             Self::Resource => "platform-resource",
+            Self::Products => "platform-products",
             Self::OidcClients => "oidc-clients",
             Self::OidcTokens => "oidc-tokens",
         }
@@ -139,6 +144,10 @@ impl Platform {
             // panel that is open while its subject moves is re-read when the
             // reader opens it again.
             Self::Party | Self::Identity | Self::Match | Self::Resource => Vec::new(),
+            // The products list is the catalogue, so a toggle moves a row this
+            // query already has rather than adding or removing one — and the
+            // key it moves is the slug the event names.
+            Self::Products => products_changed(event),
             // The registry moves on events that name a client rather than one
             // of its own keys, and the token list is a drill-in like the
             // others; both answer in sets (`rereads`).
@@ -229,6 +238,7 @@ pub async fn read(
         Platform::Match => super::platform_matches::one(reads, params).await,
         Platform::Resources => super::platform_resources::list(reads, params).await,
         Platform::Resource => super::platform_resources::one(reads, params).await,
+        Platform::Products => super::platform_products::list(reads, params).await,
         Platform::OidcClients => super::oidc::clients(reads, params).await,
         Platform::OidcTokens => super::oidc::tokens(reads, params).await,
     }
@@ -409,6 +419,14 @@ fn matches_changed(event: &Event, key: &IdKey) -> Vec<String> {
     }
 }
 
+/// A product toggle names its slug, which is this list's own key.
+fn products_changed(event: &Event) -> Vec<String> {
+    match event {
+        Event::ProductEnabled { slug } | Event::ProductDisabled { slug } => vec![slug.clone()],
+        _ => Vec::new(),
+    }
+}
+
 fn resources_changed(event: &Event, key: &IdKey) -> Vec<String> {
     fn one(resource: Id<Resource>, key: &IdKey) -> Vec<String> {
         vec![resource.public(key).as_str().to_owned()]
@@ -556,7 +574,7 @@ mod tests {
         assert_eq!(names.len(), count, "a statement is listed twice");
         // One list statement per list query, plus every drill-in's own reads.
         assert_eq!(
-            count, 23,
+            count, 24,
             "a statement was added to a platform query and not to `statements()`"
         );
     }

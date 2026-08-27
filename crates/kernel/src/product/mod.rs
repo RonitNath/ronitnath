@@ -211,7 +211,11 @@ mod tests {
     #[test]
     fn every_product_states_what_it_mounts() {
         for product in CATALOGUE {
-            assert!(!product.mounts.is_empty(), "{} mounts nothing", product.slug);
+            assert!(
+                !product.mounts.is_empty(),
+                "{} mounts nothing",
+                product.slug
+            );
             for path in product.mounts {
                 assert!(path.starts_with('/'), "{path} is not a route");
             }

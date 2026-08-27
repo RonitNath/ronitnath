@@ -32,6 +32,7 @@ mod platform_audit;
 mod platform_identities;
 mod platform_matches;
 mod platform_parties;
+mod platform_products;
 mod platform_resources;
 mod platform_sessions;
 mod platform_statements;
