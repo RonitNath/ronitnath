@@ -47,7 +47,9 @@ askama = "0.16.0"
 # askama_axum is deprecated upstream; askama_web is the current integration and
 # carries the axum 0.8 shim behind a feature.
 askama_web = { version = "0.16.0", features = ["axum-0.8"] }
-rust-embed = "8.12.0"
+# `include-exclude` keeps the 49 MB regional star catalog out of the binary;
+# `interpolate-folder-path` lets a bundle's dist path be written once.
+rust-embed = { version = "8.12.0", features = ["include-exclude", "interpolate-folder-path"] }
 
 # Storage. The feature set is the one the pre-rebuild crate proved on the live
 # cluster: no `backup` (it needs S3 and EncKeys, which breaks a bare
@@ -71,7 +73,7 @@ uuid = { version = "1.26.0", features = ["v4", "serde", "js"] }
 futures-util = { version = "0.3.34", features = ["sink"] }
 thiserror = "2.0.20"
 tracing = { version = "0.1.44", features = ["attributes"] }
-tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
+tracing-subscriber = { version = "0.3.23", features = ["env-filter", "json"] }
 config = "0.15.25"
 clap = { version = "4.6.6", features = ["derive"] }
 

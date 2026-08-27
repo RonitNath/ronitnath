@@ -6,6 +6,55 @@ rust-version.workspace = true
 license.workspace = true
 publish.workspace = true
 
+[lib]
+name = "rn_starscape"
+path = "src/lib.rs"
+
 [[bin]]
 name = "rn-starscape"
 path = "src/main.rs"
+
+[dependencies]
+wasm-bindgen = { workspace = true }
+wasm-bindgen-futures = { workspace = true }
+js-sys = { workspace = true }
+console_error_panic_hook = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+[dependencies.web-sys]
+workspace = true
+features = [
+    "Blob",
+    "CssStyleDeclaration",
+    "CustomEvent",
+    "Document",
+    "DomRect",
+    "DomTokenList",
+    "Element",
+    "Event",
+    "EventTarget",
+    "HtmlCanvasElement",
+    "HtmlCollection",
+    "HtmlElement",
+    "ImageBitmap",
+    "Location",
+    "MediaQueryList",
+    "MouseEvent",
+    "Performance",
+    "PointerEvent",
+    "ReadableStream",
+    "ReadableStreamDefaultReader",
+    "Request",
+    "RequestInit",
+    "Response",
+    "VisibilityState",
+    "WebGl2RenderingContext",
+    "WebGlBuffer",
+    "WebGlProgram",
+    "WebGlShader",
+    "WebGlTexture",
+    "WebGlUniformLocation",
+    "Window",
+    "console",
+]

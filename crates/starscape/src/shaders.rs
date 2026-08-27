@@ -2,7 +2,7 @@
 //! compile — and can be asserted about — without `web-sys`.
 //!
 //! The compositing invariant these must satisfy is documented on
-//! [`super::render`]: every fragment writes an alpha that covers the colour it
+//! [`crate::render`]: every fragment writes an alpha that covers the colour it
 //! carries. `tests` below pins it, because breaking it produces no error and
 //! no visible symptom on many GPUs.
 
@@ -26,7 +26,7 @@ uniform float u_aspect;
 uniform float u_light;
 uniform float u_reveal;
 uniform sampler2D u_map;
-// Driven by the `d` tuning panel; see starscape::tuning.
+// Shipped defaults live in crate::tuning::SPEC.
 uniform float u_extinction_k;
 uniform float u_band_gain;
 uniform float u_band_shape;
@@ -88,7 +88,7 @@ uniform float u_f;
 uniform float u_aspect;
 uniform float u_dpr;
 uniform float u_light;
-// Driven by the `d` tuning panel; see starscape::tuning.
+// Shipped defaults live in crate::tuning::SPEC.
 uniform float u_size_base;
 uniform float u_size_scale;
 uniform float u_size_exp;
@@ -125,8 +125,8 @@ void main() {
     float extinction = pow(10.0, -0.4 * u_extinction_k * (airmass - 1.0));
 
     // The magnitude->pixel response. Every constant here now arrives as a
-    // uniform so the `t` panel can drive it live; the defaults in
-    // starscape::tuning::SPEC are what ships.
+    // uniform so a tuning panel can drive it live; the defaults in
+    // crate::tuning::SPEC are what ships.
     //
     // The alpha ceiling is deliberately allowed to exceed 1.0: additive
     // blending then clips the core to white and leaves the star's colour in
