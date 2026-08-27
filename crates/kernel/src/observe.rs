@@ -156,6 +156,115 @@ pub async fn sweep_links<S: Sql>(store: &Store<S>) -> Outcome<usize> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::store::{Count, Reads};
+    use crate::testing::Local;
+
+    async fn last_seen(harness: &Local) -> i64 {
+        harness
+            .store()
+            .query::<Count>("SELECT last_seen_at AS n FROM session", bind![])
+            .await
+            .expect("query runs")[0]
+            .0
+    }
+
+    #[tokio::test]
+    async fn a_drain_writes_once_and_then_holds_off_for_the_throttle_window() {
+        let harness = Local::new();
+        let who = harness
+            .register("Ronit", "seen@example.test")
+            .await
+            .expect("registers");
+        let session = who.principal.session().expect("a member has a session");
+        let created = last_seen(&harness).await;
+        let observations = Observations::new();
+
+        // Inside the window: the statement declines to write, so two processes
+        // draining the same cluster cannot both do it.
+        harness.advance(10);
+        observations.touch(session, harness.store().clock().now(), false);
+        assert_eq!(
+            observations.drain(harness.store()).await.expect("drains"),
+            0
+        );
+        assert_eq!(last_seen(&harness).await, created);
+
+        // Past it: one row.
+        harness.advance(THROTTLE);
+        let now = harness.store().clock().now();
+        observations.touch(session, now, false);
+        assert_eq!(
+            observations.drain(harness.store()).await.expect("drains"),
+            1
+        );
+        assert_eq!(last_seen(&harness).await, now);
+        assert!(observations.is_empty(), "the queue is emptied by draining");
+    }
+
+    #[tokio::test]
+    async fn a_renewal_rides_the_same_write_and_never_shortens_a_session() {
+        let harness = Local::new();
+        let who = harness
+            .register("Ronit", "renewed@example.test")
+            .await
+            .expect("registers");
+        let session = who.principal.session().expect("a member has a session");
+        async fn expires(h: &Local) -> i64 {
+            h.store()
+                .query::<Count>("SELECT expires_at AS n FROM session", bind![])
+                .await
+                .expect("query runs")[0]
+                .0
+        }
+        let before = expires(&harness).await;
+
+        harness.advance(crate::domain::RENEW_AFTER + 1);
+        let observations = Observations::new();
+        observations.touch(session, harness.store().clock().now(), true);
+        assert_eq!(
+            observations.drain(harness.store()).await.expect("drains"),
+            1
+        );
+        assert!(expires(&harness).await > before, "the session slid forward");
+
+        // A sighting without a renewal never pulls the expiry back.
+        harness.advance(THROTTLE + 1);
+        let slid = expires(&harness).await;
+        observations.touch(session, harness.store().clock().now(), false);
+        observations.drain(harness.store()).await.expect("drains");
+        assert_eq!(expires(&harness).await, slid);
+    }
+
+    #[tokio::test]
+    async fn the_sweeps_are_bounded_and_take_only_what_has_run_out() {
+        let harness = Local::new();
+        let who = harness
+            .register("Ronit", "swept@example.test")
+            .await
+            .expect("registers");
+        let factor: Vec<crate::store::RowId<crate::ids::Factor>> = harness
+            .store()
+            .query("SELECT id FROM factor WHERE kind = 'email'", bind![])
+            .await
+            .expect("query runs");
+        crate::cmd::mint_verification(harness.store(), factor[0].0)
+            .await
+            .expect("mints");
+
+        assert_eq!(sweep_sessions(harness.store()).await.expect("sweeps"), 0);
+        assert_eq!(sweep_links(harness.store()).await.expect("sweeps"), 0);
+
+        harness.advance(crate::domain::SESSION_TTL + 1);
+        assert_eq!(sweep_sessions(harness.store()).await.expect("sweeps"), 1);
+        assert_eq!(sweep_links(harness.store()).await.expect("sweeps"), 1);
+        assert_eq!(
+            crate::principal::resolve(harness.store(), &who.token)
+                .await
+                .expect("resolves")
+                .principal,
+            crate::principal::Principal::Anonymous
+        );
+    }
 
     #[test]
     fn many_sightings_of_one_session_are_one_pending_write() {

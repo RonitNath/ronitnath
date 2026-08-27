@@ -248,12 +248,12 @@ impl<S: Sql> Writes for Store<S> {}
 /// # use rn_kernel::ids::IdKey;
 /// # async fn f() {
 /// let store = Store::new(
-///     Sqlite::memory().unwrap(),
-///     IdKey::from_hex("0f0e0d0c0b0a09080706050403020100").unwrap(),
+///     Sqlite::memory().expect("opens"),
+///     IdKey::from_hex("0f0e0d0c0b0a09080706050403020100").expect("fake test key"),
 ///     Clock::System,
 /// );
 /// let read = store.reads();
-/// read.execute("DELETE FROM session", vec![]).await.unwrap();
+/// read.execute("DELETE FROM session", vec![]).await.expect("no such method");
 /// # }
 /// ```
 ///
@@ -262,12 +262,12 @@ impl<S: Sql> Writes for Store<S> {}
 /// # use rn_kernel::ids::IdKey;
 /// # async fn f() {
 /// # let store = Store::new(
-/// #     Sqlite::memory().unwrap(),
-/// #     IdKey::from_hex("0f0e0d0c0b0a09080706050403020100").unwrap(),
+/// #     Sqlite::memory().expect("opens"),
+/// #     IdKey::from_hex("0f0e0d0c0b0a09080706050403020100").expect("fake test key"),
 /// #     Clock::System,
 /// # );
 /// let read = store.reads();
-/// read.commit(vec![Stmt::any("DELETE FROM session", vec![])]).await.unwrap();
+/// read.commit(vec![Stmt::any("DELETE FROM session", vec![])]).await.expect("no such method");
 /// # }
 /// ```
 ///
@@ -278,19 +278,19 @@ impl<S: Sql> Writes for Store<S> {}
 /// # use rn_kernel::ids::IdKey;
 /// # tokio_test_block(async {
 /// let store = Store::new(
-///     Sqlite::memory().unwrap(),
-///     IdKey::from_hex("0f0e0d0c0b0a09080706050403020100").unwrap(),
+///     Sqlite::memory().expect("opens"),
+///     IdKey::from_hex("0f0e0d0c0b0a09080706050403020100").expect("fake test key"),
 ///     Clock::System,
 /// );
 /// let rows: Vec<Count> = store
 ///     .reads()
 ///     .query("SELECT count(*) AS n FROM party", vec![])
 ///     .await
-///     .unwrap();
+///     .expect("query runs");
 /// assert_eq!(rows[0].0, 0);
 /// # });
 /// # fn tokio_test_block<F: std::future::Future>(f: F) -> F::Output {
-/// #     tokio::runtime::Builder::new_current_thread().build().unwrap().block_on(f)
+/// #     tokio::runtime::Builder::new_current_thread().build().expect("runtime").block_on(f)
 /// # }
 /// ```
 #[derive(Debug, Clone, Copy)]

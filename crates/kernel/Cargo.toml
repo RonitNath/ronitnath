@@ -6,6 +6,13 @@ rust-version.workspace = true
 license.workspace = true
 publish.workspace = true
 
+# `cargo bench` compiles the lib and the integration tests as benchmark
+# targets too, and libtest's harness does not understand criterion's flags —
+# so `cargo bench -- --quick` fails before criterion ever runs. Only the
+# criterion target is a benchmark.
+[lib]
+bench = false
+
 [dependencies]
 rn-api = { workspace = true }
 
@@ -23,6 +30,11 @@ base64 = { workspace = true }
 getrandom = { workspace = true }
 sha2 = { workspace = true }
 
+# The test harness is public — a benchmark is a separate crate and an
+# integration test that built its own fixtures would be proving a second
+# registration path — so what it needs is an ordinary dependency.
+tempfile = { workspace = true }
+
 # Shared.
 futures-util = { workspace = true }
 serde = { workspace = true }
@@ -35,8 +47,19 @@ uuid = { workspace = true }
 [dev-dependencies]
 criterion = { workspace = true, features = ["async_tokio"] }
 proptest = { workspace = true }
-tempfile = { workspace = true }
 
 [[bench]]
 name = "kernel"
 harness = false
+
+[[test]]
+name = "properties"
+bench = false
+
+[[test]]
+name = "explain"
+bench = false
+
+[[test]]
+name = "cluster"
+bench = false

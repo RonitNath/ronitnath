@@ -130,7 +130,9 @@ pub struct Resolved {
 /// A cache of resolved cookies, keyed by session digest.
 pub type PrincipalCache = Cache<Resolved>;
 
-const RESOLVE_SQL: &str = "SELECT s.id, s.identity_id, s.acting_as, s.expires_at, s.created_at, \
+/// The cookie-to-principal query, exposed so the "no full scan" gate can put
+/// it under `EXPLAIN QUERY PLAN` and assert the index it must use.
+pub const RESOLVE_SQL: &str = "SELECT s.id, s.identity_id, s.acting_as, s.expires_at, s.created_at, \
                            s.last_seen_at, i.person_id, i.status \
                            FROM session s JOIN identity i ON i.id = s.identity_id \
                            WHERE s.token_hash = $1";

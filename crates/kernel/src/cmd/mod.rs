@@ -40,7 +40,7 @@ pub use enable::enable;
 pub use register::register;
 pub use remove_factor::remove_factor;
 pub use revoke_session::revoke_session;
-pub use sign_in::{SignedIn, sign_in};
+pub use sign_in::{LOOKUP as SIGN_IN_SQL, SignedIn, sign_in};
 pub use sign_out::sign_out;
 pub use verify_email::{mint_verification, verify_email};
 

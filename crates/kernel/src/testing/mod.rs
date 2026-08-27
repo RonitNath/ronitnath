@@ -5,6 +5,10 @@
 //! would be proving a second registration path rather than the real one. Every
 //! constant here is obviously fake and says so.
 
+mod node;
+
+pub use node::{KernelCache, Node};
+
 use std::sync::Arc;
 
 use uuid::Uuid;

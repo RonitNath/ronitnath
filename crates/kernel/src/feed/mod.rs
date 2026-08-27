@@ -58,6 +58,10 @@ pub trait Feed: Send + Sync {
     ) -> impl Future<Output = Outcome<Vec<Committed>>> + Send;
 }
 
+/// The durable read, exposed so the "no full scan" gate can assert its plan.
+pub const READ_SQL: &str =
+    "SELECT id, request_digest, payload FROM audit WHERE id > $1 ORDER BY id LIMIT $2";
+
 /// The durable read both implementations share: the audit table, in id order.
 ///
 /// `id > $1` over the primary key is a range scan on the rowid — the cheapest
@@ -69,10 +73,7 @@ pub(crate) async fn read_from(
 ) -> Outcome<Vec<Committed>> {
     let limit = limit.min(READ_LIMIT) as i64;
     let rows = store
-        .query::<crate::audit::Recorded>(
-            "SELECT id, request_digest, payload FROM audit WHERE id > $1 ORDER BY id LIMIT $2",
-            bind![offset.min(i64::MAX as u64) as i64, limit],
-        )
+        .query::<crate::audit::Recorded>(READ_SQL, bind![offset.min(i64::MAX as u64) as i64, limit])
         .await?;
     Ok(rows
         .into_iter()

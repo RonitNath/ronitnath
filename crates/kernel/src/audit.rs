@@ -34,6 +34,10 @@ pub fn digest_of<T: Serialize>(args: &T) -> String {
     B64.encode(hasher.finalize())
 }
 
+/// The idempotency lookup, exposed so the "no full scan" gate can assert that
+/// it rides the UNIQUE index on `audit.key` — every command runs it twice.
+pub const BY_KEY_SQL: &str = "SELECT id, request_digest, payload FROM audit WHERE key = $1";
+
 /// What an audit row says, for a caller asking about a key it has used.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Recorded {
@@ -59,10 +63,7 @@ impl FromRow for Recorded {
 /// Look up what a key already produced.
 pub async fn recorded(store: &impl Reads, key: Uuid) -> Outcome<Option<Recorded>> {
     Ok(store
-        .query_opt::<Recorded>(
-            "SELECT id, request_digest, payload FROM audit WHERE key = $1",
-            bind![key.to_string()],
-        )
+        .query_opt::<Recorded>(BY_KEY_SQL, bind![key.to_string()])
         .await?)
 }
 

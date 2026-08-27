@@ -14,6 +14,7 @@
 
 use std::collections::HashMap;
 use std::sync::Mutex;
+use std::sync::atomic::{AtomicI64, Ordering};
 
 use rusqlite::types::Value as SqlValue;
 use rusqlite::{Connection, OpenFlags};
@@ -31,6 +32,7 @@ use super::value::{FromRow, OwnedRow};
 #[derive(Debug)]
 pub struct Sqlite {
     conn: Mutex<Connection>,
+    fail_at: AtomicI64,
 }
 
 impl Sqlite {
@@ -59,7 +61,23 @@ impl Sqlite {
         }
         Ok(Self {
             conn: Mutex::new(conn),
+            fail_at: AtomicI64::new(NO_INJECTION),
         })
+    }
+
+    /// Make the next batch fail at the given statement, once.
+    ///
+    /// Fault injection at the *edge*, which is the only place it belongs: the
+    /// command under test runs unmodified and the database is what
+    /// misbehaves. It is what lets a test prove that a half-applied
+    /// registration rolls back, rather than trusting the word "transaction".
+    pub fn fail_next_batch_at(&self, index: usize) {
+        self.fail_at.store(index as i64, Ordering::Relaxed);
+    }
+
+    /// Stop injecting failures.
+    pub fn stop_failing(&self) {
+        self.fail_at.store(NO_INJECTION, Ordering::Relaxed);
     }
 
     /// Run `EXPLAIN QUERY PLAN` and return its `detail` lines.
@@ -123,6 +141,13 @@ impl Sql for Sqlite {
         let mut affected = Vec::with_capacity(stmts.len());
 
         for (index, item) in stmts.into_iter().enumerate() {
+            if self.fail_at.load(Ordering::Relaxed) == index as i64 {
+                self.stop_failing();
+                // Dropping the transaction unwritten is the rollback.
+                return Err(StoreError::Backend(format!(
+                    "injected failure at batch statement {index}"
+                )));
+            }
             let mut stmt = txn.prepare_cached(item.sql).map_err(backend)?;
             let columns: Vec<String> = stmt.column_names().into_iter().map(str::to_owned).collect();
             bind(&mut stmt, item.params, Some(&outputs))?;
@@ -157,6 +182,9 @@ impl Sql for Sqlite {
         Ok(affected)
     }
 }
+
+/// No statement index, so no injection.
+const NO_INJECTION: i64 = -1;
 
 type Outputs = HashMap<usize, (Vec<String>, Vec<Value>)>;
 

@@ -21,7 +21,7 @@ use crate::store::{Cursor, FromRow, Reads, RowError, Sql, Value};
 ///
 /// The partial unique index on `factor(value) WHERE kind = 'email'` is what
 /// makes this a seek; `explain_sign_in` asserts it.
-const LOOKUP: &str = "SELECT i.id AS identity_id, i.person_id, i.status, p.value AS phc \
+pub const LOOKUP: &str = "SELECT i.id AS identity_id, i.person_id, i.status, p.value AS phc \
                       FROM factor e \
                       JOIN identity i ON i.id = e.identity_id \
                       LEFT JOIN factor p ON p.identity_id = i.id AND p.kind = 'password' \
