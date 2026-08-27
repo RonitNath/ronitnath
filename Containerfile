@@ -5,7 +5,7 @@
 # are pinned by manifest-list digest — a tag is a locator, not an artifact.
 #
 # Incremental by design, per the 2026-07-14 owner ruling: cache mounts keep the
-# cargo registry, the build target dir and the cargo-leptos install warm across
+# cargo registry, the build target dir and the trunk install warm across
 # releases. Clean-room release builds are deliberately not the routine path.
 
 ARG RUST_IMAGE=docker.io/library/rust@sha256:3382bd20aa942806c533e9a73cd000474fb3ef173f71e684cc9b942675781769
@@ -14,39 +14,41 @@ ARG RUNTIME_IMAGE=docker.io/library/debian@sha256:3a39a0592364683e6bab97937b72ca
 FROM ${RUST_IMAGE} AS build
 WORKDIR /app
 
-# cargo-leptos is pinned to the same version the devshell provides, so a local
-# `nix develop` build and the image build produce the same bundle layout.
-ARG CARGO_LEPTOS_VERSION=0.3.7
+# trunk is pinned to the same version the devshell provides, so a local build
+# and the image build produce the same bundle layout. wasm-bindgen and wasm-opt
+# are fetched by trunk itself and pinned here for the same reason: an unpinned
+# tool in the middle of a release build is an unpinned input.
+ARG TRUNK_VERSION=0.21.14
+ENV TRUNK_TOOLS_WASM_BINDGEN=0.2.127 \
+    TRUNK_TOOLS_WASM_OPT=version_123
 RUN --mount=type=cache,id=rn-site-cargo-registry,target=/usr/local/cargo/registry,sharing=locked \
-    --mount=type=cache,id=rn-site-cargo-leptos,target=/cargo-leptos-target,sharing=locked \
+    --mount=type=cache,id=rn-site-trunk,target=/trunk-target,sharing=locked \
     rustup target add wasm32-unknown-unknown \
-    && CARGO_TARGET_DIR=/cargo-leptos-target \
-       cargo install cargo-leptos --locked --version "${CARGO_LEPTOS_VERSION}"
-
-# cargo-leptos fetches these three tools itself and, left alone, resolves each to
-# whatever is newest at build time — an unpinned input in the middle of a release
-# build. style/tailwind.css is a real `@import "tailwindcss"`, so the CSS this
-# site ships would drift with it. Pin them.
-ENV LEPTOS_TAILWIND_VERSION=v4.2.1 \
-    LEPTOS_WASM_OPT_VERSION=version_123
+    && CARGO_TARGET_DIR=/trunk-target \
+       cargo install trunk --locked --version "${TRUNK_VERSION}"
 
 COPY Cargo.toml Cargo.lock ./
-COPY src src
-COPY migrations migrations
-COPY style style
-COPY public public
+COPY crates crates
+COPY templates templates
+COPY static static
 
 # Stamped into the binary and reported by /readyz and /version, so "which
 # revision is nyc serving" has an answer that does not require ssh.
 ARG SOURCE_GIT_HASH=unknown
 ENV SOURCE_GIT_HASH=${SOURCE_GIT_HASH}
 
+# Bundles first, binary second: the server embeds crates/<bundle>/dist with
+# rust-embed at compile time, so a binary built before the bundles exist would
+# ship an empty frontend and still pass its own build.
 RUN --mount=type=cache,id=rn-site-cargo-registry,target=/usr/local/cargo/registry,sharing=locked \
     --mount=type=cache,id=rn-site-cargo-target,target=/app/target,sharing=locked \
-    cargo leptos build --release \
+    for bundle in app-member app-org app-platform starscape; do \
+        trunk build --release "crates/$bundle/index.html" || exit 1; \
+    done \
+    && cargo build --release --locked --bin rn-site \
     && mkdir -p /out/bin \
     && cp target/release/rn-site /out/bin/rn-site \
-    && cp -r target/site /out/site
+    && cp -r static /out/static
 
 FROM ${RUNTIME_IMAGE} AS runtime
 
@@ -65,23 +67,22 @@ RUN groupadd --system --gid 9751 rn-site \
 
 WORKDIR /app
 COPY --from=build /out/bin/rn-site /app/bin/rn-site
-COPY --from=build /out/site /app/site
+COPY --from=build /out/static /app/static
 
 # COPY preserves the build context's modes, and a checkout made under a 0077
 # umask yields 0600 assets that the non-root runtime user cannot read — the
-# site then 404s every stylesheet and sky asset while /pkg (written by
-# cargo-leptos itself) works, which reads as a routing bug and is not one.
-RUN chmod -R a+rX /app/site && chmod 0755 /app/bin/rn-site
+# site then 404s every star and sky asset, which reads as a routing bug and is
+# not one.
+RUN chmod -R a+rX /app/static && chmod 0755 /app/bin/rn-site
 
 # Re-declared here on purpose: an ARG is scoped to the stage that declares it,
 # so setting it only in the build stage left every running node reporting
 # version "dev" — which is exactly the question /readyz exists to answer.
 ARG SOURCE_GIT_HASH=unknown
 ENV SOURCE_GIT_HASH=${SOURCE_GIT_HASH} \
-    LEPTOS_SITE_ROOT=/app/site \
-    LEPTOS_SITE_PKG_DIR=pkg \
-    LEPTOS_SITE_ADDR=0.0.0.0:3160 \
-    LEPTOS_ENV=PROD \
+    RN_SITE__STATIC_DIR=/app/static \
+    RN_SITE__ADDR=0.0.0.0:3160 \
+    RN_SITE__MODE=prod \
     RUST_LOG=info
 
 USER 9751:9751

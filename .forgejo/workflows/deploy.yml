@@ -32,23 +32,26 @@ jobs:
           export CARGO_TARGET_DIR="$repo_cache/cargo-target"
           mkdir -p "$CARGO_HOME" "$CARGO_TARGET_DIR"
 
-          # The crate has no default features: `ssr` is the server build and
-          # `hydrate` is the wasm one, so every gate names the feature set it
-          # means rather than relying on a default that does not exist.
+          # A workspace of eight crates, gated as one: a change that compiles
+          # in isolation and breaks a sibling is exactly what --workspace
+          # catches, and the version pins live in one place so there is no
+          # per-crate feature set to name.
           nix develop --command bash -euo pipefail -c '
             cargo fmt --check
-            cargo clippy --no-default-features --features ssr --all-targets -- -D warnings
-            cargo test --locked --no-default-features --features ssr
+            cargo clippy --workspace --all-targets -- -D warnings
+            cargo test --workspace --locked
             # The browser half must at least compile. Without this the gates
             # pass on code that only builds server-side and the failure
             # surfaces minutes later inside the release image build — which is
-            # what happened on 2026-08-11, when an `ssr`-only import reached
-            # `deploy` green. Errors only, deliberately: the wasm target still
-            # carries older warnings, and blocking releases on those is a
-            # different decision from proving the target builds.
-            cargo check --no-default-features --features hydrate \
-              --target wasm32-unknown-unknown
-            bash -n deploy/provision.sh deploy/verify-cluster.sh
+            # what happened on 2026-08-11, when an ssr-only import reached
+            # `deploy` green. Every crate that ends up in a bundle is checked
+            # against the wasm target here, not just the one that broke.
+            cargo check --target wasm32-unknown-unknown \
+              -p rn-api -p rn-ui -p rn-app -p rn-org -p rn-platform -p rn-starscape
+            bash -n deploy/*.sh
+            # Structure limits (procedures/engineering.md): 200 lines for a
+            # composition root, 600 for anything else.
+            tools/size-gate.sh
           '
       - name: Controlled red-build proof gate
         # Harmless in normal operation; adding .ci-red-proof forces one red run,
