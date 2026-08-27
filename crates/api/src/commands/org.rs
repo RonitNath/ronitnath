@@ -61,6 +61,17 @@ pub struct SetRole {
     pub role: MemberRole,
 }
 
+/// Withdraw an invitation that has not been claimed.
+///
+/// The link is named by its public id, never by its token: an admin revoking
+/// somebody else's invitation has no business holding the secret that would
+/// let them claim it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RevokeLink {
+    /// The invitation.
+    pub link: PublicId,
+}
+
 /// Leave a group or organization. The acting party removes its own membership.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Leave {
@@ -95,6 +106,7 @@ mod tests {
             party: id("p_"),
             role: MemberRole::Admin,
         });
+        round_trip(&RevokeLink { link: id("l_") });
         round_trip(&Leave { group: id("g_") });
     }
 

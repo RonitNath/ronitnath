@@ -30,20 +30,21 @@ const fn index(event: &Event) -> usize {
         Event::OrganizationCreated { .. } => 14,
         Event::GroupCreated { .. } => 15,
         Event::Invited { .. } => 16,
-        Event::LinkClaimed { .. } => 17,
-        Event::RoleSet { .. } => 18,
-        Event::Left { .. } => 19,
-        Event::Shared { .. } => 20,
-        Event::Revoked { .. } => 21,
-        Event::Transferred { .. } => 22,
-        Event::DocumentCreated { .. } => 23,
-        Event::DocumentEdited { .. } => 24,
-        Event::DocumentPublished { .. } => 25,
+        Event::LinkRevoked { .. } => 17,
+        Event::LinkClaimed { .. } => 18,
+        Event::RoleSet { .. } => 19,
+        Event::Left { .. } => 20,
+        Event::Shared { .. } => 21,
+        Event::Revoked { .. } => 22,
+        Event::Transferred { .. } => 23,
+        Event::DocumentCreated { .. } => 24,
+        Event::DocumentEdited { .. } => 25,
+        Event::DocumentPublished { .. } => 26,
     }
 }
 
 /// How many there are. Stated once, asserted against both lists.
-const VARIANTS: usize = 26;
+const VARIANTS: usize = 27;
 
 /// One of each, with ids that are obviously placeholders.
 fn every_variant() -> Vec<Event> {
@@ -112,6 +113,10 @@ fn every_variant() -> Vec<Event> {
             owner: Id::new(1),
         },
         Event::Invited {
+            container: Id::new(1),
+            link: Id::new(1),
+        },
+        Event::LinkRevoked {
             container: Id::new(1),
             link: Id::new(1),
         },

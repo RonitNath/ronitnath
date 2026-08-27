@@ -105,6 +105,10 @@ impl Event {
                 container: field(&json, "container")?,
                 link: field(&json, "link")?,
             },
+            "revoke-link" => Self::LinkRevoked {
+                container: field(&json, "container")?,
+                link: field(&json, "link")?,
+            },
             "claim-link" => Self::LinkClaimed {
                 container: field(&json, "container")?,
                 identity: field(&json, "identity")?,

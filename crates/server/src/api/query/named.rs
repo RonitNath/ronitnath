@@ -246,7 +246,10 @@ impl Named {
                     | Event::Revoked { .. }
                     | Event::PersonMerged { .. }
             ),
-            Self::Invitations => matches!(event, Event::Invited { .. } | Event::LinkClaimed { .. }),
+            Self::Invitations => matches!(
+                event,
+                Event::Invited { .. } | Event::LinkRevoked { .. } | Event::LinkClaimed { .. }
+            ),
             Self::Documents => matches!(
                 event,
                 Event::DocumentCreated { .. }

@@ -13,7 +13,7 @@
 //! per group the reader belongs to rather than writing the rule a second time.
 
 use rn_kernel::bind;
-use rn_kernel::ids::{Group, Id, IdKey, Identity, Person};
+use rn_kernel::ids::{Group, Id, IdKey, Identity, Link, Person};
 use rn_kernel::principal::SubjectSet;
 use rn_kernel::relation::visible_contacts;
 use rn_kernel::store::{Cursor, FromRow, Reads, RowError};
@@ -59,7 +59,7 @@ pub const MEMBERS_SQL: &str = "SELECT m.group_id AS group_id, m.party_id AS part
 /// An invitation is a `link` row plus the grant that says what holding its
 /// token is worth, and `relation.granted_by` is the only record of who minted
 /// it — so the grant is the driving row and the link hangs off it.
-pub const INVITATIONS_SQL: &str = "SELECT l.expires_at AS expires_at, \
+pub const INVITATIONS_SQL: &str = "SELECT l.id AS id, l.expires_at AS expires_at, \
      l.claimed_at AS claimed_at, l.created_at AS created_at, \
      rel.object_id AS container_id, rel.relation AS role, \
      g.kind AS container_kind, g.display_name AS container_display, \
@@ -211,6 +211,7 @@ pub(super) async fn group_members(
 }
 
 struct InvitationSummary {
+    id: Id<Link>,
     expires_at: Timestamp,
     claimed_at: Option<Timestamp>,
     created_at: Timestamp,
@@ -224,6 +225,7 @@ struct InvitationSummary {
 impl FromRow for InvitationSummary {
     fn from_row(row: &mut impl Cursor) -> Result<Self, RowError> {
         Ok(Self {
+            id: row.id("id")?,
             expires_at: row.int("expires_at")?,
             claimed_at: row.int_opt("claimed_at")?,
             created_at: row.int("created_at")?,
@@ -238,12 +240,13 @@ impl FromRow for InvitationSummary {
 
 /// The invitations the acting identity minted.
 ///
-/// A link has no public id — it *is* its token, and the token was handed back
-/// once, at mint. So a row here is keyed by its position in the newest-first
-/// list rather than by an identifier: a rowid in a key would be the one
-/// internal number this system never puts on a wire, and there is nothing the
-/// reader could do with it anyway, since no command can name a link as a
-/// subject. Nothing in this build revokes an invitation for the same reason.
+/// The token is not here: it was handed back once, at mint, and the row keeps
+/// only its SHA-256. The link's *public id* is, because naming the row and
+/// naming the secret are two different things — it is what `RevokeLink` takes,
+/// and it is what lets somebody withdraw an invitation they sent by mistake.
+///
+/// The key is still the row's position in the newest-first list rather than
+/// that id, because the list is what a client renders in order.
 pub(super) async fn invitations(
     reads: &impl Reads,
     identity: Id<Identity>,
@@ -259,6 +262,7 @@ pub(super) async fn invitations(
             // rather than lexicographically wrong at every power of ten.
             key: format!("{at:020}"),
             value: json!({
+                "id": row.id.public(key),
                 "created_at": row.created_at,
                 "expires_at": row.expires_at,
                 "claimed_at": row.claimed_at,

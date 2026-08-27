@@ -138,6 +138,8 @@ pub struct Document {
 pub struct Invitation {
     /// The row's key in the result set.
     pub key: String,
+    /// The link's public id. Names the row; never the token.
+    pub id: String,
     /// The container it joins.
     pub container: Option<String>,
     /// That container's name.

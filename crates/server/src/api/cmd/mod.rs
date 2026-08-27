@@ -3,8 +3,8 @@
 //!
 //! The vocabulary is `rn_api::commands::ALL_COMMAND_NAMES`: one list, shared by
 //! the kernel's event names, the browser's client and this router. The table
-//! below binds a name to a kernel function, and as of this leg it binds all
-//! twenty-five of them — `unbound()` is empty and
+//! below binds a name to a kernel function, and it binds all of them:
+//! `unbound()` is empty and
 //! `every_command_in_the_contract_is_bound` keeps it that way, so a command
 //! added to the contract without a binding fails a test rather than answering
 //! a uniform decline nobody can tell from a broken route.
@@ -23,8 +23,8 @@ use axum::{Json, Router, routing::post};
 use rn_api::commands::{
     ALL_COMMAND_NAMES, AddFactor, ClaimLink, ConfirmMatch, CreateDocument, CreateGroup,
     CreateOrganization, Disable, EditDocument, Enable, Invite, Leave, ProposeMatch,
-    PublishDocument, Register, RemoveFactor, Revoke, RevokeSession, RuleMatch, SetRole, Share,
-    SignIn, SignOut, Split, Transfer, VerifyEmail,
+    PublishDocument, Register, RemoveFactor, Revoke, RevokeLink, RevokeSession, RuleMatch, SetRole,
+    Share, SignIn, SignOut, Split, Transfer, VerifyEmail,
 };
 use rn_api::{Command, CommandEnvelope};
 use rn_kernel::Principal;
@@ -96,6 +96,7 @@ bindings! {
     plain CreateGroup => cmd::create_group,
     linking Invite => cmd::invite,
     plain ClaimLink => cmd::claim_link,
+    plain RevokeLink => cmd::revoke_link,
     plain SetRole => cmd::set_role,
     plain Leave => cmd::leave,
     plain Share => cmd::share,

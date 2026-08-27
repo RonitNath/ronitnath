@@ -24,9 +24,13 @@ pub trait Table: Copy + 'static {
 /// A table whose rows are nameable from outside the process.
 ///
 /// [`Id::public`](super::Id::public) and [`decode`](super::decode) are
-/// available for exactly these; `link` and `audit` are `Table` but not
-/// `Public`, because a link is addressed by its bearer token and an audit row
-/// by its offset, and neither should be guessable from a URL.
+/// available for exactly these; `audit` is `Table` but not `Public`, because
+/// an audit row is addressed by its offset and nothing else.
+///
+/// `link` is both, and the two names are not the same thing. A link is
+/// *claimed* by its bearer token, which is a secret and never an id; its
+/// public id names the row, so that a page listing invitations can revoke one
+/// without ever holding the token that would open it.
 pub trait Public: Table {
     /// The wire vocabulary's kind, which fixes the prefix.
     const KIND: IdKind;
@@ -72,6 +76,6 @@ tables! {
     Resource = 0x9f2c_41d7_0000_0008, "resource", IdKind::Resource;
     /// A pair of identities awaiting proof.
     MatchCandidate = 0x9f2c_41d7_0000_0009, "match_candidate", IdKind::MatchCandidate;
-    /// A bearer link. Internal only: a link is addressed by its token.
-    Link = 0x9f2c_41d7_0000_000a, "link";
+    /// A bearer link. Claimed by its token, named by this.
+    Link = 0x9f2c_41d7_0000_000a, "link", IdKind::Link;
 }

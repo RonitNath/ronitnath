@@ -86,6 +86,8 @@ pub struct Member {
 /// `invitations` — a link I minted.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 pub struct Invitation {
+    /// The link's public id. Names the row; never the token.
+    pub id: String,
     pub created_at: i64,
     pub expires_at: i64,
     #[serde(default)]

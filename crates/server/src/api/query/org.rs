@@ -184,7 +184,9 @@ pub fn touched(query: Named, event: &Event, key: &IdKey, params: &Params) -> Tou
             _ => Touch::None,
         },
         Named::OrgInvitations => match event {
-            Event::Invited { .. } | Event::LinkClaimed { .. } => Touch::Set,
+            Event::Invited { .. } | Event::LinkRevoked { .. } | Event::LinkClaimed { .. } => {
+                Touch::Set
+            }
             _ => Touch::None,
         },
         // The audit tail is append-only and forward-paginated, so a new row is

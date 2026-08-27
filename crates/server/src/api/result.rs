@@ -9,9 +9,9 @@
 //!
 //! * **Public ids only.** Every identifier is derived through the server's id
 //!   key ([`Id::public`]), so nothing on this wire is a rowid.
-//! * **A row with no public form is not named.** `link` is `Table` but not
-//!   `Public` — a link is addressed by its bearer token — so `Invited` reports
-//!   the container it joins and the token rides beside the result, not in it.
+//! * **A secret is never a name.** A link has a public id and it is not its
+//!   token: `Invited` reports the row so a page can revoke it, and the token
+//!   rides beside the result, once, on the call that minted it.
 //! * **No secrets, no addresses.** A factor's value, a session's token and an
 //!   operator's evidence never appear; the id of the row that carries them
 //!   does.
@@ -125,7 +125,14 @@ pub fn result_of(event: &Event, key: &IdKey, party: Option<PublicId>) -> Value {
         // The link's own id has no public form; the token is the only handle
         // there is and it is added by the reply, once, on the call that
         // minted it.
-        Event::Invited { container, .. } => json!({ "container": container.public(key) }),
+        Event::Invited { container, link } => json!({
+            "container": container.public(key),
+            "link": link.public(key),
+        }),
+        Event::LinkRevoked { container, link } => json!({
+            "container": container.public(key),
+            "link": link.public(key),
+        }),
         Event::LinkClaimed {
             container,
             identity,
@@ -243,22 +250,31 @@ mod tests {
     }
 
     #[test]
-    fn an_invitation_names_its_container_and_never_its_link_row() {
-        let result = result_of(
-            &Event::Invited {
+    fn an_invitation_names_its_link_row_and_never_the_secret_that_opens_it() {
+        for event in [
+            Event::Invited {
                 container: Id::<Group>::new(4),
                 link: Id::new(5),
             },
-            &key(),
-            None,
-        );
-        assert!(
-            result["container"]
-                .as_str()
-                .is_some_and(|id| id.starts_with("g_"))
-        );
-        assert!(result.get("link").is_none(), "a link row has no public id");
-        assert!(result.get("token").is_none(), "the reply adds the token");
+            Event::LinkRevoked {
+                container: Id::<Group>::new(4),
+                link: Id::new(5),
+            },
+        ] {
+            let result = result_of(&event, &key(), None);
+            assert!(
+                result["container"]
+                    .as_str()
+                    .is_some_and(|id| id.starts_with("g_"))
+            );
+            assert!(
+                result["link"]
+                    .as_str()
+                    .is_some_and(|id| id.starts_with("l_")),
+                "the row a revocation would name is missing"
+            );
+            assert!(result.get("token").is_none(), "the reply adds the token");
+        }
     }
 
     #[test]

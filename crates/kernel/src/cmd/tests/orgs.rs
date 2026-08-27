@@ -1,6 +1,6 @@
 //! Organizations, groups, invitations and roles.
 
-use rn_api::commands::{ClaimLink, Leave, SetRole};
+use rn_api::commands::{ClaimLink, Leave, RevokeLink, SetRole};
 use rn_api::whoami::MemberRole as WireRole;
 
 use super::world::{self, key, public};
@@ -381,4 +381,120 @@ async fn a_relation_the_vocabulary_refuses_never_reaches_the_table() {
     )
     .await
     .expect("a contact grant is admitted");
+}
+
+// ------------------------------------------------------- revoking a link ---
+
+#[tokio::test]
+async fn an_admin_withdraws_an_unclaimed_invitation_and_the_token_stops_being_worth_anything() {
+    let harness = Local::new();
+    let ronit = world::person(&harness, "Ronit", "rl-admin@example.test").await;
+    let outsider = world::person(&harness, "Outsider", "rl-outsider@example.test").await;
+    let group = world::group(&harness, &ronit, "Team", None)
+        .await
+        .expect("creates");
+    let token = world::invite(
+        &harness,
+        &ronit,
+        public(key(&harness), group),
+        WireRole::Member,
+        TEST_EPOCH + 3_600,
+    )
+    .await
+    .expect("mints");
+
+    let link = crate::invite::lookup(harness.store(), token.digest())
+        .await
+        .expect("reads")
+        .expect("the token is worth something")
+        .id();
+    let args = RevokeLink {
+        link: public(key(&harness), link),
+    };
+
+    // Somebody who administers nothing here is refused, and refused the way a
+    // forged id would be.
+    let refused = cmd::revoke_link(&harness.ctx(outsider.principal.clone()), &args).await;
+    assert!(matches!(refused, Err(ref e) if e.is_decline()));
+
+    let committed = cmd::revoke_link(&harness.ctx(ronit.principal.clone()), &args)
+        .await
+        .expect("its minter administers the group");
+    assert_eq!(
+        committed.event,
+        Event::LinkRevoked {
+            container: group,
+            link
+        }
+    );
+
+    // Both rows are gone, so the token opens nothing and the grant it carried
+    // is not a dangling row somebody could still claim through.
+    assert!(
+        crate::invite::lookup(harness.store(), token.digest())
+            .await
+            .expect("reads")
+            .is_none()
+    );
+    assert!(
+        relation::list_for_object(harness.store(), Object::group(group))
+            .await
+            .expect("lists")
+            .is_empty()
+    );
+
+    // And a second attempt on the same link is the same decline as one on an
+    // id that never existed.
+    let again = cmd::revoke_link(&harness.ctx(ronit.principal), &args).await;
+    assert!(matches!(again, Err(ref e) if e.is_decline()));
+}
+
+#[tokio::test]
+async fn an_invitation_somebody_already_claimed_is_not_withdrawn() {
+    let harness = Local::new();
+    let ronit = world::person(&harness, "Ronit", "rl-claimed@example.test").await;
+    let joiner = world::person(&harness, "Joiner", "rl-joiner@example.test").await;
+    let group = world::group(&harness, &ronit, "Team", None)
+        .await
+        .expect("creates");
+    let token = world::invite(
+        &harness,
+        &ronit,
+        public(key(&harness), group),
+        WireRole::Member,
+        TEST_EPOCH + 3_600,
+    )
+    .await
+    .expect("mints");
+    let link = crate::invite::lookup(harness.store(), token.digest())
+        .await
+        .expect("reads")
+        .expect("worth something")
+        .id();
+
+    cmd::claim_link(
+        &harness.ctx(joiner.principal.clone()),
+        &ClaimLink {
+            token: token.expose().to_owned(),
+        },
+    )
+    .await
+    .expect("claims");
+
+    // Withdrawing it now would say nothing about the membership it produced,
+    // and would take the claim the merge lane reads as a signal.
+    let refused = cmd::revoke_link(
+        &harness.ctx(ronit.principal),
+        &RevokeLink {
+            link: public(key(&harness), link),
+        },
+    )
+    .await;
+    assert!(matches!(refused, Err(ref e) if e.is_decline()));
+    assert_eq!(
+        org::role_of(harness.store(), Id::new(group.get()), joiner.person())
+            .await
+            .expect("reads"),
+        Some(MemberRole::Member)
+    );
 }

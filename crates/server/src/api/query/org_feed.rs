@@ -17,7 +17,7 @@
 use rn_kernel::bind;
 use rn_kernel::domain::{PartyKind, Vocabulary as _};
 use rn_kernel::error::Outcome;
-use rn_kernel::ids::{Id, IdKey, Resource};
+use rn_kernel::ids::{Id, IdKey, Link, Resource};
 use rn_kernel::store::{Cursor, FromRow, Reads, RowError, Value};
 use serde_json::json;
 
@@ -291,17 +291,22 @@ impl LinkRow {
     ///
     /// The token is not here and cannot be: the row keeps only its SHA-256, so
     /// the claim URL exists exactly once, in the reply to the `Invite` that
-    /// minted it. A list of past invitations is a list of their *fates*.
+    /// minted it. A list of past invitations is a list of their *fates* — plus
+    /// the link's own public id, which names the row without naming the
+    /// secret and is what `RevokeLink` takes.
     fn render(&self, key: &IdKey, now: i64) -> Row {
         let container = PartyKind::parse(&self.container_kind)
             .map(|kind| crate::api::party::public_of(kind, self.container, key));
-        // The link row has no public id of its own — nothing addresses a link
-        // but its token — so the list is keyed by its position in the table.
+        // Keyed by the rowid, zero-padded, so a key-ordered client map reads
+        // newest-last rather than lexicographically wrong at every power of
+        // ten. The id the reader *acts* on is the public one beside it.
         let key_text = format!("{:020}", self.id.max(0));
+        let link = Id::<Link>::new(self.id).public(key);
         Row {
             key: key_text.clone(),
             value: json!({
                 "key": key_text,
+                "id": link,
                 "container": container,
                 "container_display": self.container_display,
                 "role": self.role,

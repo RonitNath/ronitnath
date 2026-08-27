@@ -162,6 +162,13 @@ pub enum Event {
         /// else.
         link: Id<Link>,
     },
+    /// An invitation was withdrawn before anybody claimed it.
+    LinkRevoked {
+        /// The container it would have joined.
+        container: Id<Group>,
+        /// The link that is gone.
+        link: Id<Link>,
+    },
     /// An invitation was claimed, and a membership exists that did not.
     LinkClaimed {
         /// The container joined.
@@ -260,6 +267,7 @@ impl Event {
             Self::OrganizationCreated { .. } => "create-organization",
             Self::GroupCreated { .. } => "create-group",
             Self::Invited { .. } => "invite",
+            Self::LinkRevoked { .. } => "revoke-link",
             Self::LinkClaimed { .. } => "claim-link",
             Self::RoleSet { .. } => "set-role",
             Self::Left { .. } => "leave",

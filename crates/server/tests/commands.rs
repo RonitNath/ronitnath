@@ -1,7 +1,7 @@
 //! Every command the contract declares, run the way a browser runs it.
 //!
 //! `api.rs` proves the shape of a reply on one command; this proves the
-//! *table*. Each of the twenty-five names is posted to `/api/cmd/<name>` over
+//! *table*. Each of the contract's names is posted to `/api/cmd/<name>` over
 //! a real session, and each reply is held to the same two claims: the offset
 //! advances, so the write is somewhere a subscription can wait for, and the
 //! result carries the public ids that command created — derived, prefixed, and
@@ -169,10 +169,7 @@ fn an_organization_is_founded_grown_and_left_over_http() {
             .await;
         assert_eq!(id_of(&invited, "container", "g_"), group);
         let token = invited["token"].as_str().expect("a link token").to_owned();
-        assert!(
-            invited.get("link").is_none(),
-            "a link row has no public id: {invited}"
-        );
+        id_of(&invited, "link", "l_");
 
         let claimed = joiner
             .run(&mut at, "claim-link", json!({ "token": token }))
@@ -194,6 +191,24 @@ fn an_organization_is_founded_grown_and_left_over_http() {
             .await;
         assert_eq!(id_of(&role, "container", "g_"), group);
         assert_eq!(id_of(&role, "party", "p_"), joiner_person);
+
+        // A third invitation, minted and then thought better of. The reply
+        // names the row; the token that would open it is never asked for.
+        let regretted = founder
+            .run(
+                &mut at,
+                "invite",
+                json!({ "group": group, "role": "member", "expires_at": soon() }),
+            )
+            .await;
+        let link = id_of(&regretted, "link", "l_");
+        let withdrawn = founder
+            .run(&mut at, "revoke-link", json!({ "link": link }))
+            .await;
+        assert_eq!(id_of(&withdrawn, "link", "l_"), link);
+        assert_eq!(id_of(&withdrawn, "container", "g_"), group);
+        let stale = founder.post("revoke-link", json!({ "link": link })).await;
+        assert_eq!(stale.status_code(), StatusCode::FORBIDDEN);
 
         let left = joiner
             .run(&mut at, "leave", json!({ "group": group }))

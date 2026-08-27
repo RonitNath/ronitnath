@@ -42,6 +42,12 @@ pub enum IdKind {
     Factor,
     /// `m_` — a match candidate awaiting proof.
     MatchCandidate,
+    /// `l_` — an invitation link.
+    ///
+    /// The id names the row, never the secret: a link is *claimed* by its
+    /// bearer token and nothing else, and this is what a page that lists an
+    /// invitation addresses when it wants to revoke one.
+    Link,
 }
 
 impl IdKind {
@@ -57,11 +63,12 @@ impl IdKind {
             Self::Session => "s_",
             Self::Factor => "f_",
             Self::MatchCandidate => "m_",
+            Self::Link => "l_",
         }
     }
 
     /// Every kind, so a caller can exhaustively map prefixes without matching.
-    pub const ALL: [Self; 9] = [
+    pub const ALL: [Self; 10] = [
         Self::Person,
         Self::Identity,
         Self::Organization,
@@ -71,6 +78,7 @@ impl IdKind {
         Self::Session,
         Self::Factor,
         Self::MatchCandidate,
+        Self::Link,
     ];
 }
 
