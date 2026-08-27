@@ -15,6 +15,8 @@
 //! so a wrong password and an address nobody has registered take the same time
 //! as well as saying the same thing.
 
+#[cfg(debug_assertions)]
+mod dev;
 pub mod next;
 pub mod session;
 
@@ -32,17 +34,56 @@ use serde::Deserialize;
 use crate::api::cmd::{self, CommandError};
 use crate::api::decline;
 use crate::api::origin::SameOrigin;
+use crate::config::AppConfig;
 use crate::presence::theme_for;
 use crate::state::AppState;
 
 pub use session::{Session, Visitor};
 
 pub fn router() -> Router<AppState> {
-    Router::new()
+    let router = Router::new()
         .route("/auth", get(page))
         .route("/auth/register", post(register))
         .route("/auth/sign-in", post(sign_in))
-        .route("/auth/sign-out", post(sign_out))
+        .route("/auth/sign-out", post(sign_out));
+    // The developer bypass, merged only into a debug build. In a release
+    // build there is no route, no handler and no kernel entry behind it —
+    // `crates/server/tests/surface.rs` asserts the `404` in both profiles.
+    #[cfg(debug_assertions)]
+    let router = router.merge(dev::router());
+    router
+}
+
+/// Whether this build *and* this configuration serve `POST /auth/dev`.
+///
+/// Written once, read by the handler and by the page that renders its button,
+/// so the button cannot appear over a route that would refuse it. The release
+/// arm is a constant `false` rather than an absent function, because the
+/// template field it feeds has to exist in both profiles for the page to
+/// compile at all.
+/// The button and its form, as this build and this configuration render them.
+///
+/// A release build has neither, and has never heard of either: the strings
+/// live in [`dev`], which it does not compile.
+fn dev_markup(config: &AppConfig) -> (&'static str, &'static str) {
+    #[cfg(not(debug_assertions))]
+    let _ = config;
+    #[cfg(debug_assertions)]
+    if serves_dev_sign_in(config) {
+        return (dev::BUTTON, dev::FORM);
+    }
+    ("", "")
+}
+
+/// The runtime half of the gate: the flag, and a process that is in dev mode.
+///
+/// Both, because either alone is a mistake somebody could make on a
+/// deployment — a stray variable in an environment, or a `config.toml` copied
+/// from a laptop. The compile half is that this function only exists here.
+#[cfg(debug_assertions)]
+#[must_use]
+fn serves_dev_sign_in(config: &AppConfig) -> bool {
+    config.dev && config.mode == crate::config::Mode::Dev
 }
 
 /// One form's typed values and whatever went wrong in it.
@@ -73,10 +114,21 @@ struct AuthPage {
     focus: &'static str,
     sign_in: Fields,
     register: Fields,
+    /// The developer sign-in button, or nothing.
+    ///
+    /// Markup rather than a flag over a template branch, and that is the
+    /// point: a branch leaves its literals in the compiled template whatever
+    /// the flag says, so a release binary would carry the words
+    /// `action="/auth/dev"` for a route it does not serve. These two strings
+    /// live in [`dev`], which a release build does not compile.
+    dev_button: &'static str,
+    /// The form that button submits — it cannot nest inside the sign-in form.
+    dev_form: &'static str,
 }
 
 impl AuthPage {
     fn new(state: &AppState, headers: &HeaderMap, next: String) -> Self {
+        let markup = dev_markup(&state.config);
         Self {
             theme: theme_for(headers).as_str(),
             version: state.version.to_string(),
@@ -84,6 +136,8 @@ impl AuthPage {
             focus: "sign-in",
             sign_in: Fields::default(),
             register: Fields::default(),
+            dev_button: markup.0,
+            dev_form: markup.1,
         }
     }
 
@@ -256,7 +310,11 @@ async fn sign_out(
 /// say it in. That is what lets a caller register on one node and immediately
 /// command another without being declined for a person that node has not
 /// applied yet.
-fn see_other(location: &str, cookie: Option<String>, offset: rn_kernel::Offset) -> Response {
+pub(crate) fn see_other(
+    location: &str,
+    cookie: Option<String>,
+    offset: rn_kernel::Offset,
+) -> Response {
     let mut response = (StatusCode::SEE_OTHER, [(header::LOCATION, location)]).into_response();
     if let Some(cookie) = cookie.and_then(|value| value.parse().ok()) {
         response.headers_mut().insert(header::SET_COOKIE, cookie);

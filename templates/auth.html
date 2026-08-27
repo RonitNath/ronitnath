@@ -41,6 +41,11 @@
       <p class="note" data-state="invalid">{{ sign_in.error_form }}</p>
       {% endif %}
       <button type="submit" class="commit">Sign in</button>
+      {#- The developer sign-in, below the commit it is an alternative to. The
+          markup is a string rather than a branch here because a branch would
+          leave its literals in a release binary, where the route they name
+          does not exist — see `auth::dev`. -#}
+      {{ dev_button|safe }}
     </form>
 
     <form class="pane" method="post" action="/auth/register" novalidate>
@@ -81,5 +86,8 @@
       <button type="submit" class="commit">Register</button>
     </form>
   </div>
+  {#- The form that button submits. It cannot nest inside the sign-in form, so
+      it sits here and is named by the button's `form=` attribute. -#}
+  {{ dev_form|safe }}
 </main>
 {% endblock %}

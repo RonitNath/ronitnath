@@ -171,6 +171,20 @@ const CASES: &[Case] = &[
         ends_session: true,
         expect: |who| if signed_in(who) { SEE_OTHER } else { FORBIDDEN },
     },
+    // The developer bypass. `404` for everybody here in *both* build profiles,
+    // and for two different reasons: a release build does not compile the
+    // route at all, and this debug build was not told `RN_SITE__DEV=1`. The
+    // row is unconditional precisely because the answer is — a refusal that
+    // told the two apart would be the leak the route is gated against.
+    Case {
+        pattern: "/auth/dev",
+        method: "POST",
+        url: Url::Fixed("/auth/dev"),
+        body: Some(""),
+        content_type: FORM,
+        ends_session: false,
+        expect: |_| NOT_FOUND,
+    },
     // --- shells ------------------------------------------------------------
     case("/app", "GET", Url::Fixed("/app"), |who| {
         if signed_in(who) { OK } else { FOUND }

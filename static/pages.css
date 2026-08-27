@@ -56,6 +56,22 @@ body {
     margin-top: 0.5rem;
 }
 
+/* The quiet button: an alternative to the commit above it, and it must not
+ * read as a peer of it. Base `button` styling in tokens.css is already
+ * transparent and borderless, so this is position and tone only. */
+.pane .quiet {
+    justify-self: start;
+    margin-top: 0.35rem;
+    padding: 0.35rem 0;
+    font-size: var(--text-2);
+    color: var(--fg-muted);
+    cursor: pointer;
+}
+
+.pane .quiet:hover {
+    color: var(--fg);
+}
+
 /* The one anchor that is a commit — signing in to accept a link is a
  * navigation, and it must not look like a different kind of control for it. */
 a.commit {
