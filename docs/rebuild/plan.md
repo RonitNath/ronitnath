@@ -44,6 +44,14 @@ listen/notify today so rung 6 swaps transport without touching callers. Email
 factors are unique deployment-wide (`factor_email_unique_idx`); source-scoped
 uniqueness for imported identities is backlog with the import feature.
 
+Also a non-goal here and rung 7's to own: **a horizon on the change feed**.
+`audit` is both the permanent record and the feed every subscription, the
+invalidator and the observation lane read forward by `id`, and it has no
+retention, no compaction and no bound — correct for a log, wrong for a feed.
+Growth is bounded per command and every read is an index seek, so it degrades
+in disk rather than in latency, which is why it can wait; what rung 7 owes is a
+cursor horizon, the way the kernel report's log group has one.
+
 Data lifecycle: **disposable-dev**. The live cluster's state is archived, not
 migrated, at cutover (that cutover is a separate owner decision — see §Release).
 
