@@ -65,6 +65,18 @@ run-dev:
 seed:
     tools/seed.sh
 
+# This worktree's own instance: its own ports, state and keys, so two
+# checkouts can be up at once (tools/ephemeral.sh).
+up:
+    tools/ephemeral.sh up
+
+down:
+    tools/ephemeral.sh stop
+
+# `just eph status`, `just eph reset`, `just eph ports`.
+eph cmd="status":
+    tools/ephemeral.sh {{cmd}}
+
 # The rn-ui fixture API on :3199, for `trunk serve` against a bundle.
 fixture:
     cargo run -p rn-ui --example fixture

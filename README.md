@@ -60,6 +60,7 @@ cp .env.example .env                    # then RN_SITE__DEV=1 puts a "Sign in as
                                         # operator" button under the sign-in form
                                         # (debug builds only; `just run-dev`)
 tools/seed.sh                           # register the first operator and grant it
+just up                                 # this worktree's own instance
 tools/cluster.sh start                  # three real voters on this host
 tools/perf/run.sh                       # oha + samply against that cluster
 tools/size-gate.sh                      # the structure limits, as CI runs them
@@ -80,6 +81,18 @@ trunk resolves its configuration from the working directory or from `--config`
 and never from the path of the index it is handed. For live work on a bundle,
 `crates/ui/README.md` has the two-terminal recipe (the fixture API on :3199 and
 `trunk serve` at the tier path).
+
+`just up` is the per-worktree instance (`tools/ephemeral.sh`): it derives a
+slot from the worktree's absolute path — `sha256(path) mod 100` — and takes
+its three ports from it (`3300 + slot` for HTTP, `8300 + slot` and
+`8400 + slot` for hiqlite's two listeners), keeping its database, log, pid
+file, id key and signing key under `<worktree>/target/ephemeral/`. So two
+checkouts, or two agents, are up at the same time without knowing about each
+other, and neither collides with `cargo run` on :3004 or `tools/cluster.sh` on
+3161-3163. It runs in dev mode with the developer sign-in on, so the button
+under the sign-in form is a working operator session; `just eph status` says
+where it is, `just down` stops it and `just eph reset` wipes the state.
+Nothing it writes is committed — `target/` is ignored.
 
 The first operator is not a migration and not a seed row: `tools/seed.sh`
 registers one through the real form, then runs `rn-site bootstrap-operator
