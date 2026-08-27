@@ -14,7 +14,6 @@
 //! would be refused by the kernel rather than by a check this file could omit.
 
 mod executed;
-mod result;
 
 pub use executed::{CommandError, Executed};
 
@@ -177,7 +176,8 @@ async fn command(
             if executed.ended {
                 session::forget(&state, &headers);
             }
-            let mut response = Json(executed.reply(state.ids())).into_response();
+            let reply = executed.reply(&state.store.reads(), state.ids()).await;
+            let mut response = Json(reply).into_response();
             if let Some(value) = executed
                 .cookie(state.config.mode)
                 .and_then(|cookie| cookie.parse().ok())

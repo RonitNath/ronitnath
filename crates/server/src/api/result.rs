@@ -15,14 +15,49 @@
 //! * **No secrets, no addresses.** A factor's value, a session's token and an
 //!   operator's evidence never appear; the id of the row that carries them
 //!   does.
+//!
+//! One id cannot be derived here at all. Several events type a party field as
+//! `Id<Person>` because `party` is the *table*, not the kind — a transferred
+//! resource may go to an organization, a group's owner usually is one — and
+//! the four kinds share no tag, so rendering those under the person tag would
+//! hand a caller back an id that is not the one it sent. [`ambiguous_party`]
+//! names that row and the caller resolves it against `party.kind` (see
+//! [`super::party`]) before calling in, which keeps this function pure and its
+//! tests free of a database.
 
+use rn_api::PublicId;
 use rn_kernel::Event;
 use rn_kernel::domain::Vocabulary as _;
 use rn_kernel::ids::{Group, Id, IdKey, Organization, Person, Resource};
 use serde_json::{Value, json};
 
+/// The `party` row an event names whose kind the event does not fix.
+///
+/// At most one per event, and only these four: everywhere else the command's
+/// own semantics settle it — a merge is between persons, a claimant is the
+/// person who claimed, an organization's founder is a person.
+#[must_use]
+pub const fn ambiguous_party(event: &Event) -> Option<i64> {
+    match event {
+        // A group in an organization is owned by the organization.
+        Event::GroupCreated { owner, .. }
+        // A document may be owned by an organization.
+        | Event::DocumentCreated { owner, .. } => Some(owner.get()),
+        // The whole point of `Transfer` is that the new owner may be either.
+        Event::Transferred { to, .. } => Some(to.get()),
+        // A member may be a person, an organization or a group.
+        Event::RoleSet { party, .. } => Some(party.get()),
+        _ => None,
+    }
+}
+
 /// The public ids a command produced, derived on the way out.
-pub fn result_of(event: &Event, key: &IdKey) -> Value {
+///
+/// `party` is [`ambiguous_party`] already resolved, or `None` when this event
+/// names no such row — and `None` where one was named means the row could not
+/// be read, which renders as `null` rather than as an id under a guessed tag.
+pub fn result_of(event: &Event, key: &IdKey, party: Option<PublicId>) -> Value {
+    let ambiguous = || party.as_ref().map_or(Value::Null, |id| json!(id));
     match event {
         // --- identity -----------------------------------------------------
         Event::Registered {
@@ -79,13 +114,11 @@ pub fn result_of(event: &Event, key: &IdKey) -> Value {
             "owner": owner.public(key),
         }),
         Event::GroupCreated {
-            group,
-            resource,
-            owner,
+            group, resource, ..
         } => json!({
             "group": group.public(key),
             "resource": resource.public(key),
-            "owner": owner.public(key),
+            "owner": ambiguous(),
         }),
         // The link's own id has no public form; the token is the only handle
         // there is and it is added by the reply, once, on the call that
@@ -100,7 +133,11 @@ pub fn result_of(event: &Event, key: &IdKey) -> Value {
             "identity": identity.public(key),
             "party": party.public(key),
         }),
-        Event::RoleSet { container, party } | Event::Left { container, party } => json!({
+        Event::RoleSet { container, .. } => json!({
+            "container": container.public(key),
+            "party": ambiguous(),
+        }),
+        Event::Left { container, party } => json!({
             "container": container.public(key),
             "party": party.public(key),
         }),
@@ -120,13 +157,13 @@ pub fn result_of(event: &Event, key: &IdKey) -> Value {
             "object": object_id_of(object_kind, *object_id, key),
             "relation": relation.as_str(),
         }),
-        Event::Transferred { resource, to } => json!({
+        Event::Transferred { resource, .. } => json!({
             "resource": resource.public(key),
-            "to": to.public(key),
+            "to": ambiguous(),
         }),
-        Event::DocumentCreated { document, owner } => json!({
+        Event::DocumentCreated { document, .. } => json!({
             "document": document.public(key),
-            "owner": owner.public(key),
+            "owner": ambiguous(),
         }),
         Event::DocumentEdited { document, rev } | Event::DocumentPublished { document, rev } => {
             json!({ "document": document.public(key), "rev": rev })
@@ -172,6 +209,7 @@ mod tests {
                 candidate: Some(Id::<MatchCandidate>::new(3)),
             },
             &key,
+            None,
         );
         assert!(
             result["survivor"]
@@ -197,6 +235,7 @@ mod tests {
                 candidate: None,
             },
             &key(),
+            None,
         );
         assert_eq!(result["candidate"], Value::Null);
     }
@@ -209,6 +248,7 @@ mod tests {
                 link: Id::new(5),
             },
             &key(),
+            None,
         );
         assert!(
             result["container"]
@@ -229,6 +269,7 @@ mod tests {
                 relation: Relation::Editor,
             },
             &key,
+            None,
         );
         assert_eq!(document["object_kind"], "document");
         assert_eq!(document["relation"], "editor");
@@ -247,6 +288,7 @@ mod tests {
                 relation: Relation::Member,
             },
             &key,
+            None,
         );
         assert_ne!(group["object"], document["object"]);
 
@@ -260,9 +302,51 @@ mod tests {
                     relation: Relation::Operator,
                 },
                 &key,
+                None,
             );
             assert_eq!(other["object"], Value::Null, "{kind}");
         }
+    }
+
+    #[test]
+    fn a_party_field_is_named_by_its_own_kind_and_never_by_its_table() {
+        let key = key();
+        let organization = Id::<Organization>::new(11).public(&key);
+        let event = Event::Transferred {
+            resource: Id::<Resource>::new(2),
+            // The kernel types this `Id<Person>` because `party` is the table.
+            // The row is an organization, and the reply has to say so.
+            to: Id::<Person>::new(11),
+        };
+        assert_eq!(ambiguous_party(&event), Some(11));
+
+        let result = result_of(&event, &key, Some(organization.clone()));
+        assert_eq!(result["to"], json!(organization));
+        assert!(result["to"].as_str().is_some_and(|id| id.starts_with("o_")));
+
+        // Unresolved is null, never an id derived under a guessed tag: an id
+        // that decodes as the wrong kind is worse than no id at all.
+        assert_eq!(result_of(&event, &key, None)["to"], Value::Null);
+    }
+
+    #[test]
+    fn only_the_events_whose_kind_is_open_ask_for_a_party_lookup() {
+        assert_eq!(
+            ambiguous_party(&Event::PersonSplit {
+                identity: Id::new(1),
+                person: Id::new(2),
+            }),
+            None,
+            "a split is between persons, so nothing is open"
+        );
+        assert_eq!(
+            ambiguous_party(&Event::RoleSet {
+                container: Id::new(3),
+                party: Id::new(4),
+            }),
+            Some(4),
+            "a member may be a person, an organization or a group"
+        );
     }
 
     #[test]
@@ -273,6 +357,7 @@ mod tests {
                 rev: 3,
             },
             &key(),
+            None,
         );
         assert_eq!(result["rev"], 3);
         assert!(

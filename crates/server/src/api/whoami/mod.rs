@@ -25,17 +25,17 @@
 use axum::extract::State;
 use axum::response::{IntoResponse, Response};
 use axum::{Json, Router, routing::get};
-use rn_api::PublicId;
 use rn_api::whoami::{IdentityRef, MemberRole, OrganizationRef, PartyRef, PersonRef, Tier, Whoami};
 use rn_kernel::bind;
 use rn_kernel::cmd::is_platform_operator;
 use rn_kernel::domain::PartyRow;
-use rn_kernel::ids::{Group, Id, IdKey, Organization, Person, Service, Table};
+use rn_kernel::ids::{Id, IdKey, Organization, Person};
 use rn_kernel::principal::identity_of;
 use rn_kernel::store::{Count, Cursor, FromRow, Reads, RowError};
 use rn_kernel::{Outcome, Principal};
 
 use super::decline;
+use super::party::public_of;
 use crate::auth::session::Session;
 use crate::state::AppState;
 
@@ -230,27 +230,6 @@ fn role(raw: &str) -> Option<MemberRole> {
     }
 }
 
-/// A party's public id, derived under the tag its kind carries.
-///
-/// The four kinds share the `party` table and *must not* share a tag: one tag
-/// would make `o_…` and `p_…` decrypt to each other, which is the exact
-/// confusion the encryption exists to prevent.
-fn public_of(kind: rn_kernel::domain::PartyKind, raw: i64, key: &IdKey) -> PublicId {
-    use rn_kernel::domain::PartyKind as Kind;
-    match kind {
-        Kind::Person => Id::<Person>::new(raw).public(key),
-        Kind::Organization => Id::<Organization>::new(raw).public(key),
-        Kind::Group => Id::<Group>::new(raw).public(key),
-        Kind::Service => Id::<Service>::new(raw).public(key),
-    }
-}
-
-/// Assert at compile time that every party kind has its own tag.
-const _: () = {
-    assert!(<Person as Table>::TAG != <Organization as Table>::TAG);
-    assert!(<Group as Table>::TAG != <Service as Table>::TAG);
-};
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -296,31 +275,6 @@ mod tests {
         assert_eq!(role("owner"), Some(MemberRole::Owner));
         assert_eq!(role("superuser"), None);
         assert_eq!(role(""), None);
-    }
-
-    #[test]
-    fn the_same_row_gets_a_different_id_under_every_party_kind() {
-        let key = IdKey::from_hex("000102030405060708090a0b0c0d0e0f").expect("a test key");
-        let kinds = [
-            rn_kernel::domain::PartyKind::Person,
-            rn_kernel::domain::PartyKind::Organization,
-            rn_kernel::domain::PartyKind::Group,
-            rn_kernel::domain::PartyKind::Service,
-        ];
-        let ids: Vec<String> = kinds
-            .iter()
-            .map(|kind| public_of(*kind, 7, &key).as_str().to_owned())
-            .collect();
-        let mut unique = ids.clone();
-        unique.sort();
-        unique.dedup();
-        assert_eq!(
-            unique.len(),
-            ids.len(),
-            "two party kinds share an id: {ids:?}"
-        );
-        assert!(ids[0].starts_with("p_"));
-        assert!(ids[1].starts_with("o_"));
     }
 
     #[test]

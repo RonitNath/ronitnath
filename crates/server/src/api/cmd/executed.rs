@@ -22,8 +22,11 @@ use rn_kernel::domain::{SESSION_TTL, Token};
 use rn_kernel::ids::IdKey;
 use rn_kernel::{Committed, KernelError};
 
+use rn_kernel::store::Reads;
+
 use super::decline;
-use super::result::result_of;
+use crate::api::party;
+use crate::api::result::{ambiguous_party, result_of};
 use crate::auth::session;
 
 /// What a command produced, plus the two session effects a reply carries.
@@ -93,9 +96,16 @@ impl Executed {
     }
 
     /// The command's reply body.
-    #[must_use]
-    pub fn reply(&self, key: &IdKey) -> CommandReply {
-        let mut result = result_of(&self.committed.event, key);
+    ///
+    /// The read is for the one party row an event may name without fixing its
+    /// kind — see [`ambiguous_party`]. Most commands name none and pay
+    /// nothing.
+    pub async fn reply(&self, reads: &impl Reads, key: &IdKey) -> CommandReply {
+        let party = match ambiguous_party(&self.committed.event) {
+            Some(raw) => party::public_id(reads, raw, key).await,
+            None => None,
+        };
+        let mut result = result_of(&self.committed.event, key, party);
         if let (Some(link), Some(fields)) = (&self.link, result.as_object_mut()) {
             fields.insert("token".to_owned(), link.expose().into());
         }
