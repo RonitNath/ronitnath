@@ -66,6 +66,10 @@ pub fn use_whoami() -> RwSignal<Option<Whoami>> {
 /// The chrome is drawn from that one DTO, so anything that changes what the
 /// session *is* — acting as an organization, and nothing else so far — has to
 /// say so rather than wait for the next page load.
+///
+/// Call it from a reactive context: it reads the signal out of context *before*
+/// spawning, because a spawned future has no owner and `use_context` inside one
+/// finds nothing.
 pub fn refresh_whoami() {
     let who = use_whoami();
     spawn_local(async move {

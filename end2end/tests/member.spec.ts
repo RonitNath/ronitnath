@@ -6,6 +6,12 @@ const site = process.env.RN_SITE_URL || "http://127.0.0.1:3004";
 
 const PASSWORD = "an obviously fake test password";
 
+/** The operator `tools/seed.sh` registers. The merge cases need one: a
+ *  candidate about two registrations is raised by a signal or by an operator,
+ *  and no signal on this deployment can raise this pair. */
+const OPERATOR_EMAIL = process.env.RN_SEED_EMAIL || "operator@example.invalid";
+const OPERATOR_PASSWORD = process.env.RN_SEED_PASSWORD || "an obviously fake dev password";
+
 /** A fresh address per run, so a re-run is not a duplicate registration. */
 function address(who: string): string {
   return `u2-${who}-${Date.now()}-${Math.floor(Math.random() * 1e6)}@example.invalid`;
@@ -22,11 +28,11 @@ async function register(page: Page, name: string, email: string): Promise<void> 
   await page.waitForURL(`${site}/app`);
 }
 
-async function signIn(page: Page, email: string): Promise<void> {
+async function signIn(page: Page, email: string, password: string = PASSWORD): Promise<void> {
   await page.goto(`${site}/auth`);
   const form = page.locator('form[action="/auth/sign-in"]');
   await form.getByLabel("Email").fill(email);
-  await form.getByLabel("Password").fill(PASSWORD);
+  await form.getByLabel("Password").fill(password);
   await form.getByRole("button", { name: "Sign in" }).click();
   await page.waitForURL(`${site}/app`);
 }
@@ -128,4 +134,160 @@ test("a group, an invitation, a shared document and a revoked session", async ({
   await founder.close();
   await joiner.close();
   await second_device.close();
+});
+
+/**
+ * Two registrations of one human, joined by the proof a browser can give.
+ *
+ * A signal proposes and proof disposes. The signal here is an operator's
+ * `propose-match`, because no scan can raise this pair on this deployment —
+ * `verified_email` cannot fire when `factor(value)` is unique deployment-wide,
+ * and `oidc` is schema-only in this cut. What is being proven is the other
+ * half: that the person themselves can confirm it, with the one proof a
+ * browser can offer, which is the other registration's own credentials.
+ *
+ * Needs `tools/seed.sh` first, for the operator that raises the candidate.
+ */
+test("a person confirms their own two registrations with the other's credentials", async ({
+  browser,
+}) => {
+  test.setTimeout(120_000);
+
+  const operator_context = await browser.newContext();
+  const first_context = await browser.newContext();
+  const second_context = await browser.newContext();
+
+  const operator = await open(operator_context);
+  const first = await open(first_context);
+  const second = await open(second_context);
+
+  const first_email = address("twin-a");
+  const second_email = address("twin-b");
+
+  try {
+    // Two self-registrations, sharing a name and nothing else.
+    await register(first, "Twin", first_email);
+    await register(second, "Twin", second_email);
+
+    const ids = async (page: Page) =>
+      await page.evaluate(async () => await (await fetch("/api/whoami")).json());
+    const a = (await ids(first)).identity.public_id;
+    const b = (await ids(second)).identity.public_id;
+    expect(a).not.toEqual(b);
+
+    // The operator raises the question. It decides nothing.
+    await signIn(operator, OPERATOR_EMAIL, OPERATOR_PASSWORD);
+    const proposed = await operator.evaluate(
+      async ([a, b]) => {
+        const response = await fetch("/api/cmd/propose-match", {
+          method: "POST",
+          credentials: "same-origin",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            key: crypto.randomUUID(),
+            identity_a: a,
+            identity_b: b,
+            signal: "name_and_group",
+          }),
+        });
+        return { status: response.status, body: await response.json() };
+      },
+      [a, b] as const,
+    );
+    expect(proposed.status).toBe(200);
+
+    // It arrives on the first person's own page, live.
+    await first.goto(`${site}/app/merge`);
+    await expect(first.locator("section.wide")).toContainText("name and group", {
+      timeout: 15_000,
+    });
+    // Before the merge, this person is made of one registration.
+    await expect(first.locator("section", { hasText: "Made of" }).locator(".mono")).toHaveCount(1);
+
+    // The proof: the *other* registration's address and password. Nothing is
+    // minted — proving you could sign in is not signing in — so the page does
+    // not have to put itself back together, and this tab keeps its cookie.
+    await first.getByLabel("The other registration's address").fill(second_email);
+    await first.getByLabel("Its password").fill(PASSWORD);
+    await first.getByRole("button", { name: "Confirm" }).click();
+
+    // One person, made of two registrations. No reload: a merge names two
+    // persons and no identity, and this list re-reads itself on one anyway.
+    await expect(first.locator("section", { hasText: "Made of" }).locator(".mono")).toHaveCount(2, {
+      timeout: 20_000,
+    });
+    // And the same tab is still signed in as the same session it started with.
+    expect((await ids(first)).identity.public_id).toEqual(a);
+  } finally {
+    await operator_context.close();
+    await first_context.close();
+    await second_context.close();
+  }
+});
+
+/** A wrong password spends a verification and says the same thing a wrong
+ *  address does: the page cannot be used to learn which half was wrong. */
+test("a merge offered the wrong credentials is refused without saying which half", async ({
+  browser,
+}) => {
+  test.setTimeout(120_000);
+
+  const operator_context = await browser.newContext();
+  const first_context = await browser.newContext();
+  const second_context = await browser.newContext();
+  const operator = await open(operator_context);
+  const first = await open(first_context);
+  const second = await open(second_context);
+
+  try {
+    const first_email = address("wrong-a");
+    const second_email = address("wrong-b");
+    await register(first, "Wrong", first_email);
+    await register(second, "Wrong", second_email);
+
+    const whoami = async (page: Page) =>
+      await page.evaluate(async () => await (await fetch("/api/whoami")).json());
+    const a = (await whoami(first)).identity.public_id;
+    const b = (await whoami(second)).identity.public_id;
+
+    await signIn(operator, OPERATOR_EMAIL, OPERATOR_PASSWORD);
+    await operator.evaluate(
+      async ([a, b]) => {
+        await fetch("/api/cmd/propose-match", {
+          method: "POST",
+          credentials: "same-origin",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            key: crypto.randomUUID(),
+            identity_a: a,
+            identity_b: b,
+            signal: "name_and_group",
+          }),
+        });
+      },
+      [a, b] as const,
+    );
+
+    await first.goto(`${site}/app/merge`);
+    await expect(first.locator("section.wide")).toContainText("name and group", {
+      timeout: 15_000,
+    });
+
+    await first.getByLabel("The other registration's address").fill(second_email);
+    await first.getByLabel("Its password").fill("not the password");
+    await first.getByRole("button", { name: "Confirm" }).click();
+
+    // Refused, and still one registration.
+    await expect(first.locator("section", { hasText: "Made of" }).locator(".mono")).toHaveCount(1);
+    // An address nobody holds spends the same verification and answers the
+    // same: neither attempt tells the caller which half it got wrong.
+    await first.getByLabel("The other registration's address").fill(address("nobody"));
+    await first.getByLabel("Its password").fill(PASSWORD);
+    await first.getByRole("button", { name: "Confirm" }).click();
+    await expect(first.locator("section", { hasText: "Made of" }).locator(".mono")).toHaveCount(1);
+  } finally {
+    await operator_context.close();
+    await first_context.close();
+    await second_context.close();
+  }
 });

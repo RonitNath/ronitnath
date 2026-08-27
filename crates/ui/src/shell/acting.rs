@@ -23,7 +23,7 @@ use rn_api::commands::ActAs;
 
 use crate::api;
 
-use super::{refresh_whoami, use_whoami};
+use super::use_whoami;
 
 /// The value that means "myself" — no organization, so the person again.
 const SELF: &str = "";
@@ -50,10 +50,16 @@ pub fn ActingAs() -> impl IntoView {
             match api::invoke::<ActAs, serde_json::Value>(ActAs { party }).await {
                 // The switch lands on the *next* request, so the chrome has to
                 // ask again rather than assume: the session row moved, and
-                // what it now resolves to is the server's answer.
+                // what it now resolves to is the server's answer. The signal
+                // is captured here rather than looked up after the await —
+                // there is no reactive owner inside a spawned future, so
+                // `use_context` in there finds nothing.
                 Ok(_) => {
                     note.set(None);
-                    refresh_whoami();
+                    match api::whoami().await {
+                        Ok(fresh) => who.set(Some(fresh)),
+                        Err(error) => note.set(Some(error.message())),
+                    }
                 }
                 Err(error) => note.set(Some(error.message())),
             }

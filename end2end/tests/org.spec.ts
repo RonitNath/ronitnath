@@ -212,3 +212,102 @@ test("a document owned by the organization is written, shared and published", as
   await page.getByRole("button", { name: "Share" }).click();
   await expect(page.locator(".grants")).toContainText("viewer", { timeout: 15_000 });
 });
+
+test("an invitation is withdrawn, a member is removed, and the organization speaks for itself", async ({
+  page,
+  browser,
+}) => {
+  test.slow();
+  const run = unique();
+  await register(page, "E2E Chair", `org-e2e-chair-${run}@example.invalid`);
+  const org = (await command(page, "create-organization", {
+    display_name: `Authority ${run}`,
+  })).organization as string;
+
+  // --- a link, and taking it back ----------------------------------------
+  await page.goto(`${site}/org/members`);
+  await page.locator("summary", { hasText: "Invite to organization" }).click();
+  await page.getByRole("button", { name: "Mint link" }).click();
+  await expect(page.locator(".claim code")).toContainText("/links/");
+  const spare = (await page.locator(".claim code").textContent())!.trim();
+
+  await page.goto(`${site}/org/invitations`);
+  const link = page.getByRole("row", { name: /unclaimed/ });
+  await expect(link).toBeVisible({ timeout: 15_000 });
+  // The verb is in the row, on the rows it can act on.
+  await link.getByRole("button", { name: "Withdraw" }).click();
+  await expect(page.getByRole("row", { name: /unclaimed/ })).toHaveCount(0, { timeout: 15_000 });
+
+  // And the token it minted opens nothing: the grant went with the row.
+  const { context: stale, page: latecomer } = await second(browser);
+  try {
+    await register(latecomer, "E2E Latecomer", `org-e2e-late-${run}@example.invalid`);
+    await latecomer.goto(spare);
+    await expect(latecomer.getByRole("button", { name: "Accept" })).toHaveCount(0);
+  } finally {
+    await stale.close();
+  }
+
+  // --- somebody joins, and is removed by somebody else --------------------
+  await page.goto(`${site}/org/members`);
+  await page.locator("summary", { hasText: "Invite to organization" }).click();
+  await page.getByRole("button", { name: "Mint link" }).click();
+  const claim = (await page.locator(".claim code").textContent())!.trim();
+
+  const { context, page: joiner } = await second(browser);
+  try {
+    await register(joiner, "E2E Guest", `org-e2e-guest-${run}@example.invalid`);
+    await joiner.goto(claim);
+    await joiner.getByRole("button", { name: "Accept" }).click();
+
+    const guest = page.getByRole("row", { name: /E2E Guest/ });
+    await expect(guest).toBeVisible({ timeout: 15_000 });
+    // The owner may remove them; the owner's own row offers nothing, because
+    // leaving is a different question and carries the last-owner rule.
+    await expect(page.getByRole("row", { name: /E2E Chair/ })).not.toContainText("Remove");
+    await guest.getByRole("button", { name: "Remove" }).click();
+    await expect(page.getByRole("row", { name: /E2E Guest/ })).toHaveCount(0, { timeout: 15_000 });
+
+    // Which is the whole of holding the tier: /org is not theirs any more.
+    await expect
+      .poll(async () => (await joiner.request.get(`${site}/org`)).status(), { timeout: 15_000 })
+      .toBe(404);
+  } finally {
+    await context.close();
+  }
+
+  // --- acting as the organization ----------------------------------------
+  //
+  // Attribution, not authority. What moves is the party the audit row names,
+  // and the organization's own tail is the place that shows it: a command that
+  // names no container of this organization is in it because the principal was
+  // speaking as the organization when they ran it.
+  await page.goto(`${site}/org/audit`);
+  await expect(page.getByRole("row", { name: /create-organization/ })).toBeVisible({
+    timeout: 15_000,
+  });
+  expect(await page.getByRole("row", { name: /create-document/ }).count()).toBe(0);
+
+  // A personal document, made while speaking as themselves. It names nothing
+  // about the organization, so it is not the organization's business.
+  await command(page, "create-document", { title: `Mine ${run}`, body: "" });
+  await page.waitForTimeout(1000);
+  expect(await page.getByRole("row", { name: /create-document/ }).count()).toBe(0);
+
+  // Now speak as the organization. The rail says who that is.
+  await page.getByLabel("Acting as").selectOption({ label: `Authority ${run}` });
+  await expect(page.locator(".rail-identity .acting")).toHaveText(`Authority ${run}`, {
+    timeout: 15_000,
+  });
+
+  // The same command, run by the same person, is now the organization's.
+  await command(page, "create-document", { title: `Theirs ${run}`, body: "" });
+  await expect(page.getByRole("row", { name: /create-document/ })).toBeVisible({
+    timeout: 15_000,
+  });
+
+  // And back to themselves, which is the half that proves the switch was a
+  // switch rather than a promotion.
+  await page.getByLabel("Acting as").selectOption({ label: "E2E Chair" });
+  await expect(page.locator(".rail-identity .acting")).toHaveText("", { timeout: 15_000 });
+});

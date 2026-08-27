@@ -210,6 +210,24 @@ impl Named {
                 }
             }
             Scope::Once => Touch::None,
+            // A merge is the one thing that changes what a person is *made of*
+            // and names no identity while doing it: `PersonMerged` names two
+            // persons, and the registrations they are made of are not in the
+            // event. So this list answers in sets, re-reads its own, and diffs
+            // it against what the connection has been sent — strictly narrower
+            // than naming keys we cannot justify, since a `del` can then only
+            // mention a key that was previously put. `platform-identities`
+            // carries the same arm for the same reason, and `/app/merge` is
+            // the page that said nothing without it.
+            Scope::Identity
+                if matches!(self, Self::Identities)
+                    && matches!(
+                        committed.event,
+                        Event::PersonMerged { .. } | Event::PersonSplit { .. }
+                    ) =>
+            {
+                Touch::Set
+            }
             // Two of the deployment's lists move on events that name none of
             // their rows, so they answer in sets like a shared one does
             // (`platform::rereads`).
@@ -376,6 +394,48 @@ mod tests {
         for query in ALL {
             assert_eq!(Named::parse(query.as_str()), Some(*query));
         }
+    }
+
+    /// A merge names two persons and no identity, so the member tier's own
+    /// list of "what I am made of" cannot be keyed off the event — and a page
+    /// that showed one registration after confirming a second is a page that
+    /// says the command did nothing.
+    #[test]
+    fn a_merge_makes_the_identity_list_re_read_itself() {
+        let mine = Principal::Member {
+            identity: Id::new(1),
+            person: Some(Id::new(2)),
+            acting_as: Id::new(2),
+            session: Id::new(3),
+        };
+        let merged = committed(Event::PersonMerged {
+            survivor: Id::new(2),
+            absorbed: Id::new(7),
+            method: rn_kernel::merge::LinkMethod::SelfLink,
+            candidate: None,
+        });
+        let params = Params::default();
+        assert_eq!(
+            Named::Identities.touched(&merged, &mine, &key(), &params),
+            Touch::Set,
+            "no key can be named, so the set is re-read and diffed"
+        );
+        assert!(
+            Named::Identities.changed(&merged, &mine, &key()).is_empty(),
+            "and naming a key remains something this event cannot justify"
+        );
+
+        // The ordinary events still answer by key: a re-read of the whole set
+        // per factor added would be the cure applied to the healthy.
+        let added = committed(Event::FactorAdded {
+            identity: Id::new(1),
+            factor: Id::new(5),
+            kind: rn_kernel::domain::FactorKind::Email,
+        });
+        assert!(matches!(
+            Named::Identities.touched(&added, &mine, &key(), &params),
+            Touch::Keys(keys) if keys.len() == 1
+        ));
     }
 
     #[test]

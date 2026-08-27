@@ -153,11 +153,15 @@ test("an operator rules two registrations into one person, and ends a session", 
     await expect(panel.locator("h3", { hasText: "Alias" })).toContainText("1");
 
     await operator.goto(`${site}/platform/identities`);
+    // A deployment this suite has run against before has more registrations
+    // than one page holds, so each row is found the way an operator finds one.
+    await operator.getByLabel("Filter rows").fill(a);
     const rowA = operator.getByRole("row", { name: new RegExp(a) });
-    const rowB = operator.getByRole("row", { name: new RegExp(b) });
     await expect(rowA).toBeVisible();
-    await expect(rowB).toBeVisible();
     await expect(rowA).toContainText(NAME);
+    await operator.getByLabel("Filter rows").fill(b);
+    const rowB = operator.getByRole("row", { name: new RegExp(b) });
+    await expect(rowB).toBeVisible();
     await expect(rowB).toContainText(NAME);
 
     // --- the ruling is in the log, with what it relied on ------------------
@@ -186,6 +190,7 @@ test("an operator rules two registrations into one person, and ends a session", 
     });
 
     await operator.goto(`${site}/platform/sessions`);
+    await operator.getByLabel("Filter rows").fill(otherSession);
     const sessionRow = operator.getByRole("row", { name: new RegExp(otherSession) });
     await expect(sessionRow).toBeVisible();
     await sessionRow.click();
@@ -201,6 +206,7 @@ test("an operator rules two registrations into one person, and ends a session", 
 
     // --- and a stranger's session ends by disabling the party --------------
     await operator.goto(`${site}/platform`);
+    await operator.getByLabel("Filter rows").fill(person);
     const partyRow = operator.getByRole("row", { name: new RegExp(person) });
     await expect(partyRow).toBeVisible();
     await partyRow.click();
@@ -219,6 +225,7 @@ test("an operator rules two registrations into one person, and ends a session", 
 
     // Put it back, so a second run of this suite starts where the first did.
     await operator.goto(`${site}/platform`);
+    await operator.getByLabel("Filter rows").fill(person);
     const again = operator.getByRole("row", { name: new RegExp(person) });
     await again.click();
     await operator.locator(".panel").getByRole("button", { name: "Enable" }).click();
@@ -247,10 +254,99 @@ test("the cluster page reports what this node witnessed", async ({ browser }) =>
     await expect(page.getByRole("row", { name: /^sqlite/ })).toContainText("formed");
     await expect(page.getByRole("row", { name: /^cache/ })).toContainText("formed");
     // The feed head is where a fresh subscriber is seeded, so by now it is
-    // past zero: this deployment has served commands.
-    const head = await page.getByRole("row", { name: /Feed head/ }).innerText();
+    // past zero: this deployment has served commands. It is a reading rather
+    // than a row — a fact list is not a table — so it is read from the fact
+    // it sits in.
+    const head = await page
+      .locator(".fact", { hasText: "Feed head" })
+      .locator(".fact-value")
+      .innerText();
     expect(Number(head.replace(/\D/g, ""))).toBeGreaterThan(0);
   } finally {
     await context.close();
+  }
+});
+
+test("an operator ends a stranger's session and takes an organization out of service", async ({
+  browser,
+}) => {
+  test.setTimeout(120_000);
+  const contexts: BrowserContext[] = [];
+  const open = async () => {
+    const context = await browser.newContext();
+    contexts.push(context);
+    return await context.newPage();
+  };
+
+  try {
+    const operator = await open();
+    await signIn(operator, operatorEmail);
+
+    // --- a stranger, and their session -------------------------------------
+    //
+    // Not the operator's own second window: `RevokeSession` reads the operator
+    // relation, so ending somebody else's session is the reach a deployment
+    // needs and not a hole in the rule that a session is its identity's.
+    const stranger = await open();
+    const strangerEmail = unique("stranger");
+    await register(stranger, "Stranger", strangerEmail);
+    const strangerSession = await stranger.evaluate(async () => {
+      const rows = await (await fetch("/api/q/sessions")).json();
+      return rows.find((row: { current: boolean }) => row.current).public_id as string;
+    });
+
+    await operator.goto(`${site}/platform/sessions`);
+    // Every run of this suite leaves sessions behind, so the list is paged.
+    // Finding the row is what the filter box is for.
+    await operator.getByLabel("Filter rows").fill(strangerSession);
+    const row = operator.getByRole("row", { name: new RegExp(strangerSession) });
+    await expect(row).toBeVisible({ timeout: 15_000 });
+    await row.click();
+    await operator.locator(".panel").getByRole("button", { name: "Revoke" }).click();
+    // A session row *is* the session, so a deletion looks like a row leaving.
+    await expect(row).toHaveCount(0, { timeout: 15_000 });
+
+    // The stranger finds out on their next navigation.
+    await stranger.goto(`${site}/app`);
+    await expect(stranger).toHaveURL(/\/auth/);
+
+    // --- an organization, disabled -----------------------------------------
+    //
+    // `Disable` takes any party. An organization is not a person and the
+    // console offers it anyway, because the kernel decides authority by what
+    // the party is rather than by refusing everything that is not human.
+    const founder = await open();
+    await register(founder, "Founder", unique("founder"));
+    const org = await founder.evaluate(async () => {
+      const response = await fetch("/api/cmd/create-organization", {
+        method: "POST",
+        headers: { "content-type": "application/json", "sec-fetch-site": "same-origin" },
+        body: JSON.stringify({ key: crypto.randomUUID(), display_name: "Wound Up" }),
+      });
+      return (await response.json()).result.organization as string;
+    });
+
+    await operator.goto(`${site}/platform`);
+    await operator.getByLabel("Filter rows").fill(org);
+    const partyRow = operator.getByRole("row", { name: new RegExp(org) });
+    await expect(partyRow).toBeVisible({ timeout: 15_000 });
+    await partyRow.click();
+    const panel = operator.locator(".panel");
+    await expect(panel).toContainText("A reason is required");
+    await panel.getByLabel("Reason").fill("wound up at the founder's request");
+    await panel.getByRole("button", { name: "Disable" }).click();
+    await expect
+      .poll(async () => await panel.locator(".state").first().innerText(), { timeout: 15_000 })
+      .toBe("disabled");
+
+    // Put it back, so a second run of this suite starts where the first did.
+    await panel.getByRole("button", { name: "Enable" }).click();
+    await expect
+      .poll(async () => await panel.locator(".state").first().innerText(), { timeout: 15_000 })
+      .toBe("active");
+  } finally {
+    for (const context of contexts) {
+      await context.close();
+    }
   }
 });
