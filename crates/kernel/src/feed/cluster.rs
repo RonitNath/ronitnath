@@ -89,9 +89,22 @@ impl Feed for ClusterFeed {
         // that there is something to read, and a subscriber past that offset
         // ignores it.
         let _ = self.wake.send(offset);
-        if let Err(err) = self.store.engine().notify(&offset).await {
-            tracing::warn!(%err, offset, "change feed notification not sent");
-        }
+
+        // The other nodes hear it off the request path. hiqlite's `notify` is
+        // a raft write, and awaiting it here put a second quorum round trip
+        // between a command committing and its caller being told — 0.78 ms of
+        // a 2.13 ms commit at p50, measured (`docs/perf/2026-08-27-f5.md`).
+        // Nothing durable rides on it: the offsets are hints and every
+        // subscriber reads the audit table from its own cursor, so a
+        // notification that is late, lost or duplicated costs latency on one
+        // node's sockets and nothing else. What must not be lost is the
+        // commit, and that already happened.
+        let client = self.store.engine().clone();
+        tokio::spawn(async move {
+            if let Err(err) = client.notify(&offset).await {
+                tracing::warn!(%err, offset, "change feed notification not sent");
+            }
+        });
     }
 
     fn subscribe(&self) -> impl Stream<Item = Offset> + Send + 'static {

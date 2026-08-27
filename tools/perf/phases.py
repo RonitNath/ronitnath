@@ -11,11 +11,10 @@ an account of itself rather than one total.
     tools/perf/phases.py target/cluster/node1/rn-site.log
 """
 
-import re
+import json
 import sys
 
 PHASES = ["replay_us", "plan_us", "commit_us", "read_back_us", "notify_us", "total_us"]
-FIELD = re.compile(r"(\w+)=(\d+)")
 
 
 def percentile(values, fraction):
@@ -34,7 +33,11 @@ def main(paths):
             for line in handle:
                 if "command phases" not in line:
                     continue
-                fields = dict(FIELD.findall(line))
+                # The server logs JSON; a line that is not is not one of ours.
+                try:
+                    fields = json.loads(line)
+                except ValueError:
+                    continue
                 if "total_us" not in fields:
                     continue
                 counted += 1
