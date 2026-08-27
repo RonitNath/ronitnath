@@ -196,8 +196,7 @@ body {
 
 /* The bar floats on the dark top of the dusk gradient in light mode, so its
  * own foreground has to come from the on-dusk scale, not the page scale. */
-:root[data-theme="light"] .topbar,
-:root[data-theme="light"] .sky-chrome {
+:root[data-theme="light"] .topbar {
     --fg: var(--on-dusk-fg);
     --fg-muted: var(--on-dusk-muted);
     --fg-subtle: var(--on-dusk-muted);
@@ -209,8 +208,7 @@ body {
 }
 
 @media (prefers-color-scheme: light) {
-    :root:not([data-theme="dark"]) .topbar,
-    :root:not([data-theme="dark"]) .sky-chrome {
+    :root:not([data-theme="dark"]) .topbar {
         --fg: var(--on-dusk-fg);
         --fg-muted: var(--on-dusk-muted);
         --fg-subtle: var(--on-dusk-muted);
@@ -357,8 +355,17 @@ body {
 
 .star-callout {
     position: fixed;
-    max-width: 12rem;
+    /* Wide enough for the longest detail line the catalog produces
+       ("Orion · blue supergiant · 863 ly") at this tracking, so a label
+       states the star rather than trailing off in an ellipsis. */
+    max-width: min(22rem, calc(100vw - 1.5rem));
     color: var(--fg);
+    /* The dusk gradient runs from near-black to near-white down the frame, so
+       one ink colour cannot be legible everywhere on it. The halo is the page
+       ground, which makes a label readable at either end. */
+    text-shadow:
+        0 0 6px var(--bg),
+        0 1px 2px var(--bg);
     text-transform: uppercase;
     letter-spacing: 0.08em;
     animation: callout-in 0.45s ease both;
@@ -475,6 +482,13 @@ body {
     .social-links {
         display: grid;
         grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    /* A star label claims to point at a star. In a 390px frame it cannot do
+       that without landing on the hero, so it is the layer that gets elided:
+       the sky itself is still the sky. */
+    .star-annotations {
+        display: none;
     }
 }
 

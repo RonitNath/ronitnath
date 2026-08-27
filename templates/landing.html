@@ -1,6 +1,9 @@
 {% extends "base.html" %}
 
 {% block head %}
+{#- Server clock at render: every browser draws the same instant, however
+    wrong its own clock is. -#}
+<meta name="rn-server-epoch-ms" content="{{ epoch_ms }}">
 <script type="module">
   import init from "/pkg/starscape/rn-starscape.js";
   init();

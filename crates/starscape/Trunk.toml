@@ -1,0 +1,11 @@
+# The landing's sky, built as one wasm bundle.
+#
+# `filehash = false` because the server marks every asset `no-cache,
+# must-revalidate` on a stable URL: the browser revalidates and gets a 304, and
+# the askama landing can name the module in a plain <script type="module">
+# rather than being regenerated on every build to chase a hash.
+[build]
+target = "index.html"
+dist = "dist"
+public_url = "/pkg/starscape/"
+filehash = false

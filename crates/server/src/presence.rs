@@ -71,17 +71,29 @@ pub fn theme_for(headers: &HeaderMap) -> Theme {
         .unwrap_or(Theme::Dark)
 }
 
+fn unix_millis() -> i64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|since| i64::try_from(since.as_millis()).unwrap_or(i64::MAX))
+        .unwrap_or(0)
+}
+
 #[derive(Template, WebTemplate)]
 #[template(path = "landing.html")]
 struct Landing {
     theme: &'static str,
     version: String,
+    /// The server's clock at render, in unix milliseconds. The sky the bundle
+    /// draws is a function of this, so publishing it is what makes every
+    /// browser on the site see the same sky at the same moment.
+    epoch_ms: i64,
 }
 
 async fn landing(State(state): State<AppState>, headers: HeaderMap) -> Response {
     let page = Landing {
         theme: theme_for(&headers).as_str(),
         version: state.version.to_string(),
+        epoch_ms: unix_millis(),
     };
     (
         [
