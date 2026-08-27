@@ -23,25 +23,50 @@
 //! be a caller with a stale view arguing with one that is current.
 
 mod add_factor;
+mod claim_link;
+mod create_document;
+mod create_group;
+mod create_organization;
 mod disable;
+mod edit_document;
 mod enable;
+mod invite;
+mod leave;
+mod publish_document;
+mod refs;
 mod register;
 mod remove_factor;
+mod revoke;
 mod revoke_session;
+mod set_role;
+mod share;
 mod sign_in;
 mod sign_out;
 #[cfg(test)]
 mod tests;
+mod transfer;
 mod verify_email;
 
 pub use add_factor::add_factor;
+pub use claim_link::claim_link;
+pub use create_document::create_document;
+pub use create_group::create_group;
+pub use create_organization::create_organization;
 pub use disable::disable;
+pub use edit_document::edit_document;
 pub use enable::enable;
+pub use invite::invite;
+pub use leave::leave;
+pub use publish_document::publish_document;
 pub use register::register;
 pub use remove_factor::remove_factor;
+pub use revoke::revoke;
 pub use revoke_session::revoke_session;
+pub use set_role::set_role;
+pub use share::{SHARER, share};
 pub use sign_in::{LOOKUP as SIGN_IN_SQL, SignedIn, sign_in};
 pub use sign_out::sign_out;
+pub use transfer::transfer;
 pub use verify_email::{mint_verification, verify_email};
 
 // The four merge commands live in `crate::merge`, beside the five steps they

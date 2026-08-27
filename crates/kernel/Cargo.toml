@@ -71,3 +71,17 @@ bench = false
 [[test]]
 name = "cluster"
 bench = false
+
+[[test]]
+name = "relations"
+bench = false
+
+# K2's budgets are two separate questions — "may I" and "what may I see" — so
+# they are two benchmark targets and `--bench check` runs only the first.
+[[bench]]
+name = "check"
+harness = false
+
+[[bench]]
+name = "list"
+harness = false

@@ -16,8 +16,12 @@ use serde_json::Value as Json;
 
 use crate::Offset;
 use crate::domain::FactorKind;
-use crate::ids::{Factor, Id, Identity, MatchCandidate, Person, Session, Table};
+use crate::ids::{
+    Factor, Group, Id, Identity, Link, MatchCandidate, Organization, Person, Resource, Session,
+    Table,
+};
 use crate::merge::LinkMethod;
+use crate::relation::Relation;
 
 /// One thing that happened.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -125,6 +129,103 @@ pub enum Event {
         /// The person it moved to.
         person: Id<Person>,
     },
+    /// An organization was founded.
+    OrganizationCreated {
+        /// Its party row — what memberships and relations address.
+        organization: Id<Organization>,
+        /// Its resource row — what ownership and `Transfer` address.
+        resource: Id<Resource>,
+        /// The person who founded it, and its first owner.
+        owner: Id<Person>,
+    },
+    /// A group was created, in an organization or for one person.
+    GroupCreated {
+        /// Its party row.
+        group: Id<Group>,
+        /// Its resource row.
+        resource: Id<Resource>,
+        /// The person or organization that owns it.
+        owner: Id<Person>,
+    },
+    /// An invitation link was minted.
+    Invited {
+        /// The container it joins.
+        container: Id<Group>,
+        /// The link that was minted. Its token is in the reply and nowhere
+        /// else.
+        link: Id<Link>,
+    },
+    /// An invitation was claimed, and a membership exists that did not.
+    LinkClaimed {
+        /// The container joined.
+        container: Id<Group>,
+        /// The registration that claimed it.
+        identity: Id<Identity>,
+        /// The party that is now a member.
+        party: Id<Person>,
+    },
+    /// A member's role changed.
+    RoleSet {
+        /// The container.
+        container: Id<Group>,
+        /// Whose role.
+        party: Id<Person>,
+    },
+    /// A member left.
+    Left {
+        /// The container.
+        container: Id<Group>,
+        /// Who left.
+        party: Id<Person>,
+    },
+    /// A relation was granted. The object is a kind and a row rather than a
+    /// typed id, because a share is over anything the vocabulary registers —
+    /// a document by its resource row, a person by their party row.
+    Shared {
+        /// The registered kind.
+        object_kind: String,
+        /// The row it addresses.
+        object_id: i64,
+        /// What was granted.
+        relation: Relation,
+    },
+    /// A relation was withdrawn.
+    Revoked {
+        /// The registered kind.
+        object_kind: String,
+        /// The row it addresses.
+        object_id: i64,
+        /// What was withdrawn.
+        relation: Relation,
+    },
+    /// A resource changed hands. The only event that reports an owner change.
+    Transferred {
+        /// The resource.
+        resource: Id<Resource>,
+        /// Its new owner.
+        to: Id<Person>,
+    },
+    /// A document was created, in draft.
+    DocumentCreated {
+        /// Its resource row.
+        document: Id<Resource>,
+        /// Who owns it.
+        owner: Id<Person>,
+    },
+    /// A document's draft moved on.
+    DocumentEdited {
+        /// The document.
+        document: Id<Resource>,
+        /// The revision the edit produced.
+        rev: i64,
+    },
+    /// A document's draft became its published version.
+    DocumentPublished {
+        /// The document.
+        document: Id<Resource>,
+        /// The revision that is now published.
+        rev: i64,
+    },
 }
 
 impl Event {
@@ -149,6 +250,18 @@ impl Event {
                 LinkMethod::SelfLink | LinkMethod::Factor | LinkMethod::Import => "confirm-match",
             },
             Self::PersonSplit { .. } => "split",
+            Self::OrganizationCreated { .. } => "create-organization",
+            Self::GroupCreated { .. } => "create-group",
+            Self::Invited { .. } => "invite",
+            Self::LinkClaimed { .. } => "claim-link",
+            Self::RoleSet { .. } => "set-role",
+            Self::Left { .. } => "leave",
+            Self::Shared { .. } => "share",
+            Self::Revoked { .. } => "revoke",
+            Self::Transferred { .. } => "transfer",
+            Self::DocumentCreated { .. } => "create-document",
+            Self::DocumentEdited { .. } => "edit-document",
+            Self::DocumentPublished { .. } => "publish-document",
         }
     }
 
@@ -163,12 +276,9 @@ impl Event {
             | Self::FactorRemoved { identity, .. }
             | Self::EmailVerified { identity, .. }
             | Self::PersonSplit { identity, .. }
-            | Self::IdentityLinked { identity, .. } => Some(*identity),
-            Self::PartyDisabled { .. }
-            | Self::PartyEnabled { .. }
-            | Self::MatchProposed { .. }
-            | Self::MatchRejected { .. }
-            | Self::PersonMerged { .. } => None,
+            | Self::IdentityLinked { identity, .. }
+            | Self::LinkClaimed { identity, .. } => Some(*identity),
+            _ => None,
         }
     }
 
@@ -179,6 +289,13 @@ impl Event {
             Self::PartyDisabled { party } | Self::PartyEnabled { party } => Some(*party),
             Self::PersonMerged { survivor, .. } => Some(*survivor),
             Self::PersonSplit { person, .. } | Self::IdentityLinked { person, .. } => Some(*person),
+            Self::OrganizationCreated { owner, .. }
+            | Self::GroupCreated { owner, .. }
+            | Self::DocumentCreated { owner, .. } => Some(*owner),
+            Self::LinkClaimed { party, .. }
+            | Self::RoleSet { party, .. }
+            | Self::Left { party, .. } => Some(*party),
+            Self::Transferred { to, .. } => Some(*to),
             _ => None,
         }
     }
@@ -259,6 +376,59 @@ impl Event {
             "split" => Self::PersonSplit {
                 identity: field(&json, "identity")?,
                 person: field(&json, "person")?,
+            },
+            "create-organization" => Self::OrganizationCreated {
+                organization: field(&json, "organization")?,
+                resource: field(&json, "resource")?,
+                owner: field(&json, "owner")?,
+            },
+            "create-group" => Self::GroupCreated {
+                group: field(&json, "group")?,
+                resource: field(&json, "resource")?,
+                owner: field(&json, "owner")?,
+            },
+            "invite" => Self::Invited {
+                container: field(&json, "container")?,
+                link: field(&json, "link")?,
+            },
+            "claim-link" => Self::LinkClaimed {
+                container: field(&json, "container")?,
+                identity: field(&json, "identity")?,
+                party: field(&json, "party")?,
+            },
+            "set-role" => Self::RoleSet {
+                container: field(&json, "container")?,
+                party: field(&json, "party")?,
+            },
+            "leave" => Self::Left {
+                container: field(&json, "container")?,
+                party: field(&json, "party")?,
+            },
+            "share" => Self::Shared {
+                object_kind: json.get("object_kind")?.as_str()?.to_owned(),
+                object_id: json.get("object_id")?.as_i64()?,
+                relation: Relation::parse(json.get("relation")?.as_str()?)?,
+            },
+            "revoke" => Self::Revoked {
+                object_kind: json.get("object_kind")?.as_str()?.to_owned(),
+                object_id: json.get("object_id")?.as_i64()?,
+                relation: Relation::parse(json.get("relation")?.as_str()?)?,
+            },
+            "transfer" => Self::Transferred {
+                resource: field(&json, "resource")?,
+                to: field(&json, "to")?,
+            },
+            "create-document" => Self::DocumentCreated {
+                document: field(&json, "document")?,
+                owner: field(&json, "owner")?,
+            },
+            "edit-document" => Self::DocumentEdited {
+                document: field(&json, "document")?,
+                rev: json.get("rev")?.as_i64()?,
+            },
+            "publish-document" => Self::DocumentPublished {
+                document: field(&json, "document")?,
+                rev: json.get("rev")?.as_i64()?,
             },
             _ => return None,
         })
@@ -345,7 +515,7 @@ mod tests {
 
     #[test]
     fn a_payload_from_a_build_that_knew_more_is_skipped_rather_than_guessed() {
-        assert_eq!(Event::from_payload(r#"{"event":"transfer"}"#), None);
+        assert_eq!(Event::from_payload(r#"{"event":"merge"}"#), None);
         assert_eq!(Event::from_payload(r#"{"event":"register"}"#), None);
         assert_eq!(Event::from_payload("not json"), None);
     }

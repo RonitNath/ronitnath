@@ -62,12 +62,16 @@ async fn the_migration_creates_exactly_the_reports_tables() {
         names(&store, "table").await,
         vec![
             "audit",
+            // K2's migration adds `document` and `party_resource`; the list is
+            // exhaustive on purpose, so a table nobody meant to add fails here.
+            "document",
             "factor",
             "identity",
             "link",
             "match_candidate",
             "membership",
             "party",
+            "party_resource",
             "person_alias",
             "person_link",
             "relation",
@@ -99,7 +103,9 @@ async fn every_named_index_exists() {
         "person_link_person_idx",
         "relation_object_idx",
         "relation_subject_idx",
+        "relation_subject_key_idx",
         "relation_unique_idx",
+        "resource_kind_created_idx",
         "resource_owner_idx",
         "session_expires_idx",
         "session_identity_idx",
@@ -325,4 +331,6 @@ fn the_embedded_migrations_are_the_files_on_disk() {
     assert_eq!(sql.len(), 3);
     assert!(sql[0].contains("CREATE TABLE party"));
     assert!(sql[2].contains("person_link_is_append_only_update"));
+    // Order is what makes the second file able to alter the first's tables.
+    assert!(sql[1].contains("ALTER TABLE relation"));
 }

@@ -353,6 +353,8 @@ async fn no_table_outside_the_kernel_references_a_person() {
             "identity.person_id",
             "membership.group_id",
             "membership.party_id",
+            // K2: the party row of an organization or group, bound to its resource.
+            "party_resource.party_id",
             "person_alias.old_person_id",
             "person_alias.person_id",
             "person_link.from_person_id",
