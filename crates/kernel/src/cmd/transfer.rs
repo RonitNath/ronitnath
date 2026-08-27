@@ -20,10 +20,15 @@
 //! For the party-backed kinds it also moves the owner *membership*: the new
 //! owner becomes `owner` and the old one is demoted to `admin` rather than
 //! removed, because somebody who hands their organization on has not left it.
+//!
+//! Two principals may run it: the owner, and a platform operator. The second
+//! is what a deployment needs when an owner is gone and the thing they owned
+//! is not — and it is audited under the operator's own identity, so a
+//! reassignment is always attributable afterwards.
 
 use rn_api::commands::Transfer;
 
-use super::{Batch, Ctx, refs, run};
+use super::{Batch, Ctx, is_platform_operator, refs, run};
 use crate::domain::Vocabulary as _;
 use crate::error::{Outcome, decline};
 use crate::event::Committed;
@@ -81,7 +86,7 @@ pub async fn transfer<S: Sql, F: Feed>(ctx: &Ctx<'_, S, F>, args: &Transfer) -> 
     let subjects = crate::principal::expand(ctx.store, &ctx.principal).await?;
     let mut owners: Vec<Id<Person>> = vec![person];
     owners.extend(subjects.organizations.iter().map(|o| Id::new(o.get())));
-    if !row.owned_by_any(&owners) {
+    if !row.owned_by_any(&owners) && !is_platform_operator(&ctx.store.reads(), person).await? {
         return decline();
     }
     if row.owner_party_id == to {

@@ -353,3 +353,88 @@ async fn a_session_speaks_as_an_organization_it_administers_and_as_no_other() {
         "the audit row did not record the organization"
     );
 }
+
+// ------------------------------------------------------ operator reach ---
+
+#[tokio::test]
+async fn a_platform_operator_revokes_a_grant_and_transfers_a_resource_they_do_not_own() {
+    use rn_api::commands::{Revoke, Share, Transfer};
+    use rn_api::whoami::DocRole;
+
+    let harness = Local::new();
+    let owner = world::person(&harness, "Owner", "op-doc-owner@example.test").await;
+    let reader = world::person(&harness, "Reader", "op-doc-reader@example.test").await;
+    let operator = world::person(&harness, "Operator", "op-doc-operator@example.test").await;
+    let document = world::document(&harness, &owner, "Charter", None)
+        .await
+        .expect("creates");
+    let resource = public(key(&harness), document);
+    cmd::share(
+        &harness.ctx(owner.principal.clone()),
+        &Share {
+            resource: resource.clone(),
+            subject: public(key(&harness), reader.person()),
+            relation: DocRole::Viewer,
+        },
+    )
+    .await
+    .expect("shares");
+
+    let revoke = Revoke {
+        resource: resource.clone(),
+        subject: public(key(&harness), reader.person()),
+        relation: DocRole::Viewer,
+    };
+    let transfer = Transfer {
+        resource: resource.clone(),
+        to: public(key(&harness), operator.person()),
+    };
+
+    // A stranger with no relation on it reaches neither.
+    assert!(matches!(
+        cmd::revoke(&harness.ctx(operator.principal.clone()), &revoke).await,
+        Err(ref e) if e.is_decline()
+    ));
+    assert!(matches!(
+        cmd::transfer(&harness.ctx(operator.principal.clone()), &transfer).await,
+        Err(ref e) if e.is_decline()
+    ));
+
+    super::prelude::make_operator(&harness, operator.person()).await;
+
+    cmd::revoke(&harness.ctx(operator.principal.clone()), &revoke)
+        .await
+        .expect("an operator may withdraw any relation");
+    assert!(
+        !relation::list_for_object(harness.store(), Object::resource("document", document))
+            .await
+            .expect("lists")
+            .iter()
+            .any(|grant| grant.relation == crate::relation::Relation::Viewer)
+    );
+
+    cmd::transfer(&harness.ctx(operator.principal.clone()), &transfer)
+        .await
+        .expect("an operator may reassign any resource");
+    assert_eq!(
+        crate::resource::load(harness.store(), document)
+            .await
+            .expect("reads")
+            .expect("still there")
+            .owner_party_id,
+        operator.person()
+    );
+
+    // Both are on the record under the operator's own identity, which is what
+    // makes the reach reviewable rather than merely present.
+    assert_eq!(
+        world::count(
+            &harness,
+            "SELECT count(*) AS n FROM audit \
+             WHERE command IN ('revoke', 'transfer') AND acting_as = $1",
+            bind![operator.person()],
+        )
+        .await,
+        2
+    );
+}

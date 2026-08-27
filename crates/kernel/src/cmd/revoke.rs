@@ -8,11 +8,16 @@
 //! Revoking something that was never granted is not an error. The world the
 //! caller asked for is the world that already exists, so the command succeeds
 //! and the audit row records that it ran.
+//!
+//! A platform operator may withdraw any relation at all. That is not a hole in
+//! the rule above — it is the rule that a deployment has somebody who can
+//! answer for it, and the audit row names them, which is what makes the power
+//! reviewable rather than merely present.
 
 use rn_api::commands::Revoke;
 
 use super::share::{may_share, object_of, relation_of};
-use super::{Batch, Ctx, refs, run};
+use super::{Batch, Ctx, is_platform_operator, refs, run};
 use crate::error::{Outcome, decline};
 use crate::event::Committed;
 use crate::feed::Feed;
@@ -32,7 +37,9 @@ pub async fn revoke<S: Sql, F: Feed>(ctx: &Ctx<'_, S, F>, args: &Revoke) -> Outc
     let subject = refs::subject(ctx.store.ids(), &args.subject)?;
     let relation = relation_of(args.relation);
 
-    if !may_share(ctx, object, person).await? {
+    if !may_share(ctx, object, person).await?
+        && !is_platform_operator(&ctx.store.reads(), person).await?
+    {
         return decline();
     }
     let now = ctx.now();
