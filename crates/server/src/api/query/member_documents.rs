@@ -83,12 +83,17 @@ pub const HELD_SQL: &str = "SELECT r.object_id AS id, r.relation AS relation \
 /// the reader. Only the three party subjects are returned: a document shared
 /// with `public` or with a link is not something this tier can revoke, and a
 /// subject with no public id could not be named back to the server anyway.
+///
+/// `owner` is not a share and is left out. It is the row `CreateDocument` and
+/// `Transfer` keep in step with `resource.owner_party_id`, so offering it
+/// beside the grants would offer a `Revoke` that takes a document away from
+/// its owner while the column still says they own it.
 pub const SHARES_SQL: &str = "SELECT r.object_id AS object_id, r.relation AS relation, \
      r.at AS at, p.kind AS party_kind, p.display_name AS display, p.id AS party_id \
      FROM json_each($1) d \
      CROSS JOIN relation r ON r.object_kind = 'document' AND r.object_id = d.value \
      JOIN party p ON p.id = r.subject_id \
-     WHERE r.subject_kind IN ('person', 'organization', 'group') \
+     WHERE r.subject_kind IN ('person', 'organization', 'group') AND r.relation <> 'owner' \
      ORDER BY r.object_id, r.relation, p.display_name";
 
 struct DocumentSummary {
