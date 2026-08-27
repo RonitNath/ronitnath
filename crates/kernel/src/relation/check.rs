@@ -29,12 +29,21 @@ use super::{NO_IDS, Object, Subject, owner_ids, party_ids, subject_keys};
 /// `UNION ALL` rather than `UNION`: the caller is asking whether *any* row
 /// covers what it wants, and de-duplicating first would be sorting rows nobody
 /// is going to read.
+///
+/// `CROSS JOIN` is not a different join — in SQLite it is the same join with
+/// the loop order pinned. Left to itself the planner drives from the object,
+/// because a virtual table has no statistics to argue with, and that is
+/// exactly backwards: it makes a `check` cost one pass per grant on the
+/// object, which is a number a stranger chooses by sharing something widely.
+/// Pinned this way it costs one index seek per subject, which is a number
+/// real membership bounds.
 pub const CHECK_SQL: &str = "SELECT r.relation AS relation \
-     FROM json_each($1) s JOIN relation r ON r.subject_key = s.value \
+     FROM json_each($1) s CROSS JOIN relation r ON r.subject_key = s.value \
      WHERE r.object_kind = $2 AND r.object_id = $3 \
      UNION ALL \
      SELECT m.role AS relation \
-     FROM json_each($4) p JOIN membership m ON m.group_id = $3 AND m.party_id = p.value";
+     FROM json_each($4) p CROSS JOIN membership m \
+       ON m.group_id = $3 AND m.party_id = p.value";
 
 /// "Everything of this kind I can see", in one statement.
 ///
@@ -42,18 +51,23 @@ pub const CHECK_SQL: &str = "SELECT r.relation AS relation \
 /// row naming one of my subjects, or my own ownership — and both sides are
 /// index seeks. The outer select then pages the survivors by
 /// `(created_at, id)`, which is the order `resource_kind_created_idx` is
-/// already in, so there is no sort.
+/// already in, so the page itself is not sorted — only the candidate set is,
+/// and that is the `UNION` de-duplicating the two ways in.
+///
+/// The `CROSS JOIN`s pin the loop order for the same reason `CHECK_SQL`'s
+/// does: driven the other way, the relation side is a scan of every grant of
+/// that kind in the deployment.
 pub const LIST_VISIBLE_SQL: &str = "SELECT res.id, res.kind, res.owner_party_id, res.home_zone, \
             res.status, res.created_at \
      FROM resource res \
      WHERE res.kind = $1 AND res.status <> 'deleted' \
        AND (res.created_at < $2 OR (res.created_at = $2 AND res.id < $3)) \
        AND res.id IN (SELECT r.object_id FROM json_each($4) s \
-                        JOIN relation r ON r.subject_key = s.value \
+                        CROSS JOIN relation r ON r.subject_key = s.value \
                        WHERE r.object_kind = $1 \
                       UNION \
                       SELECT o.id FROM json_each($5) p \
-                        JOIN resource o ON o.owner_party_id = p.value AND o.kind = $1) \
+                        CROSS JOIN resource o ON o.owner_party_id = p.value AND o.kind = $1) \
      ORDER BY res.created_at DESC, res.id DESC LIMIT $6";
 
 /// Whose contact details are visible inside one group.

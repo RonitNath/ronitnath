@@ -85,6 +85,9 @@ CREATE TABLE document
 
 -- ------------------------------------------------------------- resource ----
 -- `list_visible` pages by (created_at, id) within one kind, so the order it
--- wants is the order this index is already in and there is no sort.
+-- wants is the order this index is already in and there is no sort. `status`
+-- is deliberately *not* in it: a column between `kind` and `created_at` that
+-- the query filters with `<>` cannot be a prefix constraint, so it would cost
+-- the ordering and buy nothing.
 CREATE INDEX resource_kind_created_idx
-    ON resource (kind, status, created_at DESC, id DESC);
+    ON resource (kind, created_at DESC, id DESC);
