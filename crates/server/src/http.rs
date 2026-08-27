@@ -2,8 +2,11 @@
 //!
 //! Two rules, and the split between them is the whole point:
 //!
-//! * **Documents and API responses are `no-store`.** They carry session-shaped
-//!   state; a back-button replay out of the bfcache is a stale-permissions bug.
+//! * **Documents are `no-store`.** They carry session-shaped state; a
+//!   back-button replay out of the bfcache is a stale-permissions bug.
+//! * **API responses are `private, no-store`.** Same reason, plus the word
+//!   that tells a shared cache between the browser and the node that these
+//!   bytes belong to one reader (`docs/rebuild/plan.md` §API).
 //! * **Assets are `no-cache, must-revalidate`.** Their URLs are stable across
 //!   releases — there is no `?v=` cache-busting anywhere — so the browser must
 //!   ask every time and gets a 304 for its trouble.
@@ -27,6 +30,7 @@ pub const VERSION_HEADER: HeaderName = HeaderName::from_static("x-rn-app-version
 pub fn cache_policy(path: &str) -> &'static str {
     const ASSETS: &[&str] = &[
         "/static/",
+        "/tokens.css",
         "/pkg/",
         "/app/pkg/",
         "/org/pkg/",
@@ -35,6 +39,8 @@ pub fn cache_policy(path: &str) -> &'static str {
     ];
     if ASSETS.iter().any(|prefix| path.starts_with(prefix)) {
         "no-cache, must-revalidate"
+    } else if path.starts_with("/api/") {
+        "private, no-store"
     } else {
         "no-store"
     }
@@ -64,6 +70,7 @@ mod tests {
     fn assets_revalidate_and_everything_else_refuses_to_be_stored() {
         for asset in [
             "/static/stars/bright.bin",
+            "/tokens.css",
             "/pkg/starscape/rn-starscape.js",
             "/app/pkg/rn-app_bg.wasm",
             "/platform/pkg/rn-platform.js",
@@ -71,8 +78,18 @@ mod tests {
         ] {
             assert_eq!(cache_policy(asset), "no-cache, must-revalidate", "{asset}");
         }
-        for document in ["/", "/healthz", "/readyz", "/version", "/api/whoami"] {
+        for document in [
+            "/", "/healthz", "/readyz", "/version", "/auth", "/app", "/links/x",
+        ] {
             assert_eq!(cache_policy(document), "no-store", "{document}");
+        }
+        for private in [
+            "/api/whoami",
+            "/api/q/sessions",
+            "/api/cmd/sign-out",
+            "/api/sub",
+        ] {
+            assert_eq!(cache_policy(private), "private, no-store", "{private}");
         }
     }
 }

@@ -1,3 +1,95 @@
+/* The public landing's own tokens.
+ *
+ * `crates/ui/tokens.css` is the site's palette and carries every value the
+ * bundles and the askama pages share. What is here is the landing and nothing
+ * else: the dusk gradient the light theme *is*, the hero pair, the readouts
+ * that sit on top of the sky, and the two type sizes this one page uses. They
+ * live beside the rules that read them rather than in the shared file, because
+ * a token no other surface can use is not shared — it is this page's.
+ *
+ * The display face is declared in `fonts.css`, which every server-rendered
+ * page links.
+ */
+
+:root {
+    --topbar-height: 4.45rem;
+    --col-narrow: 500px;
+    /* Headings sit near body scale: distinction is family, letter-spacing and
+     * colour, not sheer size. This is the ceiling, not a starting point. */
+    --text-body: 1rem;
+    --text-hero: 1.75rem;
+    --weight-semibold: 600;
+
+    /* The identity pair. Public hero only — never on an internal surface. */
+    --hero-fg: var(--hero-red);
+    --hero-shadow: none;
+    --hero-muted: oklch(0.97 0.005 255);
+    --hero-muted-shadow: none;
+    --company-fg: var(--hero-gold);
+
+    /* The light theme is dusk, not white paper: the page *is* the sky. */
+    --dusk-gradient: linear-gradient(
+        180deg,
+        oklch(0.26 0.070 265) 0%,
+        oklch(0.36 0.090 264) 14%,
+        oklch(0.52 0.090 258) 32%,
+        oklch(0.70 0.070 252) 50%,
+        oklch(0.78 0.060 246) 70%,
+        oklch(0.82 0.050 242) 86%,
+        oklch(0.88 0.030 238) 94%,
+        oklch(0.95 0.012 235) 100%
+    );
+}
+
+/* One block of light-theme values, applied by the media query for a visitor
+ * who has expressed no preference and by the attribute for one who has. */
+@media (prefers-color-scheme: light) {
+    :root:not([data-theme="dark"]) {
+        --hero-fg: var(--hero-gold);
+        --hero-shadow:
+            0 1px 2px oklch(0.18 0.04 265 / 0.6),
+            0 0 16px oklch(0.16 0.03 265 / 0.5);
+        --hero-muted-shadow:
+            0 1px 2px oklch(0.18 0.04 265 / 0.6),
+            0 0 16px oklch(0.16 0.03 265 / 0.5);
+        --company-fg: var(--hero-red);
+        --dusk: var(--dusk-gradient);
+        --on-dusk-fg: oklch(0.97 0.005 255);
+        --on-dusk-muted: oklch(0.86 0.012 255);
+        --on-dusk-border: oklch(0.97 0.005 255 / 0.3);
+        --on-dusk-bg: oklch(0.97 0.005 255 / 0.12);
+        --on-dusk-accent: oklch(0.84 0.09 215);
+        --on-dusk-glass: oklch(0.42 0.095 262 / 0.42);
+        --on-dusk-glass-hover: oklch(0.52 0.100 260 / 0.55);
+    }
+}
+
+:root[data-theme="light"] {
+    --hero-fg: var(--hero-gold);
+    --hero-shadow:
+        0 1px 2px oklch(0.18 0.04 265 / 0.6),
+        0 0 16px oklch(0.16 0.03 265 / 0.5);
+    --hero-muted-shadow:
+        0 1px 2px oklch(0.18 0.04 265 / 0.6),
+        0 0 16px oklch(0.16 0.03 265 / 0.5);
+    --company-fg: var(--hero-red);
+    --dusk: var(--dusk-gradient);
+    --on-dusk-fg: oklch(0.97 0.005 255);
+    --on-dusk-muted: oklch(0.86 0.012 255);
+    --on-dusk-border: oklch(0.97 0.005 255 / 0.3);
+    --on-dusk-bg: oklch(0.97 0.005 255 / 0.12);
+    --on-dusk-accent: oklch(0.84 0.09 215);
+    --on-dusk-glass: oklch(0.42 0.095 262 / 0.42);
+    --on-dusk-glass-hover: oklch(0.52 0.100 260 / 0.55);
+}
+
+:root[data-theme="dark"] {
+    --hero-fg: var(--hero-red);
+    --hero-shadow: none;
+    --hero-muted-shadow: none;
+    --company-fg: var(--hero-gold);
+}
+
 /* The public landing: three background layers, one hero, two corner readouts.
  *
  * Layer order, back to front:

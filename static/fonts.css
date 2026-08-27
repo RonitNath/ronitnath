@@ -1,0 +1,16 @@
+/* The display face, declared once for every server-rendered page.
+ *
+ * `--font-display` is defined in `crates/ui/tokens.css`, which is the palette
+ * and carries no `@font-face` — a token names a family, it does not fetch one.
+ * The file lives here because the pages that use it are served from here; the
+ * bundles link the same token and fall back to `system-ui` until their own
+ * build carries the face.
+ */
+
+@font-face {
+    font-family: "Agency Bold";
+    src: url("/static/fonts/agency-bold.ttf") format("truetype");
+    font-weight: 400 700;
+    font-style: normal;
+    font-display: swap;
+}

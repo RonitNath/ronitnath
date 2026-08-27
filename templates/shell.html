@@ -1,0 +1,32 @@
+{#- The tier shell: the document a bundle mounts into, and nothing else.
+
+    It does not extend base.html. That template is the *public presence* — it
+    carries a stylesheet link and a theme toggle that belong to the landing,
+    and the bundle brings its own fingerprinted copy of the same tokens. What
+    the two do share is the pre-paint theme rule, and it is repeated here on
+    purpose: it has to run before anything else in the head, which is exactly
+    what an inherited block cannot promise.
+
+    Everything below `{{ head }}` is trunk's own output, read out of the
+    bundle's `dist/index.html` (`assets::bundle_head`) — the build states what
+    it loads, and a rebuild that renames every file needs no edit here. -#}
+<!DOCTYPE html>
+<html lang="en" data-theme="{{ theme }}" data-tier="{{ tier }}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="rn-app-version" content="{{ version }}">
+<title>{{ tier }}</title>
+<link rel="icon" href="/favicon.ico">
+<script>
+(function () {
+  try {
+    var t = localStorage.getItem("rn-theme");
+    if (t === "light" || t === "dark") document.documentElement.setAttribute("data-theme", t);
+  } catch (e) { /* the server-rendered attribute stands */ }
+})();
+</script>
+{{ head|safe }}
+</head>
+<body></body>
+</html>

@@ -1,0 +1,328 @@
+//! `GET /api/whoami` — the only chrome DTO, and the tier computation behind it.
+//!
+//! What is *not* here is the point. No email address: an identity is named by
+//! the source it registered at, never by the factor that proves it. No
+//! internal id: every identifier is derived on the way out. No relation the
+//! chrome does not draw. `whoami_leaks_nothing` reads the rendered JSON back
+//! and asserts both, so widening this type without a screen that renders the
+//! new field fails a test rather than a review.
+//!
+//! Tiers are computed from relations, never from a column
+//! (`docs/kernel/index.html` — platform administration is
+//! `platform:* #operator @person`, which is why there is no `is_admin`
+//! anywhere in this tree):
+//!
+//! * `member` — every session has it.
+//! * `org` — at least one organization membership at `admin` or above.
+//! * `platform` — the operator relation row.
+
+use axum::extract::State;
+use axum::response::{IntoResponse, Response};
+use axum::{Json, Router, routing::get};
+use rn_api::PublicId;
+use rn_api::whoami::{IdentityRef, MemberRole, OrganizationRef, PartyRef, PersonRef, Tier, Whoami};
+use rn_kernel::bind;
+use rn_kernel::domain::PartyRow;
+use rn_kernel::ids::{Group, Id, IdKey, Organization, Person, Service, Table};
+use rn_kernel::principal::identity_of;
+use rn_kernel::store::{Count, Cursor, FromRow, Reads, RowError};
+use rn_kernel::{Outcome, Principal};
+
+use super::decline;
+use crate::auth::session::Session;
+use crate::state::AppState;
+
+pub fn router() -> Router<AppState> {
+    Router::new().route("/api/whoami", get(whoami))
+}
+
+async fn whoami(State(state): State<AppState>, session: Session) -> Response {
+    match build(&state, &session.principal, session.expires_at).await {
+        Ok(Some(body)) => Json(body).into_response(),
+        // A live session whose rows have gone is not a server error: the
+        // identity was disabled or absorbed between resolving and reading.
+        Ok(None) => decline::forbidden(),
+        Err(error) => decline::from_kernel(&error),
+    }
+}
+
+/// One organization the principal belongs to, as the chrome lists it.
+struct Belongs {
+    party: i64,
+    role: String,
+    display: String,
+}
+
+impl FromRow for Belongs {
+    fn from_row(row: &mut impl Cursor) -> Result<Self, RowError> {
+        Ok(Self {
+            party: row.int("group_id")?,
+            role: row.text("role")?,
+            display: row.text("display_name")?,
+        })
+    }
+}
+
+/// The organizations of a person, with the role the row records.
+const ORGANIZATIONS: &str = "SELECT m.group_id, m.role, p.display_name \
+                             FROM membership m JOIN party p ON p.id = m.group_id \
+                             WHERE m.party_id = $1 AND p.kind = 'organization' \
+                             ORDER BY p.display_name";
+
+/// Platform administration as a relation row, which is the only form it has.
+const OPERATOR: &str = "SELECT count(*) AS n FROM relation \
+                        WHERE object_kind = 'platform' AND object_id = 0 \
+                          AND relation = 'operator' \
+                          AND subject_kind = 'person' AND subject_id = $1";
+
+const PARTY: &str = "SELECT id, kind, display_name, status, created_at FROM party WHERE id = $1";
+
+/// Whether a person operates any organization at all — the `/org` tier, asked
+/// without gathering the list the chrome would render.
+const OPERATES: &str = "SELECT count(*) AS n FROM membership m \
+                        JOIN party p ON p.id = m.group_id \
+                        WHERE m.party_id = $1 AND p.kind = 'organization' \
+                        AND m.role IN ('admin', 'owner')";
+
+/// The tiers a principal holds, for the shell router.
+///
+/// The same computation `whoami` reports, in two counting queries rather than
+/// the full DTO: serving `/app` should not cost the organization list that
+/// only the chrome draws.
+pub async fn tiers_of(state: &AppState, principal: &Principal) -> Outcome<Vec<Tier>> {
+    let mut tiers = vec![Tier::Member];
+    let Principal::Member { person, .. } = principal else {
+        return Ok(Vec::new());
+    };
+    let Some(person) = person else {
+        return Ok(tiers);
+    };
+    let reads = state.store.reads();
+    if counted(&reads, OPERATES, *person).await? {
+        tiers.push(Tier::Org);
+    }
+    if counted(&reads, OPERATOR, *person).await? {
+        tiers.push(Tier::Platform);
+    }
+    Ok(tiers)
+}
+
+async fn counted(reads: &impl Reads, sql: &'static str, person: Id<Person>) -> Outcome<bool> {
+    Ok(reads
+        .query::<Count>(sql, bind![person])
+        .await?
+        .first()
+        .is_some_and(|count| count.0 > 0))
+}
+
+/// Everything the chrome is allowed to know, or `None` if the rows are gone.
+pub async fn build(
+    state: &AppState,
+    principal: &Principal,
+    expires_at: i64,
+) -> Outcome<Option<Whoami>> {
+    let (Some(identity_id), Some(acting_as)) = (principal.identity(), principal.acting_as()) else {
+        return Ok(None);
+    };
+    let reads = state.store.reads();
+    let key = state.ids();
+
+    let Some(identity) = identity_of(&reads, identity_id).await? else {
+        return Ok(None);
+    };
+    let Some(acting) = party(&reads, acting_as).await? else {
+        return Ok(None);
+    };
+
+    let person = match identity.person_id {
+        Some(id) => party(&reads, id).await?.map(|row| PersonRef {
+            public_id: id.public(key),
+            display: row.display_name,
+        }),
+        None => None,
+    };
+
+    let organizations = match identity.person_id {
+        Some(id) => memberships(&reads, id, key).await?,
+        None => Vec::new(),
+    };
+    let platform = match identity.person_id {
+        Some(id) => is_operator(&reads, id).await?,
+        None => false,
+    };
+
+    Ok(Some(Whoami {
+        // An identity is a registration, so what names it is where it
+        // registered. Its factors are its secrets and never its label.
+        identity: IdentityRef {
+            public_id: identity_id.public(key),
+            display: identity.source,
+        },
+        person,
+        acting_as: PartyRef {
+            kind: acting.kind.into(),
+            public_id: public_of(acting.kind, acting_as.get(), key),
+            display: acting.display_name,
+        },
+        tiers: tiers(&organizations, platform),
+        organizations,
+        session_expires_at: expires_at,
+    }))
+}
+
+/// The tiers a principal holds, in shell order.
+fn tiers(organizations: &[OrganizationRef], platform: bool) -> Vec<Tier> {
+    let mut tiers = vec![Tier::Member];
+    if organizations
+        .iter()
+        .any(|org| matches!(org.role, MemberRole::Admin | MemberRole::Owner))
+    {
+        tiers.push(Tier::Org);
+    }
+    if platform {
+        tiers.push(Tier::Platform);
+    }
+    tiers
+}
+
+async fn party(reads: &impl Reads, id: Id<Person>) -> Outcome<Option<PartyRow>> {
+    Ok(reads.query_opt::<PartyRow>(PARTY, bind![id]).await?)
+}
+
+async fn memberships(
+    reads: &impl Reads,
+    person: Id<Person>,
+    key: &IdKey,
+) -> Outcome<Vec<OrganizationRef>> {
+    Ok(reads
+        .query::<Belongs>(ORGANIZATIONS, bind![person])
+        .await?
+        .into_iter()
+        .filter_map(|row| {
+            Some(OrganizationRef {
+                public_id: Id::<Organization>::new(row.party).public(key),
+                display: row.display,
+                role: role(&row.role)?,
+            })
+        })
+        .collect())
+}
+
+async fn is_operator(reads: &impl Reads, person: Id<Person>) -> Outcome<bool> {
+    counted(reads, OPERATOR, person).await
+}
+
+/// A membership role as the wire names it. An unknown value is dropped rather
+/// than guessed at: a role this build does not understand is not a member
+/// role it may safely round down to.
+fn role(raw: &str) -> Option<MemberRole> {
+    match raw {
+        "member" => Some(MemberRole::Member),
+        "admin" => Some(MemberRole::Admin),
+        "owner" => Some(MemberRole::Owner),
+        _ => None,
+    }
+}
+
+/// A party's public id, derived under the tag its kind carries.
+///
+/// The four kinds share the `party` table and *must not* share a tag: one tag
+/// would make `o_…` and `p_…` decrypt to each other, which is the exact
+/// confusion the encryption exists to prevent.
+fn public_of(kind: rn_kernel::domain::PartyKind, raw: i64, key: &IdKey) -> PublicId {
+    use rn_kernel::domain::PartyKind as Kind;
+    match kind {
+        Kind::Person => Id::<Person>::new(raw).public(key),
+        Kind::Organization => Id::<Organization>::new(raw).public(key),
+        Kind::Group => Id::<Group>::new(raw).public(key),
+        Kind::Service => Id::<Service>::new(raw).public(key),
+    }
+}
+
+/// Assert at compile time that every party kind has its own tag.
+const _: () = {
+    assert!(<Person as Table>::TAG != <Organization as Table>::TAG);
+    assert!(<Group as Table>::TAG != <Service as Table>::TAG);
+};
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn org(role: MemberRole) -> OrganizationRef {
+        OrganizationRef {
+            public_id: "o_AAAAAAAAAAAAAAAAAAAAAA".parse().expect("a shaped id"),
+            display: "Isoastra".into(),
+            role,
+        }
+    }
+
+    #[test]
+    fn a_session_is_always_a_member_and_nothing_more_by_default() {
+        assert_eq!(tiers(&[], false), vec![Tier::Member]);
+    }
+
+    #[test]
+    fn belonging_to_an_organization_is_not_operating_one() {
+        assert_eq!(tiers(&[org(MemberRole::Member)], false), vec![Tier::Member]);
+        assert_eq!(
+            tiers(&[org(MemberRole::Admin)], false),
+            vec![Tier::Member, Tier::Org]
+        );
+        assert_eq!(
+            tiers(&[org(MemberRole::Owner)], false),
+            vec![Tier::Member, Tier::Org]
+        );
+    }
+
+    #[test]
+    fn the_platform_tier_comes_from_the_relation_and_stands_alone() {
+        assert_eq!(tiers(&[], true), vec![Tier::Member, Tier::Platform]);
+        assert_eq!(
+            tiers(&[org(MemberRole::Owner)], true),
+            vec![Tier::Member, Tier::Org, Tier::Platform]
+        );
+    }
+
+    #[test]
+    fn a_role_this_build_does_not_know_is_dropped_rather_than_rounded_down() {
+        assert_eq!(role("member"), Some(MemberRole::Member));
+        assert_eq!(role("owner"), Some(MemberRole::Owner));
+        assert_eq!(role("superuser"), None);
+        assert_eq!(role(""), None);
+    }
+
+    #[test]
+    fn the_same_row_gets_a_different_id_under_every_party_kind() {
+        let key = IdKey::from_hex("000102030405060708090a0b0c0d0e0f").expect("a test key");
+        let kinds = [
+            rn_kernel::domain::PartyKind::Person,
+            rn_kernel::domain::PartyKind::Organization,
+            rn_kernel::domain::PartyKind::Group,
+            rn_kernel::domain::PartyKind::Service,
+        ];
+        let ids: Vec<String> = kinds
+            .iter()
+            .map(|kind| public_of(*kind, 7, &key).as_str().to_owned())
+            .collect();
+        let mut unique = ids.clone();
+        unique.sort();
+        unique.dedup();
+        assert_eq!(
+            unique.len(),
+            ids.len(),
+            "two party kinds share an id: {ids:?}"
+        );
+        assert!(ids[0].starts_with("p_"));
+        assert!(ids[1].starts_with("o_"));
+    }
+
+    #[test]
+    fn the_party_vocabulary_is_the_kernels_and_not_a_copy() {
+        use rn_api::whoami::PartyKind;
+        assert_eq!(
+            PartyKind::from(rn_kernel::domain::PartyKind::Group),
+            PartyKind::Group
+        );
+    }
+}

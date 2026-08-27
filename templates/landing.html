@@ -1,5 +1,9 @@
 {% extends "base.html" %}
 
+{% block styles %}
+<link rel="stylesheet" href="/static/site.css">
+{% endblock %}
+
 {% block head %}
 {#- Server clock at render: every browser draws the same instant, however
     wrong its own clock is. -#}

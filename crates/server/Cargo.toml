@@ -15,7 +15,11 @@ name = "rn_site"
 path = "src/lib.rs"
 
 [dependencies]
+rn-api = { workspace = true }
+rn-kernel = { workspace = true }
 axum = { workspace = true }
+futures-util = { workspace = true }
+uuid = { workspace = true }
 tokio = { workspace = true }
 tower-http = { workspace = true }
 askama = { workspace = true }
@@ -32,3 +36,4 @@ thiserror = { workspace = true }
 [dev-dependencies]
 axum-test = { workspace = true }
 tempfile = { workspace = true }
+futures-util = { workspace = true }

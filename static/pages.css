@@ -1,0 +1,107 @@
+/* Layout for the two server-rendered pages a person meets before a bundle:
+ * `/auth` and `/links/<token>`.
+ *
+ * Only layout. Every colour, size, field, note and button already exists in
+ * `crates/ui/tokens.css` and is used from there — `.field`, `.field .note`,
+ * `.commit` are the bundles' own components, so a form on the sign-in page and
+ * a form inside `/app` are the same form.
+ */
+
+body {
+    min-height: 100dvh;
+    display: grid;
+    place-items: center;
+    padding: 2rem 1.25rem;
+}
+
+.page {
+    width: 100%;
+    max-width: 46rem;
+    display: grid;
+    gap: 1.75rem;
+}
+
+.page > h1 {
+    font-family: var(--font-display);
+    font-size: var(--text-5);
+    letter-spacing: 0.02em;
+    color: var(--fg);
+}
+
+/* Two forms, side by side while there is room, stacked when there is not.
+ * They are peers: neither is the primary action. */
+.panes {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr));
+    gap: 2.5rem;
+    align-items: start;
+}
+
+.pane {
+    display: grid;
+    gap: 0.25rem;
+}
+
+.pane > h2 {
+    margin-bottom: 0.5rem;
+}
+
+/* Buttons size to their words. A commit stretched across its column reads as
+ * a banner rather than as a thing to press. */
+.commit {
+    justify-self: start;
+}
+
+.pane .commit {
+    margin-top: 0.5rem;
+}
+
+/* The one anchor that is a commit — signing in to accept a link is a
+ * navigation, and it must not look like a different kind of control for it. */
+a.commit {
+    display: inline-block;
+    text-decoration: none;
+}
+
+a.commit:hover {
+    color: var(--bg);
+    text-decoration: none;
+}
+
+/* A form-level refusal sits where the reader's eye already is: immediately
+ * above the button they just pressed. */
+.pane .note {
+    font-size: var(--text-1);
+    color: var(--fg-muted);
+    min-height: 1.1em;
+}
+
+.pane .note[data-state="invalid"] {
+    color: var(--hero-red);
+}
+
+.claim {
+    display: grid;
+    justify-items: start;
+    gap: 1rem;
+    max-width: 26rem;
+}
+
+.claim .grant {
+    font-size: var(--text-4);
+    color: var(--fg);
+}
+
+.leave {
+    font-size: var(--text-1);
+}
+
+@media (max-width: 30rem) {
+    body {
+        place-items: start center;
+    }
+
+    .panes {
+        gap: 2rem;
+    }
+}

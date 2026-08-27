@@ -1,7 +1,12 @@
 {#- The one document shell every server-rendered page extends. `theme` is
     resolved on the server (presence::theme_for); the inline script only
     corrects it before first paint for a visitor whose browser sends no client
-    hint, which is why it is inline and not a fetched module. -#}
+    hint, which is why it is inline and not a fetched module.
+
+    The key is `rn-theme` — the same one the bundles' pre-paint script and
+    `rn_ui::shell::theme` read, so a reader who picks a theme in `/app` finds
+    the askama pages already in it. The cookie is written alongside it so the
+    *next* navigation is server-rendered rather than corrected. -#}
 <!DOCTYPE html>
 <html lang="en" data-theme="{{ theme }}">
 <head>
@@ -10,13 +15,14 @@
 <meta name="rn-app-version" content="{{ version }}">
 <title>{% block title %}Ronit Nath{% endblock %}</title>
 <link rel="icon" href="/favicon.ico">
-<link rel="stylesheet" href="/static/tokens.css">
-<link rel="stylesheet" href="/static/site.css">
+<link rel="stylesheet" href="/tokens.css">
+<link rel="stylesheet" href="/static/fonts.css">
+{% block styles %}{% endblock %}
 <script>
 (function () {
   var root = document.documentElement;
   try {
-    var saved = localStorage.getItem("theme");
+    var saved = localStorage.getItem("rn-theme");
     if (saved !== "light" && saved !== "dark") {
       saved = matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
     }
@@ -36,7 +42,7 @@
     const next = root.getAttribute("data-theme") === "light" ? "dark" : "light";
     root.setAttribute("data-theme", next);
     try {
-      localStorage.setItem("theme", next);
+      localStorage.setItem("rn-theme", next);
       document.cookie = "rn_theme=" + next + ";path=/;max-age=31536000;samesite=lax";
     } catch (e) { /* the attribute is the source of truth for this page */ }
     dispatchEvent(new Event("starscape-redraw"));

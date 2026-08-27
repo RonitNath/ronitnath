@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+
+{% block title %}{{ grant }}{% endblock %}
+
+{% block styles %}
+<link rel="stylesheet" href="/static/pages.css">
+{% endblock %}
+
+{% block body %}
+{#- The link says what it grants and nothing about who minted it or who else
+    holds one. A grant lands on a person, so a reader who is not one yet is
+    sent to sign in and comes back here. -#}
+<main class="page">
+  <h1>Ronit Nath</h1>
+
+  <div class="claim">
+    <p class="grant">{{ grant }}</p>
+
+    {% if signed_in %}
+    <form method="post" action="/links/{{ token }}/claim">
+      <button type="submit" class="commit">Accept</button>
+    </form>
+    {% else %}
+    <a class="commit" href="/auth?next={{ next }}">Sign in to accept</a>
+    {% endif %}
+
+    {% if !error.is_empty() %}
+    <p class="note" data-state="invalid">{{ error }}</p>
+    {% endif %}
+  </div>
+</main>
+{% endblock %}

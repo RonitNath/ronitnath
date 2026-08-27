@@ -33,7 +33,7 @@ async fn state() -> AppState {
             "127.0.0.1:8195",
             "127.0.0.1:8295",
             Tuning::fast_single_node(),
-            &Migrations::default(),
+            &Migrations::embedded::<rn_kernel::Migrations>().expect("the kernel's history"),
         )
         .await
         .expect("a single dev node");
@@ -76,7 +76,7 @@ async fn readiness_reports_this_node_and_both_raft_groups() {
 async fn the_release_identity_is_one_curl_away_from_any_url() {
     let server = server().await;
     server.get("/version").await.assert_text("dev");
-    for path in ["/", "/healthz", "/readyz", "/version", "/static/tokens.css"] {
+    for path in ["/", "/healthz", "/readyz", "/version", "/tokens.css"] {
         let response = server.get(path).await;
         assert_eq!(
             response
@@ -107,7 +107,7 @@ async fn documents_refuse_to_be_stored_and_assets_revalidate() {
             "{path}"
         );
     }
-    for path in ["/static/tokens.css", "/favicon.ico"] {
+    for path in ["/tokens.css", "/favicon.ico"] {
         let response = server.get(path).await;
         assert_eq!(
             cache_control(&response).as_deref(),
@@ -121,7 +121,8 @@ async fn documents_refuse_to_be_stored_and_assets_revalidate() {
 async fn a_shipped_asset_is_served_with_its_type_and_anything_else_is_absent() {
     let server = server().await;
     for (path, content_type) in [
-        ("/static/tokens.css", "text/css; charset=utf-8"),
+        ("/tokens.css", "text/css; charset=utf-8"),
+        ("/static/site.css", "text/css; charset=utf-8"),
         ("/static/stars/named.json", "application/json"),
         ("/static/sky/milkyway.webp", "image/webp"),
         ("/favicon.ico", "image/x-icon"),
@@ -234,20 +235,13 @@ async fn the_landing_carries_no_build_machinery_and_no_explanatory_copy() {
     assert!(!body.contains("?v="));
 }
 
+/// The routes S2 added are the whole of `/api`, the auth pages, the shells and
+/// the claim page; their own matrix is in `surface.rs`. What this leg still
+/// owns is the negative half — that nothing outside either leg answers at all.
 #[tokio::test]
-async fn nothing_this_leg_does_not_own_answers() {
+async fn nothing_either_leg_owns_answers() {
     let server = server().await;
-    for absent in [
-        "/api/whoami",
-        "/api/q/anything",
-        "/app",
-        "/org",
-        "/platform",
-        "/auth",
-        "/manage",
-        "/metrics",
-        "/links/token",
-    ] {
+    for absent in ["/manage", "/metrics", "/api/realtime", "/pkg/rn-site.js"] {
         server.get(absent).await.assert_status_not_found();
     }
 }
