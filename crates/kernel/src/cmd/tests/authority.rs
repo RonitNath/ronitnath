@@ -564,3 +564,92 @@ async fn the_k1_commands_attribute_themselves_to_the_party_the_session_speaks_as
         );
     }
 }
+
+/// The event names the row the command moved, not the party it is attributed
+/// to.
+///
+/// `audit.acting_as` and the event's own subject are two different facts, and
+/// three commands were binding one parameter for both. They agree until
+/// somebody runs `ActAs`, after which the feed said an organization had
+/// founded, joined and left things its *member* had — and a subscription that
+/// keys a diff off `Event::Left { party }` re-read the wrong row.
+#[tokio::test]
+async fn an_event_names_the_party_it_moved_and_not_the_one_it_is_attributed_to() {
+    use rn_api::commands::{ActAs, ClaimLink, CreateOrganization, Leave};
+    use rn_api::whoami::MemberRole as WireRole;
+
+    let harness = Local::new();
+    let founder = world::person(&harness, "Founder", "subj-founder@example.test").await;
+    let host = world::person(&harness, "Host", "subj-host@example.test").await;
+    let (org, _) = world::organization(&harness, &founder, "Isoastra")
+        .await
+        .expect("founds");
+
+    cmd::act_as(
+        &harness.ctx(founder.principal.clone()),
+        &ActAs {
+            party: Some(public(key(&harness), org)),
+        },
+    )
+    .await
+    .expect("its admin may speak as it");
+    let acting = crate::principal::Principal::Member {
+        identity: founder.principal.identity().expect("has one"),
+        person: Some(founder.person()),
+        acting_as: Id::new(org.get()),
+        session: founder.principal.session().expect("has one"),
+    };
+
+    // Founding: the resource is the person's, so the event must say so.
+    let committed = cmd::create_organization(
+        &harness.ctx(acting.clone()),
+        &CreateOrganization {
+            display_name: "Second".into(),
+        },
+    )
+    .await
+    .expect("founds a second");
+    let Event::OrganizationCreated { owner, .. } = committed.event else {
+        panic!("create-organization produced {:?}", committed.event)
+    };
+    assert_eq!(owner, founder.person(), "the event named the acting party");
+
+    // Joining and leaving: the membership is the person's.
+    let team = world::group(&harness, &host, "Team", None)
+        .await
+        .expect("creates");
+    let token = world::invite(
+        &harness,
+        &host,
+        public(key(&harness), team),
+        WireRole::Member,
+        TEST_EPOCH + 3_600,
+    )
+    .await
+    .expect("mints");
+    let committed = cmd::claim_link(
+        &harness.ctx(acting.clone()),
+        &ClaimLink {
+            token: token.expose().to_owned(),
+        },
+    )
+    .await
+    .expect("claims");
+    let Event::LinkClaimed { party, .. } = committed.event else {
+        panic!("claim-link produced {:?}", committed.event)
+    };
+    assert_eq!(party, founder.person(), "the event named the acting party");
+
+    let committed = cmd::leave(
+        &harness.ctx(acting),
+        &Leave {
+            group: public(key(&harness), team),
+        },
+    )
+    .await
+    .expect("leaves");
+    let Event::Left { party, .. } = committed.event else {
+        panic!("leave produced {:?}", committed.event)
+    };
+    assert_eq!(party, founder.person(), "the event named the acting party");
+}

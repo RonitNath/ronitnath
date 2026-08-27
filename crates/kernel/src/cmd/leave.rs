@@ -21,10 +21,14 @@ use crate::ids::{Id, Person};
 use crate::org::{self, MemberRole};
 use crate::store::{Reads, Sql};
 
+/// The event names the party whose membership went, which is the *person* —
+/// `$7`, not `$3`. `acting_as` is who the command is attributed to and after
+/// `ActAs` the two differ, so reusing the audit column here made the feed say
+/// an organization had left a group one of its members walked out of.
 const AUDIT: &str = "INSERT INTO audit \
      (key, command, actor_identity_id, acting_as, at, request_digest, payload) \
      SELECT $1, 'leave', $2, $3, $4, $5, \
-            json_object('event', 'leave', 'container', $6, 'party', $3) \
+            json_object('event', 'leave', 'container', $6, 'party', $7) \
      WHERE changes() > 0";
 
 /// Leave a group or an organization.
@@ -51,7 +55,8 @@ pub async fn leave<S: Sql, F: Feed>(ctx: &Ctx<'_, S, F>, args: &Leave) -> Outcom
                 acting_as,
                 now,
                 crate::audit::digest_of(args),
-                container
+                container,
+                person
             ],
         );
         Ok(batch)

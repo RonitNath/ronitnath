@@ -31,10 +31,14 @@ const MEMBERSHIP: &str = "INSERT INTO membership (group_id, party_id, role, at) 
                    AND claimed_by_identity_id IS NULL AND expires_at > $4) \
      ON CONFLICT (group_id, party_id) DO NOTHING";
 
+/// `party` is the person the membership landed on — `$7`. `$3` is the
+/// `acting_as` column, which after `ActAs` is a different party altogether,
+/// and naming it here made the feed report that an organization had joined a
+/// group one of its members was invited to.
 const AUDIT: &str = "INSERT INTO audit \
      (key, command, actor_identity_id, acting_as, at, request_digest, payload) \
      SELECT $1, 'claim-link', $2, $3, $4, $5, \
-            json_object('event', 'claim-link', 'container', $6, 'identity', $2, 'party', $3) \
+            json_object('event', 'claim-link', 'container', $6, 'identity', $2, 'party', $7) \
      WHERE changes() > 0";
 
 /// Claim an invitation.
@@ -79,7 +83,8 @@ pub async fn claim_link<S: Sql, F: Feed>(
                 acting_as,
                 now,
                 crate::audit::digest_of(args),
-                invitation.container
+                invitation.container,
+                person
             ],
         );
         Ok(batch)

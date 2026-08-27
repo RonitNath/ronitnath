@@ -21,11 +21,15 @@ use crate::store::{Sql, Value};
 const PARTY: &str = "INSERT INTO party (kind, display_name, status, created_at) \
                      VALUES ('organization', $1, 'active', $2) RETURNING id";
 
+/// `owner` is `$8`, the person the two statements above actually name. `$3`
+/// is `acting_as`, which after `ActAs` is some other party — and an event
+/// saying an organization owns what a person owns is a feed disagreeing with
+/// `resource.owner_party_id`.
 const AUDIT: &str = "INSERT INTO audit \
      (key, command, actor_identity_id, acting_as, at, request_digest, payload) \
      VALUES ($1, 'create-organization', $2, $3, $4, $5, \
              json_object('event', 'create-organization', 'organization', $6, \
-                         'resource', $7, 'owner', $3))";
+                         'resource', $7, 'owner', $8))";
 
 /// Found an organization. The acting person owns it and administers it, and
 /// ownership moves from there only through `Transfer`.
@@ -85,6 +89,7 @@ pub async fn create_organization<S: Sql, F: Feed>(
                 Value::from(crate::audit::digest_of(args)),
                 party.column("id"),
                 row.column("id"),
+                Value::from(person),
             ],
         );
         Ok(batch)
