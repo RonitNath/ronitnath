@@ -96,8 +96,12 @@ test("an organization is founded, grown, and handed on", async ({ page, browser 
     await joiner.getByRole("button", { name: "Accept" }).click();
 
     // The founder's roster shows them without a reload: the membership landed
-    // in the change feed and the socket carried the diff.
-    await expect(page.getByRole("cell", { name: "E2E Joiner" })).toBeVisible({ timeout: 15_000 });
+    // in the change feed and the socket carried the diff. Scoped to the roster
+    // — the drill's Invitations table names the claimant too, in its "Claimed
+    // by" column, so an unscoped cell locator matches two cells the moment the
+    // second diff arrives and which one lands first is a race.
+    const roster = page.locator(".drill .tbl").first();
+    await expect(roster.getByRole("cell", { name: "E2E Joiner" })).toBeVisible({ timeout: 15_000 });
 
     // Belonging to a group of an organization is not belonging to the
     // organization: the tier comes from a membership on the organization's own
