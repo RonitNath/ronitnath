@@ -29,14 +29,20 @@
 
 pub mod audit;
 pub mod cmd;
+pub mod document;
 pub mod domain;
 pub mod error;
 pub mod event;
 pub mod feed;
+pub mod group;
 pub mod ids;
+pub mod invite;
 pub mod observe;
+pub mod org;
 pub mod password;
 pub mod principal;
+pub mod relation;
+pub mod resource;
 pub mod store;
 pub mod testing;
 
@@ -44,6 +50,7 @@ pub use error::{Decline, Invalid, KernelError, Outcome};
 pub use event::{Committed, Event};
 pub use ids::{Id, IdKey};
 pub use principal::{Principal, SubjectSet};
+pub use relation::{Object, Relation, Subject, SubjectKind, check};
 pub use store::{Migrations, ReadStore, Sql, Store};
 
 /// Unix seconds. Every instant in the schema is one of these.

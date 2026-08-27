@@ -62,6 +62,10 @@ pub struct CreateDocument {
 pub struct EditDocument {
     /// The document being edited.
     pub document: PublicId,
+    /// The draft revision the client read. The kernel's update guards on it,
+    /// so an edit written against a version somebody else has already moved
+    /// past is declined rather than silently overwriting them.
+    pub expected_rev: i64,
     /// A new title.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub title: Option<String>,
@@ -110,6 +114,7 @@ mod tests {
     fn an_edit_sends_only_what_changed() {
         let edit = EditDocument {
             document: id("r_"),
+            expected_rev: 3,
             title: Some("Kernel report, revised".into()),
             body: None,
         };
