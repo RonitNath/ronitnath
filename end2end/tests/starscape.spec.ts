@@ -254,6 +254,310 @@ test("a phone frame elides the labels rather than covering the page with them", 
   await expect(page.locator("#grounding")).not.toBeEmpty();
 });
 
+// ---------------------------------------------------------------- atlas ---
+//
+// The deep-zoom atlas. Every case below is the counterpart of one in the
+// pre-rebuild suite, which tested these behaviours against a lazily-imported
+// JavaScript module.
+//
+// Two of that suite's cases have no counterpart, and the reason is the same for
+// both: they tested the module *import* — a retry after a failed import, and
+// suppression of a second launch while an import was in flight. There is no
+// import. The atlas is in the bundle the landing has already loaded, so neither
+// failure can occur. What the second was really protecting — one dialog,
+// however many launches — is proved below without it.
+//
+// A third, "StarScape is home-only", is likewise absent: the bundle mounts only
+// on a page carrying `#starscape`, and the landing is the only page this leg
+// serves. It becomes provable once there is a second page to prove it against.
+
+/** Which regional-catalog files the page has actually asked the network for. */
+const lodRequests = (page: import("@playwright/test").Page) =>
+  page.evaluate(() =>
+    performance
+      .getEntriesByType("resource")
+      .filter(entry => entry.name.includes("/static/stars/lod/"))
+      .map(entry => ({
+        name: entry.name,
+        bytes: (entry as PerformanceResourceTiming).decodedBodySize,
+      })),
+  );
+
+test("the atlas is interaction-gated, and zooming pays for tiles, not the file", async ({
+  page,
+}) => {
+  await page.goto(withTelemetry);
+  await page.waitForFunction(() => window.__rnTelemetry?.stars?.complete === true);
+
+  // Nothing of the 49 MB regional catalog is touched by the landing itself.
+  expect(await lodRequests(page)).toEqual([]);
+  await expect(page.getByRole("button", { name: "Open atlas" })).toBeEnabled();
+
+  // Where the landing is looking, sampled just before the atlas opens on it.
+  const zenith = await page.evaluate(() => {
+    const matrix = window.__rnStarscape.viewMatrix();
+    return [matrix[2], matrix[5], matrix[8]];
+  });
+
+  await page.getByRole("button", { name: "Open atlas" }).click();
+  const atlas = page.getByRole("dialog", { name: "Celestial atlas" });
+  await expect(atlas).toBeVisible();
+  await page.waitForFunction(() => window.__rnStarscape.atlas()?.firstFrameAtMs > 0);
+  // The sky behind it stops drawing a picture nobody can see.
+  expect(await page.evaluate(() => window.__rnTelemetry.sky.pausedForExplorer)).toBe(true);
+  // The launcher is behind the dialog, so it leaves the tab order entirely.
+  await expect(page.getByRole("button", { name: "Open atlas" })).toBeHidden();
+
+  // It opens on the zenith the landing was drawing at its centre. The sky runs
+  // at sixty times real time, so this is an angle between two directions and
+  // not an equality between two samples of a moving one.
+  const opened: number[] = await page.evaluate(
+    () => window.__rnStarscape.atlas().initialForward,
+  );
+  const cosine = opened.reduce((sum, value, index) => sum + value * zenith[index], 0);
+  expect(cosine).toBeGreaterThan(0.999);
+
+  // Zoom in to the regional threshold and prove the tiles arrive by range.
+  for (let step = 0; step < 5; step += 1) {
+    await page.getByRole("button", { name: "Zoom in" }).click();
+  }
+  await expect.poll(() => page.evaluate(() => window.__rnStarscape.atlas().fov)).toBeLessThan(25);
+  await page.waitForFunction(() => window.__rnTelemetry.explorer?.residentTiles > 0);
+
+  const requests = await lodRequests(page);
+  const deep = requests.filter(entry => entry.name.endsWith("g12.bin"));
+  expect(deep.length).toBeGreaterThan(0);
+  // The whole file is 49 MB. No single response may be anywhere near it.
+  expect(Math.max(...deep.map(entry => entry.bytes))).toBeLessThan(2 * 1024 * 1024);
+  expect(await page.evaluate(() => window.__rnTelemetry.explorer.residentBytes)).toBeLessThan(
+    64 * 1024 * 1024,
+  );
+});
+
+test("the regional catalog answers ranges, and refuses the ones it cannot", async ({ page }) => {
+  await page.goto(site);
+  const responses = await page.evaluate(async () => {
+    const url = "/static/stars/lod/g12.bin";
+    const whole = await fetch("/static/stars/lod/manifest.json");
+    const tile = await fetch(url, { headers: { Range: "bytes=12-4459" } });
+    const body = await tile.arrayBuffer();
+    const head = await fetch(url, { headers: { Range: "bytes=0-11" } });
+    const header = await head.arrayBuffer();
+    const magic = new TextDecoder().decode(header.slice(0, 8));
+    const past = await fetch(url, { headers: { Range: "bytes=99999999999-" } });
+    return {
+      wholeStatus: whole.status,
+      wholeAcceptsRanges: whole.headers.get("accept-ranges"),
+      tileStatus: tile.status,
+      tileRange: tile.headers.get("content-range"),
+      tileBytes: body.byteLength,
+      magic,
+      pastStatus: past.status,
+      pastRange: past.headers.get("content-range"),
+    };
+  });
+
+  expect(responses).toMatchObject({
+    wholeStatus: 200,
+    wholeAcceptsRanges: "bytes",
+    tileStatus: 206,
+    tileBytes: 4_448,
+    // The 12-byte file header is inside the range that was asked for, and is
+    // *not* inside the tile above it — the tiles start after it.
+    magic: "GDR3LOD1",
+    pastStatus: 416,
+  });
+  expect(responses.tileRange).toMatch(/^bytes 12-4459\/\d+$/);
+  expect(responses.pastRange).toMatch(/^bytes \*\/\d+$/);
+});
+
+test("a star label opens the atlas on that star and holds it there", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto(withTelemetry);
+  await expect.poll(() => page.locator(".star-callout").count()).toBeGreaterThan(0);
+
+  const label = page.locator(".star-callout").first();
+  const name = await label.getAttribute("data-name");
+  expect(name).toBeTruthy();
+  await label.click();
+
+  await expect(page.getByRole("dialog", { name: "Celestial atlas" })).toBeVisible();
+  await page.waitForFunction(() => window.__rnStarscape.atlas()?.firstFrameAtMs > 0);
+  const state = await page.evaluate(() => window.__rnStarscape.atlas());
+  expect(state.target).toBe(name);
+  expect(state.tracking).toBe(true);
+  // A star is worth a close look, so it opens narrow rather than at the sky.
+  expect(state.fov).toBeLessThan(25);
+  await expect(page.locator(".atlas-target")).toHaveText(name!);
+
+  // Tracking holds: the sky drifts past, the star does not.
+  const first = state.ra;
+  await page.waitForTimeout(600);
+  expect(await page.evaluate(() => window.__rnStarscape.atlas().ra)).toBe(first);
+});
+
+test("pausing stops the clock, and closing gives the page back unchanged", async ({ page }) => {
+  await page.goto(withTelemetry);
+  await page.waitForFunction(() => window.__rnTelemetry?.stars?.complete === true);
+
+  // A viewpoint the visitor chose before opening the atlas is theirs to keep.
+  await page.evaluate(() => window.__rnStarscape.setObserver(-33.8688, 151.2093));
+  await expect(page.locator("#resume-orbit")).toBeVisible();
+
+  await page.getByRole("button", { name: "Open atlas" }).click();
+  await page.waitForFunction(() => window.__rnStarscape.atlas()?.firstFrameAtMs > 0);
+
+  await page.getByRole("button", { name: "Pause", exact: true }).click();
+  const pausedAt = await page.evaluate(() => window.__rnStarscape.atlas().simMs);
+  await page.waitForTimeout(300);
+  expect(await page.evaluate(() => window.__rnStarscape.atlas().simMs)).toBe(pausedAt);
+  await expect(page.getByRole("button", { name: "Resume", exact: true })).toBeVisible();
+
+  await page.getByRole("button", { name: "Close the atlas" }).click();
+  await expect(page.getByRole("dialog", { name: "Celestial atlas" })).toHaveCount(0);
+  expect(
+    await page.evaluate(() => ({
+      atlas: window.__rnStarscape.atlas(),
+      openClass: document.documentElement.classList.contains("starscape-explorer-open"),
+      // Closing hands focus back to the control that opened it.
+      focus: document.activeElement?.id,
+      pausedForExplorer: window.__rnTelemetry.sky.pausedForExplorer,
+      observer: window.__rnStarscape.manualObserver()?.lat,
+    })),
+  ).toMatchObject({
+    atlas: null,
+    openClass: false,
+    focus: "starscape-launch",
+    pausedForExplorer: false,
+  });
+  await expect(page.getByRole("button", { name: "Open atlas" })).toBeEnabled();
+  // And the sky is drawing again.
+  const frames = await page.evaluate(() => window.__rnTelemetry.sky.animationFrames);
+  await expect
+    .poll(() => page.evaluate(() => window.__rnTelemetry.sky.animationFrames))
+    .toBeGreaterThan(frames);
+
+  // Resume orbit still clears the observer the atlas was opened over.
+  await page.getByRole("button", { name: "Resume orbit" }).click();
+  await expect.poll(() => page.evaluate(() => window.__rnStarscape.manualObserver())).toBeNull();
+});
+
+test("escape closes the atlas, and two launches make one dialog", async ({ page }) => {
+  await page.goto(withTelemetry);
+  await page.waitForFunction(() => window.__rnTelemetry?.stars?.complete === true);
+
+  await page.evaluate(() => {
+    window.__rnStarscape.openAtlas();
+    window.__rnStarscape.openAtlas();
+  });
+  await expect(page.getByRole("dialog", { name: "Celestial atlas" })).toHaveCount(1);
+  await page.waitForFunction(() => window.__rnStarscape.atlas()?.firstFrameAtMs > 0);
+  await page.evaluate(() => window.__rnStarscape.openAtlas());
+  await expect(page.getByRole("dialog", { name: "Celestial atlas" })).toHaveCount(1);
+
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog", { name: "Celestial atlas" })).toHaveCount(0);
+});
+
+test("star names failing to load leaves the atlas reachable from the launcher", async ({
+  page,
+}) => {
+  await page.route("**/static/stars/named.json", route => route.abort());
+  await page.goto(withTelemetry);
+  await page.waitForFunction(() => window.__rnTelemetry?.stars?.complete === true);
+
+  await expect(page.locator("#star-annotations")).toHaveAttribute(
+    "data-annotations-ready",
+    "false",
+  );
+  expect(await page.locator(".star-callout").count()).toBe(0);
+
+  await page.getByRole("button", { name: "Open atlas" }).click();
+  await expect(page.getByRole("dialog", { name: "Celestial atlas" })).toBeVisible();
+  await page.waitForFunction(() => window.__rnStarscape.atlas()?.visibleStars > 0);
+});
+
+test("reduced motion opens the atlas as a still sky", async ({ browser }) => {
+  const context = await browser.newContext({ reducedMotion: "reduce" });
+  const page = await context.newPage();
+  await page.goto(withTelemetry);
+  await page.waitForFunction(() => window.__rnTelemetry?.stars?.complete === true);
+
+  await page.getByRole("button", { name: "Open atlas" }).click();
+  await page.waitForFunction(() => window.__rnStarscape.atlas()?.firstFrameAtMs > 0);
+
+  const before = await page.evaluate(() => window.__rnStarscape.atlas());
+  expect(before.paused).toBe(true);
+  await page.waitForTimeout(700);
+  const after = await page.evaluate(() => window.__rnStarscape.atlas());
+  // Still a sky — stars are drawn — but not a moving one.
+  expect(after.visibleStars).toBeGreaterThan(0);
+  expect(after.simMs).toBe(before.simMs);
+  expect(after.ra).toBe(before.ra);
+  expect(
+    await page.evaluate(
+      () => getComputedStyle(document.querySelector(".starscape-explorer")!).animationName,
+    ),
+  ).toBe("none");
+  await context.close();
+});
+
+test("a phone frame fits the atlas rather than letting it overflow", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(withTelemetry);
+  await page.waitForFunction(() => window.__rnTelemetry?.stars?.complete === true);
+
+  await page.getByRole("button", { name: "Open atlas" }).click();
+  await page.waitForFunction(() => window.__rnStarscape.atlas()?.firstFrameAtMs > 0);
+
+  expect(
+    await page.evaluate(() => {
+      const bar = document.querySelector(".atlas-bar")!.getBoundingClientRect();
+      return {
+        barFits: bar.right <= window.innerWidth + 0.5 && bar.left >= -0.5,
+        // The keyboard legend is a desktop affordance; a phone has no keys.
+        keys: getComputedStyle(document.querySelector(".atlas-keys")!).display,
+        overflowX: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+        overflowY: document.documentElement.scrollHeight - document.documentElement.clientHeight,
+      };
+    }),
+  ).toEqual({ barFits: true, keys: "none", overflowX: 0, overflowY: 0 });
+
+  // Every control in the bar is still reachable and still works.
+  await page.getByRole("button", { name: "Zoom in" }).click();
+  await expect.poll(() => page.evaluate(() => window.__rnStarscape.atlas().fov)).toBeLessThan(115);
+  await page.getByRole("button", { name: "Close the atlas" }).click();
+  await expect(page.getByRole("dialog", { name: "Celestial atlas" })).toHaveCount(0);
+});
+
+test("the atlas takes its ground from the theme it is opened in", async ({ page }) => {
+  await page.goto(site);
+  const ground = async (theme: "dark" | "light") => {
+    await page.evaluate(name => document.documentElement.setAttribute("data-theme", name), theme);
+    await page.getByRole("button", { name: "Open atlas" }).click();
+    await page.waitForFunction(() => window.__rnStarscape.atlas()?.firstFrameAtMs > 0);
+    const colours = await page.evaluate(() => ({
+      atlas: getComputedStyle(document.querySelector(".starscape-explorer")!).backgroundColor,
+      page: getComputedStyle(document.documentElement).backgroundColor,
+    }));
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("dialog", { name: "Celestial atlas" })).toHaveCount(0);
+    return colours;
+  };
+
+  const night = await ground("dark");
+  const dusk = await ground("light");
+
+  // Both themes are authored, and they are not the same picture.
+  expect(night.atlas).not.toBe(dusk.atlas);
+  // At night the atlas is the page's own ground, continuing the sky behind it.
+  expect(night.atlas).toBe(night.page);
+  // By day the page runs to near-white, and a star map on paper is not a star
+  // map — so the atlas takes the dark end of the dusk gradient instead.
+  expect(dusk.atlas).not.toBe(dusk.page);
+  expect(dusk.atlas).not.toBe(night.page);
+});
+
 declare global {
   interface Window {
     __rnTelemetry: any;
