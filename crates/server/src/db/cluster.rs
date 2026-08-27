@@ -11,6 +11,7 @@
 //! | `RN_SITE_HQL_SECRET_API` / `_API_FILE` | API secret, value or mounted file |
 //! | `RN_SITE_HQL_ADDR_RAFT` / `_ADDR_API` | what this process listens on |
 //! | `RN_SITE_HQL_LEARNER_ONLY` | join without becoming a voter |
+//! | `RN_SITE_HQL_LOCAL_CLUSTER` | this peer map is one host (see below) |
 //!
 //! Dev needs none of it: one node on loopback with built-in secrets.
 
@@ -83,7 +84,11 @@ pub fn from_env(cfg: &AppConfig, addr_raft: &str, addr_api: &str) -> Result<Topo
                 .parse()
                 .map_err(|_| DbError::config("RN_SITE_HQL_NODE_ID must be an integer"))?;
             Ok(Topology {
-                nodes: parse_nodes(&required("RN_SITE_HQL_NODES")?, node_id)?,
+                nodes: parse_nodes_allowing(
+                    &required("RN_SITE_HQL_NODES")?,
+                    node_id,
+                    flag("RN_SITE_HQL_LOCAL_CLUSTER")?,
+                )?,
                 node_id,
                 secret_raft: secret("RN_SITE_HQL_SECRET_RAFT", "RN_SITE_HQL_SECRET_RAFT_FILE")?,
                 secret_api: secret("RN_SITE_HQL_SECRET_API", "RN_SITE_HQL_SECRET_API_FILE")?,
@@ -155,6 +160,23 @@ fn secret(value_name: &str, file_name: &str) -> Result<String, DbError> {
 /// would rather find at boot. Growing three to five means listing both new
 /// nodes before either joins.
 pub fn parse_nodes(value: &str, local_id: u64) -> Result<Vec<NodeAddr>, DbError> {
+    parse_nodes_allowing(value, local_id, false)
+}
+
+/// [`parse_nodes`], with the loopback refusal lifted.
+///
+/// A peer address no peer can reach is a provisioning mistake, and refusing it
+/// at boot is the point of that check — a deployed node that formed a cluster
+/// with itself is a much worse thing to discover later. `tools/cluster.sh`
+/// runs three voters on one host on purpose, for the perf and resilience
+/// drills, and says so by setting `RN_SITE_HQL_LOCAL_CLUSTER=1`. Nothing under
+/// `deploy/` sets it, and an operator naming it is not making the mistake the
+/// check exists to catch.
+pub fn parse_nodes_allowing(
+    value: &str,
+    local_id: u64,
+    allow_loopback: bool,
+) -> Result<Vec<NodeAddr>, DbError> {
     let mut nodes: Vec<NodeAddr> = Vec::new();
     for entry in value.split(',').map(str::trim).filter(|s| !s.is_empty()) {
         let shape = || {
@@ -178,9 +200,9 @@ pub fn parse_nodes(value: &str, local_id: u64) -> Result<Vec<NodeAddr>, DbError>
             )));
         }
         for address in [addr_raft, addr_api] {
-            if address.starts_with("127.")
-                || address.starts_with("0.0.0.0")
-                || address.starts_with("localhost")
+            if !allow_loopback && address.starts_with("127.")
+                || (!allow_loopback
+                    && (address.starts_with("0.0.0.0") || address.starts_with("localhost")))
             {
                 return Err(DbError::config(format!(
                     "a production peer address must be mesh-reachable, not `{address}`"
@@ -257,6 +279,20 @@ mod tests {
         ] {
             assert!(parse_nodes(bad, 1).is_err(), "{bad} should not parse");
         }
+    }
+
+    #[test]
+    fn a_single_host_cluster_is_admissible_only_when_it_says_so() {
+        let local = "1@127.0.0.1:8101@127.0.0.1:8201,\
+                     2@127.0.0.1:8102@127.0.0.1:8202,\
+                     3@127.0.0.1:8103@127.0.0.1:8203";
+        assert!(parse_nodes(local, 2).is_err());
+        let nodes = parse_nodes_allowing(local, 2, true).expect("a declared local cluster");
+        assert_eq!(nodes.len(), 3);
+        assert_eq!(nodes[1].addr_raft, "127.0.0.1:8102");
+        // The rules that are not about reachability still apply.
+        assert!(parse_nodes_allowing(local, 4, true).is_err());
+        assert!(parse_nodes_allowing("1@127.0.0.1:8101@127.0.0.1:8201", 1, true).is_err());
     }
 
     #[test]
