@@ -54,6 +54,8 @@ pub enum Named {
     Shares,
     /// Proposed pairs involving the acting person's registrations.
     Matches,
+    /// The OpenID clients the acting person has authorised.
+    Authorizations,
     /// One organization: who owns it, when it was founded, and its counts.
     Org,
     /// The memberships of an organization, or of one of its groups.
@@ -103,6 +105,7 @@ pub const ALL: &[Named] = &[
     Named::Document,
     Named::Shares,
     Named::Matches,
+    Named::Authorizations,
     Named::Org,
     Named::OrgMembers,
     Named::OrgGroups,
@@ -137,6 +140,7 @@ impl Named {
             Self::Document => "document",
             Self::Shares => "shares",
             Self::Matches => "matches",
+            Self::Authorizations => "authorizations",
             Self::Org => "org",
             Self::OrgMembers => "org-members",
             Self::OrgGroups => "org-groups",
@@ -158,7 +162,8 @@ impl Named {
             | Self::Invitations
             | Self::Documents
             | Self::Shares
-            | Self::Matches => Scope::Set,
+            | Self::Matches
+            | Self::Authorizations => Scope::Set,
             Self::Document => Scope::Once,
             Self::Org
             | Self::OrgMembers
@@ -299,6 +304,13 @@ impl Named {
                     | Event::PersonMerged { .. }
                     | Event::IdentityLinked { .. }
                     | Event::PersonSplit { .. }
+            ),
+            Self::Authorizations => matches!(
+                event,
+                Event::Authorized { .. }
+                    | Event::ConsentRevoked { .. }
+                    | Event::ClientDeleted { .. }
+                    | Event::ClientUpdated { .. }
             ),
             // Every other scope answers through `touched`'s own arm.
             _ => false,

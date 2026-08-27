@@ -23,6 +23,7 @@ pub mod member_documents;
 pub mod member_groups;
 pub mod member_matches;
 mod named;
+mod oidc;
 pub mod org;
 pub mod org_feed;
 pub mod org_rows;
@@ -179,6 +180,12 @@ pub async fn read(
         Named::Matches => {
             member_matches::matches(reads, &expanded(reads, principal).await?, key).await
         }
+        // The reader's own, always: the statement is keyed on the acting
+        // person and takes no parameter that could name anybody else's.
+        Named::Authorizations => match expanded(reads, principal).await?.person {
+            Some(person) => oidc::authorizations(reads, person, key).await,
+            None => Ok(Vec::new()),
+        },
         // Every organization and platform query returned above.
         Named::Org
         | Named::OrgMembers

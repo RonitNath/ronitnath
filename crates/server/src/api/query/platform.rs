@@ -72,6 +72,10 @@ pub enum Platform {
     Resources,
     /// One resource, with the relations held on it.
     Resource,
+    /// The OpenID client registry.
+    OidcClients,
+    /// The tokens one session is holding. A drill-in: it takes a `subject`.
+    OidcTokens,
 }
 
 /// Every platform query this build serves.
@@ -86,6 +90,8 @@ pub const ALL: &[Platform] = &[
     Platform::Match,
     Platform::Resources,
     Platform::Resource,
+    Platform::OidcClients,
+    Platform::OidcTokens,
 ];
 
 impl Platform {
@@ -103,6 +109,8 @@ impl Platform {
             Self::Match => "platform-match",
             Self::Resources => "platform-resources",
             Self::Resource => "platform-resource",
+            Self::OidcClients => "oidc-clients",
+            Self::OidcTokens => "oidc-tokens",
         }
     }
 
@@ -131,6 +139,10 @@ impl Platform {
             // panel that is open while its subject moves is re-read when the
             // reader opens it again.
             Self::Party | Self::Identity | Self::Match | Self::Resource => Vec::new(),
+            // The registry moves on events that name a client rather than one
+            // of its own keys, and the token list is a drill-in like the
+            // others; both answer in sets (`rereads`).
+            Self::OidcClients | Self::OidcTokens => Vec::new(),
             // One row per command, keyed by the offset that command landed
             // at — which is the audit row's own id. This is the one query
             // whose key is the position rather than the subject, and the
@@ -151,6 +163,22 @@ impl Platform {
             (self, event),
             (Self::Identities, Event::PersonMerged { .. })
                 | (Self::Sessions, Event::PartyDisabled { .. })
+                | (
+                    Self::OidcClients,
+                    Event::ClientRegistered { .. }
+                        | Event::ClientUpdated { .. }
+                        | Event::ClientSecretRotated { .. }
+                        | Event::ClientDeleted { .. }
+                )
+                | (
+                    Self::OidcTokens,
+                    Event::CodeExchanged { .. }
+                        | Event::TokenRefreshed { .. }
+                        | Event::TokenRevoked { .. }
+                        | Event::SignedOut { .. }
+                        | Event::SessionRevoked { .. }
+                        | Event::SessionEnded { .. }
+                )
         )
     }
 }
@@ -201,6 +229,8 @@ pub async fn read(
         Platform::Match => super::platform_matches::one(reads, params).await,
         Platform::Resources => super::platform_resources::list(reads, params).await,
         Platform::Resource => super::platform_resources::one(reads, params).await,
+        Platform::OidcClients => super::oidc::clients(reads, params).await,
+        Platform::OidcTokens => super::oidc::tokens(reads, params).await,
     }
 }
 
@@ -404,7 +434,16 @@ mod tests {
     fn every_platform_name_is_prefixed_and_unique() {
         let mut names: Vec<&str> = ALL.iter().map(|q| q.as_str()).collect();
         for name in &names {
-            assert!(name.starts_with("platform-"), "{name}");
+            // The OpenID Provider's two lists are the exception, and they are
+            // named for what they are rather than for who may read them: the
+            // registry and the tokens under a session are the *Provider's*
+            // vocabulary, and a downstream deployment that mounts it reads
+            // them under those names. The tier they are served on is decided
+            // by `read`'s operator guard, not by a prefix.
+            assert!(
+                name.starts_with("platform-") || name.starts_with("oidc-"),
+                "{name}"
+            );
             assert_eq!(Platform::parse(name), Platform::parse(name));
         }
         let count = names.len();
