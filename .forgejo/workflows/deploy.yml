@@ -15,8 +15,9 @@ concurrency:
 
 jobs:
   gates:
-    # The zero-secret host-native runner (procedures/ci.md). It proves source
-    # and locked inputs; it cannot publish or deploy, and holds no credential.
+    # The zero-secret host-native runner (procedures/delivery.md). It proves
+    # source and locked inputs; it cannot publish or deploy, and holds no
+    # credential.
     runs-on: [self-hosted, native]
     steps:
       - name: Check out the exact revision
@@ -37,6 +38,10 @@ jobs:
           # catches, and the version pins live in one place so there is no
           # per-crate feature set to name.
           nix develop --command bash -euo pipefail -c '
+            # The release image builds every bundle with trunk. Assert the
+            # devshell still carries it here, where the failure is one line,
+            # rather than twenty minutes into the release build.
+            trunk --version
             cargo fmt --check
             cargo clippy --workspace --all-targets -- -D warnings
             cargo test --workspace --locked
@@ -48,19 +53,23 @@ jobs:
             # against the wasm target here, not just the one that broke.
             cargo check --target wasm32-unknown-unknown \
               -p rn-api -p rn-ui -p rn-app -p rn-org -p rn-platform -p rn-starscape
-            bash -n deploy/*.sh
+            # Every shell script in the repository, not only the deploy ones:
+            # tools/cluster.sh and tools/seed.sh are how the resilience and
+            # perf drills run, and a syntax error in one of them is found at
+            # the worst possible moment otherwise.
+            bash -n deploy/*.sh tools/*.sh
             # Structure limits (procedures/engineering.md): 200 lines for a
             # composition root, 600 for anything else.
             tools/size-gate.sh
           '
       - name: Controlled red-build proof gate
         # Harmless in normal operation; adding .ci-red-proof forces one red run,
-        # which is how adoption is proven (procedures/ci.md).
+        # which is how adoption is proven (procedures/delivery.md).
         run: test ! -e .ci-red-proof
 
   release:
     needs: gates
-    # The deliberately separate privileged CD runner (procedures/cd.md): runs as
+    # The deliberately separate privileged CD runner (procedures/delivery.md): runs as
     # `deployer`, holds the publisher credential, the SSH key and a fleet
     # checkout. This is a different trust contract, not a widening of the CI one.
     runs-on: [self-hosted, deploy]
