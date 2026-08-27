@@ -144,12 +144,22 @@ fn Chrome(tier: Tier, nav: &'static [NavItem], children: Children) -> impl IntoV
             .into_any()
     };
 
+    // Who you are leads; the registration you signed in with is a line under
+    // it, and only when it says something the name does not — a resolved
+    // identity is named by its person, so repeating it would be the same words
+    // twice. The organization you are acting as sits under both.
     let identity = move || {
         who.get().map(|whoami| {
-            let acting = (whoami.acting_as.display != whoami.identity.display)
-                .then_some(whoami.acting_as.display);
+            let name = whoami.person.as_ref().map_or_else(
+                || whoami.identity.display.clone(),
+                |person| person.display.clone(),
+            );
+            let registration =
+                (whoami.identity.display != name).then_some(whoami.identity.display.clone());
+            let acting = (whoami.acting_as.display != name).then_some(whoami.acting_as.display);
             view! {
-                <span class="who">{whoami.identity.display}</span>
+                <span class="who">{name}</span>
+                <span class="registration">{registration}</span>
                 <span class="acting">{acting}</span>
             }
         })

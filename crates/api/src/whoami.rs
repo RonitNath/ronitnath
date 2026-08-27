@@ -89,7 +89,16 @@ pub struct PartyRef {
 pub struct IdentityRef {
     /// The identity's public id.
     pub public_id: PublicId,
-    /// The identity's display name.
+    /// What to call this registration.
+    ///
+    /// The person's display name when the identity has resolved to one, which
+    /// is every registration this deployment mints. Otherwise the local part
+    /// of its address, masked — `r…t@` — which is enough to recognise your own
+    /// registration and not enough to read it back.
+    ///
+    /// Never the identity's `source`. A source names the deployment or the
+    /// issuer a registration came from, so using it as a label says the same
+    /// word to everybody and tells nobody who they are.
     pub display: String,
 }
 
@@ -140,7 +149,8 @@ mod tests {
         Whoami {
             identity: IdentityRef {
                 public_id: crate::testing::id("i_"),
-                display: "ronit@rinity".into(),
+                // Resolved, so the identity is named by its person.
+                display: "Ronit".into(),
             },
             person: Some(PersonRef {
                 public_id: crate::testing::id("p_"),
@@ -167,11 +177,13 @@ mod tests {
     }
 
     #[test]
-    fn an_unresolved_identity_omits_the_person_entirely() {
+    fn an_unresolved_identity_omits_the_person_entirely_and_is_named_by_a_mask() {
         let mut w = whoami();
         w.person = None;
+        w.identity.display = "r…t@".into();
         let json = serde_json::to_value(&w).expect("serialises");
         assert!(json.get("person").is_none());
+        assert_eq!(json["identity"]["display"], "r…t@");
         round_trip(&w);
     }
 
