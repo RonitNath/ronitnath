@@ -42,6 +42,24 @@ mod prelude {
         }
     }
 
+    /// Grant `platform:* #operator @person:P`.
+    ///
+    /// The row, written the way an operator seeding a deployment writes it —
+    /// platform administration is a relation and not a column, so there is no
+    /// flag to set and nothing else to fake.
+    pub(super) async fn make_operator(harness: &Local, person: crate::ids::Id<crate::ids::Person>) {
+        harness
+            .store()
+            .execute(
+                "INSERT INTO relation \
+                 (object_kind, object_id, relation, subject_kind, subject_id, at) \
+                 VALUES ('platform', 0, 'operator', 'person', $1, $2)",
+                bind![person, crate::testing::TEST_EPOCH],
+            )
+            .await
+            .expect("an operator relation");
+    }
+
     /// Run a `SELECT count(*) AS n` and return the number.
     pub(super) async fn count(harness: &Local, sql: &'static str) -> i64 {
         harness

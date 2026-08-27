@@ -90,6 +90,59 @@ async fn a_session_belonging_to_somebody_else_cannot_be_revoked() {
 }
 
 #[tokio::test]
+async fn a_platform_operator_may_revoke_anybody_and_the_audit_names_whose_it_was() {
+    let harness = Local::new();
+    let operator = harness
+        .register("Operator", "revoker@example.test")
+        .await
+        .expect("registers");
+    let subject = harness
+        .register("Subject", "revoked@example.test")
+        .await
+        .expect("registers");
+    let theirs = subject.principal.session().expect("a member has a session");
+    let args = RevokeSession {
+        session: theirs.public(harness.store().ids()),
+    };
+
+    // Not yet: an ordinary member is refused another member's session.
+    let refused = revoke_session(&harness.ctx(operator.principal.clone()), &args).await;
+    assert!(matches!(refused, Err(ref e) if e.is_decline()));
+
+    make_operator(
+        &harness,
+        operator.principal.acting_as().expect("acts as somebody"),
+    )
+    .await;
+
+    let committed = revoke_session(&harness.ctx(operator.principal.clone()), &args)
+        .await
+        .expect("an operator may");
+    let Event::SessionRevoked { identity, session } = committed.event else {
+        panic!("a revocation produces its own event");
+    };
+    assert_eq!(session, theirs);
+    assert_eq!(
+        identity,
+        subject.principal.identity().expect("a member has one"),
+        "the audit row named the operator instead of the account it signed out"
+    );
+    assert_eq!(
+        crate::principal::resolve(harness.store(), &subject.token)
+            .await
+            .expect("resolves")
+            .principal,
+        Principal::Anonymous,
+        "the revoked session still resolves"
+    );
+    // The operator's own session is untouched.
+    assert_eq!(
+        count(&harness, "SELECT count(*) AS n FROM session").await,
+        1
+    );
+}
+
+#[tokio::test]
 async fn a_forged_session_id_is_refused_without_a_query() {
     let harness = Local::new();
     let who = harness
