@@ -1,0 +1,4 @@
+node_modules
+# 5.7 MB of inlined fonts, icons and translations. Rebuilt by `pnpm build`;
+# the canvas itself is committed as platform-admin.tldr.
+dist/board.html

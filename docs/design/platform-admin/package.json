@@ -1,0 +1,22 @@
+{
+  "name": "rn-platform-admin-board",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "vite build"
+  },
+  "dependencies": {
+    "@tldraw/assets": "4.5.12",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "tldraw": "^4"
+  },
+  "devDependencies": {
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "@vitejs/plugin-react": "^5",
+    "typescript": "^5",
+    "vite": "^7",
+    "vite-plugin-singlefile": "^2"
+  }
+}
