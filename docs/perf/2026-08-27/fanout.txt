@@ -1,0 +1,7 @@
+profile: fan-out
+load average at start: 4.37
+started: 2026-08-27T03:08:34-07:00
+
+wsprobe: 100/100 sockets seeded
+WS /api/sub fan-out (100 subscribers) n=100     p50   17.699 ms  p99   18.381 ms  max    18.396 ms     100.0 rps  errors 0  [200×100]
+  the command's own reply took 1.256 ms; 0 socket(s) never delivered

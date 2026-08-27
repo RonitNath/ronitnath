@@ -1,0 +1,16 @@
+revision: 264fde986128cb41770c81a633e9573fe614e065
+branch:   rb-p1
+date:     2026-08-27T03:00:14-07:00
+machine:  Darwin 25.2.0 arm64
+cpu:      Apple M4 (10 cores)
+memory:   17179869184 bytes
+rustc:    rustc 1.97.1 (8bab26f4f 2026-07-14)
+oha:      oha 1.16.0
+samply:   samply 0.13.1
+server:   dev profile, opt-level 3, debug assertions false
+load ceiling: 6 (one-minute average; three idle voters sit above zero)
+seed:     10000 documents, 100 subscribers, 8 commit workers
+loopback: 20 packets transmitted, 0 packets received, 100.0% packet loss
+not measured
+loopback TCP handshake: min 0.037 ms  p50 0.053 ms  p99 0.098 ms (200 connects)
+-rw-r--r--@ 1 ronitnath  staff   4.8M Aug 27 03:12 /Users/ronitnath/dev/worktrees/rn-site--p1/docs/perf/2026-08-27/flamegraph-whoami-and-commit.json.gz

@@ -1,0 +1,28 @@
+{
+  "profiles": [
+    {
+      "count": 33902,
+      "errors": 8,
+      "max_ms": 307.726167,
+      "p50_ms": 4.5097499999999995,
+      "p99_ms": 49.790292,
+      "profile": "POST /api/cmd/edit-document",
+      "rps": 1129.9234865288654,
+      "statuses": {
+        "200": 33894,
+        "403": 8
+      }
+    },
+    {
+      "count": 0,
+      "errors": 0,
+      "max_ms": 0.0,
+      "p50_ms": 0.0,
+      "p99_ms": 0.0,
+      "profile": "GET /api/q/documents (mixed)",
+      "rps": 0.0,
+      "statuses": {}
+    }
+  ],
+  "wall_seconds": 30.0038015
+}
