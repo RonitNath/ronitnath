@@ -106,13 +106,20 @@ fn Detail(person: Person, cascade: RwSignal<Option<Cascade>>, then: Callback<()>
         })
         .collect_view();
 
-    // The mask is the whole content of the cell: `r…t@` is enough to match a
-    // support call against a row and not enough to write to it.
+    // The mask is the whole content of the lead: `r…t@` is enough to match a
+    // support call against a row and not enough to write to it. A factor with
+    // no half worth showing — a password's hash, a passkey's credential — has
+    // a dash there, and says so rather than repeating its own kind twice.
+    //
+    // The verified word is only shown for a kind that *can* be verified. A
+    // password has no `verified_at` and never will, so calling it unverified
+    // would be a word about something the deployment never witnessed.
     let factors = person
         .factors
         .clone()
         .into_iter()
         .map(|factor| {
+            let verifiable = factor.kind == "email";
             let word = if factor.verified {
                 "verified"
             } else {
@@ -120,10 +127,12 @@ fn Detail(person: Person, cascade: RwSignal<Option<Cascade>>, then: Callback<()>
             };
             view! {
                 <Line
-                    lead=factor.hint.clone().unwrap_or_else(|| factor.kind.clone())
+                    lead=factor.hint.clone().unwrap_or_else(|| "\u{2014}".to_owned())
                     trail=factor.kind.clone()
                 >
-                    <State value=word />
+                    <Show when=move || verifiable>
+                        <State value=word />
+                    </Show>
                 </Line>
             }
         })

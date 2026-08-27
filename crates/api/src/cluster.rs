@@ -64,7 +64,14 @@ pub struct ClusterView {
     pub version: String,
     /// Its two raft groups.
     pub raft: RaftViews,
-    /// Where the change feed ends — the offset a fresh subscriber is seeded at.
+    /// Where the change feed ends — the offset a fresh subscriber is seeded
+    /// at, and the `audit` id this node has applied.
+    ///
+    /// The same number `/readyz` reports under the same name, and the same one
+    /// `node_report.feed_head` carries for every node in the formation. One
+    /// fact, one spelling: a restore that says which offset it restored to is
+    /// checked against this, and a reader who had to learn two names for it
+    /// would be a reader who could compare the wrong two numbers.
     pub feed_head: u64,
     /// How many `/api/sub` sockets this node is carrying.
     pub subscribers: usize,

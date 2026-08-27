@@ -26,7 +26,7 @@ use leptos::task::spawn_local;
 use rn_api::{ClusterView, RaftView};
 use rn_ui::{Column, PageHead, Priority, Table};
 
-use crate::keys::KeyTable;
+use crate::keys::{KeyTable, Rotate};
 use crate::panel::{Facts, when};
 use crate::rows::{Feed, Node};
 
@@ -82,12 +82,22 @@ pub fn Deployment() -> impl IntoView {
         <div class="deployment">
             <Nodes nodes=nodes />
             <div class="readings-pair">
-                <Rollout nodes=nodes />
-                <FeedReadings feed=feed />
+                // Each half is wrapped, because a component that renders a
+                // table renders two children — its tools and its rows — and a
+                // two-column grid would hand them to two different columns.
+                <div class="reading"><Rollout nodes=nodes /></div>
+                <div class="reading"><FeedReadings feed=feed /></div>
             </div>
             <div class="readings-pair">
-                <Raft cluster=cluster />
-                <KeyTable />
+                <div class="reading"><Raft cluster=cluster /></div>
+                <div class="reading">
+                    <KeyTable />
+                    // B6.4: the key age is beside the node table and so is
+                    // the decision it informs. Retiring one is the other
+                    // decision and lives on Keys, where the count that makes
+                    // it safe is a column.
+                    <Rotate />
+                </div>
             </div>
         </div>
     }

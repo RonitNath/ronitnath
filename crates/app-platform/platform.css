@@ -255,6 +255,11 @@
   gap: var(--gap-section);
   align-items: start;
 }
+.reading {
+  display: grid;
+  gap: 0.6rem;
+  min-width: 0;
+}
 @media (max-width: 52rem) {
   .readings-pair {
     grid-template-columns: minmax(0, 1fr);
@@ -334,8 +339,29 @@
   gap: 0.5rem;
 }
 .controls .reason {
-  width: 22rem;
-  max-width: 100%;
+  width: min(22rem, 100%);
+}
+/* On a phone the field takes the line and the verb sits under it. Side by
+ * side, the button leaves the viewport and the reason it is held leaves with
+ * it — which is the one thing on this control that must not be elided. */
+@media (max-width: 42rem) {
+  .controls .actions {
+    grid-auto-flow: row;
+    justify-items: stretch;
+  }
+  .controls .act {
+    justify-content: start;
+  }
+}
+
+/* The person's own facts, then their lists. Without this the last fact and
+ * the first heading share a line's worth of space and read as one block. */
+.person {
+  margin-top: var(--gap-section);
+}
+/* A command under a table is a section, not a caption on the last row. */
+.split-main > .group {
+  margin-top: var(--gap-section);
 }
 
 /* The cluster readings are two dense tables and no chart.

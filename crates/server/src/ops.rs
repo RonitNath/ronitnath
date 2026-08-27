@@ -48,6 +48,22 @@ pub struct Readiness {
     pub node: String,
     pub version: String,
     pub raft: RaftGroups,
+    /// Where this node's change feed ends — the `audit` id it has applied.
+    ///
+    /// The same field, the same name and the same meaning as
+    /// [`rn_api::ClusterView::feed_head`] and as `node_report.feed_head`: one
+    /// number about one node, reported by every surface that reports on that
+    /// node at all. It is here because a restore is *proven by the health
+    /// screen* (F16.3) — `rn-site admin restore` names the offset it restored
+    /// to, and the only way to check that claim from outside the process is a
+    /// route that says where the feed now ends. `/admin/readyz` on the
+    /// loopback listener answers with the same field for the same reason.
+    ///
+    /// A feed that cannot answer reads as zero, which is what a subscriber
+    /// seeding from scratch would see, and is never a reason to fail
+    /// readiness: a node whose raft groups are formed is ready whatever its
+    /// feed says.
+    pub feed_head: u64,
 }
 
 /// Ask both raft groups where they stand.
@@ -96,6 +112,7 @@ pub async fn raft_groups(state: &AppState) -> RaftGroups {
 async fn readyz(State(state): State<AppState>) -> impl IntoResponse {
     let raft = raft_groups(&state).await;
     let ready = raft.ready();
+    let feed_head = feed_head(&state).await;
     (
         if ready {
             StatusCode::OK
@@ -107,8 +124,20 @@ async fn readyz(State(state): State<AppState>) -> impl IntoResponse {
             node: state.node.to_string(),
             version: state.version.to_string(),
             raft,
+            feed_head,
         }),
     )
+}
+
+/// Where the feed ends, off the feed rather than off a `SELECT` of this
+/// module's own — a reader with its own statement would go on reading a table
+/// a later transport no longer owns.
+async fn feed_head(state: &AppState) -> u64 {
+    use rn_kernel::feed::Feed as _;
+    state.feed.head().await.unwrap_or_else(|error| {
+        tracing::warn!(%error, "the change feed head could not be read for readiness");
+        0
+    })
 }
 
 #[cfg(test)]

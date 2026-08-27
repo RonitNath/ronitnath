@@ -31,15 +31,19 @@ pub fn KeyTable() -> impl IntoView {
         Column::new("Age", |row: &Key| format!("{}d", row.age_days))
             .mono()
             .titled(|row: &Key| when(row.created_at)),
+        // On the deployment screen this is the fourth column of five on a
+        // phone, and the decision it informs is made on the Keys page, where
+        // it is always shown.
         Column::new("Tokens alive", |row: &Key| {
             row.signed_tokens_alive.to_string()
         })
-        .mono(),
+        .mono()
+        .priority(Priority::Secondary),
         Column::new("Retired", |row: &Key| {
             row.retired_at.map_or_else(|| "\u{2014}".to_owned(), when)
         })
         .mono()
-        .priority(Priority::Secondary),
+        .priority(Priority::Tertiary),
     ];
     view! {
         <Table
@@ -101,7 +105,7 @@ pub fn Keys() -> impl IntoView {
 /// Mint the next key. The active one becomes `retiring` in the same
 /// transaction, which is the whole of what an overlap is.
 #[component]
-fn Rotate() -> impl IntoView {
+pub fn Rotate() -> impl IntoView {
     let run = run_with(move || async move {
         rn_ui::invoke::<RotateSigningKey, serde_json::Value>(RotateSigningKey {})
             .await
