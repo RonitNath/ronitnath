@@ -33,7 +33,7 @@ async function signIn(page: Page, email: string, password: string = PASSWORD): P
   const form = page.locator('form[action="/auth/sign-in"]');
   await form.getByLabel("Email").fill(email);
   await form.getByLabel("Password").fill(password);
-  await form.getByRole("button", { name: "Sign in" }).click();
+  await form.getByRole("button", { name: "Sign in", exact: true }).click();
   await page.waitForURL(`${site}/app`);
 }
 

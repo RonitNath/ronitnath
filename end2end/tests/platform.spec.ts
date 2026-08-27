@@ -41,7 +41,7 @@ async function signIn(page: Page, email: string) {
   await page.goto(`${site}/auth`);
   await page.locator("form").filter({ hasText: "Sign in" }).getByLabel("Email").fill(email);
   await page.locator("form").filter({ hasText: "Sign in" }).getByLabel("Password").fill(password);
-  await page.getByRole("button", { name: "Sign in" }).click();
+  await page.getByRole("button", { name: "Sign in", exact: true }).click();
   await page.waitForURL(`${site}/app`);
 }
 

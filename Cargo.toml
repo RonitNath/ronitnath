@@ -105,6 +105,11 @@ tempfile = "3.27.0"
 
 # The wasm bundles are shipped over the wire, so they are optimised for size,
 # and a panic in a browser bundle has nothing to unwind into.
+# Dependencies carry no debuginfo in dev builds: a cold debug target was 19 GB
+# with it (2026-08-27), and the profiler runs against release anyway.
+[profile.dev.package."*"]
+debug = false
+
 [profile.wasm-release]
 inherits = "release"
 opt-level = "z"
