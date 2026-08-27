@@ -1,0 +1,23 @@
+{
+  "identity": { "public_id": "i_Zml4dHVyZWlkZW50aXR5MA", "display": "Ronit Nath" },
+  "person": { "public_id": "p_Zml4dHVyZXBlcnNvbjAwMA", "display": "Ronit Nath" },
+  "acting_as": {
+    "kind": "person",
+    "public_id": "p_Zml4dHVyZXBlcnNvbjAwMA",
+    "display": "Ronit Nath"
+  },
+  "tiers": ["member", "org", "platform"],
+  "organizations": [
+    {
+      "public_id": "o_Zml4dHVyZW9yZ2FuaXphMA",
+      "display": "Rose City Dental Arts",
+      "role": "owner"
+    },
+    {
+      "public_id": "o_Zml4dHVyZW9yZ2FuaXphMQ",
+      "display": "Isoastra",
+      "role": "admin"
+    }
+  ],
+  "session_expires_at": 1788000000
+}
