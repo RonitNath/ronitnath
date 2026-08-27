@@ -4084,10 +4084,15 @@ dependencies = [
 name = "rn-org"
 version = "0.1.0"
 dependencies = [
+ "js-sys",
  "leptos",
  "leptos_router",
  "rn-api",
  "rn-ui",
+ "serde",
+ "serde_json",
+ "wasm-bindgen",
+ "web-sys",
 ]
 
 [[package]]

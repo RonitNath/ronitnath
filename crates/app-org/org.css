@@ -1,0 +1,228 @@
+/* The /org bundle's own layout, over `crates/ui/tokens.css`.
+ *
+ * Nothing here restates a token or a component: the shell, the table and the
+ * fields come from rn-ui, and these are the shapes only an operator console
+ * for one organization has — the scope switcher above the page, the fact list
+ * on the overview, the drill-in panel a table opens, and the folded-away
+ * affordance a rare decision lives behind.
+ *
+ * Borderless: regions are separated by space and by ground, never by a rule
+ * that is not already the table's hairline.
+ */
+
+.switcher {
+  margin-bottom: 0.75rem;
+}
+.switcher select {
+  background: var(--bg-muted);
+  color: var(--fg);
+  font-size: var(--text-2);
+  padding: 0.25rem 0.4rem;
+}
+
+/* The overview's facts: label left, value right, on one axis. */
+.facts {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 0.2rem 1.25rem;
+  margin: 0 0 var(--gap-section);
+  font-size: var(--text-2);
+}
+.facts dt {
+  color: var(--fg-subtle);
+  font-size: var(--text-1);
+  align-self: baseline;
+}
+.facts dd {
+  margin: 0;
+  min-width: 0;
+}
+
+.sections {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.25rem;
+  margin-bottom: var(--gap-section);
+  font-size: var(--text-3);
+}
+.sections a {
+  color: var(--fg);
+}
+.sections a:hover {
+  color: var(--accent-hover);
+  text-decoration: none;
+}
+.sections .num {
+  color: var(--fg-subtle);
+}
+
+/* A rare or destructive decision, folded away until it is wanted. */
+.asides {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  margin-bottom: 1rem;
+}
+.aside > summary {
+  cursor: pointer;
+  color: var(--fg-muted);
+  font-size: var(--text-1);
+  list-style: none;
+  padding: 0.15rem 0;
+}
+.aside > summary::-webkit-details-marker {
+  display: none;
+}
+.aside > summary::before {
+  content: "+ ";
+  color: var(--fg-subtle);
+}
+.aside[open] > summary::before {
+  content: "\2212\00a0";
+}
+.aside > summary:hover {
+  color: var(--fg);
+}
+.aside-body {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.75rem;
+  padding: 0.6rem 0 0.2rem;
+  background: var(--bg-muted);
+  padding-inline: 0.75rem;
+  margin-top: 0.4rem;
+  padding-bottom: 0.6rem;
+}
+
+/* A row's drill-in: the panel a table opens under itself. */
+.panel,
+.drill {
+  margin-top: var(--gap-section);
+  padding: 0.9rem 1rem 1rem;
+  background: var(--bg-muted);
+  display: grid;
+  gap: 0.6rem;
+  justify-items: start;
+}
+.panel h2,
+.drill h2 {
+  color: var(--fg);
+}
+.panel .field,
+.drill .field {
+  margin-bottom: 0;
+  width: min(26rem, 100%);
+}
+.panel .held {
+  color: var(--fg-subtle);
+  font-size: var(--text-2);
+}
+.editor textarea {
+  width: min(52rem, 100%);
+  background: var(--bg);
+  padding: 0.4rem 0.5rem;
+  resize: vertical;
+  line-height: 1.45;
+}
+
+.block {
+  width: 100%;
+  margin-top: 1rem;
+  display: grid;
+  gap: 0.5rem;
+  justify-items: start;
+}
+.block > * {
+  width: 100%;
+}
+.block h3 {
+  width: auto;
+}
+
+/* Controls that sit in a row rather than in a form column. */
+.minting {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.75rem;
+  width: 100%;
+}
+.choice {
+  display: grid;
+  gap: 0.2rem;
+}
+.choice > span {
+  font-size: var(--text-1);
+  color: var(--fg-subtle);
+}
+.choice input,
+.choice select {
+  background: var(--bg);
+  padding: 0.3rem 0.45rem;
+  min-width: 12rem;
+}
+.aside-body .choice input,
+.aside-body .choice select {
+  background: var(--bg);
+}
+
+button.quiet {
+  cursor: pointer;
+  padding: 0.35rem 0.8rem;
+  font-size: var(--text-2);
+  color: var(--fg-muted);
+  background: var(--bg-subtle);
+}
+button.quiet:hover {
+  color: var(--fg);
+}
+
+.copyable {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+.copyable code {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.copyable button {
+  cursor: pointer;
+  font-size: var(--text-1);
+  color: var(--fg-muted);
+  padding: 0.1rem 0.35rem;
+  background: var(--bg-subtle);
+}
+.copyable button:hover {
+  color: var(--fg);
+}
+.claim {
+  padding: 0.4rem 0;
+}
+
+.grants {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: var(--text-2);
+  display: grid;
+  gap: 0.15rem;
+}
+.grants li {
+  display: flex;
+  gap: 0.75rem;
+}
+.grants .relation {
+  color: var(--fg-subtle);
+}
+
+.note {
+  font-size: var(--text-1);
+  color: var(--fg-muted);
+  min-height: 1.1em;
+}
+.note[data-state="invalid"] {
+  color: var(--hero-red);
+}
