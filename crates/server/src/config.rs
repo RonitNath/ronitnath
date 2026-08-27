@@ -57,6 +57,17 @@ pub struct AppConfig {
     /// the same grant, taken by the running process (see [`crate::bootstrap`]).
     #[serde(default)]
     pub bootstrap_operator_email: Option<String>,
+    /// Whether this process serves the developer sign-in bypass
+    /// (`RN_SITE__DEV=1`, and `crates/server/src/auth/dev.rs`).
+    ///
+    /// The flag is only half the gate and the weaker half: the route, its
+    /// handler and the kernel entry behind it are all `#[cfg(debug_assertions)]`,
+    /// so a release binary has nothing for this to turn on. It is read here
+    /// rather than under the same `cfg` because a configuration field that
+    /// exists in one profile and not the other is a struct that two halves of
+    /// the tree spell differently.
+    #[serde(default)]
+    pub dev: bool,
 }
 
 /// Everything that can go wrong turning the environment into an [`AppConfig`].
@@ -79,6 +90,7 @@ impl AppConfig {
             .set_default("db_path", "data/db.sqlite")?
             .set_default("addr", "127.0.0.1:3004")?
             .set_default("static_dir", "static")?
+            .set_default("dev", false)?
             .add_source(config::File::with_name(&path).required(false))
             .add_source(
                 config::Environment::with_prefix("RN_SITE")
@@ -202,6 +214,7 @@ mod tests {
             static_dir: PathBuf::from("static"),
             id_key: id_key.map(str::to_string),
             bootstrap_operator_email: None,
+            dev: false,
         }
     }
 
@@ -271,6 +284,40 @@ mod tests {
 
         assert_eq!(read.as_deref(), Some(key), "the newline is not the key");
         assert!(is_id_key(read.as_deref().unwrap()), "and it validates");
+    }
+
+    /// `RN_SITE__DEV=1` is what the `.env` says, and `1` is not the word
+    /// `true`: the environment source parses it as an integer, so the flag is
+    /// only a flag if the deserializer converts one. Built through the same
+    /// builder [`AppConfig::load`] uses, without touching the process
+    /// environment, which two tests running at once would race over.
+    #[test]
+    fn the_dev_flag_is_off_by_default_and_the_number_one_turns_it_on() {
+        let build = |dev: Option<config::Value>| {
+            let mut builder = config::Config::builder()
+                .set_default("mode", "dev")
+                .expect("a default")
+                .set_default("db_path", "data/db.sqlite")
+                .expect("a default")
+                .set_default("addr", "127.0.0.1:3004")
+                .expect("a default")
+                .set_default("static_dir", "static")
+                .expect("a default")
+                .set_default("dev", false)
+                .expect("a default");
+            if let Some(dev) = dev {
+                builder = builder.set_override("dev", dev).expect("an override");
+            }
+            builder
+                .build()
+                .expect("a configuration")
+                .try_deserialize::<AppConfig>()
+                .expect("it deserializes")
+        };
+        assert!(!build(None).dev, "the checked-in default is off");
+        assert!(build(Some(1.into())).dev, "RN_SITE__DEV=1");
+        assert!(build(Some(true.into())).dev, "RN_SITE__DEV=true");
+        assert!(!build(Some(0.into())).dev);
     }
 
     #[test]

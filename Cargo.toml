@@ -75,6 +75,10 @@ thiserror = "2.0.20"
 tracing = { version = "0.1.44", features = ["attributes"] }
 tracing-subscriber = { version = "0.3.23", features = ["env-filter", "json"] }
 config = "0.15.25"
+# `.env` for `cargo run`, and only for it: the server reads the file in debug
+# builds so a developer's local switches live in one ignored file. Already in
+# the graph as one of hiqlite's dependencies, so this pins no new version.
+dotenvy = "0.15.7"
 
 # Crypto: argon2 for password factors, sha2 for bearer-token hashes, aes for
 # the public-id derivation, base64 for its encoding.

@@ -12,8 +12,29 @@ fn subcommand(name: &str) -> Option<String> {
     (args.next().as_deref() == Some(name)).then(|| args.next().unwrap_or_default())
 }
 
+/// Fold `./.env` into the environment, in a debug build, before anything
+/// reads it.
+///
+/// Existing process variables win, which is dotenvy's default and the right
+/// way round: `RN_SITE__DEV=1 cargo run` must not be overruled by a file, and
+/// a deployment has no file at all. Silence is the ordinary case — most
+/// working copies have no `.env`, and a line about it on every boot is a log
+/// nobody reads. Debug only: a release binary never looks for the file, so
+/// the deployment's configuration is the environment it was given and
+/// nothing else. `.env.example` is the checked-in template.
+#[cfg(debug_assertions)]
+fn dev_env() {
+    if let Ok(path) = dotenvy::dotenv() {
+        eprintln!("rn-site: read {}", path.display());
+    }
+}
+
+#[cfg(not(debug_assertions))]
+const fn dev_env() {}
+
 #[tokio::main]
 async fn main() {
+    dev_env();
     let config = match AppConfig::load() {
         Ok(config) => config,
         Err(error) => {

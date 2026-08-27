@@ -256,6 +256,7 @@ mod tests {
             static_dir: PathBuf::from("static"),
             id_key: Some("0".repeat(32)),
             bootstrap_operator_email: None,
+            dev: false,
         }
     }
 

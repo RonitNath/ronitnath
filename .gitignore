@@ -7,10 +7,15 @@ crates/*/dist/
 # Local hiqlite / SQLite state from `cargo run` (see config.toml db_path).
 data/
 
-# Local secrets. The app itself reads no .env: sessions are opaque DB-backed
-# tokens, so there is no cookie-signing secret to keep.
+# Local switches. A DEBUG build reads `./.env` at startup (dotenvy, in
+# crates/server/src/main.rs) so a developer's local flags live in one place;
+# a release build never looks for it and a deployment has none. Nothing in it
+# is a secret — sessions are opaque DB-backed tokens, so there is no
+# cookie-signing secret to keep — and it stays ignored regardless.
+# `.env.example` is the checked-in template and is NOT ignored.
 .env
 .env.*
+!.env.example
 
 # Cargo.lock is deliberately COMMITTED: this is a deployed application, and both
 # the `cargo test --locked` gate and the release image build have nothing to lock

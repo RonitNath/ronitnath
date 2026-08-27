@@ -4122,6 +4122,7 @@ dependencies = [
  "axum",
  "axum-test",
  "config",
+ "dotenvy",
  "futures-util",
  "hiqlite",
  "rn-api",

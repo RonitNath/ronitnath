@@ -89,17 +89,61 @@ pub async fn node_with(
     clock: rn_kernel::store::Clock,
     bootstrap_operator_email: Option<String>,
 ) -> AppState {
+    boot(
+        cell,
+        raft,
+        api,
+        clock,
+        bootstrap_operator_email,
+        Mode::Dev,
+        false,
+    )
+    .await
+}
+
+/// The same node for a process that was told `RN_SITE__DEV=1`, or told it in
+/// production — the two halves of the developer bypass's runtime gate.
+pub async fn node_dev(
+    cell: &'static OnceCell<AppState>,
+    raft: &str,
+    api: &str,
+    mode: Mode,
+    dev: bool,
+) -> AppState {
+    boot(
+        cell,
+        raft,
+        api,
+        rn_kernel::store::Clock::System,
+        None,
+        mode,
+        dev,
+    )
+    .await
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn boot(
+    cell: &'static OnceCell<AppState>,
+    raft: &str,
+    api: &str,
+    clock: rn_kernel::store::Clock,
+    bootstrap_operator_email: Option<String>,
+    mode: Mode,
+    dev: bool,
+) -> AppState {
     cell.get_or_init(|| async {
         let directory = Box::leak(Box::new(
             tempfile::tempdir().expect("a temporary data directory"),
         ));
         let config = AppConfig {
-            mode: Mode::Dev,
+            mode,
             db_path: directory.path().join("db.sqlite"),
             addr: "127.0.0.1:0".parse().expect("a loopback address"),
             static_dir: PathBuf::from("../../static"),
             id_key: Some(CANARY_ID_KEY.to_string()),
             bootstrap_operator_email,
+            dev,
         };
         let migrations = Migrations::embedded::<rn_kernel::Migrations>()
             .expect("the kernel's migration history");
