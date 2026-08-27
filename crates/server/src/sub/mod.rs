@@ -221,7 +221,7 @@ impl Connection {
         let key = self.state.ids();
         for committed in events {
             for query in self.queries.clone() {
-                let keys = query.changed(&committed.event, &self.principal, key);
+                let keys = query.changed(&committed, &self.principal, key);
                 if keys.is_empty() {
                     continue;
                 }

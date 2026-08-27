@@ -87,6 +87,16 @@ const UNPROCESSABLE: u16 = 422;
 const PUBLIC: fn(Who) -> u16 = |_| OK;
 const MEMBERS_ONLY: fn(Who) -> u16 = |who| if signed_in(who) { OK } else { FORBIDDEN };
 
+/// A `/platform` read: the operator relation, and the same refusal for
+/// everybody else however they arrived.
+const OPERATORS_ONLY: fn(Who) -> u16 = |who| {
+    if who == Who::PlatformOperator {
+        OK
+    } else {
+        FORBIDDEN
+    }
+};
+
 const CASES: &[Case] = &[
     // --- public: ops, presence, assets ------------------------------------
     case("/healthz", "GET", Url::Fixed("/healthz"), PUBLIC),
@@ -189,6 +199,14 @@ const CASES: &[Case] = &[
         "GET",
         Url::Fixed("/api/q/sessions"),
         MEMBERS_ONLY,
+    ),
+    // The node's own account of itself: a literal segment that wins over the
+    // capture above, and the operator relation re-read on every request.
+    case(
+        "/api/q/cluster",
+        "GET",
+        Url::Fixed("/api/q/cluster"),
+        OPERATORS_ONLY,
     ),
     Case {
         pattern: "/api/cmd/{name}",
