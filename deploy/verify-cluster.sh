@@ -48,9 +48,12 @@ group_of() {
     printf '%s' "${rest%%\}*}"
 }
 
+# The status code, or 000 when the request never completed. Deliberately not
+# fatal on its own: the caller says which code it wanted, and "expected 404,
+# got 000" is a more useful line than curl's exit status under `set -e`.
 http_status() {
     curl --silent --show-error --location --max-time 10 \
-        --output /dev/null --write-out '%{http_code}' "$1"
+        --output /dev/null --write-out '%{http_code}' "$1" || true
 }
 
 # --- every voter, on both raft groups ---------------------------------------
