@@ -15,6 +15,7 @@ use rn_kernel::ids::IdKey;
 use rn_kernel::observe::{Matches, Observations};
 use rn_kernel::oidc::Provider;
 use rn_kernel::principal::PrincipalCache;
+use rn_kernel::product::ProductSet;
 use rn_kernel::store::{Clock, Store};
 
 use crate::config::AppConfig;
@@ -54,6 +55,14 @@ pub struct AppState {
     /// Live subscription sockets, so the per-identity and per-node caps are
     /// one shared count rather than a number each connection believes.
     pub connections: Arc<Connections>,
+    /// Which products this node believes are enabled.
+    ///
+    /// The projection every gated route reads (`crate::product::gate`). It is
+    /// per node and holds no truth of its own: it is loaded from the `product`
+    /// table at boot and re-read when the change feed carries a toggle
+    /// (`crate::sub::invalidate`), which is what makes a product enabled on
+    /// one voter answer on all three without a broadcast of its own.
+    pub products: Arc<ProductSet>,
 }
 
 impl AppState {
@@ -83,9 +92,19 @@ impl AppState {
         let store = Arc::new(Store::new(db.clone(), key, clock));
         let feed = Arc::new(ClusterFeed::new(Arc::clone(&store)));
         let principals = Arc::new(PrincipalCache::new(PRINCIPAL_CACHE));
-        // A revoked session must stop working, not merely stop being renewed.
-        // The feed is the witness that says when (`sub::invalidate`).
-        crate::sub::invalidate::spawn(Arc::clone(&feed), Arc::clone(&principals));
+        // Nothing enabled until this node has read the table, which the task
+        // below does before it waits on anything: a product reads as off until
+        // this node knows otherwise, which is the safe direction.
+        let products = Arc::new(ProductSet::empty());
+        // A revoked session must stop working, not merely stop being renewed;
+        // a disabled product must stop answering. The feed is the witness that
+        // says when, for both (`sub::invalidate`).
+        crate::sub::invalidate::spawn(
+            Arc::clone(&feed),
+            Arc::clone(&principals),
+            Arc::clone(&store),
+            Arc::clone(&products),
+        );
         let provider = Arc::new(config.provider());
         Self {
             db,
@@ -100,6 +119,7 @@ impl AppState {
             observations: Arc::new(Observations::new()),
             matches: Arc::new(Matches::new()),
             connections: Arc::new(Connections::default()),
+            products,
         }
     }
 

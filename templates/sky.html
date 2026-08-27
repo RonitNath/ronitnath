@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+
+{#- `/sky` — the starscape product's one page: the landing's sky with nothing
+    standing in front of it. It is a *product* route, so it is mounted at boot
+    and answers only while `starscape` is enabled (`server::product`); a
+    deployment with it off is indistinguishable from one that never had it. -#}
+
+{% block title %}The sky{% endblock %}
+
+{% block styles %}
+<link rel="stylesheet" href="/static/site.css">
+{% endblock %}
+
+{% block head %}
+{#- Server clock at render: every browser draws the same instant, however
+    wrong its own clock is. -#}
+<meta name="rn-server-epoch-ms" content="{{ epoch_ms }}">
+<link rel="stylesheet" href="/pkg/starscape/explorer.css">
+<script type="module">
+  import init from "/pkg/starscape/rn-starscape.js";
+  init();
+</script>
+{% endblock %}
+
+{% block body %}
+<div class="starfield" aria-hidden="true">
+  <div class="stars-dim"></div>
+  <div class="stars-med"></div>
+  <div class="stars-bright"></div>
+</div>
+<div class="nebula" aria-hidden="true"></div>
+<canvas id="starscape" class="starscape" aria-hidden="true"></canvas>
+
+<div class="sky-chrome">
+  <canvas id="mini-globe" class="mini-globe" width="320" height="320"
+          role="application" tabindex="0"
+          aria-label="Choose an observer location on the globe"></canvas>
+  <p id="grounding" class="grounding"></p>
+  <button type="button" id="starscape-launch" class="starscape-launch"
+          data-state="idle">Open atlas</button>
+  <button type="button" id="resume-orbit" class="resume-orbit" hidden>Resume orbit</button>
+</div>
+
+<header class="topbar">
+  <button type="button" class="theme-toggle" aria-label="Toggle colour theme">
+    <span class="theme-toggle-icon" aria-hidden="true">
+      <svg class="theme-icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="2" stroke-linecap="round">
+        <circle cx="12" cy="12" r="4"></circle>
+        <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"></path>
+      </svg>
+      <svg class="theme-icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+      </svg>
+    </span>
+  </button>
+</header>
+
+<div id="star-annotations" class="star-annotations" aria-hidden="true"></div>
+{% endblock %}

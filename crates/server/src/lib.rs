@@ -10,7 +10,8 @@
 //! The trust boundaries (`docs/rebuild/plan.md` §Product contract) are three,
 //! and each is a router:
 //!
-//! * **public** — [`presence`], [`assets`], [`ops`], and `GET /auth`.
+//! * **public** — [`presence`], [`assets`], [`ops`], `GET /auth`, and the
+//!   [`product`] routes this deployment has turned on.
 //! * **browser-session** — [`api`], [`sub`], [`shell`] and the `/auth` posts;
 //!   the cookie, resolved to a [`Principal`](rn_kernel::Principal).
 //! * **recipient/embed** — [`links`], and nothing else. It has its own router
@@ -39,6 +40,7 @@ pub mod observe;
 pub mod oidc;
 pub mod ops;
 pub mod presence;
+pub mod product;
 pub mod shell;
 pub mod shutdown;
 pub mod state;
@@ -62,6 +64,11 @@ pub fn router(state: AppState) -> Router {
         .merge(shell::router())
         .merge(oidc::router())
         .merge(api::router())
+        // Every product's routes, mounted always and answered only while the
+        // product is on. The router is built once, here, at boot — which is
+        // exactly why enabling a product cannot add a route and must instead
+        // change what a route already mounted answers (`product`).
+        .merge(product::router(&state))
         .with_state(state.clone());
 
     // The bearer surface carries its own state, which is what keeps its

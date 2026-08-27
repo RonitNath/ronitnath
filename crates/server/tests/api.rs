@@ -304,13 +304,21 @@ fn a_command_replies_with_the_offset_its_event_landed_at() {
 
         // The same key with a different body is the one thing that is neither
         // a replay nor a fresh command.
+        //
+        // The bodies differ in `kind` rather than in `value`, and that is not
+        // arbitrary: `value` is a credential-bearing field, so it is redacted
+        // before the digest is taken (`kernel::audit::REDACTED_FIELDS`) and
+        // two calls that differ only in it are — deliberately — a replay. A
+        // caller retrying with a corrected password under a key they have
+        // already spent gets the first call's answer, which is the safer of
+        // the two.
         let conflict = server
             .post("/api/cmd/add-factor")
             .add_header("cookie", cookie)
             .add_header("sec-fetch-site", "same-origin")
             .text(
                 r#"{"key":"9c1e5a70-0000-4000-8000-000000000010",
-                    "kind":"email","value":"command-third@example.invalid"}"#,
+                    "kind":"password","value":"an obviously fake test password"}"#,
             )
             .content_type("application/json")
             .await;
