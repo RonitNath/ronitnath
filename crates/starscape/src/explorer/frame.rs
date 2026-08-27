@@ -63,6 +63,12 @@ impl Atlas {
         };
         if now - self.last_paint.get() >= interval {
             self.last_paint.set(now);
+            // Keep asking. Only a handful of tile requests may be in flight at
+            // once, so one ask per steer fills the middle of the view and
+            // leaves its edges empty until the next gesture — the sky then
+            // looks like it has a hole in it wherever you last stopped moving.
+            self.tiles
+                .request(&self.camera.get(), self.aspect_of_surface());
             self.draw(now);
         }
         self.schedule();
@@ -128,6 +134,11 @@ impl Atlas {
 
     fn aspect_of(&self, width: f64, height: f64) -> f64 {
         if height > 0.0 { width / height } else { 1.6 }
+    }
+
+    fn aspect_of_surface(&self) -> f64 {
+        let (width, height) = self.surface.borrow().css_size();
+        self.aspect_of(width, height)
     }
 }
 

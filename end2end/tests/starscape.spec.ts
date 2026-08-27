@@ -323,6 +323,13 @@ test("the atlas is interaction-gated, and zooming pays for tiles, not the file",
   }
   await expect.poll(() => page.evaluate(() => window.__rnStarscape.atlas().fov)).toBeLessThan(25);
   await page.waitForFunction(() => window.__rnTelemetry.explorer?.residentTiles > 0);
+  // The whole view fills in, not just the six tiles one gesture can have in
+  // flight: the frame keeps asking until nothing it can see is missing.
+  await expect
+    .poll(() => page.evaluate(() => window.__rnTelemetry.explorer.residentTiles), {
+      timeout: 15_000,
+    })
+    .toBeGreaterThan(6);
 
   const requests = await lodRequests(page);
   const deep = requests.filter(entry => entry.name.endsWith("g12.bin"));
