@@ -104,30 +104,46 @@ pub async fn run(plan: Plan) -> Result<Value, String> {
     let mut conn = Conn::connect(&plan.host)
         .await
         .map_err(|error| error.to_string())?;
-    let body = json!({
-        "key": key::uuid(),
-        "document": document,
-        "expected_rev": plan.seed["fanout"]["rev"].as_u64().unwrap_or(1),
-        "body": "the edit the fan-out probe measures",
-    })
-    .to_string();
-    let fired = Instant::now();
-    go.send(Some(fired)).map_err(|error| error.to_string())?;
-    let reply = conn
-        .post(
-            "/api/cmd/edit-document",
-            Some(&owner),
-            ("application/json", &body),
-        )
-        .await
-        .map_err(|error| error.to_string())?;
-    if reply.status != 200 {
-        return Err(format!(
-            "the probe's edit answered {} — {}",
-            reply.status, reply.body
-        ));
+    // The revision is read rather than assumed. A command's precondition is a
+    // local read, so an `expected_rev` that is right on the leader can be
+    // declined by a follower that has not applied the last entry — and a
+    // probe that fired into a decline would report a fan-out of nothing.
+    let commit;
+    let mut attempts = 0;
+    loop {
+        attempts += 1;
+        let rev = current_rev(&mut conn, &owner, &document)
+            .await
+            .unwrap_or_else(|| plan.seed["fanout"]["rev"].as_u64().unwrap_or(1));
+        let body = json!({
+            "key": key::uuid(),
+            "document": document,
+            "expected_rev": rev,
+            "body": format!("the edit the fan-out probe measures, attempt {attempts}"),
+        })
+        .to_string();
+        let fired = Instant::now();
+        go.send(Some(fired)).map_err(|error| error.to_string())?;
+        let reply = conn
+            .post(
+                "/api/cmd/edit-document",
+                Some(&owner),
+                ("application/json", &body),
+            )
+            .await
+            .map_err(|error| error.to_string())?;
+        if reply.status == 200 {
+            commit = reply.took;
+            break;
+        }
+        if attempts >= 5 {
+            return Err(format!(
+                "the probe's edit answered {} five times — {}",
+                reply.status, reply.body
+            ));
+        }
+        tokio::time::sleep(Duration::from_millis(200)).await;
     }
-    let commit = reply.took;
 
     let mut delivered = Samples::default();
     let deadline = Instant::now() + Duration::from_secs(30);
@@ -234,4 +250,19 @@ async fn listen(
             None => {}
         }
     }
+}
+
+/// What revision the fan-out document is at now, as the node this probe is
+/// talking to sees it.
+async fn current_rev(conn: &mut Conn, token: &str, document: &str) -> Option<u64> {
+    let reply = conn
+        .get(&format!("/api/q/document?id={document}"), Some(token))
+        .await
+        .ok()?;
+    reply
+        .json()
+        .ok()?
+        .as_array()
+        .and_then(|rows| rows.first())
+        .and_then(|row| row["draft_rev"].as_u64())
 }

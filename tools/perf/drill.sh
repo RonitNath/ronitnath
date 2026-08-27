@@ -75,6 +75,7 @@ fi
 log "seeding the drill's world"
 "$perf" seed --host "127.0.0.1:$(port_of 1)" --documents "$documents" \
     --subscribers 2 --workers 8 --out "$work/drill-seed.json" >/dev/null
+cookie=$(cat "$work/owner.cookie")
 
 for round in $(seq 1 "$rounds"); do
     report=$out/drill-$round.txt
@@ -107,25 +108,66 @@ for round in $(seq 1 "$rounds"); do
     say "  $(at)  kill node $third — two voters down, no quorum"
     tools/cluster.sh kill "$third" >> "$report" 2>&1
 
-    # Reads on the survivor, while there is no quorum to write with.
+    # Reads on the survivor, while there is no quorum to write with. With the
+    # session cookie: an anonymous read is a 403 whatever the cluster is
+    # doing, and proving the decline works is not the claim under test.
     say "  $(at)  reads on the survivor with no quorum:"
     (
         for _ in $(seq 20); do
             curl --silent --output /dev/null --max-time 15 \
+                --header "cookie: rn_session=$cookie" \
                 --write-out '    read /api/q/documents %{http_code} in %{time_total}s\n' \
                 "http://$host/api/q/documents" || echo '    read failed'
             sleep 1
         done
     ) >> "$report" 2>&1 &
     reads_pid=$!
-    wait "$reads_pid"; reads_pid=
+    wait "$reads_pid" || true; reads_pid=
 
     say "  $(at)  restarting the cluster"
     restart=$(stamp)
-    tools/cluster.sh start >> "$report" 2>&1
-    converged=$(awk "BEGIN{printf \"%.1f\", $(stamp) - $restart}")
-    say "  $(at)  all three /readyz answered ok after ${converged}s"
-    for id in 1 2 3; do say "    node $id: $(readyz "$id")"; done
+    # `cluster.sh start` blocks until it is satisfied or gives up after 90s, so
+    # the convergence clock cannot be read off its return: it runs in the
+    # background and this polls at 200 ms, which is the resolution the claim
+    # deserves. A node that does not come back gets one retry and, either way,
+    # the last line of its log.
+    tools/cluster.sh start >> "$report" 2>&1 &
+    starter=$!
+    converged=""
+    retried=0
+    poll_deadline=$((SECONDS + 240))
+    while [ "$SECONDS" -lt "$poll_deadline" ]; do
+        up=0
+        for id in 1 2 3; do
+            case "$(readyz "$id")" in
+                *'"status":"ok"'*'"voters":3'*) up=$((up + 1)) ;;
+            esac
+        done
+        if [ "$up" -eq 3 ]; then
+            converged=$(awk "BEGIN{printf \"%.1f\", $(stamp) - $restart}")
+            break
+        fi
+        if ! kill -0 "$starter" 2>/dev/null && [ "$retried" -eq 0 ]; then
+            retried=1
+            say "  $(at)  a node did not come back on the first start; retrying once"
+            tools/cluster.sh start >> "$report" 2>&1 &
+            starter=$!
+        fi
+        sleep 0.2
+    done
+    wait "$starter" 2>/dev/null || true
+
+    if [ -n "$converged" ]; then
+        say "  $(at)  three voters, all /readyz ok, ${converged}s after the restart was issued (retries: $retried)"
+    else
+        say "  $(at)  the cluster did NOT reconverge within 240s (retries: $retried)"
+    fi
+    for id in 1 2 3; do
+        say "    node $id: $(readyz "$id")"
+        if [ -z "$(readyz "$id")" ]; then
+            say "      last log line: $(tail -1 "target/cluster/node$id/rn-site.log" 2>/dev/null)"
+        fi
+    done
 
     # Converged is not the same as writable: the drill's last claim is that a
     # command commits, so it commits one and times it.

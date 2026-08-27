@@ -104,14 +104,18 @@ oha_profile() {
 }
 
 cleanup() {
+    # The profiled node always goes, `--keep` or not: it is this script's own
+    # process and nothing else in the run refers to it.
+    if [ -n "${samply_pid:-}" ]; then
+        leftover=$(lsof -ti "tcp:${samply_node##*:}" -sTCP:LISTEN 2>/dev/null | head -1)
+        [ -n "$leftover" ] && kill "$leftover" 2>/dev/null
+        kill "$samply_pid" 2>/dev/null || true
+        wait "$samply_pid" 2>/dev/null || true
+    fi
+    rm -rf "$work/samply-node"
     if [ "$keep" -eq 0 ]; then
         log "stopping the cluster"
         tools/cluster.sh stop >/dev/null 2>&1 || true
-        if [ -n "${samply_pid:-}" ]; then
-            kill "$samply_pid" 2>/dev/null || true
-            wait "$samply_pid" 2>/dev/null || true
-        fi
-        rm -rf "$work/samply-node"
     fi
 }
 trap cleanup EXIT
@@ -119,6 +123,18 @@ trap cleanup EXIT
 # ---------------------------------------------------------------- build first
 # Everything that compiles happens before anything that measures, so `quiet`
 # has something to wait for rather than something to race.
+#
+# The server embeds each bundle's `dist/` with rust-embed, which is a compile
+# error rather than an empty tree when the directory is missing — so a perf run
+# in a fresh worktree needs `trunk build` to have happened, and says which one
+# is missing rather than handing back four pages of macro output.
+for bundle in starscape app-member app-org app-platform; do
+    if [ ! -d "crates/$bundle/dist" ]; then
+        echo "crates/$bundle/dist is missing — run 'trunk build --release' in it first" >&2
+        exit 1
+    fi
+done
+
 log "building the server and the harness"
 CARGO_BUILD_JOBS=${CARGO_BUILD_JOBS:-4} cargo build --quiet -p rn-site
 (cd tools/perf && CARGO_BUILD_JOBS=${CARGO_BUILD_JOBS:-4} cargo build --quiet --release)
@@ -138,6 +154,11 @@ perf=$root/tools/perf/target/release/rn-perf
     printf 'samply:   %s\n' "$(samply --version 2>/dev/null || echo absent)"
     printf 'seed:     %s documents, %s subscribers, %s commit workers\n' \
         "$documents" "$subscribers" "$workers"
+    # Two of the report's budgets are stated as "one RTT plus a millisecond",
+    # so the run has to say what an RTT is here. On this harness it is the
+    # loopback, which is the floor a real intra-zone number sits above.
+    printf 'loopback: %s\n' \
+        "$(ping -c 20 -q 127.0.0.1 2>/dev/null | tail -1 || echo 'not measured')"
 } > "$out/run.txt"
 log "wrote $out/run.txt"
 
@@ -194,7 +215,7 @@ if [ "$do_samply" -eq 1 ] && command -v samply >/dev/null 2>&1; then
             -- "$root/target/debug/rn-site" > "$work/samply-node/rn-site.log" 2>&1 &
     samply_pid=$!
 
-    for _ in $(seq 60); do
+    for _ in $(seq 90); do
         curl --fail --silent --max-time 2 "http://$samply_node/readyz" >/dev/null 2>&1 && break
         sleep 1
     done
@@ -207,12 +228,26 @@ if [ "$do_samply" -eq 1 ] && command -v samply >/dev/null 2>&1; then
     "$perf" commit --seed "$work/samply-seed.json" --seconds 20 --reads 4 \
         > "$out/samply-commit.txt" 2>&1
 
-    # samply writes the profile when the process it started exits.
-    kill "$samply_pid" 2>/dev/null || true
+    # samply writes the profile when the process *it started* exits, and dies
+    # without writing anything if it is signalled itself — so the server is the
+    # one that gets the signal. It is found by the port this script chose,
+    # never by name: sibling legs run their own `rn-site` on this machine and
+    # a pattern kill would take theirs with it.
+    profiled=$(lsof -ti "tcp:${samply_node##*:}" -sTCP:LISTEN 2>/dev/null | head -1)
+    if [ -n "$profiled" ]; then
+        kill "$profiled" 2>/dev/null || true
+    fi
     wait "$samply_pid" 2>/dev/null || true
     samply_pid=
     ls -lh "$out"/flamegraph-*.json.gz >> "$out/run.txt" 2>&1 || true
     log "flame graph at $out/flamegraph-whoami-and-commit.json.gz"
+
+    if command -v python3 >/dev/null 2>&1; then
+        python3 tools/perf/hot-frames.py "$out/flamegraph-whoami-and-commit.json.gz" \
+            --binary "$root/target/debug/rn-site" --top 25 \
+            > "$out/hot-frames.txt" 2>&1 || true
+        log "hot frames at $out/hot-frames.txt"
+    fi
 else
     log "samply not run; the report says so"
 fi

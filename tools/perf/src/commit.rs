@@ -36,6 +36,9 @@ pub struct Plan {
     pub persist: bool,
 }
 
+/// How many refusals in a row mean something other than a stale revision.
+const GIVE_UP: u32 = 200;
+
 /// One completed write, as the timeline remembers it.
 struct Mark {
     at: f64,
@@ -151,6 +154,7 @@ impl Worker {
         let (mut writes, mut lists, mut marks) =
             (Samples::default(), Samples::default(), Vec::new());
         let mut conn = None;
+        let mut refusals = 0u32;
 
         while Instant::now() < self.deadline {
             if conn.is_none() {
@@ -199,14 +203,30 @@ impl Worker {
                             .ok()
                             .and_then(|value| value["result"]["rev"].as_u64())
                             .unwrap_or(self.rev + 1);
-                    } else if self.persist {
-                        // A refusal under a lost quorum says nothing about the
-                        // revision, so the worker re-reads it rather than
-                        // guessing — but only when it is meant to survive one.
-                        tokio::time::sleep(Duration::from_millis(100)).await;
-                        self.rev = self.reread(&self.token).await.unwrap_or(self.rev);
+                        refusals = 0;
                     } else {
-                        break;
+                        // A decline says the revision this worker believes in
+                        // is not the one the node it asked can see — which
+                        // happens without any node being down, because the
+                        // command's precondition is a *local* read and a
+                        // follower may not have applied the last entry yet.
+                        // So the worker asks what the revision is now rather
+                        // than guessing, and keeps going: the profile is
+                        // about throughput and latency, and the declines are
+                        // counted where the table can show them.
+                        refusals += 1;
+                        if refusals > GIVE_UP {
+                            break;
+                        }
+                        tokio::time::sleep(Duration::from_millis(if self.persist {
+                            100
+                        } else {
+                            5
+                        }))
+                        .await;
+                        if let Some(seen) = self.reread(&self.token).await {
+                            self.rev = seen;
+                        }
                     }
                 }
                 Err(_) => {
@@ -253,10 +273,10 @@ impl Worker {
             .await
             .ok()?;
         let value = reply.json().ok()?;
-        value["rows"]
+        // `/api/q/document` answers with the query's rows — an array of one.
+        value
             .as_array()
             .and_then(|rows| rows.first())
             .and_then(|row| row["draft_rev"].as_u64())
-            .or_else(|| value["draft_rev"].as_u64())
     }
 }

@@ -61,28 +61,53 @@ pub async fn register(conn: &mut Conn, display: &str, email: &str) -> Result<Cal
     Ok(Caller { token, person })
 }
 
+/// How long the seeder will keep asking after a decline before giving up.
+const PATIENCE: u32 = 100;
+
 /// Run a command and hand back its `result`, refusing anything but a 200.
+///
+/// A decline is retried, which is not the seeder being lax. A command's
+/// preconditions are read from the *local* state machine, so a node that has
+/// not yet applied the entry the previous command committed answers "declined"
+/// to a request that is perfectly well formed — reproducibly, for a
+/// `create-document` issued on a follower right after the `register` that
+/// created the person. The retry is how the seed gets its rows; the fact that
+/// it is needed is a finding, and belongs in the report rather than in a
+/// comment nobody reads.
 pub async fn command(
     conn: &mut Conn,
     token: &str,
     name: &str,
     args: Value,
 ) -> Result<Value, String> {
-    let mut body = args.as_object().cloned().unwrap_or_default();
-    body.insert("key".to_owned(), json!(key::uuid()));
-    let payload = Value::Object(body).to_string();
-    let reply = conn
-        .post(
-            &format!("/api/cmd/{name}"),
-            Some(token),
-            ("application/json", &payload),
-        )
-        .await
-        .map_err(|error| error.to_string())?;
-    if reply.status != 200 {
-        return Err(format!("{name} answered {} — {}", reply.status, reply.body));
+    let mut attempt = 0;
+    loop {
+        let mut body = args.as_object().cloned().unwrap_or_default();
+        body.insert("key".to_owned(), json!(key::uuid()));
+        let payload = Value::Object(body).to_string();
+        let reply = conn
+            .post(
+                &format!("/api/cmd/{name}"),
+                Some(token),
+                ("application/json", &payload),
+            )
+            .await
+            .map_err(|error| error.to_string())?;
+        if reply.status == 200 {
+            if attempt > 0 {
+                eprintln!("seed: {name} took {attempt} retries to stop being declined");
+            }
+            return Ok(reply.json()?["result"].clone());
+        }
+        attempt += 1;
+        if attempt > PATIENCE {
+            return Err(format!(
+                "{name} answered {} {attempt} times — {}",
+                reply.status, reply.body
+            ));
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
     }
-    Ok(reply.json()?["result"].clone())
 }
 
 /// Everything the profiles need, written once and read by every other
