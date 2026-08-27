@@ -311,3 +311,54 @@ fn the_seventeenth_socket_is_closed_rather_than_served() {
         }
     });
 }
+
+#[test]
+fn a_member_who_subscribes_to_the_deployments_lists_is_told_nothing_about_them() {
+    harness::run(async {
+        let state = state().await;
+        let server = server(&state);
+        // Two ordinary members. Neither holds `platform:* #operator`, and the
+        // socket does not check tiers — a name is a name.
+        let nosy = harness::register(&state, "Nosy", "sub-nosy@example.invalid").await;
+        let other = harness::register(&state, "Other", "sub-other@example.invalid").await;
+
+        // Resume from where the feed already is, so nothing here is a seed:
+        // what arrives afterwards arrives because an event named a key.
+        let here = touch(&server, &nosy.token, "leak-start").await["offset"]
+            .as_u64()
+            .expect("an offset");
+        let mut socket = subscribe(
+            &server,
+            &nosy.token,
+            &["platform-parties", "platform-identities", "platform-audit"],
+            here,
+        )
+        .await;
+
+        // Somebody else's command, on rows this reader has no claim to. The
+        // platform lists name their keys off the event and are guarded only
+        // on the read, so a decline that reads as an empty result set turns
+        // every one of those keys into a `del` addressed to this socket.
+        for tag in ["leak-a", "leak-b", "leak-c"] {
+            touch(&server, &other.token, tag).await;
+        }
+
+        for _ in 0..8 {
+            match tokio::time::timeout(
+                std::time::Duration::from_millis(400),
+                socket.receive_json::<Value>(),
+            )
+            .await
+            {
+                Ok(message) if message["type"] == "heartbeat" => {}
+                Ok(message) => panic!(
+                    "a member who cannot read the deployment's lists was sent {}",
+                    message
+                ),
+                Err(_) => {}
+            }
+        }
+
+        socket.close().await;
+    });
+}

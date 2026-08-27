@@ -159,6 +159,23 @@ impl Subscribed {
     }
 }
 
+/// What a subscription's re-read came to.
+///
+/// The distinction the socket needs and an `Option<Vec<Row>>` cannot make: an
+/// *empty* result set is a set the reader may read and which currently holds
+/// nothing, and a *declined* one is a set the reader may not read at all.
+/// Collapsing the two turns every key an event named into a `del` addressed
+/// to somebody who was never entitled to learn the key exists — which for
+/// `platform-*` is every party, resource and session id in the deployment,
+/// since those queries name their keys off the event and are guarded only on
+/// the read.
+enum Readable {
+    /// The rows, as the query answered.
+    Rows(Vec<Row>),
+    /// The reader may not read this set.
+    Denied,
+}
+
 /// One connection's subscription state.
 struct Connection {
     state: AppState,
@@ -219,7 +236,7 @@ impl Connection {
     async fn seed(&mut self) {
         let head = self.head().await;
         for index in 0..self.queries.len() {
-            let Some(rows) = self.rows(index).await else {
+            let Some(Readable::Rows(rows)) = self.rows(index).await else {
                 continue;
             };
             let query = self.queries[index].named;
@@ -238,8 +255,10 @@ impl Connection {
     /// One subscribed query's rows, read with its own parameters.
     ///
     /// A read that declines is not an error to shout about: it is what an
-    /// organization the reader has just been removed from looks like.
-    async fn rows(&self, index: usize) -> Option<Vec<Row>> {
+    /// organization the reader has just been removed from looks like. It is
+    /// also not an empty result set, and [`Readable`] is the difference —
+    /// see that type.
+    async fn rows(&self, index: usize) -> Option<Readable> {
         let subscribed = &self.queries[index];
         match query::read(
             &self.state.store.reads(),
@@ -249,8 +268,8 @@ impl Connection {
         )
         .await
         {
-            Ok(rows) => Some(rows),
-            Err(error) if error.is_decline() => Some(Vec::new()),
+            Ok(rows) => Some(Readable::Rows(rows)),
+            Err(error) if error.is_decline() => Some(Readable::Denied),
             Err(error) => {
                 tracing::warn!(
                     %error,
@@ -287,18 +306,30 @@ impl Connection {
                 if touch == Touch::None {
                     continue;
                 }
-                let Some(rows) = self.rows(index).await else {
+                let Some(readable) = self.rows(index).await else {
                     continue;
                 };
                 let sent = &mut self.queries[index].sent;
-                let ops = match touch {
-                    Touch::Keys(keys) => {
+                let ops = match (touch, readable) {
+                    (Touch::Keys(keys), Readable::Rows(rows)) => {
                         let ops = query::ops(&keys, rows);
                         query::remember(sent, &ops);
                         ops
                     }
-                    Touch::Set => query::set_ops(sent, rows),
-                    Touch::None => Vec::new(),
+                    // The reader may not read this set, so it is told nothing
+                    // about it — not even that the keys the event named
+                    // exist. `query::ops` would have turned every one of them
+                    // into a `del`, which is a public id off an event about
+                    // somebody else, addressed to somebody who cannot read the
+                    // query it arrived under.
+                    (Touch::Keys(_), Readable::Denied) => Vec::new(),
+                    // A whole-set diff against a set that is now unreadable is
+                    // the honest answer, and it is safe for the same reason
+                    // the ordinary one is: a `del` can only name a key this
+                    // connection previously sent.
+                    (Touch::Set, Readable::Rows(rows)) => query::set_ops(sent, rows),
+                    (Touch::Set, Readable::Denied) => query::set_ops(sent, Vec::new()),
+                    (Touch::None, _) => Vec::new(),
                 };
                 if ops.is_empty() {
                     continue;

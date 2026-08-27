@@ -256,9 +256,13 @@ fn membership_touch(event: &Event, params: &Params, key: &IdKey, party: i64) -> 
             party: who,
             ..
         } if container.get() == listed => Touch::Keys(vec![who.public(key).as_str().to_owned()]),
-        Event::PartyDisabled { party: who } | Event::PartyEnabled { party: who } => {
-            Touch::Keys(vec![who.public(key).as_str().to_owned()])
-        }
+        // A party is disabled deployment-wide and the event says nothing
+        // about which containers it belonged to, so naming its key here
+        // would hand this organization's reader the public id of a party
+        // that may be nobody's member. The whole set is re-read instead and
+        // diffed against what this connection sent, which is narrower: a
+        // `del` can then only mention a row the reader already had.
+        Event::PartyDisabled { .. } | Event::PartyEnabled { .. } => Touch::Set,
         _ => Touch::None,
     }
 }
