@@ -404,6 +404,10 @@ body {
 .viewport-center {
     position: relative;
     z-index: 5;
+    /* The hero band spans the whole viewport so its content can be centred in
+       it, which would otherwise swallow every click meant for the globe or the
+       resume control underneath. Only the card itself is a target. */
+    pointer-events: none;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -415,6 +419,7 @@ body {
 .home-card {
     max-width: var(--col-narrow);
     text-align: center;
+    pointer-events: auto;
 }
 
 .home-card h1 {
@@ -500,6 +505,14 @@ body {
     .mini-globe {
         transition: none;
         animation: none;
+    }
+
+    /* The crossfade between the fallback and the canvas is itself motion, and
+       it carries a 1.2s visibility delay. Specific enough to beat the rule
+       that sets it, so the swap is a cut rather than a fade. */
+    :root.starscape-active .starscape,
+    :root.starscape-active .starfield {
+        transition: none;
     }
 
     [data-theme="dark"] .stars-med,
