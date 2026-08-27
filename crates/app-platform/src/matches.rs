@@ -157,13 +157,12 @@ fn Detail(candidate: CandidateDetail, selected: RwSignal<Option<String>>) -> imp
             </Group>
             <section class="group">
                 <h3>"Split"</h3>
+                <p class="none">
+                    "Detach one registration onto a person of its own. The reason lands on the new link row."
+                </p>
                 <div class="group-rows">
-                    <Line lead=splits.to_string() trail="detach onto a person of its own">
-                        <Splitter identity=splits.to_string() />
-                    </Line>
-                    <Line lead=split_b.to_string() trail="detach onto a person of its own">
-                        <Splitter identity=split_b.to_string() />
-                    </Line>
+                    <Splitter identity=splits.to_string() />
+                    <Splitter identity=split_b.to_string() />
                 </div>
             </section>
         </Panel>
@@ -175,7 +174,9 @@ fn Detail(candidate: CandidateDetail, selected: RwSignal<Option<String>>) -> imp
 fn Ruling(candidate: String, status: String) -> impl IntoView {
     let evidence = RwSignal::new(String::new());
     let open = status == "proposed";
-    let blocked = Signal::derive(move || {
+    // Stated once, under the field it is about, because both buttons wait on
+    // the same thing and the same sentence twice is not twice as clear.
+    let missing = Signal::derive(move || {
         if !open {
             Some("This candidate has already been ruled on.".to_owned())
         } else if evidence.get().trim().is_empty() {
@@ -184,6 +185,7 @@ fn Ruling(candidate: String, status: String) -> impl IntoView {
             None
         }
     });
+    let held = Signal::derive(move || missing.get().is_some());
 
     let rule = |candidate: String, same_person: bool, evidence: RwSignal<String>| {
         run_with(move || {
@@ -216,13 +218,10 @@ fn Ruling(candidate: String, status: String) -> impl IntoView {
                 prop:value=move || evidence.get()
                 on:input=move |event| evidence.set(event_target_value(&event))
             ></textarea>
-            <div class="actions">
-                <Act
-                    label="Same person"
-                    run=rule(candidate.clone(), true, evidence)
-                    blocked=blocked
-                />
-                <Act label="Two people" run=rule(candidate, false, evidence) blocked=blocked />
+            <p class="none">{move || missing.get()}</p>
+            <div class="actions row">
+                <Act label="Same person" run=rule(candidate.clone(), true, evidence) held=held />
+                <Act label="Two people" run=rule(candidate, false, evidence) held=held />
             </div>
         </section>
     }
@@ -232,13 +231,8 @@ fn Ruling(candidate: String, status: String) -> impl IntoView {
 #[component]
 fn Splitter(identity: String) -> impl IntoView {
     let evidence = RwSignal::new(String::new());
-    let blocked = Signal::derive(move || {
-        evidence
-            .get()
-            .trim()
-            .is_empty()
-            .then(|| "A reason is required.".to_owned())
-    });
+    let held = Signal::derive(move || evidence.get().trim().is_empty());
+    let name = identity.clone();
     let run = run_with(move || {
         let identity = identity.clone();
         let evidence = evidence.get_untracked().trim().to_owned();
@@ -253,7 +247,8 @@ fn Splitter(identity: String) -> impl IntoView {
         }
     });
     view! {
-        <span class="split-act">
+        <div class="line split-act">
+            <span class="line-lead mono">{name}</span>
             <input
                 type="text"
                 class="reason"
@@ -262,7 +257,7 @@ fn Splitter(identity: String) -> impl IntoView {
                 prop:value=move || evidence.get()
                 on:input=move |event| evidence.set(event_target_value(&event))
             />
-            <Act label="Split" run=run blocked=blocked />
-        </span>
+            <Act label="Split" run=run held=held />
+        </div>
     }
 }

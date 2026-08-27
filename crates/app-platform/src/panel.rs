@@ -195,7 +195,9 @@ pub fn State(
 ///
 /// The reason a command cannot run yet is shown as text rather than left
 /// implicit behind a disabled control: a button that refuses and explains
-/// nothing is a button a reader retries.
+/// nothing is a button a reader retries. Where two buttons share one
+/// precondition the caller states it once and passes [`held`](Act) instead,
+/// because the same sentence twice is not twice as clear.
 #[component]
 pub fn Act(
     /// The verb and its object: "Disable", "Rule same person".
@@ -206,12 +208,15 @@ pub fn Act(
     /// A precondition the caller has not met, in the caller's terms.
     #[prop(optional, into)]
     blocked: Signal<Option<String>>,
+    /// Held for a precondition the caller is stating itself.
+    #[prop(optional, into)]
+    held: Signal<bool>,
 ) -> impl IntoView {
     let note = RwSignal::new(None::<String>);
     let busy = RwSignal::new(false);
     let run = StoredValue::new(run);
     let go = move |_| {
-        if busy.get_untracked() || blocked.get_untracked().is_some() {
+        if busy.get_untracked() || held.get_untracked() || blocked.get_untracked().is_some() {
             return;
         }
         busy.set(true);
@@ -227,7 +232,7 @@ pub fn Act(
         <span class="act">
             <button
                 type="button"
-                disabled=move || busy.get() || blocked.get().is_some()
+                disabled=move || busy.get() || held.get() || blocked.get().is_some()
                 on:click=go
             >
                 {label}

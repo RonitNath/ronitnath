@@ -78,6 +78,7 @@ fn Readings(cluster: ClusterView) -> impl IntoView {
         .collect_view();
 
     view! {
+        <div class="readings">
         <table class="tbl">
             <thead>
                 <tr>
@@ -114,6 +115,7 @@ fn Readings(cluster: ClusterView) -> impl IntoView {
             </thead>
             <tbody>{rows}</tbody>
         </table>
+        </div>
     }
 }
 

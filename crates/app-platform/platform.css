@@ -191,11 +191,13 @@
 
 /* Commands. The reason one cannot run is text beside it, never silence. */
 
+/* A command and whatever it needs typed into it first: the input takes the
+ * line, the button and its reason sit under it. A row that tried to hold all
+ * three wraps its explanation into a shape nobody chose. */
 .actions {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 0.5rem;
+  display: grid;
+  gap: 0.4rem;
+  justify-items: start;
 }
 .act {
   display: inline-flex;
@@ -236,14 +238,25 @@
   resize: vertical;
   font-family: inherit;
 }
+/* One registration, its reason, and the button that detaches it: the id names
+ * the row above, the two controls share the line below. */
 .split-act {
-  display: inline-flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.25rem 0.4rem;
   align-items: center;
-  gap: 0.4rem;
-  flex: 1 1 12rem;
 }
-.split-act .reason {
-  max-width: 9rem;
+.split-act .line-lead {
+  grid-column: 1 / -1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Two commands that share one precondition sit on one line. */
+.actions.row {
+  grid-auto-flow: column;
+  justify-content: start;
 }
 
 /* The audit payload: the event as its command wrote it. */
@@ -258,8 +271,14 @@
   overflow-wrap: anywhere;
 }
 
-/* The cluster page is two dense tables and no chart. */
+/* The cluster page is two dense tables and no chart.
+ *
+ * They are narrow on purpose: label left and number right stops being the
+ * right arrangement the moment the gap between them outgrows the content, and
+ * five readings stretched across a 1440 viewport is exactly that. */
 
-.content > .tbl + .tbl {
-  margin-top: var(--gap-section);
+.readings {
+  max-width: 42rem;
+  display: grid;
+  gap: var(--gap-section);
 }

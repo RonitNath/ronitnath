@@ -132,7 +132,6 @@ fn Detail(party: PartyDetail, selected: RwSignal<Option<String>>) -> impl IntoVi
         <Panel title=party.display.clone() on_close=close>
             <div class="panel-state">
                 <State value=party.status.clone() />
-                <Status party=party.clone() />
             </div>
             <Facts facts=facts />
             <Group label="Identities" count=counts.0 empty="No registration resolves to this party.">
@@ -147,6 +146,7 @@ fn Detail(party: PartyDetail, selected: RwSignal<Option<String>>) -> impl IntoVi
             <Group label="Granted" count=counts.3 empty="It has been granted nothing.">
                 {relations}
             </Group>
+            <Status party=party.clone() />
         </Panel>
     }
 }
@@ -200,22 +200,25 @@ fn Status(party: PartyDetail) -> impl IntoView {
     };
 
     view! {
-        <div class="actions">
-            <Show when=move || is_person && !disabled>
-                <input
-                    type="text"
-                    class="reason"
-                    aria-label="Reason"
-                    placeholder="Reason"
-                    prop:value=move || reason.get()
-                    on:input=move |event| reason.set(event_target_value(&event))
+        <section class="group">
+            <h3>"Status"</h3>
+            <div class="actions">
+                <Show when=move || is_person && !disabled>
+                    <input
+                        type="text"
+                        class="reason"
+                        aria-label="Reason"
+                        placeholder="Reason"
+                        prop:value=move || reason.get()
+                        on:input=move |event| reason.set(event_target_value(&event))
+                    />
+                </Show>
+                <Act
+                    label=if disabled { "Enable" } else { "Disable" }
+                    run=run.clone()
+                    blocked=blocked
                 />
-            </Show>
-            <Act
-                label=if disabled { "Enable" } else { "Disable" }
-                run=run.clone()
-                blocked=blocked
-            />
-        </div>
+            </div>
+        </section>
     }
 }
