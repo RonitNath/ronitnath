@@ -19,3 +19,8 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 js-sys = { workspace = true }
 wasm-bindgen = { workspace = true }
+# Named for its *features*, not for its symbols: `leptos::window()` returns a
+# `web_sys::Window`, and `navigator()`/`clipboard()` only exist on it when this
+# crate turns those features on. A grep for `web_sys` in src finds nothing and
+# the wasm-release build fails without it.
+web-sys = { workspace = true, features = ["Clipboard", "Navigator", "Location", "Storage", "Window"] }
