@@ -13,6 +13,7 @@
 use rn_api::commands::Leave;
 
 use super::{Batch, Ctx, refs, run};
+use crate::authority::{self, Want};
 use crate::bind;
 use crate::error::{Outcome, decline};
 use crate::event::Committed;
@@ -36,6 +37,10 @@ pub async fn leave<S: Sql, F: Feed>(ctx: &Ctx<'_, S, F>, args: &Leave) -> Outcom
     let (identity, person, acting_as) = refs::actor(&ctx.principal)?;
     let container: Id<Person> = Id::new(refs::container(ctx.store.ids(), &args.group)?.get());
 
+    // Leaving is about a membership, so an operator with none has nothing to
+    // leave — and that refusal is the missing row, not the missing authority,
+    // which is why the operator clause is asked first and separately.
+    authority::require(ctx, Want::Settled(true)).await?;
     let Some(role) = org::role_of(ctx.store, container, person).await? else {
         return decline();
     };
@@ -59,6 +64,16 @@ pub async fn leave<S: Sql, F: Feed>(ctx: &Ctx<'_, S, F>, args: &Leave) -> Outcom
                 person
             ],
         );
+        batch.push(crate::audit::object_stmt(
+            ctx.key,
+            crate::audit::object::PARTY,
+            container.get(),
+        ));
+        batch.push(crate::audit::object_stmt(
+            ctx.key,
+            crate::audit::object::PARTY,
+            person.get(),
+        ));
         Ok(batch)
     })
     .await?;

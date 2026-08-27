@@ -24,10 +24,11 @@ use axum::{Json, Router, routing::post};
 use rn_api::commands::{
     ALL_COMMAND_NAMES, ActAs, AddFactor, Authorize, ClaimLink, ClientCredentials, ConfirmMatch,
     CreateDocument, CreateGroup, CreateOrganization, DeleteClient, Disable, EditDocument, Enable,
-    EndSession, ExchangeCode, Invite, Leave, ProposeMatch, PublishDocument, RefreshToken, Register,
-    RegisterClient, RemoveFactor, RemoveMember, Revoke, RevokeConsent, RevokeLink, RevokeSession,
+    EndImpersonation, EndSession, ExchangeCode, GrantOperator, Invite, Leave, ProposeMatch,
+    PublishDocument, ReAuthenticate, RefreshToken, Register, RegisterClient, RemoveFactor,
+    RemoveMember, RetireKey, Revoke, RevokeConsent, RevokeLink, RevokeOperator, RevokeSession,
     RevokeToken, RotateClientSecret, RotateSigningKey, RuleMatch, SetHandle, SetRole, Share,
-    SignIn, SignOut, Split, Transfer, UpdateClient, VerifyEmail,
+    SignIn, SignInAs, SignOut, Split, Transfer, UpdateClient, VerifyEmail,
 };
 use rn_api::{Command, CommandEnvelope};
 use rn_kernel::Principal;
@@ -77,6 +78,11 @@ macro_rules! bindings {
                     let envelope: CommandEnvelope<$args> = serde_json::from_str(body)
                         .map_err(|error| CommandError::Malformed(error.to_string()))?;
                     let ctx = Ctx {
+                        // C11.3, until P5's `RN_SITE__IMPERSONATION` lands:
+                        // on in dev, off in prod, which is the default the
+                        // requirement names. A deployment that wants it on in
+                        // prod turns the config key on when it exists.
+                        impersonation: state.config.mode == crate::config::Mode::Dev,
                         store: state.store.as_ref(),
                         feed: state.feed.as_ref(),
                         provider: state.provider.as_ref(),
@@ -153,6 +159,19 @@ bindings! {
     plain RevokeConsent => cmd::revoke_consent,
     // The caller's own session is the one that ended, so the cookie goes too.
     ending EndSession => cmd::end_session,
+    // The platform operator's own.
+    plain GrantOperator => cmd::grant_operator,
+    plain RevokeOperator => cmd::revoke_operator,
+    plain ReAuthenticate => cmd::reauthenticate,
+    // `linking` and not `minting`: the session `SignInAs` mints is not this
+    // browser's — the operator's own cookie must survive the call, because it
+    // is what they go back to. The secret rides in the reply body for exactly
+    // the reason an invitation's token does: it has no other name and no
+    // other moment.
+    linking SignInAs => cmd::sign_in_as,
+    // `ending`, because the session that ran it is the session it deleted.
+    ending EndImpersonation => cmd::end_impersonation,
+    plain RetireKey => cmd::retire_key,
 }
 
 /// Run a command, on this handler's own task.

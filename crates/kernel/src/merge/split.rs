@@ -48,8 +48,9 @@ use rn_api::commands::Split;
 use super::LinkMethod;
 use super::recovery::owned_identity;
 use super::rule::EVIDENCE_LIMIT;
+use crate::authority::{self, Want};
 use crate::bind;
-use crate::cmd::{Applied, Batch, Ctx, is_platform_operator, run};
+use crate::cmd::{Applied, Batch, Ctx, run};
 use crate::domain::Vocabulary;
 use crate::error::{Invalid, Outcome, decline};
 use crate::event::Committed;
@@ -160,12 +161,12 @@ pub async fn split<S: Sql, F: Feed>(ctx: &Ctx<'_, S, F>, args: &Split) -> Outcom
     };
 
     // A person is theirs to split, or an operator's. Nobody else's.
-    let method = if owned_identity(&ctx.store.reads(), who, identity).await? && who == person {
+    let mine = owned_identity(&ctx.store.reads(), who, identity).await? && who == person;
+    authority::require(ctx, Want::Settled(mine)).await?;
+    let method = if mine {
         LinkMethod::SelfLink
-    } else if is_platform_operator(&ctx.store.reads(), who).await? {
-        LinkMethod::Operator
     } else {
-        return decline();
+        LinkMethod::Operator
     };
 
     // Splitting the only identity of a person would move it from one person to

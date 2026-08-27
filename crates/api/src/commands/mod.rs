@@ -9,6 +9,7 @@
 mod identity;
 mod merge;
 mod org;
+mod platform;
 mod resource;
 
 pub use crate::oidc::{
@@ -23,6 +24,9 @@ pub use identity::{
 pub use merge::{ConfirmMatch, MatchSignal, ProposeMatch, RuleMatch, Split};
 pub use org::{
     ClaimLink, CreateGroup, CreateOrganization, Invite, Leave, RemoveMember, RevokeLink, SetRole,
+};
+pub use platform::{
+    EndImpersonation, GrantOperator, ReAuthenticate, RetireKey, RevokeOperator, SignInAs,
 };
 pub use resource::{CreateDocument, EditDocument, PublishDocument, Revoke, Share, Transfer};
 
@@ -87,6 +91,16 @@ command_names! {
     RevokeToken => "revoke-token",
     RevokeConsent => "revoke-consent",
     EndSession => "end-session",
+    // The platform operator's own: delegating the relation, proving a
+    // password again, wearing somebody else's hat, and taking a signing key
+    // out of the JWKS. Every one of them carries a stated reason, because
+    // each is an act with no second actor to check it.
+    GrantOperator => "grant-operator",
+    RevokeOperator => "revoke-operator",
+    ReAuthenticate => "re-authenticate",
+    SignInAs => "sign-in-as",
+    EndImpersonation => "end-impersonation",
+    RetireKey => "retire-key",
 }
 
 #[cfg(test)]
@@ -96,7 +110,7 @@ mod tests {
     #[test]
     fn the_product_contract_is_covered_exactly_once() {
         // The list in docs/rebuild/plan.md §Product contract, verbatim.
-        assert_eq!(ALL_COMMAND_NAMES.len(), 41);
+        assert_eq!(ALL_COMMAND_NAMES.len(), 47);
         let mut sorted = ALL_COMMAND_NAMES.to_vec();
         sorted.sort_unstable();
         let count = sorted.len();

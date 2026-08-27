@@ -175,6 +175,7 @@ fn member(person: i64) -> rn_kernel::principal::Principal {
         person: Some(Id::new(person)),
         acting_as: Id::new(person),
         session: Id::new(1),
+        impersonated_by: None,
     }
 }
 

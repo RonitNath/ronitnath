@@ -41,8 +41,9 @@ const FACTOR: &str = "INSERT INTO factor (identity_id, kind, value, created_at) 
                       VALUES ($1, $2, $3, $4)";
 
 const SESSION: &str = "INSERT INTO session \
-                       (identity_id, acting_as, token_hash, expires_at, created_at, last_seen_at) \
-                       VALUES ($1, $2, $3, $4, $5, $5) RETURNING id";
+                       (identity_id, acting_as, token_hash, expires_at, created_at, \
+                        last_seen_at, auth_time) \
+                       VALUES ($1, $2, $3, $4, $5, $5, $5) RETURNING id";
 
 const AUDIT: &str = "INSERT INTO audit \
                      (key, command, actor_identity_id, acting_as, at, request_digest, payload) \

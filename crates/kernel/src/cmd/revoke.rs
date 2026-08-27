@@ -17,8 +17,9 @@
 use rn_api::commands::Revoke;
 
 use super::share::{may_share, object_of, relation_of};
-use super::{Batch, Ctx, is_platform_operator, refs, run};
-use crate::error::{Outcome, decline};
+use super::{Batch, Ctx, refs, run};
+use crate::authority::{self, Want};
+use crate::error::Outcome;
 use crate::event::Committed;
 use crate::feed::Feed;
 use crate::relation;
@@ -37,11 +38,8 @@ pub async fn revoke<S: Sql, F: Feed>(ctx: &Ctx<'_, S, F>, args: &Revoke) -> Outc
     let subject = refs::subject(ctx.store.ids(), &args.subject)?;
     let relation = relation_of(args.relation);
 
-    if !may_share(ctx, object, person).await?
-        && !is_platform_operator(&ctx.store.reads(), person).await?
-    {
-        return decline();
-    }
+    let mine = may_share(ctx, object, person).await?;
+    authority::require(ctx, Want::Settled(mine)).await?;
     let now = ctx.now();
 
     let applied = run(ctx, args, async || {
@@ -60,6 +58,16 @@ pub async fn revoke<S: Sql, F: Feed>(ctx: &Ctx<'_, S, F>, args: &Revoke) -> Outc
                 Value::from(relation.as_str()),
             ],
         );
+        batch.push(crate::audit::object_stmt(
+            ctx.key,
+            crate::audit::object::RESOURCE,
+            object.id,
+        ));
+        batch.push(crate::audit::object_stmt(
+            ctx.key,
+            crate::audit::object::PARTY,
+            subject.id,
+        ));
         Ok(batch)
     })
     .await?;

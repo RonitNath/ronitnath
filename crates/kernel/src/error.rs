@@ -67,6 +67,16 @@ pub enum KernelError {
     /// The idempotency key has been used before, for a different body.
     #[error("that idempotency key was used for a different request")]
     Conflict,
+    /// A sensitive command whose session has not presented a password inside
+    /// [`crate::authority::PLATFORM_REAUTH_WINDOW`].
+    ///
+    /// The one refusal a caller is allowed to tell apart from
+    /// [`Decline`], and the exception is narrow enough to state: the caller is
+    /// already inside the platform tier, so nothing is disclosed by the
+    /// distinction, and what they must do — present the password again — is
+    /// something they cannot guess from a uniform decline. Rendered `401`.
+    #[error("that command needs the password again")]
+    ReAuthRequired,
     /// The database refused, or broke.
     #[error(transparent)]
     Store(#[from] StoreError),
@@ -91,6 +101,11 @@ impl KernelError {
     /// the server should branch on.
     pub const fn is_decline(&self) -> bool {
         matches!(self, Self::Decline(_))
+    }
+
+    /// Whether this is the re-authentication refusal.
+    pub const fn is_reauth_required(&self) -> bool {
+        matches!(self, Self::ReAuthRequired)
     }
 }
 

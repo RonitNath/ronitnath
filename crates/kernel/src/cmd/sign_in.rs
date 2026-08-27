@@ -13,7 +13,7 @@ use rn_api::commands::SignIn;
 
 use super::{Applied, Batch, Ctx, Minted, run};
 use crate::bind;
-use crate::domain::{SESSION_TTL, Token, normalize_email};
+use crate::domain::{OPERATOR_SESSION_TTL, SESSION_TTL, Token, normalize_email};
 use crate::error::{Outcome, decline};
 use crate::feed::Feed;
 use crate::ids::{Id, Identity, Person};
@@ -39,8 +39,9 @@ pub const LOOKUP: &str = "SELECT i.id AS identity_id, i.person_id, \
 /// above decides, and this is what makes the decision hold against a `Disable`
 /// that commits between the two.
 const SESSION: &str = "INSERT INTO session \
-                       (identity_id, acting_as, token_hash, expires_at, created_at, last_seen_at) \
-                       SELECT $1, $2, $3, $4, $5, $5 \
+                       (identity_id, acting_as, token_hash, expires_at, created_at, \
+                        last_seen_at, auth_time) \
+                       SELECT $1, $2, $3, $4, $5, $5, $5 \
                        WHERE EXISTS (SELECT 1 FROM identity i \
                                      LEFT JOIN party who ON who.id = i.person_id \
                                      WHERE i.id = $1 AND i.status = 'active' \
@@ -108,6 +109,16 @@ pub async fn sign_in<S: Sql, F: Feed>(ctx: &Ctx<'_, S, F>, args: &SignIn) -> Out
         .unwrap_or(Id::<Person>::new(candidate.identity_id.get()));
     let token = Token::mint();
     let now = ctx.now();
+    // An operator's session is eight hours, everybody else's is a fortnight.
+    // Chosen here, at the moment the password was presented, because that is
+    // the only moment the deployment knows how much of a life it is handing
+    // out; a later grant shortens what it promotes instead
+    // (`GrantOperator`, requirement A3.1).
+    let ttl = if crate::authority::is_operator(&ctx.store.reads(), acting_as).await? {
+        OPERATOR_SESSION_TTL
+    } else {
+        SESSION_TTL
+    };
 
     let Applied { committed, fresh } = run(ctx, args, async || {
         let mut batch = Batch::new();
@@ -117,7 +128,7 @@ pub async fn sign_in<S: Sql, F: Feed>(ctx: &Ctx<'_, S, F>, args: &SignIn) -> Out
                 Value::from(candidate.identity_id),
                 Value::from(acting_as),
                 Value::from(token.digest()),
-                Value::from(now + SESSION_TTL),
+                Value::from(now + ttl),
                 Value::from(now),
             ],
         );

@@ -13,13 +13,13 @@ use rn_api::commands::PublishDocument;
 
 use super::share::SHARER;
 use super::{Batch, Ctx, refs, run};
+use crate::authority::{self, Want};
 use crate::bind;
 use crate::document;
 use crate::error::{Outcome, decline};
 use crate::event::Committed;
 use crate::feed::Feed;
-use crate::principal::expand;
-use crate::relation::{self, Object};
+use crate::relation::Object;
 use crate::store::{Reads, Sql};
 
 const AUDIT: &str = "INSERT INTO audit \
@@ -36,11 +36,15 @@ pub async fn publish_document<S: Sql, F: Feed>(
     let (identity, _person, acting_as) = refs::actor(&ctx.principal)?;
     let document_id = refs::resource(ctx.store.ids(), &args.document)?;
 
-    let subjects = expand(ctx.store, &ctx.principal).await?;
     let object = Object::document(document_id);
-    if !relation::check(ctx.store, &subjects, SHARER, object).await? {
-        return decline();
-    }
+    authority::require(
+        ctx,
+        Want::On {
+            relation: SHARER,
+            object,
+        },
+    )
+    .await?;
     let Some(row) = document::load(ctx.store, document_id).await? else {
         return decline();
     };
@@ -65,6 +69,11 @@ pub async fn publish_document<S: Sql, F: Feed>(
         // Already `published` after the first time, and a resource that was
         // deleted is not brought back — hence the status in the guard.
         batch.any(document::PUBLISH_RESOURCE_SQL, bind![document_id]);
+        batch.push(crate::audit::object_stmt(
+            ctx.key,
+            crate::audit::object::RESOURCE,
+            document_id.get(),
+        ));
         Ok(batch)
     })
     .await?;

@@ -17,7 +17,8 @@
 
 use rn_api::commands::RevokeSession;
 
-use super::{Applied, Batch, Ctx, is_platform_operator, refs, run};
+use super::{Applied, Batch, Ctx, refs, run};
+use crate::authority::{self, Want};
 use crate::bind;
 use crate::error::{Outcome, decline};
 use crate::event::Committed;
@@ -62,9 +63,8 @@ pub async fn revoke_session<S: Sql, F: Feed>(
     let Some(Owner(whose)) = ctx.store.query_opt::<Owner>(OWNER, bind![target]).await? else {
         return decline();
     };
-    if whose != identity && !is_platform_operator(&ctx.store.reads(), person).await? {
-        return decline();
-    }
+    let _ = person;
+    authority::require(ctx, Want::Settled(whose == identity)).await?;
     let now = ctx.now();
     let targets = oidc::logout_targets(&ctx.store.reads(), target).await?;
     let clients = oidc::target_ids_json(&targets);
@@ -87,6 +87,16 @@ pub async fn revoke_session<S: Sql, F: Feed>(
                 clients.as_str()
             ],
         );
+        batch.push(crate::audit::object_stmt(
+            ctx.key,
+            crate::audit::object::SESSION,
+            target.get(),
+        ));
+        batch.push(crate::audit::object_stmt(
+            ctx.key,
+            crate::audit::object::IDENTITY,
+            whose.get(),
+        ));
         Ok(batch)
     })
     .await?;

@@ -34,6 +34,7 @@ async fn a_registration_flows_through_raft_and_out_of_the_feed() {
 
     let provider = rn_kernel::oidc::Provider::dev();
     let ctx = |principal: Principal| Ctx {
+        impersonation: false,
         store: store.as_ref(),
         feed: &feed,
         provider: &provider,

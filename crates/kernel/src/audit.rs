@@ -26,6 +26,60 @@ use crate::error::{KernelError, Outcome};
 use crate::event::{Committed, Event};
 use crate::store::{Cursor, FromRow, Reads, RowError};
 
+/// The kinds `audit_object` carries.
+///
+/// A vocabulary rather than a set of table names, because a person and an
+/// organization are both `party` rows and a caller asking about one is not
+/// asking about the other's table. Stated here so a command and the query that
+/// will read it back agree by construction.
+pub mod object {
+    /// A person, an organization or a group — a `party` row.
+    pub const PARTY: &str = "party";
+    /// A `session` row.
+    pub const SESSION: &str = "session";
+    /// A `resource` row: a document, an organization's or a group's resource.
+    pub const RESOURCE: &str = "resource";
+    /// A `link` row — an invitation.
+    pub const LINK: &str = "link";
+    /// An `identity` row.
+    pub const IDENTITY: &str = "identity";
+    /// A `factor` row.
+    pub const FACTOR: &str = "factor";
+    /// An `oidc_client` row — a registered relying party.
+    pub const CLIENT: &str = "oidc_client";
+    /// An `oidc_key` row, addressed by its rowid; the `kid` is on the payload.
+    pub const KEY: &str = "oidc_key";
+}
+
+/// Record that this command's audit row was about a row.
+///
+/// The statement finds the audit row by the idempotency key rather than by a
+/// `RETURNING id` the command would have to thread through, and that is not
+/// only convenience: `audit.key` is UNIQUE and NOT NULL, the audit statement
+/// is in this same batch, and every statement in a batch carries the command's
+/// guard — so this either finds the row the batch just wrote or finds nothing
+/// because the batch wrote nothing. There is no third case in which it could
+/// attach to somebody else's ruling.
+///
+/// `INSERT OR IGNORE` because a command may name the same row twice — a
+/// transfer whose new owner is also the container — and saying so once is the
+/// fact.
+///
+/// [`Expect::Any`](crate::store::Expect::Any): a guarded audit statement that
+/// wrote nothing means this writes nothing, which is right rather than a miss.
+pub fn object_stmt(key: Uuid, kind: &'static str, id: i64) -> crate::store::Stmt {
+    // The binding order is the statement's order of *first appearance*, not
+    // the numbers: SQLite reads `$N` as a name and assigns it the index it is
+    // first seen at. `$1` and `$2` are in the projection, `$3` in the `WHERE`,
+    // so that is the order they are bound in.
+    crate::store::Stmt::any(OBJECT_SQL, crate::bind![kind, id, key.to_string()])
+}
+
+/// [`object_stmt`]'s statement, exposed so the "no full scan" gate can assert
+/// that finding the audit row by its key is the seek it looks like.
+pub const OBJECT_SQL: &str = "INSERT OR IGNORE INTO audit_object (audit_id, kind, id) \
+     SELECT a.id, $1, $2 FROM audit a WHERE a.key = $3";
+
 /// A digest of a command's arguments, for telling a replay from a reuse.
 pub fn digest_of<T: Serialize>(args: &T) -> String {
     let canonical = serde_json::to_vec(args).unwrap_or_default();

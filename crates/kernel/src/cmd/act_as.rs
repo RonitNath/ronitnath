@@ -20,12 +20,13 @@
 use rn_api::commands::ActAs;
 
 use super::{Applied, Batch, Ctx, member, run};
+use crate::authority::{self, Want};
 use crate::bind;
 use crate::error::{Outcome, decline};
 use crate::event::Committed;
 use crate::feed::Feed;
 use crate::ids::{self, Id, Organization, Person};
-use crate::org::{self, MemberRole};
+use crate::org::MemberRole;
 use crate::store::{Reads, Sql};
 
 /// The guard is the person: a session that changed hands between the read and
@@ -60,9 +61,19 @@ pub async fn act_as<S: Sql, F: Feed>(ctx: &Ctx<'_, S, F>, args: &ActAs) -> Outco
                     return decline();
                 };
                 let container: Id<Person> = Id::new(organization.get());
-                if !org::holds(ctx.store, container, person, MemberRole::Admin).await? {
-                    return decline();
-                }
+                // C11.1: an operator may speak as any organization. It is
+                // attribution and not authority — `check()` answers exactly
+                // what it answered before the switch — so what this admits is
+                // an audit trail that reads correctly when an operator works
+                // inside a tenant.
+                authority::require(
+                    ctx,
+                    Want::Role {
+                        container,
+                        role: MemberRole::Admin,
+                    },
+                )
+                .await?;
                 container
             }
         }

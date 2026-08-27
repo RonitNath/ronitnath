@@ -337,3 +337,185 @@ async fn explain_the_clients_a_session_has_to_be_told_about_is_a_seek() {
     .await;
     rides(&plan, "oidc_token_session_idx");
 }
+
+// ------------------------------------------------------- platform admin ---
+//
+// The reads leg P1 added. Two of them run on *every* command in the
+// deployment — the operator clause and, for a sensitive one, the
+// re-authentication window — so a scan in either would be a scan per write.
+
+#[tokio::test]
+async fn explain_the_operator_clause_rides_the_relation_unique_index() {
+    let harness = Local::new();
+    let who = harness
+        .register("Ronit", "plan-op@example.test")
+        .await
+        .expect("registers");
+    // The last clause of every command's authorisation
+    // (`authority::allows`). It is asked only when the ordinary rule already
+    // said no, which is most of the interesting requests.
+    let plan = plan(
+        &harness,
+        rn_kernel::authority::OPERATOR_SQL,
+        bind![who.principal.acting_as().expect("acts as somebody")],
+    )
+    .await;
+    rides(&plan, "relation_unique_idx");
+}
+
+#[tokio::test]
+async fn explain_the_reauth_window_reads_the_session_by_its_rowid() {
+    let harness = Local::new();
+    harness
+        .register("Ronit", "plan-reauth@example.test")
+        .await
+        .expect("registers");
+    let plan = plan(
+        &harness,
+        "SELECT auth_time AS n FROM session WHERE id = $1",
+        bind![1i64],
+    )
+    .await;
+    assert!(
+        plan.join("\n").contains("INTEGER PRIMARY KEY"),
+        "the window is one seek by rowid:\n{}",
+        plan.join("\n")
+    );
+}
+
+#[tokio::test]
+async fn explain_an_impersonated_session_checks_its_operator_by_two_seeks() {
+    let harness = Local::new();
+    harness
+        .register("Ronit", "plan-imp@example.test")
+        .await
+        .expect("registers");
+    // Only impersonated sessions make this read, and they are a handful in a
+    // deployment's history — but it is on the resolve path, so it is asserted
+    // like everything else there.
+    let plan = plan(
+        &harness,
+        rn_kernel::principal::OPERATOR_STILL_SQL,
+        bind![1i64],
+    )
+    .await;
+    rides(&plan, "relation_unique_idx");
+}
+
+#[tokio::test]
+async fn explain_a_ruling_is_found_by_the_object_it_was_about() {
+    let harness = Local::new();
+    harness
+        .register("Ronit", "plan-obj@example.test")
+        .await
+        .expect("registers");
+    // Finding F4's whole point: without `audit_object` this question is a
+    // full scan of a table that is also the change feed and has no retention.
+    let by_object = plan(
+        &harness,
+        "SELECT audit_id FROM audit_object WHERE kind = $1 AND id = $2 \
+         ORDER BY audit_id DESC",
+        bind!["party", 1i64],
+    )
+    .await;
+    rides(&by_object, "audit_object");
+    assert!(
+        !by_object.join("\n").contains("TEMP B-TREE"),
+        "the primary key already orders it:\n{}",
+        by_object.join("\n")
+    );
+
+    // And the write side: the statement finds the audit row it belongs to by
+    // the idempotency key, which is UNIQUE.
+    let by_key = plan(
+        &harness,
+        "SELECT a.id FROM audit a WHERE a.key = $1",
+        bind!["00000000-0000-0000-0000-000000000000"],
+    )
+    .await;
+    assert!(
+        by_key.join("\n").contains("sqlite_autoindex_audit_1") || by_key.join("\n").contains("key"),
+        "the object row attaches by key:\n{}",
+        by_key.join("\n")
+    );
+}
+
+#[tokio::test]
+async fn explain_the_audit_filters_an_operator_can_reach_are_all_seeks() {
+    let harness = Local::new();
+    harness
+        .register("Ronit", "plan-filter@example.test")
+        .await
+        .expect("registers");
+    // A filter with no index is a filter that scans the deployment's whole
+    // history. Three of them, and the fourth — the object — is above.
+    for (sql, index) in [
+        (
+            "SELECT id FROM audit WHERE actor_identity_id = $1 ORDER BY id DESC",
+            "audit_actor_idx",
+        ),
+        (
+            "SELECT id FROM audit WHERE acting_as = $1 ORDER BY id DESC",
+            "audit_acting_as_idx",
+        ),
+    ] {
+        rides(&plan(&harness, sql, bind![1i64]).await, index);
+    }
+    rides(
+        &plan(
+            &harness,
+            "SELECT id FROM audit WHERE at >= $1 AND at < $2",
+            bind![0i64, 1i64],
+        )
+        .await,
+        "audit_at_idx",
+    );
+}
+
+#[tokio::test]
+async fn explain_a_key_retirement_counts_live_tokens_on_the_expiry_index() {
+    let harness = Local::new();
+    harness
+        .register("Ronit", "plan-key@example.test")
+        .await
+        .expect("registers");
+    // B6.1's number, and it is what makes the retire decision safe — so it has
+    // to be a count of rows the system holds rather than something an operator
+    // waits on.
+    let plan = plan(
+        &harness,
+        rn_kernel::cmd::RETIRE_ALIVE_SQL,
+        bind![1i64, 0i64],
+    )
+    .await;
+    rides(&plan, "oidc_token_expires_idx");
+}
+
+#[tokio::test]
+async fn explain_the_disable_cascade_counts_without_a_scan() {
+    let harness = Local::new();
+    let who = harness
+        .register("Ronit", "plan-casc@example.test")
+        .await
+        .expect("registers");
+    // Four counts in one statement, run twice per disable — once for the
+    // confirm control a person is waiting on, once inside the command.
+    let plan = plan(
+        &harness,
+        rn_kernel::cascade::COUNTS_SQL,
+        bind![who.principal.acting_as().expect("acts as somebody"), 0i64],
+    )
+    .await;
+    let joined = plan.join("\n");
+    for wanted in [
+        "session_identity_idx",
+        "oidc_token_person_client_idx",
+        "relation_granted_by_idx",
+        "oidc_consent_person_idx",
+    ] {
+        assert!(
+            joined.contains(wanted),
+            "the plan does not use {wanted}:\n{joined}"
+        );
+    }
+}

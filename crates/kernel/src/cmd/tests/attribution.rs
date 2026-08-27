@@ -60,6 +60,7 @@ async fn the_k1_commands_attribute_themselves_to_the_party_the_session_speaks_as
         person: Some(founder.person()),
         acting_as: organization,
         session: founder.principal.session().expect("has one"),
+        impersonated_by: None,
     };
 
     cmd::add_factor(
@@ -170,6 +171,7 @@ async fn an_event_names_the_party_it_moved_and_not_the_one_it_is_attributed_to()
         person: Some(founder.person()),
         acting_as: Id::new(org.get()),
         session: founder.principal.session().expect("has one"),
+        impersonated_by: None,
     };
 
     // Founding: the resource is the person's, so the event must say so.

@@ -31,10 +31,13 @@ mod create_organization;
 mod disable;
 mod edit_document;
 mod enable;
+mod impersonate;
 mod invite;
 mod leave;
 pub(crate) mod oidc;
+mod operator;
 mod publish_document;
+mod reauthenticate;
 pub(crate) mod refs;
 mod register;
 mod remove_factor;
@@ -60,14 +63,18 @@ pub use create_organization::create_organization;
 pub use disable::disable;
 pub use edit_document::edit_document;
 pub use enable::enable;
+pub use impersonate::{end_impersonation, sign_in_as};
 pub use invite::invite;
 pub use leave::leave;
 pub use oidc::{
-    Authorized, Granted, Issued, Registered, authorize, client_credentials, delete_client,
-    end_session, exchange_code, refresh_token, register_client, revoke_consent, revoke_token,
-    rotate_client_secret, rotate_signing_key, set_handle, update_client,
+    Authorized, Granted, Issued, RETIRE_ALIVE_SQL, Registered, authorize, client_credentials,
+    delete_client, end_session, exchange_code, refresh_token, register_client, retire_key,
+    revoke_consent, revoke_token, rotate_client_secret, rotate_signing_key, set_handle,
+    update_client,
 };
+pub use operator::{grant_operator, revoke_operator};
 pub use publish_document::publish_document;
+pub use reauthenticate::reauthenticate;
 pub use register::register;
 pub use remove_factor::remove_factor;
 pub use remove_member::remove_member;
@@ -86,19 +93,30 @@ pub use verify_email::{mint_verification, verify_email};
 // route is reachable by one name.
 pub use crate::merge::{confirm_match, propose_match, rule_match, split};
 
+/// Whether a person holds `platform:* #operator`.
+///
+/// Re-exported under the name the tier checks outside this crate ask by. It is
+/// deliberately *not* how a command authorises itself any more: the eight
+/// open-coded calls that used to sit inside command modules are one clause of
+/// [`crate::authority::allows`] now, so that the eighteen commands that had no
+/// operator path could stop being eighteen separate omissions. What is left
+/// here is the read the server makes to decide whether to serve the
+/// `/platform` shell at all, which is a question about a bundle rather than
+/// about a write.
+pub use crate::authority::is_operator as is_platform_operator;
+
 use std::future::Future;
 
 use serde::Serialize;
 use uuid::Uuid;
 
 use crate::audit;
-use crate::bind;
 use crate::error::{KernelError, Outcome, decline};
 use crate::event::Committed;
 use crate::feed::Feed;
 use crate::ids::{Id, Identity, Person, Session};
 use crate::principal::Principal;
-use crate::store::{Count, Reads, Sql, Stmt, Store, StoreError, Value};
+use crate::store::{Sql, Stmt, Store, StoreError, Value};
 
 /// Everything a command needs that is not its own arguments.
 pub struct Ctx<'a, S: Sql, F: Feed> {
@@ -113,6 +131,14 @@ pub struct Ctx<'a, S: Sql, F: Feed> {
     pub principal: Principal,
     /// The caller's idempotency key.
     pub key: Uuid,
+    /// Whether this deployment allows impersonation at all (requirement
+    /// C11.3, `RN_SITE__IMPERSONATION`).
+    ///
+    /// A flag rather than a config reference, because the kernel does not read
+    /// configuration: the server hands it in, and a deployment that never
+    /// wants an operator able to become a person turns it off and does not
+    /// have to trust a review of this crate. Default on in dev, off in prod.
+    pub impersonation: bool,
 }
 
 impl<S: Sql, F: Feed> Ctx<'_, S, F> {
@@ -348,26 +374,8 @@ pub(crate) fn member(principal: &Principal) -> Outcome<(Id<Identity>, Id<Person>
             person,
             acting_as,
             session,
+            ..
         } => Ok((*identity, person.unwrap_or(*acting_as), *session)),
         Principal::Bearer { .. } | Principal::Anonymous => decline(),
     }
-}
-
-/// Whether a person holds `platform:* #operator`.
-///
-/// Platform administration is a relation, not a column and not a role enum —
-/// the kernel report's ruling, and the reason there is no `is_admin` anywhere
-/// in this crate. The row is written by an operator seeding it or by K2's
-/// `SetRole`; K1 only reads it, which is why the operator paths here are
-/// reachable and testable before that command exists.
-pub async fn is_platform_operator(store: &impl Reads, person: Id<Person>) -> Outcome<bool> {
-    let rows = store
-        .query::<Count>(
-            "SELECT count(*) AS n FROM relation \
-             WHERE object_kind = 'platform' AND object_id = 0 AND relation = 'operator' \
-               AND subject_kind = 'person' AND subject_id = $1",
-            bind![person],
-        )
-        .await?;
-    Ok(rows.first().is_some_and(|c| c.0 > 0))
 }

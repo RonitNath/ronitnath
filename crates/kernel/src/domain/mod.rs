@@ -27,7 +27,7 @@ pub use factor::{FactorKind, FactorRow};
 pub use identity::{IdentityRow, IdentityStatus};
 pub use link::{LinkRow, VERIFY_TTL};
 pub use party::{PartyKind, PartyRow, PartyStatus};
-pub use session::{RENEW_AFTER, SESSION_TTL, SessionRow};
+pub use session::{IMPERSONATION_TTL, OPERATOR_SESSION_TTL, RENEW_AFTER, SESSION_TTL, SessionRow};
 pub use token::Token;
 
 /// Longest a display name may be. Long enough for a legal entity's name,

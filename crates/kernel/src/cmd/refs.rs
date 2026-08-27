@@ -21,9 +21,31 @@ use crate::relation::{Subject, SubjectKind};
 /// grants are theirs, and switching a session cannot conjure any — while the
 /// audit row records the organization, which is what makes an organization's
 /// history readable as its own.
+///
+/// ## Impersonation is one change here and nowhere else
+///
+/// A session minted by `SignInAs` carries the operator behind it
+/// ([`Principal::impersonated_by`]). When it does, the *first* value is that
+/// operator's identity rather than the session's own — so `actor_identity_id`
+/// on every audit row in the deployment names the operator, and `acting_as`
+/// names the person whose hat they are wearing. Twenty-six commands already
+/// route their audit row through this function, so the rule holds everywhere
+/// by construction rather than by twenty-six edits that could each be
+/// forgotten.
+///
+/// The *middle* value is untouched, and that is deliberate: it is the person
+/// authority is asked about ([`crate::authority::allows`]), and under
+/// impersonation the authority is the target's. An operator wearing a hat has
+/// exactly what the person under it has, plus their own operator relation
+/// through the last clause — which is why the ten commands that could change
+/// who the person *is* are refused outright rather than merely audited.
 pub(crate) fn actor(principal: &Principal) -> Outcome<(Id<Identity>, Id<Person>, Id<Person>)> {
     let (identity, person, _) = super::member(principal)?;
-    Ok((identity, person, acting_as(principal, person)))
+    Ok((
+        principal.impersonated_by().unwrap_or(identity),
+        person,
+        acting_as(principal, person),
+    ))
 }
 
 /// The party a command's audit row is attributed to, for a caller that already

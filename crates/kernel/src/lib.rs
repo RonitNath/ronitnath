@@ -28,6 +28,8 @@
 #![warn(missing_docs)]
 
 pub mod audit;
+pub mod authority;
+pub mod cascade;
 pub mod cmd;
 /// The developer sign-in bypass, in debug builds only.
 ///
@@ -58,6 +60,7 @@ pub mod resource;
 pub mod store;
 pub mod testing;
 
+pub use authority::Want;
 pub use error::{Decline, Invalid, KernelError, Outcome};
 pub use event::{Committed, Event};
 pub use ids::{Id, IdKey};

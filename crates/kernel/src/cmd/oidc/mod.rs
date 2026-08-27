@@ -25,6 +25,7 @@ mod client;
 mod handle;
 mod keys;
 mod mint;
+mod retire;
 mod session;
 mod token;
 
@@ -32,12 +33,14 @@ pub use client::{Registered, delete_client, register_client, rotate_client_secre
 pub use handle::set_handle;
 pub use keys::rotate_signing_key;
 pub use mint::{Granted, Issued};
+pub use retire::{ALIVE_SQL as RETIRE_ALIVE_SQL, retire_key};
 pub use session::{end_session, revoke_consent};
 pub use token::{
     Authorized, authorize, client_credentials, exchange_code, refresh_token, revoke_token,
 };
 
-use crate::cmd::{Ctx, is_platform_operator, refs};
+use crate::authority::{self, Want};
+use crate::cmd::{Ctx, refs};
 use crate::error::{Outcome, decline};
 use crate::feed::Feed;
 use crate::ids::{Id, Identity, OidcClient, Person};
@@ -54,9 +57,7 @@ pub(crate) async fn operator<S: Sql, F: Feed>(
     ctx: &Ctx<'_, S, F>,
 ) -> Outcome<(Id<Identity>, Id<Person>, Id<Person>)> {
     let (identity, person, acting_as) = refs::actor(&ctx.principal)?;
-    if !is_platform_operator(&ctx.store.reads(), person).await? {
-        return decline();
-    }
+    authority::require(ctx, Want::Platform).await?;
     Ok((identity, person, acting_as))
 }
 
@@ -83,23 +84,22 @@ pub(crate) async fn may_administer<S: Sql, F: Feed>(
     person: Id<Person>,
     client: &ClientRow,
 ) -> Outcome<bool> {
-    if is_platform_operator(&ctx.store.reads(), person).await? {
-        return Ok(true);
-    }
-    let Some(owner) = client.owner_party_id else {
-        // A platform-owned client has no owning organization to administer it.
-        return Ok(false);
+    let ordinary = match client.owner_party_id {
+        // A platform-owned client has no owning organization to administer it,
+        // so the only clause left is the operator's.
+        None => false,
+        Some(owner) if owner == person => true,
+        Some(owner) => {
+            org::holds(
+                &ctx.store.reads(),
+                Id::new(owner.get()),
+                person,
+                MemberRole::Admin,
+            )
+            .await?
+        }
     };
-    if owner == person {
-        return Ok(true);
-    }
-    org::holds(
-        &ctx.store.reads(),
-        Id::new(owner.get()),
-        person,
-        MemberRole::Admin,
-    )
-    .await
+    authority::allows(ctx, Want::Settled(ordinary)).await
 }
 
 /// Whether a `members_only` client will accept this person.
@@ -118,7 +118,7 @@ pub(crate) async fn admits_person<S: Sql, F: Feed>(
     }
     let reads = ctx.store.reads();
     match client.owner_party_id {
-        None => is_platform_operator(&reads, person).await,
+        None => crate::authority::is_operator(&reads, person).await,
         Some(owner) if owner == person => Ok(true),
         Some(owner) => Ok(org::role_of(&reads, Id::new(owner.get()), person)
             .await?

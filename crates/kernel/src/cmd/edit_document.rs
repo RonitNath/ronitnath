@@ -15,13 +15,13 @@ use rn_api::commands::EditDocument;
 
 use super::share::SHARER;
 use super::{Batch, Ctx, refs, run};
+use crate::authority::{self, Want};
 use crate::bind;
 use crate::document::{self, BODY_LIMIT, TITLE_LIMIT};
 use crate::error::{Invalid, Outcome, decline};
 use crate::event::Committed;
 use crate::feed::Feed;
-use crate::principal::expand;
-use crate::relation::{self, Object};
+use crate::relation::Object;
 use crate::store::{Reads, Sql, Value};
 
 const AUDIT: &str = "INSERT INTO audit \
@@ -62,11 +62,15 @@ pub async fn edit_document<S: Sql, F: Feed>(
         .into());
     }
 
-    let subjects = expand(ctx.store, &ctx.principal).await?;
     let object = Object::document(document_id);
-    if !relation::check(ctx.store, &subjects, SHARER, object).await? {
-        return decline();
-    }
+    authority::require(
+        ctx,
+        Want::On {
+            relation: SHARER,
+            object,
+        },
+    )
+    .await?;
     // A document row that is not there is the same answer as one that is not
     // yours, and the revision guard would decline it anyway — reading it here
     // is what makes the event carry the revision the edit produced.
@@ -102,6 +106,11 @@ pub async fn edit_document<S: Sql, F: Feed>(
                 next
             ],
         );
+        batch.push(crate::audit::object_stmt(
+            ctx.key,
+            crate::audit::object::RESOURCE,
+            document_id.get(),
+        ));
         Ok(batch)
     })
     .await?;

@@ -15,6 +15,7 @@ use rn_api::commands::{DeleteClient, RegisterClient, RotateClientSecret, UpdateC
 use rn_api::oidc::{ClientAuthMethod, ClientMetadata, GrantType, Scope};
 
 use super::{client_of, may_administer, operator};
+use crate::authority;
 use crate::cmd::{Applied, Batch, Ctx, refs, run};
 use crate::domain::Token;
 use crate::error::{Invalid, Outcome, decline};
@@ -134,6 +135,9 @@ pub async fn register_client<S: Sql, F: Feed>(
     ctx: &Ctx<'_, S, F>,
     args: &RegisterClient,
 ) -> Outcome<Registered> {
+    // An impersonated session may not change what the person is, or who
+    // may become them (`authority::FORBIDDEN_WHILE_IMPERSONATING`).
+    authority::not_impersonating(&ctx.principal)?;
     let (identity, _, acting_as) = operator(ctx).await?;
     validate(&args.metadata)?;
 
@@ -230,6 +234,11 @@ pub async fn update_client<S: Sql, F: Feed>(
                 Value::from(id),
             ],
         );
+        batch.push(crate::audit::object_stmt(
+            ctx.key,
+            crate::audit::object::CLIENT,
+            id.get(),
+        ));
         Ok(batch)
     })
     .await?;
@@ -241,6 +250,9 @@ pub async fn rotate_client_secret<S: Sql, F: Feed>(
     ctx: &Ctx<'_, S, F>,
     args: &RotateClientSecret,
 ) -> Outcome<Registered> {
+    // An impersonated session may not change what the person is, or who
+    // may become them (`authority::FORBIDDEN_WHILE_IMPERSONATING`).
+    authority::not_impersonating(&ctx.principal)?;
     let (identity, person, acting_as) = refs::actor(&ctx.principal)?;
     let client = client_of(ctx, args.client.as_str()).await?;
     if !may_administer(ctx, person, &client).await? {
@@ -275,6 +287,14 @@ pub async fn rotate_client_secret<S: Sql, F: Feed>(
                 Value::from(client.id),
             ],
         );
+        // After the audit row and never before it: this statement finds that
+        // row by its key, and a `changes() > 0` guard in front of it would be
+        // reading *this* insert's count instead of the one it means.
+        batch.push(crate::audit::object_stmt(
+            ctx.key,
+            crate::audit::object::CLIENT,
+            client.id.get(),
+        ));
         Ok(batch)
     })
     .await?;
@@ -296,9 +316,8 @@ pub async fn delete_client<S: Sql, F: Feed>(
 ) -> Outcome<Committed> {
     let (identity, person, acting_as) = refs::actor(&ctx.principal)?;
     let client = client_of(ctx, args.client.as_str()).await?;
-    if !may_administer(ctx, person, &client).await? {
-        return decline();
-    }
+    let ordinary = may_administer(ctx, person, &client).await?;
+    crate::authority::require(ctx, crate::authority::Want::Settled(ordinary)).await?;
     let now = ctx.now();
 
     let Applied { committed, .. } = run(ctx, args, async || {
@@ -307,6 +326,28 @@ pub async fn delete_client<S: Sql, F: Feed>(
             registry::DELETE_SQL,
             vec![Value::from(now), Value::from(client.id)],
         );
+        // Immediately after the tombstone, because `changes()` is the *last*
+        // statement's count and the three cascades below are `any`: a client
+        // nobody had ever consented to deleted its grants, `changes()` read
+        // zero, and the audit row this command exists to write was skipped —
+        // reported to the caller as a guard miss on a delete that had in fact
+        // happened.
+        batch.one(
+            DELETE_AUDIT,
+            vec![
+                Value::from(ctx.key.to_string()),
+                Value::from(identity),
+                Value::from(acting_as),
+                Value::from(now),
+                Value::from(crate::audit::digest_of(args)),
+                Value::from(client.id),
+            ],
+        );
+        batch.push(crate::audit::object_stmt(
+            ctx.key,
+            crate::audit::object::CLIENT,
+            client.id.get(),
+        ));
         batch.any(
             registry::REVOKE_CLIENT_TOKENS_SQL,
             vec![Value::from(now), Value::from(client.id)],
@@ -318,17 +359,6 @@ pub async fn delete_client<S: Sql, F: Feed>(
         batch.any(
             registry::DELETE_CLIENT_GRANTS_SQL,
             vec![Value::from(client.id)],
-        );
-        batch.one(
-            DELETE_AUDIT,
-            vec![
-                Value::from(ctx.key.to_string()),
-                Value::from(identity),
-                Value::from(acting_as),
-                Value::from(now),
-                Value::from(crate::audit::digest_of(args)),
-                Value::from(client.id),
-            ],
         );
         Ok(batch)
     })

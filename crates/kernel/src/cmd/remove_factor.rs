@@ -8,6 +8,7 @@
 use rn_api::commands::RemoveFactor;
 
 use super::{Applied, Batch, Ctx, refs, run};
+use crate::authority::{self, Want};
 use crate::bind;
 use crate::error::{Outcome, decline};
 use crate::event::Committed;
@@ -35,9 +36,19 @@ pub async fn remove_factor<S: Sql, F: Feed>(
     ctx: &Ctx<'_, S, F>,
     args: &RemoveFactor,
 ) -> Outcome<Committed> {
+    // An impersonated session may not change what the person is, or who
+    // may become them (`authority::FORBIDDEN_WHILE_IMPERSONATING`).
+    authority::not_impersonating(&ctx.principal)?;
     let (actor, person, acting_as) = refs::actor(&ctx.principal)?;
     let identity =
-        target_identity(&ctx.store.reads(), actor, person, args.identity.as_ref()).await?;
+        match target_identity(&ctx.store.reads(), actor, person, args.identity.as_ref()).await {
+            Ok(identity) => identity,
+            Err(error) if error.is_decline() => {
+                authority::require(ctx, Want::Platform).await?;
+                super::add_factor::any_identity(ctx, args.identity.as_ref()).await?
+            }
+            Err(error) => return Err(error),
+        };
     let Ok(target) = ids::decode::<ids::Factor>(ctx.store.ids(), &args.factor) else {
         return decline();
     };
@@ -58,6 +69,16 @@ pub async fn remove_factor<S: Sql, F: Feed>(
                 target
             ],
         );
+        batch.push(crate::audit::object_stmt(
+            ctx.key,
+            crate::audit::object::IDENTITY,
+            identity.get(),
+        ));
+        batch.push(crate::audit::object_stmt(
+            ctx.key,
+            crate::audit::object::FACTOR,
+            target.get(),
+        ));
         Ok(batch)
     })
     .await?;

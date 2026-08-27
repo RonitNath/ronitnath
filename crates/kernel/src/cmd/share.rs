@@ -18,6 +18,7 @@
 use rn_api::commands::Share;
 
 use super::{Batch, Ctx, refs, run};
+use crate::authority::{self, Want};
 use crate::error::{Outcome, decline};
 use crate::event::Committed;
 use crate::feed::Feed;
@@ -80,9 +81,8 @@ pub async fn share<S: Sql, F: Feed>(ctx: &Ctx<'_, S, F>, args: &Share) -> Outcom
     if !Vocabulary::KERNEL.admits(object.kind, relation, subject.kind) {
         return decline();
     }
-    if !may_share(ctx, object, person).await? {
-        return decline();
-    }
+    let mine = may_share(ctx, object, person).await?;
+    authority::require(ctx, Want::Settled(mine)).await?;
     let now = ctx.now();
 
     let applied = run(ctx, args, async || {
@@ -107,6 +107,16 @@ pub async fn share<S: Sql, F: Feed>(ctx: &Ctx<'_, S, F>, args: &Share) -> Outcom
                 Value::from(relation.as_str()),
             ],
         );
+        batch.push(crate::audit::object_stmt(
+            ctx.key,
+            crate::audit::object::RESOURCE,
+            object.id,
+        ));
+        batch.push(crate::audit::object_stmt(
+            ctx.key,
+            crate::audit::object::PARTY,
+            subject.id,
+        ));
         Ok(batch)
     })
     .await?;

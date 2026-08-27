@@ -74,6 +74,18 @@ pub fn unavailable() -> Response {
     (StatusCode::SERVICE_UNAVAILABLE, Json(Decline::default())).into_response()
 }
 
+/// A sensitive command on a session that has not seen a password lately.
+///
+/// The one status this surface uses that is not a uniform decline, a `422` or
+/// a `409`, and the exception is deliberate: the caller is already inside the
+/// platform tier, so nothing is disclosed by telling them, and the body is the
+/// same bytes as every other refusal — what carries the information is the
+/// status alone, which is the least a caller can be told and still act.
+#[must_use]
+pub fn reauth() -> Response {
+    (StatusCode::UNAUTHORIZED, Json(Decline::default())).into_response()
+}
+
 /// A replayed idempotency key carrying a different body.
 #[must_use]
 pub fn conflict() -> Response {
@@ -106,6 +118,7 @@ pub fn from_kernel(error: &KernelError) -> Response {
     match error {
         KernelError::Invalid(invalid) => self::invalid(invalid),
         KernelError::Conflict => conflict(),
+        KernelError::ReAuthRequired => reauth(),
         KernelError::Decline(_) => forbidden(),
         KernelError::Store(store) => {
             tracing::error!(%store, "the database refused a command");

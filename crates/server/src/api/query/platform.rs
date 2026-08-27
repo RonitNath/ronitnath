@@ -305,6 +305,15 @@ fn parties_changed(event: &Event, key: &IdKey) -> Vec<String> {
         | Event::TokenRefreshed { .. }
         | Event::ServiceTokenIssued { .. }
         | Event::TokenRevoked { .. }
+        // The platform operator's own. Granting or revoking the relation
+        // writes a `relation` row and not a `party` one; impersonation writes
+        // a session. What changes for a list of parties is nothing.
+        | Event::OperatorGranted { .. }
+        | Event::OperatorRevoked { .. }
+        | Event::ReAuthenticated { .. }
+        | Event::Impersonated { .. }
+        | Event::ImpersonationEnded { .. }
+        | Event::SigningKeyRetired { .. }
         | Event::ConsentRevoked { .. } => Vec::new(),
     }
 }
@@ -355,6 +364,14 @@ fn identities_changed(event: &Event, key: &IdKey) -> Vec<String> {
         | Event::TokenRefreshed { .. }
         | Event::ServiceTokenIssued { .. }
         | Event::TokenRevoked { .. }
+        // An impersonation is a session of an identity that already existed,
+        // and a re-authentication touches a column no identity list renders.
+        | Event::OperatorGranted { .. }
+        | Event::OperatorRevoked { .. }
+        | Event::ReAuthenticated { .. }
+        | Event::Impersonated { .. }
+        | Event::ImpersonationEnded { .. }
+        | Event::SigningKeyRetired { .. }
         | Event::ConsentRevoked { .. } => Vec::new(),
     }
 }

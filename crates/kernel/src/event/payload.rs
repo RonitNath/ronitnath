@@ -185,6 +185,32 @@ impl Event {
             "rotate-signing-key" => Self::SigningKeyRotated {
                 kid: json.get("kid")?.as_str()?.to_owned(),
             },
+            "retire-key" => Self::SigningKeyRetired {
+                kid: json.get("kid")?.as_str()?.to_owned(),
+                // Absent reads as an ordinary retire. The forced one always
+                // says so, because it is the one that is a decision.
+                forced: json.get("forced").and_then(Json::as_bool).unwrap_or(false),
+            },
+            "grant-operator" => Self::OperatorGranted {
+                person: field(&json, "person")?,
+            },
+            "revoke-operator" => Self::OperatorRevoked {
+                person: field(&json, "person")?,
+            },
+            "re-authenticate" => Self::ReAuthenticated {
+                identity: field(&json, "identity")?,
+                session: field(&json, "session")?,
+            },
+            "sign-in-as" => Self::Impersonated {
+                operator: field(&json, "operator")?,
+                person: field(&json, "person")?,
+                session: field(&json, "session")?,
+            },
+            "end-impersonation" => Self::ImpersonationEnded {
+                operator: field(&json, "operator")?,
+                person: field(&json, "person")?,
+                session: field(&json, "session")?,
+            },
             "authorize" => Self::Authorized {
                 client: field(&json, "client")?,
                 person: field(&json, "person")?,

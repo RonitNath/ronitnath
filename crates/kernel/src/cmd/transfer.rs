@@ -28,7 +28,8 @@
 
 use rn_api::commands::Transfer;
 
-use super::{Batch, Ctx, is_platform_operator, refs, run};
+use super::{Batch, Ctx, refs, run};
+use crate::authority::{self, Want};
 use crate::domain::Vocabulary as _;
 use crate::error::{Outcome, decline};
 use crate::event::Committed;
@@ -83,9 +84,7 @@ pub async fn transfer<S: Sql, F: Feed>(ctx: &Ctx<'_, S, F>, args: &Transfer) -> 
     let subjects = crate::principal::expand(ctx.store, &ctx.principal).await?;
     let mut owners: Vec<Id<Person>> = vec![person];
     owners.extend(subjects.organizations.iter().map(|o| Id::new(o.get())));
-    if !row.owned_by_any(&owners) && !is_platform_operator(&ctx.store.reads(), person).await? {
-        return decline();
-    }
+    authority::require(ctx, Want::Settled(row.owned_by_any(&owners))).await?;
     if row.owner_party_id == to {
         // The world the caller asked for is the world that exists, but saying
         // so would need an audit row describing a change nobody made.
@@ -133,6 +132,17 @@ pub async fn transfer<S: Sql, F: Feed>(ctx: &Ctx<'_, S, F>, args: &Transfer) -> 
                 to
             ],
         );
+        batch.push(crate::audit::object_stmt(
+            ctx.key,
+            crate::audit::object::RESOURCE,
+            resource_id.get(),
+        ));
+        batch.push(crate::audit::object_stmt(
+            ctx.key,
+            crate::audit::object::PARTY,
+            to.get(),
+        ));
+
         ownership(&mut batch, object, resource_id, to, to_kind, identity, now);
         if party.is_some() {
             memberships(&mut batch, object.id, from, to, now);

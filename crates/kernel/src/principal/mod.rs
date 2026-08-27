@@ -38,6 +38,15 @@ pub enum Principal {
         acting_as: Id<Person>,
         /// The session row, so `SignOut` knows what to delete.
         session: Id<Session>,
+        /// The operator behind this session, when it is an impersonation.
+        ///
+        /// `None` for every ordinary session. It is not authority: `person`
+        /// above is the *target*, so this principal expands to the target's
+        /// real subject set and `check()` learns no new case. What it changes
+        /// is who the audit row names as actor ([`crate::cmd::refs::actor`])
+        /// and which commands are refused outright
+        /// ([`crate::authority::FORBIDDEN_WHILE_IMPERSONATING`]).
+        impersonated_by: Option<Id<Identity>>,
     },
     /// The holder of a link token. Reaches the claim page and nothing else.
     Bearer {
@@ -69,6 +78,16 @@ impl Principal {
     pub const fn acting_as(&self) -> Option<Id<Person>> {
         match self {
             Self::Member { acting_as, .. } => Some(*acting_as),
+            _ => None,
+        }
+    }
+
+    /// The operator wearing this session, if somebody is.
+    pub const fn impersonated_by(&self) -> Option<Id<Identity>> {
+        match self {
+            Self::Member {
+                impersonated_by, ..
+            } => *impersonated_by,
             _ => None,
         }
     }
@@ -133,9 +152,25 @@ pub type PrincipalCache = Cache<Resolved>;
 /// The cookie-to-principal query, exposed so the "no full scan" gate can put
 /// it under `EXPLAIN QUERY PLAN` and assert the index it must use.
 pub const RESOLVE_SQL: &str = "SELECT s.id, s.identity_id, s.acting_as, s.expires_at, s.created_at, \
-                           s.last_seen_at, i.person_id, i.status \
+                           s.last_seen_at, s.auth_time, s.impersonated_by_identity_id, \
+                           i.person_id, i.status \
                            FROM session s JOIN identity i ON i.id = s.identity_id \
                            WHERE s.token_hash = $1";
+
+/// Whether the operator behind an impersonated session still holds the
+/// relation.
+///
+/// One extra indexed read, made only for a session that has an operator on it
+/// — which is a handful in a deployment's whole history. It is the third of
+/// C11.2's five endings and the one that has no event to hang off: revoking an
+/// operator does not know which hats they are wearing, so the hat asks at the
+/// moment it is put on the head. The identity's own person is one seek by
+/// rowid and the relation is `relation_unique_idx`.
+pub const OPERATOR_STILL_SQL: &str = "SELECT count(*) AS n FROM identity i \
+     JOIN relation r ON r.object_kind = 'platform' AND r.object_id = 0 \
+                    AND r.relation = 'operator' AND r.subject_kind = 'person' \
+                    AND r.subject_id = i.person_id \
+     WHERE i.id = $1";
 
 struct ResolveRow {
     session: SessionRow,
@@ -181,6 +216,16 @@ pub async fn resolve_digest(store: &impl Reads, digest: &Digest) -> Outcome<Reso
     if !row.session.is_live(now) || row.identity_status != "active" {
         return Ok(anonymous);
     }
+    // An impersonated session ends when the operator behind it stops being
+    // one. Checked here rather than by an event, because `RevokeOperator` has
+    // no way to know which sessions somebody is wearing — and checked only for
+    // the sessions that have an operator on them, so an ordinary request pays
+    // nothing for the rule.
+    if let Some(operator) = row.session.impersonated_by_identity_id
+        && !operator_still(store, operator).await?
+    {
+        return Ok(anonymous);
+    }
 
     Ok(Resolved {
         principal: Principal::Member {
@@ -188,10 +233,20 @@ pub async fn resolve_digest(store: &impl Reads, digest: &Digest) -> Outcome<Reso
             person: row.person_id,
             acting_as: row.session.acting_as,
             session: row.session.id,
+            impersonated_by: row.session.impersonated_by_identity_id,
         },
         expires_at: row.session.expires_at,
         wants_renewal: row.session.wants_renewal(now),
     })
+}
+
+/// Whether an identity's person still holds `platform:* #operator`.
+async fn operator_still(store: &impl Reads, operator: Id<Identity>) -> Outcome<bool> {
+    Ok(store
+        .query::<crate::store::Count>(OPERATOR_STILL_SQL, bind![operator])
+        .await?
+        .first()
+        .is_some_and(|row| row.0 > 0))
 }
 
 /// Resolve through a cache, falling back to the database on a miss.

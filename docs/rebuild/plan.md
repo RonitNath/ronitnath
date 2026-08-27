@@ -28,9 +28,20 @@ ConfirmMatch (self-link merge), RuleMatch (operator merge with evidence),
 Split, Disable, Enable — and the OpenID Provider's thirteen (leg O1):
 SetHandle, RegisterClient, UpdateClient, RotateClientSecret, DeleteClient,
 RotateSigningKey, Authorize, ExchangeCode, RefreshToken, ClientCredentials,
-RevokeToken, RevokeConsent, EndSession. Forty-one in all
+RevokeToken, RevokeConsent, EndSession — and the platform operator's own six
+(leg P1): GrantOperator, RevokeOperator, ReAuthenticate, SignInAs,
+EndImpersonation, RetireKey. Forty-seven in all
 (`rn_api::commands::ALL_COMMAND_NAMES`). One transaction each, audit row
 inside, typed event appended to the change feed.
+
+Every command's authorisation ends in one function —
+`kernel::authority::allows(ctx, want)` — whose last clause is
+`platform:* #operator`. Not a middleware: the check stays inside the command,
+and what is shared is the sentence "…or an operator" rather than the place it
+is asked. `cmd::tests::operator` enumerates `ALL_COMMAND_NAMES` and classifies
+every one as gated or as authorised by something that is not a principal (a
+password, a bearer token, a client credential, the caller's own session,
+proof), so a command added with no operator path fails the build.
 
 Trust boundaries (engineering.md surface taxonomy): `public` (landing, public
 pages, `/auth`, `/links/<token>` claim page, ops routes, static assets);
@@ -142,6 +153,27 @@ which binds an identity.
 unique deployment-wide, changeable, and never freed, because a handle that
 changed hands is an impersonation waiting to happen.
 
+Migration 7 (`7_authority.sql`) adds what an operator's authority needs to be
+accountable: `session.auth_time` (when a password was last presented, moved by
+`ReAuthenticate` and by nothing else), `session.impersonated_by_identity_id`
+and `impersonation_reason` (NULL for every ordinary session), and
+`link.suspended_at` — a link that is asleep because its party is disabled, not
+a delete, because `Enable` has to put it back and `RevokeLink` already means
+gone for good. And `audit_object (audit_id, kind, id)`, written inside every
+command's own transaction, so "every ruling about this row" is a seek rather
+than a scan of the change feed. Three session lives, not one: `SESSION_TTL`
+14 days, `OPERATOR_SESSION_TTL` 8 hours chosen at `SignIn` and imposed by
+`GrantOperator`, `IMPERSONATION_TTL` 30 minutes.
+
+**Impersonation is a real session, not a fourth principal.** `SignInAs` mints a
+`session` row for an active identity of the target, so `principal::expand`
+resolves the target's own subject set and `check()` learns no new case;
+`Principal::Member` carries `impersonated_by` and `cmd::refs::actor` reads it,
+which makes "the operator is the actor and the person is the hat" true of every
+audit row in the deployment by construction. Ten commands are refused from an
+impersonated session — the rule in one sentence is that it may not change what
+the person is or who may become them.
+
 Statuses are projections: `party.status ∈ active|disabled|merged`,
 `identity.status ∈ active`, `session` has no status (row = live),
 `resource.status ∈ draft|published`, `match_candidate.status ∈
@@ -173,7 +205,14 @@ rots.
   <offset>, ...args }` → `200 { offset, result }` | `409` replayed key with a
   different body | `422 { invalid: [{ field, message }] }` for a malformed
   request, which is the one refusal that may be specific because it describes
-  what the caller itself sent | `503` uniform decline when this node passed
+  what the caller itself sent | `401` with the uniform decline body for a
+  *sensitive* command whose session has not presented a password inside
+  `authority::PLATFORM_REAUTH_WINDOW` (15 min) — the second refusal a caller
+  may tell apart, and the exception is narrow: the caller is already inside the
+  platform tier, so nothing is disclosed, and what they must do is something
+  they cannot guess from a uniform decline. The set is named
+  (`authority::SENSITIVE`) and is the same seam a second factor would gate |
+  `503` uniform decline when this node passed
   its deadline (`http::COMMAND_DEADLINE`) — a timed-out command is *undecided*,
   which is what the key is for | `403/404` uniform decline for everything
   else. `after` is the read-your-writes barrier: the offset the caller has
@@ -206,6 +245,11 @@ rots.
   /oidc/end_session`. Config: `RN_SITE__PUBLIC_ORIGIN` (the issuer, exactly),
   `RN_SITE__OIDC_KEY[_FILE]` (seals the signing keys, and is *not* the id
   key), `RN_SITE__PUBLIC_NAME` (what a page calls this deployment).
+- **Impersonation config**, leg P5's to add: `RN_SITE__IMPERSONATION` — whether
+  `SignInAs` works at all, default on in dev and **off** in prod. The kernel
+  reads it as `Ctx::impersonation`, which the server fills from
+  `config.mode == Dev` until the key exists; a deployment that never wants an
+  operator able to become a person turns it off rather than trusting a review.
 - Queries the Provider adds: `oidc-clients` and `oidc-tokens` (a platform
   operator's; the second is a drill-in on a session) and `authorizations` (the
   reader's own).

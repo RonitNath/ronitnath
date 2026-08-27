@@ -81,6 +81,7 @@ pub fn context(
     principal: Principal,
 ) -> Ctx<'_, hiqlite::Client, rn_kernel::feed::ClusterFeed> {
     Ctx {
+        impersonation: state.config.mode == crate::config::Mode::Dev,
         store: state.store.as_ref(),
         feed: state.feed.as_ref(),
         provider: state.provider.as_ref(),

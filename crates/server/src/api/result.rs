@@ -214,6 +214,26 @@ pub fn result_of(event: &Event, key: &IdKey, party: Option<PublicId>) -> Value {
         }),
         // The `kid` is public — it is what the JWKS publishes each key by.
         Event::SigningKeyRotated { kid } => json!({ "kid": kid }),
+        Event::SigningKeyRetired { kid, forced } => json!({ "kid": kid, "forced": forced }),
+
+        // --- the platform operator ----------------------------------------
+        Event::OperatorGranted { person } | Event::OperatorRevoked { person } => {
+            json!({ "person": person.public(key) })
+        }
+        Event::ReAuthenticated { session, .. } => json!({ "session": session.public(key) }),
+        // The person is named and the operator is not: the id a caller reads
+        // back is the hat they are now wearing, and their own identity is
+        // something they already hold. The reason lives on the audit row and
+        // on the session, never in a reply.
+        Event::Impersonated {
+            person, session, ..
+        }
+        | Event::ImpersonationEnded {
+            person, session, ..
+        } => json!({
+            "person": person.public(key),
+            "session": session.public(key),
+        }),
     }
 }
 

@@ -136,6 +136,8 @@ fn a_session_expires_and_slides() {
         expires_at: 1_000 + SESSION_TTL,
         created_at: 1_000,
         last_seen_at: 1_000,
+        auth_time: 0,
+        impersonated_by_identity_id: None,
     };
     assert!(session.is_live(1_000));
     assert!(!session.is_live(1_000 + SESSION_TTL));
@@ -150,9 +152,18 @@ fn a_link_is_claimed_once_and_then_never_again() {
         expires_at: 2_000,
         claimed_by_identity_id: None,
         verifies_factor_id: Some(crate::ids::Id::new(7)),
+        suspended_at: None,
     };
     assert!(link.is_claimable(1_000));
     assert!(!link.is_claimable(2_000), "expired");
+
+    // A suspended link is unclaimable and stays a live row: the party behind
+    // it is disabled, and `Enable` has to be able to put it back.
+    link.suspended_at = Some(1_500);
+    assert!(!link.is_claimable(1_000), "suspended");
+    link.suspended_at = None;
+    assert!(link.is_claimable(1_000), "and back again");
+
     link.claimed_by_identity_id = Some(crate::ids::Id::new(3));
     assert!(!link.is_claimable(1_000), "claimed");
 }

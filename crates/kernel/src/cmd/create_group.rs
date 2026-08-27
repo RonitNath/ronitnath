@@ -12,9 +12,10 @@
 use rn_api::commands::CreateGroup;
 
 use super::{Batch, Ctx, refs, run};
+use crate::authority::{self, Want};
 use crate::bind;
 use crate::domain::{DEFAULT_ZONE, DISPLAY_NAME_LIMIT, Vocabulary as _};
-use crate::error::{Invalid, Outcome, decline};
+use crate::error::{Invalid, Outcome};
 use crate::event::Committed;
 use crate::feed::Feed;
 use crate::ids::{Id, Person};
@@ -54,9 +55,14 @@ pub async fn create_group<S: Sql, F: Feed>(
         Some(id) => {
             let org = refs::organization(ctx.store.ids(), id)?;
             let container = Id::new(org.get());
-            if !org::holds(ctx.store, container, person, MemberRole::Admin).await? {
-                return decline();
-            }
+            authority::require(
+                ctx,
+                Want::Role {
+                    container,
+                    role: MemberRole::Admin,
+                },
+            )
+            .await?;
             container
         }
         None => person,
