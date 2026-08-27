@@ -16,6 +16,8 @@
 //! An empty list would be the honest answer to "which of mine is this" and the
 //! wrong answer to "what is r_…", which is what was asked.
 
+use std::collections::HashMap;
+
 use rn_api::PublicId;
 use rn_kernel::domain::{PartyKind, Vocabulary as _};
 use rn_kernel::error::decline;
@@ -66,14 +68,19 @@ pub const DOCUMENT_SQL: &str = "SELECT res.id AS id, res.owner_party_id AS owner
      JOIN party owner ON owner.id = res.owner_party_id \
      WHERE res.id = $1 AND res.kind = 'document' AND res.status <> 'deleted'";
 
-/// Which relation this principal holds on each document they can reach.
+/// Which relation this principal holds on each document *of a given page*.
 ///
-/// The same index the visibility branch uses, read for its `relation` column:
-/// what a reader may *do* with a row in the list is a property of the row, and
-/// asking for it separately is one seek per subject rather than one per row.
+/// Driven from the object side, one seek per listed document on
+/// `relation_object_idx`, and the subject set filters within the seek. The
+/// direction is the whole point: keyed on the subject instead, this returns
+/// every grant the principal holds anywhere — 10 004 rows to render a page of
+/// 200 for the seeded owner — and the list is capped while the grant read
+/// behind it is capped at nothing. Bounded by the page, it reads what the
+/// page needs and stops.
 pub const HELD_SQL: &str = "SELECT r.object_id AS id, r.relation AS relation \
-     FROM json_each($1) s CROSS JOIN relation r ON r.subject_key = s.value \
-     WHERE r.object_kind = 'document'";
+     FROM json_each($1) d \
+     CROSS JOIN relation r ON r.object_kind = 'document' AND r.object_id = d.value \
+     WHERE r.subject_key IN (SELECT s.value FROM json_each($2) s)";
 
 /// Every grant on a set of documents — what a sharing panel renders.
 ///
@@ -137,28 +144,47 @@ impl FromRow for Held {
     }
 }
 
-/// The strongest relation the principal holds on each document.
-async fn held(reads: &impl Reads, subjects: &SubjectSet) -> Outcome<Vec<(i64, Relation)>> {
-    let mut best: Vec<(i64, Relation)> = Vec::new();
+/// The strongest relation the principal holds on each of `documents`.
+///
+/// A map rather than a `Vec`, and the pair matters: the old fold was a linear
+/// `find` per returned row and [`summary`] did a second one per listed row, so
+/// the page cost the product of the two — ~50 million comparisons to render
+/// 200 rows for a principal with 10 004 grants. Both sides are now a hash
+/// lookup, and the query behind them only ever returns rows for this page.
+async fn held(
+    reads: &impl Reads,
+    subjects: &SubjectSet,
+    documents: &[i64],
+) -> Outcome<HashMap<i64, Relation>> {
+    if documents.is_empty() {
+        return Ok(HashMap::new());
+    }
+    let mut best: HashMap<i64, Relation> = HashMap::with_capacity(documents.len());
     for row in reads
-        .query::<Held>(HELD_SQL, bind_keys(subjects))
+        .query::<Held>(HELD_SQL, bind_keys(documents, subjects))
         .await?
-        .into_iter()
     {
         let Some(relation) = Relation::parse(&row.relation) else {
             continue;
         };
-        match best.iter_mut().find(|(id, _)| *id == row.id) {
-            Some(entry) if relation.covers(entry.1) => entry.1 = relation,
-            Some(_) => {}
-            None => best.push((row.id, relation)),
-        }
+        best.entry(row.id)
+            .and_modify(|held| {
+                if relation.covers(*held) {
+                    *held = relation;
+                }
+            })
+            .or_insert(relation);
     }
     Ok(best)
 }
 
-fn bind_keys(subjects: &SubjectSet) -> Vec<rn_kernel::store::Value> {
-    vec![rn_kernel::store::Value::from(subject_keys(subjects))]
+fn bind_keys(documents: &[i64], subjects: &SubjectSet) -> Vec<rn_kernel::store::Value> {
+    rn_kernel::bind![ids_json(documents), subject_keys(subjects)]
+}
+
+/// A list of row ids as the JSON array `json_each` takes.
+fn ids_json(ids: &[i64]) -> String {
+    serde_json::to_string(ids).unwrap_or_else(|_| "[]".to_owned())
 }
 
 /// Whether one of the principal's own parties owns this row.
@@ -170,16 +196,14 @@ fn owned_by(subjects: &SubjectSet, owner: i64) -> bool {
 fn summary(
     row: &DocumentSummary,
     subjects: &SubjectSet,
-    held: &[(i64, Relation)],
+    held: &HashMap<i64, Relation>,
     key: &IdKey,
 ) -> serde_json::Value {
     let mine = owned_by(subjects, row.owner_id);
     let relation = if mine {
         Relation::Owner
     } else {
-        held.iter()
-            .find(|(id, _)| *id == row.id.get())
-            .map_or(Relation::Viewer, |(_, relation)| *relation)
+        held.get(&row.id.get()).copied().unwrap_or(Relation::Viewer)
     };
     json!({
         "public_id": row.id.public(key),
@@ -215,7 +239,8 @@ pub(super) async fn documents(
             rn_kernel::bind![subject_keys(subjects), owner_ids(subjects), PAGE],
         )
         .await?;
-    let held = held(reads, subjects).await?;
+    let ids: Vec<i64> = rows.iter().map(|row| row.id.get()).collect();
+    let held = held(reads, subjects, &ids).await?;
     Ok(rows
         .into_iter()
         .map(|row| Row {
@@ -257,7 +282,7 @@ pub(super) async fn document(
     else {
         return decline();
     };
-    let held = held(reads, subjects).await?;
+    let held = held(reads, subjects, &[full.summary.id.get()]).await?;
     let mut value = summary(&full.summary, subjects, &held, key);
     if let Some(fields) = value.as_object_mut() {
         fields.insert("body".to_owned(), json!(full.body));
@@ -319,7 +344,7 @@ pub(super) async fn shares(
         )
         .await?;
     let ids: Vec<i64> = visible.iter().map(|row| row.id.get()).collect();
-    let list = serde_json::to_string(&ids).unwrap_or_else(|_| "[]".to_owned());
+    let list = ids_json(&ids);
 
     Ok(reads
         .query::<Share>(SHARES_SQL, rn_kernel::bind![list])

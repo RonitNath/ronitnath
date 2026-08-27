@@ -111,10 +111,23 @@ async fn explain_one_document_is_a_primary_key_seek() {
 }
 
 #[tokio::test]
-async fn explain_what_i_hold_rides_the_subject_key_index() {
+async fn explain_what_i_hold_is_bounded_by_the_page_it_is_read_for() {
     let harness = Local::new();
-    let plan = plan(&harness, member_documents::HELD_SQL, bind![KEYS]);
+    let plan = plan(&harness, member_documents::HELD_SQL, bind!["[1,2]", KEYS]);
+    // The page drives and the seek carries the document id: every column of
+    // `relation_subject_key_idx` is bound, so this is an index-only lookup
+    // per (listed document, subject) rather than a walk of every grant the
+    // principal holds anywhere. What it used to be — `subject_key` bound and
+    // nothing else — returned 10 004 rows to render a page of 200 (finding 1,
+    // docs/perf/2026-08-27.md), and the shape of that is a seek that stops at
+    // `subject_key=?`.
     rides(&plan, "relation_subject_key_idx");
+    assert!(
+        plan.join("\n")
+            .contains("(subject_key=? AND object_kind=? AND object_id=?)"),
+        "the held read must be bounded by the page it is read for:\n{}",
+        plan.join("\n")
+    );
 }
 
 #[tokio::test]
