@@ -72,16 +72,26 @@ pub fn Documents() -> impl IntoView {
                     rows=rows
                     columns=vec![
                         Column::new("Title", |row: &Document| row.title.clone()),
+                        Column::new("State", |row: &Document| row.status.clone()).state(),
+                        // The draft's revision and the published one. "Draft,
+                        // unpublished changes" was two status words for a
+                        // document that had never been published — a fact
+                        // about nothing, said twice.
+                        Column::new("Revision", |row: &Document| row.draft_rev.to_string())
+                            .mono()
+                            .priority(Priority::Secondary),
                         Column::new(
-                            "State",
-                            |row: &Document| {
-                                if row.unpublished {
-                                    format!("{}, unpublished changes", titled(&row.status))
-                                } else {
-                                    titled(&row.status)
-                                }
-                            },
-                        ),
+                                "Published",
+                                |row: &Document| {
+                                    row.published_rev
+                                        .map_or_else(
+                                            || "\u{2014}".to_owned(),
+                                            |rev| rev.to_string(),
+                                        )
+                                },
+                            )
+                            .mono()
+                            .priority(Priority::Secondary),
                         Column::new("Yours", |row: &Document| titled(&row.relation))
                             .priority(Priority::Secondary),
                         Column::new("Owner", |row: &Document| row.owner.display.clone())

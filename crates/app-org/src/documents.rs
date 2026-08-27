@@ -26,15 +26,20 @@ pub fn Documents(
     let columns = vec![
         Column::new("Title", |row: &Document| row.title.clone()),
         Column::new("Status", |row: &Document| row.status.clone()).state(),
-        // Whether the draft is ahead of what is published is a different fact
-        // from what the document *is*, and folding the two into one cell was
-        // what stopped the status being a word the ink could colour.
-        Column::new("Draft", |row: &Document| {
-            if row.unpublished { "ahead" } else { "" }.to_owned()
-        }),
+        // The draft's revision and the published one, side by side. Whether
+        // the first is ahead of the second is the fact the reader wanted, and
+        // saying it as two numbers says it without a second status word: a
+        // document that has never been published is not "unpublished
+        // changes", it is a draft, which the column beside it already said.
         Column::new("Revision", |row: &Document| row.draft_rev.to_string())
             .mono()
             .priority(Priority::Secondary),
+        Column::new("Published", |row: &Document| {
+            row.published_rev
+                .map_or_else(|| "\u{2014}".to_owned(), |rev| rev.to_string())
+        })
+        .mono()
+        .priority(Priority::Secondary),
         Column::new("Created", |row: &Document| on(row.created_at)).priority(Priority::Tertiary),
     ];
     let rows = Signal::derive(move || live.rows());

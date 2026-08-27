@@ -27,7 +27,7 @@ pub fn Invitations() -> impl IntoView {
 
     let columns = vec![
         Column::new("Group", |row: &Invitation| row.container.display.clone()),
-        Column::new("Role", |row: &Invitation| titled(&row.role)),
+        Column::new("Role", |row: &Invitation| titled(&row.role)).priority(Priority::Secondary),
         Column::new("State", |row: &Invitation| {
             if row.claimed_at.is_some() {
                 "claimed"
@@ -39,12 +39,13 @@ pub fn Invitations() -> impl IntoView {
         .state(),
         Column::new("Claimed by", |row: &Invitation| {
             row.claimed_by.clone().unwrap_or_default()
-        }),
+        })
+        .priority(Priority::Secondary),
         Column::new("Claimed", |row: &Invitation| {
             row.claimed_at.map(when).unwrap_or_default()
         })
         .mono()
-        .priority(Priority::Secondary),
+        .priority(Priority::Tertiary),
         Column::new("Expires", |row: &Invitation| when(row.expires_at))
             .mono()
             .priority(Priority::Tertiary),

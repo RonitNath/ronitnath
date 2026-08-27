@@ -157,13 +157,15 @@ pub fn Switcher() -> impl IntoView {
             })
             .collect_view();
         Some(view! {
-            <label for="org-scope">"Organization"</label>
-            <select
-                id="org-scope"
-                on:change=move |event| scope.choose(event_target_value(&event))
-            >
-                {options}
-            </select>
+            <div class="rail-slot">
+                <label for="org-scope">"Organization"</label>
+                <select
+                    id="org-scope"
+                    on:change=move |event| scope.choose(event_target_value(&event))
+                >
+                    {options}
+                </select>
+            </div>
         })
     }
 }

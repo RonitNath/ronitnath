@@ -91,6 +91,10 @@ pub fn Shell(
     /// tier is allowed to add to the chrome. `/org` puts its organization
     /// switcher here, because which organization you are looking at is
     /// navigation and belongs where navigation is.
+    ///
+    /// It brings its own `.rail-slot` wrapper rather than being given one: a
+    /// slot that draws a box around nothing is a gap in the rail on every
+    /// reader who has one organization.
     #[prop(optional)]
     rail: Option<ChildrenFn>,
     /// The bundle's routes.
@@ -213,7 +217,7 @@ fn Chrome(
                 <div class="rail-identity">{identity}</div>
                 <div class="rail-scope">{scopes}</div>
                 <ActingAs />
-                {rail.map(|rail| view! { <div class="rail-slot">{rail()}</div> })}
+                {rail.map(|rail| rail())}
                 <div class="rail-nav" on:click=move |_| close()>
                     {links}
                 </div>

@@ -380,7 +380,12 @@ where
                     page.set(0);
                 }
             />
-            <span class="count">{move || arranged.get().matched} " rows"</span>
+            <span class="count">
+                {move || {
+                    let matched = arranged.get().matched;
+                    format!("{matched} {}", if matched == 1 { "row" } else { "rows" })
+                }}
+            </span>
             <span class="pager">
                 <button
                     type="button"

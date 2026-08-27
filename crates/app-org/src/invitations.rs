@@ -30,17 +30,21 @@ pub fn Invitations(
     let live = use_scope().live::<Invitation>("org-invitations", &[("org", &org)]);
     let note = RwSignal::new(None::<String>);
     let columns = vec![
+        // What it joins and what became of it survive a phone; who and when
+        // are the first things a narrow reader gives up, because the verb in
+        // the row is worth more than either and has to fit beside them.
         Column::new("Into", |row: &Invitation| row.container_display.clone()),
-        Column::new("Role", |row: &Invitation| row.role.clone()),
         Column::new("State", state).state(),
+        Column::new("Role", |row: &Invitation| row.role.clone()).priority(Priority::Secondary),
         Column::new("Claimed by", |row: &Invitation| {
             row.claimed_by.clone().unwrap_or_default()
-        }),
+        })
+        .priority(Priority::Secondary),
         Column::new("Minted by", |row: &Invitation| {
             row.minted_by.clone().unwrap_or_default()
         })
-        .priority(Priority::Secondary),
-        Column::new("Minted", |row: &Invitation| on(row.created_at)).priority(Priority::Secondary),
+        .priority(Priority::Tertiary),
+        Column::new("Minted", |row: &Invitation| on(row.created_at)).priority(Priority::Tertiary),
         Column::new("Expires", |row: &Invitation| on(row.expires_at)).priority(Priority::Tertiary),
     ];
     let withdraw = RowAction::new(

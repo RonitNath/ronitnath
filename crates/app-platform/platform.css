@@ -249,3 +249,11 @@
   display: grid;
   gap: var(--gap-section);
 }
+/* The panel's fact column is 6.5rem wide because a panel is 24rem wide. Out
+ * here there is room, and "Observations pending" wrapping to two lines beside
+ * a one-character value is the label column being asked to be narrower than
+ * its labels. */
+.readings .fact {
+  grid-template-columns: 12rem minmax(0, 1fr);
+  font-size: var(--text-2);
+}
