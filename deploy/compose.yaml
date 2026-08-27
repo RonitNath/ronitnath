@@ -38,12 +38,24 @@ services:
       - ./image.env
       - ./node.env
     environment:
-      PUBLIC_URL: https://ronitnath.com
       RUST_LOG: info
       RN_SITE__MODE: prod
       RN_SITE__DB_PATH: /var/lib/rn-site/db.sqlite
       RN_SITE_HQL_SECRET_RAFT_FILE: /run/secrets/hiqlite_raft
       RN_SITE_HQL_SECRET_API_FILE: /run/secrets/hiqlite_api
+      # The AES-128 key every public id is derived from. It is not a session
+      # secret and it is not rotatable: a public_id is the ciphertext of
+      # `table_tag ‖ rowid` under this key, computed on read and stored in no
+      # column, so a new key silently renames every object in the deployment —
+      # every bookmarked URL, every invitation link, every id anyone pasted
+      # anywhere. It is provisioned once alongside the two Hiqlite secrets and
+      # then left alone; see deploy/CUTOVER.md for the one time it is minted.
+      #
+      # `_FILE` is the same contract the two Hiqlite secrets use: the value is
+      # never an environment variable, because a container's environment is
+      # readable by anything that can inspect it and shows up in every crash
+      # dump. The server reads the file at boot.
+      RN_SITE__ID_KEY_FILE: /run/secrets/id_key
     volumes:
       - type: bind
         source: ../state
@@ -53,6 +65,7 @@ services:
     secrets:
       - hiqlite_raft
       - hiqlite_api
+      - id_key
     ports:
       # Public HTTP, reachable only from nanode's Caddy over the mesh. Bound to
       # the node's mesh IP, never 0.0.0.0 — which is also why every health gate
@@ -89,3 +102,5 @@ secrets:
     file: ../secrets/hiqlite-raft
   hiqlite_api:
     file: ../secrets/hiqlite-api
+  id_key:
+    file: ../secrets/id-key

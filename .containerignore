@@ -1,0 +1,10 @@
+# Build-context exclusions. The release job checks out clean, so this mostly
+# matters for a local `podman build` against a working tree — where `target/`
+# alone is tens of gigabytes and would be streamed to the engine before the
+# first instruction ran, for files the Containerfile never COPYs.
+target/
+crates/*/dist/
+data/
+end2end/test-results/
+node_modules/
+.git/
