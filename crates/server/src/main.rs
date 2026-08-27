@@ -55,6 +55,21 @@ async fn main() {
         }
     };
 
+    // `rn-site admin <cmd>` — the way in that does not depend on the web tier
+    // (`rn_site::admin`, story G21). It opens the database itself, because the
+    // first thing it does is refuse when another process is holding it: with
+    // hiqlite's `auto-heal` on, a second open of a live data directory is not
+    // an error, it is a rebuild.
+    if let Some(argv) = rn_site::admin::cli::arguments() {
+        std::process::exit(rn_site::admin::cli::run(argv, config, &migrations).await);
+    }
+
+    // Who holds the data directory, for `rn-site admin` to refuse against.
+    // hiqlite's own lock file carries no pid and this is the only thing that
+    // does; it is claimed before the open and released after the shutdown, so
+    // it brackets exactly the window in which the directory is not free.
+    let held = rn_site::admin::lock::PidFile::claim(&config.db_dir());
+
     let db = match db::open(&config, &migrations).await {
         Ok(db) => db,
         Err(error) => {
@@ -92,6 +107,12 @@ async fn main() {
     // still writing while hiqlite is being handed back is an auto-heal boot.
     let lane = rn_site::observe::spawn(state.clone());
 
+    // The node-local operator route, if this deployment configured one
+    // (`RN_SITE__ADMIN_ADDR`, G21.2). Its own listener on its own socket, so
+    // `/admin/*` is not a path the public router refuses — it is a path the
+    // public router does not have.
+    let admin = rn_site::admin::route::spawn(state.clone());
+
     let app = rn_site::router(state.clone());
 
     let listener = match tokio::net::TcpListener::bind(addr).await {
@@ -119,10 +140,18 @@ async fn main() {
 
     bootstrap.abort();
     lane.stop().await;
+    if let Some(admin) = admin {
+        admin.abort();
+    }
 
     // The listener has drained by the time `serve` returns; only now is it safe
     // to hand the raft group back, which is what lets a voter leave cleanly.
     tokio::time::timeout(Duration::from_secs(20), shutdown::close(db))
         .await
         .unwrap_or_else(|_| tracing::error!("hiqlite did not shut down within 20s"));
+
+    // Last, so the file exists for exactly as long as the directory is held:
+    // dropped after hiqlite has been handed back, which is the moment
+    // `rn-site admin` may have it.
+    drop(held);
 }

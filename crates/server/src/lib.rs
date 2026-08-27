@@ -27,6 +27,7 @@
 //! is a client's own service party. What that party may *do* is whatever
 //! relations somebody granted it.
 
+pub mod admin;
 pub mod api;
 pub mod assets;
 pub mod auth;

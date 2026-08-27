@@ -86,6 +86,17 @@ const NOT_FOUND: u16 = 404;
 const UNPROCESSABLE: u16 = 422;
 
 const PUBLIC: fn(Who) -> u16 = |_| OK;
+
+/// Not on this surface, for anybody, however they arrived.
+///
+/// `/admin/*` (requirement G21.2, `rn_site::admin::route`) is served by its own
+/// listener on its own loopback socket and is never merged into
+/// [`rn_site::router`]. These rows say the stronger thing than "it is
+/// guarded": the public router does not have the path at all, so there is no
+/// principal — not the platform operator, not a bearer, not a cookie
+/// presented sideways — for whom it exists. A future merge of the admin router
+/// into the public one turns every one of these red.
+const ABSENT: fn(Who) -> u16 = |_| NOT_FOUND;
 const MEMBERS_ONLY: fn(Who) -> u16 = |who| if signed_in(who) { OK } else { FORBIDDEN };
 
 /// A `/platform` read: the operator relation, and the same refusal for
@@ -332,6 +343,60 @@ const CASES: &[Case] = &[
         "GET",
         Url::FreshLink("/links/{token}"),
         |_| OK,
+    ),
+    // --- the node-local operator route, which this surface does not have ---
+    case("/admin/readyz", "GET", Url::Fixed("/admin/readyz"), ABSENT),
+    case(
+        "/admin/audit",
+        "GET",
+        Url::Fixed("/admin/audit?tail=5"),
+        ABSENT,
+    ),
+    case(
+        "/admin/sessions",
+        "GET",
+        Url::Fixed("/admin/sessions"),
+        ABSENT,
+    ),
+    case(
+        "/admin/operators",
+        "GET",
+        Url::Fixed("/admin/operators"),
+        ABSENT,
+    ),
+    case(
+        "/admin/products",
+        "GET",
+        Url::Fixed("/admin/products"),
+        ABSENT,
+    ),
+    // The writes, asked for as GETs on purpose: what is being proved is that
+    // the path does not resolve, and a router that had grown the route would
+    // answer `405` here rather than `404` — which fails these rows too.
+    case(
+        "/admin/revoke-session",
+        "GET",
+        Url::Fixed("/admin/revoke-session"),
+        ABSENT,
+    ),
+    case(
+        "/admin/grant-operator",
+        "GET",
+        Url::Fixed("/admin/grant-operator"),
+        ABSENT,
+    ),
+    case(
+        "/admin/revoke-operator",
+        "GET",
+        Url::Fixed("/admin/revoke-operator"),
+        ABSENT,
+    ),
+    case("/admin/enable", "GET", Url::Fixed("/admin/enable"), ABSENT),
+    case(
+        "/admin/disable",
+        "GET",
+        Url::Fixed("/admin/disable"),
+        ABSENT,
     ),
     Case {
         pattern: "/links/{token}/claim",
