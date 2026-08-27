@@ -233,6 +233,7 @@ mod tests {
             addr: "127.0.0.1:0".parse().unwrap(),
             static_dir: PathBuf::from("static"),
             id_key: Some("0".repeat(32)),
+            bootstrap_operator_email: None,
         }
     }
 

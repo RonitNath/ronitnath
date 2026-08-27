@@ -56,6 +56,18 @@ services:
       # readable by anything that can inspect it and shows up in every crash
       # dump. The server reads the file at boot.
       RN_SITE__ID_KEY_FILE: /run/secrets/id_key
+      # The first platform operator, on the one node that is asked to take it.
+      # `bootstrap-operator` cannot run against a formed cluster — hiqlite locks
+      # its data directory, so the subcommand and the serving voter cannot both
+      # have it — so the serving process does it instead: when the address below
+      # registers and this deployment has no operator yet, it writes
+      # `platform:* #operator @person`. The kernel refuses a second one, so this
+      # is safe to leave set and does nothing on every boot after the first.
+      #
+      # Set it in *nexus's* node.env, not here, and on one node only; see
+      # deploy/CUTOVER.md §6.
+      #
+      #   RN_SITE__BOOTSTRAP_OPERATOR_EMAIL: you@example.com
     volumes:
       - type: bind
         source: ../state

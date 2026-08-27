@@ -77,7 +77,10 @@ and never from the path of the index it is handed. For live work on a bundle,
 
 The first operator is not a migration and not a seed row: `tools/seed.sh`
 registers one through the real form, then runs `rn-site bootstrap-operator
-<email>` against the stopped server — the kernel refuses a second one.
+<email>` against the stopped server — the kernel refuses a second one. That
+subcommand needs the database to itself, which a formed cluster never gives it;
+on a deployment the running process takes the same grant instead, from
+`RN_SITE__BOOTSTRAP_OPERATOR_EMAIL` (`deploy/CUTOVER.md` §6).
 
 ## Delivery
 

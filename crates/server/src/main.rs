@@ -60,6 +60,12 @@ async fn main() {
         return;
     }
 
+    // The configured first operator, if this deployment names one and has not
+    // got one. A formed cluster cannot run `bootstrap-operator` — hiqlite's
+    // data directory is locked by the voter that is serving — so the serving
+    // process takes the grant instead, at boot and on every registration.
+    let bootstrap = rn_site::bootstrap::watch(state.clone());
+
     // The observation lane: `last_seen`, match scanning and the two sweeps.
     // Held rather than detached, so it stops when this scope does — a task
     // still writing while hiqlite is being handed back is an auto-heal boot.
@@ -90,6 +96,7 @@ async fn main() {
         tracing::error!(%error, "the listener stopped with an error");
     }
 
+    bootstrap.abort();
     lane.stop().await;
 
     // The listener has drained by the time `serve` returns; only now is it safe

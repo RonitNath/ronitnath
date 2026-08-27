@@ -68,6 +68,18 @@ pub async fn node_on(
     api: &str,
     clock: rn_kernel::store::Clock,
 ) -> AppState {
+    node_with(cell, raft, api, clock, None).await
+}
+
+/// The same node, for a deployment that names its first platform operator by
+/// address (`RN_SITE__BOOTSTRAP_OPERATOR_EMAIL`).
+pub async fn node_with(
+    cell: &'static OnceCell<AppState>,
+    raft: &str,
+    api: &str,
+    clock: rn_kernel::store::Clock,
+    bootstrap_operator_email: Option<String>,
+) -> AppState {
     cell.get_or_init(|| async {
         let directory = Box::leak(Box::new(
             tempfile::tempdir().expect("a temporary data directory"),
@@ -78,6 +90,7 @@ pub async fn node_on(
             addr: "127.0.0.1:0".parse().expect("a loopback address"),
             static_dir: PathBuf::from("../../static"),
             id_key: Some("000102030405060708090a0b0c0d0e0f".to_string()),
+            bootstrap_operator_email,
         };
         let migrations = Migrations::embedded::<rn_kernel::Migrations>()
             .expect("the kernel's migration history");

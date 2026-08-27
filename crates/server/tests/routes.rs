@@ -27,6 +27,7 @@ async fn state() -> AppState {
             addr: "127.0.0.1:0".parse().expect("a loopback address"),
             static_dir: PathBuf::from("../../static"),
             id_key: Some("000102030405060708090a0b0c0d0e0f".to_string()),
+            bootstrap_operator_email: None,
         };
         let db = db::open_on(
             &config,

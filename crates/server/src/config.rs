@@ -42,7 +42,21 @@ pub struct AppConfig {
     pub static_dir: PathBuf,
     /// AES-128 key for public-id derivation, 32 lowercase hex characters.
     /// Required in prod; minted per boot in dev (see [`Self::require_id_key`]).
+    ///
+    /// A mounted file wins over the value: `RN_SITE__ID_KEY_FILE` names a path
+    /// and is read at load, which is how Compose hands a secret in without it
+    /// appearing in `docker inspect` or an env dump — the same contract
+    /// [`crate::db::cluster`] already uses for the two raft secrets.
     pub id_key: Option<String>,
+    /// The address that becomes this deployment's first platform operator the
+    /// moment it registers, if it has not got one.
+    ///
+    /// `bootstrap-operator` opens the database directly, and hiqlite holds an
+    /// exclusive lock on its data directory — so on a formed cluster there is
+    /// no moment at which the subcommand can run: every voter is live. This is
+    /// the same grant, taken by the running process (see [`crate::bootstrap`]).
+    #[serde(default)]
+    pub bootstrap_operator_email: Option<String>,
 }
 
 /// Everything that can go wrong turning the environment into an [`AppConfig`].
@@ -72,7 +86,10 @@ impl AppConfig {
                     .try_parsing(true),
             )
             .build()?;
-        let loaded: Self = settings.try_deserialize()?;
+        let mut loaded: Self = settings.try_deserialize()?;
+        if let Some(from_file) = id_key_file()? {
+            loaded.id_key = Some(from_file);
+        }
         loaded.validate()?;
         Ok(loaded)
     }
@@ -132,6 +149,26 @@ impl AppConfig {
     }
 }
 
+/// The id key from the file `RN_SITE__ID_KEY_FILE` names, if it names one.
+///
+/// Trailing whitespace is trimmed before anything looks at the value: a secret
+/// written by `printf` and a secret written by an editor differ by one newline,
+/// and a 33-character key is refused by [`is_id_key`] with a message about hex
+/// digits that is true and useless.
+fn id_key_file() -> Result<Option<String>, ConfigError> {
+    let Ok(path) = std::env::var("RN_SITE__ID_KEY_FILE") else {
+        return Ok(None);
+    };
+    let path = path.trim();
+    if path.is_empty() {
+        return Ok(None);
+    }
+    let key = std::fs::read_to_string(path).map_err(|error| {
+        ConfigError::Invalid(format!("RN_SITE__ID_KEY_FILE: cannot read {path}: {error}"))
+    })?;
+    Ok(Some(key.trim_end().to_string()))
+}
+
 fn is_id_key(key: &str) -> bool {
     key.len() == 32
         && key
@@ -164,6 +201,7 @@ mod tests {
             addr: "127.0.0.1:3004".parse().unwrap(),
             static_dir: PathBuf::from("static"),
             id_key: id_key.map(str::to_string),
+            bootstrap_operator_email: None,
         }
     }
 
@@ -195,6 +233,44 @@ mod tests {
         let key = cfg(Mode::Dev, None).require_id_key();
         assert!(is_id_key(&key), "{key}");
         assert_ne!(key, cfg(Mode::Dev, None).require_id_key());
+    }
+
+    /// Everything `RN_SITE__ID_KEY_FILE` promises, in one test because they all
+    /// move the same process-wide variable and two tests that did would race.
+    ///
+    /// A file wins over the value; a trailing newline is not part of the key —
+    /// a secret written by `printf` and one written by an editor differ by
+    /// exactly that, and the second would otherwise be refused with a message
+    /// about hex digits; an unset or empty path is absent rather than an error,
+    /// which is how Compose spells "not this deployment"; and a path that was
+    /// named and cannot be read is a boot failure rather than a quietly
+    /// generated key, which would rename every object on the deployment.
+    #[test]
+    fn a_mounted_key_file_wins_over_the_variable_and_loses_its_newline() {
+        // SAFETY: the whole contract is exercised here rather than across
+        // tests precisely so nothing else is reading this variable meanwhile.
+        unsafe { std::env::remove_var("RN_SITE__ID_KEY_FILE") };
+        assert!(id_key_file().expect("unset is not an error").is_none());
+
+        unsafe { std::env::set_var("RN_SITE__ID_KEY_FILE", "   ") };
+        assert!(id_key_file().expect("empty is not an error").is_none());
+
+        unsafe { std::env::set_var("RN_SITE__ID_KEY_FILE", "/nowhere/rn-site/id.key") };
+        assert!(id_key_file().is_err(), "a named path that cannot be read");
+
+        let dir = std::env::temp_dir().join(format!("rn-site-id-key-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).expect("a temporary directory");
+        let path = dir.join("id.key");
+        let key = "0123456789abcdef0123456789abcdef";
+        std::fs::write(&path, format!("{key}\n")).expect("the key file");
+
+        unsafe { std::env::set_var("RN_SITE__ID_KEY_FILE", &path) };
+        let read = id_key_file().expect("the file reads");
+        unsafe { std::env::remove_var("RN_SITE__ID_KEY_FILE") };
+        std::fs::remove_dir_all(&dir).ok();
+
+        assert_eq!(read.as_deref(), Some(key), "the newline is not the key");
+        assert!(is_id_key(read.as_deref().unwrap()), "and it validates");
     }
 
     #[test]

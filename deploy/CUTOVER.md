@@ -133,19 +133,41 @@ revalidation contract, one real module per bundle, and 404 on `/api/realtime`,
 
 Then unfreeze `deploy`.
 
-## 6. The first operator — open
+## 6. The first operator
 
 The formed cluster has no platform operator, and nobody can grant one through
 the product: `platform:* #operator @person` is the one grant with no actor.
+
 `rn-site bootstrap-operator <email>` writes it, but it opens the database
 directly and hiqlite holds an exclusive lock on its data directory — which is
-why `tools/seed.sh` stops the dev server before running it. There is no
-equivalent against a live voter, so **this step has no runbook yet**. Settle it
-before the cutover, not during: either a path that reaches a running node, or a
-documented single-node window on nexus before the other two voters join.
+why `tools/seed.sh` stops the dev server before running it. There is no moment
+on a formed cluster at which that is possible: every voter is serving, and
+stopping one to take a grant is stopping the deployment to take a grant.
 
-Registering the first person is ordinary: the real `/auth` form, through the
-public site.
+So the running process takes it instead. Set the address on **one** node:
+
+```sh
+# On nexus only, in /data/apps/rn-site/deploy/node.env
+RN_SITE__BOOTSTRAP_OPERATOR_EMAIL=<your address>
+```
+
+then restart that node's container. Nothing happens yet: the address names no
+person until somebody registers it.
+
+Register through the real `/auth` form on the public site, with that address.
+The node that holds the variable sees the `Registered` event on the change feed
+— its own, or another voter's — and writes the relation. It logs one line:
+
+```
+the configured address is now this deployment's platform operator
+```
+
+Confirm by loading `/platform`; it is a 404 to everybody else, so seeing the
+Parties list *is* the confirmation.
+
+The kernel refuses a second operator, so leaving the variable set is safe and
+re-running the step does nothing. Remove it at your leisure; from here,
+platform administration is `SetRole` and has an actor on every row.
 
 ## Rolling back
 

@@ -44,6 +44,7 @@ fn prod() -> AppConfig {
         addr: "0.0.0.0:3160".parse().expect("a bind address"),
         static_dir: PathBuf::from("/app/static"),
         id_key: Some("000102030405060708090a0b0c0d0e0f".to_string()),
+        bootstrap_operator_email: None,
     }
 }
 
@@ -238,6 +239,7 @@ fn dev_needs_no_provisioning_at_all() {
         addr: "127.0.0.1:3004".parse().expect("a loopback address"),
         static_dir: PathBuf::from("static"),
         id_key: None,
+        bootstrap_operator_email: None,
     };
     let topology = cluster::from_env(&config, "127.0.0.1:8100", "127.0.0.1:8200")
         .expect("the built-in dev topology");
