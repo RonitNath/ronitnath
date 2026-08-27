@@ -7,14 +7,24 @@
 {% endblock %}
 
 {% block body %}
-{#- The link says what it grants and nothing about who minted it or who else
-    holds one. A grant lands on a person, so a reader who is not one yet is
-    sent to sign in and comes back here. -#}
+{#- The link says what it grants — which container, at what role, from whom,
+    and for how much longer — and nothing about who else holds one. A grant
+    lands on a person, so a reader who is not one yet is sent to sign in and
+    comes back here. -#}
 <main class="page">
   <h1>Ronit Nath</h1>
 
   <div class="claim">
     <p class="grant">{{ grant }}</p>
+
+    {% if !facts.is_empty() %}
+    <dl class="facts">
+      {% for fact in facts %}
+      <dt>{{ fact.label }}</dt>
+      <dd>{{ fact.value }}</dd>
+      {% endfor %}
+    </dl>
+    {% endif %}
 
     {% if signed_in %}
     <form method="post" action="/links/{{ token }}/claim">

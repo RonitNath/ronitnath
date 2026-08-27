@@ -29,10 +29,9 @@ use axum::http::{HeaderMap, StatusCode, header};
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use rn_api::commands::{ClaimLink, VerifyEmail};
-use rn_kernel::Principal;
-use rn_kernel::bind;
 use rn_kernel::domain::{LinkRow, Token};
 use rn_kernel::store::Reads;
+use rn_kernel::{Principal, Timestamp, bind, invite};
 
 use crate::api::cmd::{self, CommandError};
 use crate::api::decline;
@@ -114,31 +113,106 @@ pub fn router() -> Router<LinkState> {
 
 /// What a link grants, in the vocabulary this cut has.
 ///
-/// One purpose exists today — proving an address — because
-/// `link.verifies_factor_id` is the only grant column migration 1 carries. K2
-/// replaces it with a relation row (`group:X #member @link:T`), at which point
-/// this reads the relation and gains its other arms.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// Two purposes exist, and they are reached differently. Proving an address is
+/// a column on the link (`link.verifies_factor_id`), because there is no
+/// relation that expresses "this token verifies that factor". An invitation is
+/// a relation row — `group:X #member @link:T` — so naming one means reading
+/// the relation store, which is why this is a query and not a `match` on the
+/// row the extractor already has.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Grant {
     /// Proving an email address belongs to the identity that claims it.
     Email,
-    /// A grant this build cannot name.
+    /// Joining a container at a role, described well enough to be accepted.
+    Invitation(invite::Description),
+    /// A link that carries neither: no factor to verify and no relation row.
+    /// Nothing mints one, and a page that made something up about it would be
+    /// worse than a page that says it cannot.
     Unknown,
 }
 
 impl Grant {
-    fn of(link: &LinkRow) -> Self {
-        match link.verifies_factor_id {
-            Some(_) => Self::Email,
-            None => Self::Unknown,
+    /// One extra indexed read, on a page that is one link and one button.
+    async fn of(reads: &impl Reads, link: &LinkRow) -> Self {
+        if link.verifies_factor_id.is_some() {
+            return Self::Email;
+        }
+        match invite::describe(reads, link.id).await {
+            Ok(Some(description)) => Self::Invitation(description),
+            Ok(None) => Self::Unknown,
+            Err(error) => {
+                // The page still opens; it just cannot say what it opens on.
+                tracing::warn!(%error, "an invitation could not be described");
+                Self::Unknown
+            }
         }
     }
 
-    const fn label(self) -> &'static str {
+    /// The heading: what accepting this does.
+    fn headline(&self) -> String {
         match self {
-            Self::Email => "Confirm an email address",
-            Self::Unknown => "An invitation",
+            Self::Email => "Confirm an email address".to_owned(),
+            Self::Invitation(what) => format!("Join {}", what.container),
+            Self::Unknown => "An invitation".to_owned(),
         }
+    }
+
+    /// The facts under it. Empty for a verification link, which grants nothing
+    /// to describe — its wording is the whole of what it says.
+    fn facts(&self, now: Timestamp) -> Vec<Fact> {
+        let Self::Invitation(what) = self else {
+            return Vec::new();
+        };
+        let container = match what.container_kind.as_str() {
+            "organization" => "Organization",
+            "group" => "Group",
+            // The statement only joins those two kinds, so this is
+            // unreachable; naming it beats an empty label if it ever is not.
+            _ => "Container",
+        };
+        let mut facts = vec![
+            Fact::new(container, what.container.clone()),
+            Fact::new("Role", what.role.clone()),
+        ];
+        if let Some(minted_by) = &what.minted_by {
+            facts.push(Fact::new("From", minted_by.clone()));
+        }
+        facts.push(Fact::new("Expires", within(what.expires_at - now)));
+        facts
+    }
+}
+
+/// One label and one value, under the heading.
+pub struct Fact {
+    /// What it is.
+    pub label: &'static str,
+    /// What it says.
+    pub value: String,
+}
+
+impl Fact {
+    fn new(label: &'static str, value: String) -> Self {
+        Self { label, value }
+    }
+}
+
+/// How long is left, in the largest unit that is still a whole number of them.
+///
+/// A duration and not a date: the page is rendered by the server and read in a
+/// timezone the server does not know, and "in 29 days" is true everywhere
+/// while a printed timestamp is true in one place.
+fn within(seconds: Timestamp) -> String {
+    const MINUTE: Timestamp = 60;
+    const HOUR: Timestamp = 60 * MINUTE;
+    const DAY: Timestamp = 24 * HOUR;
+    let plural = |count: Timestamp, unit: &str| {
+        format!("in {count} {unit}{}", if count == 1 { "" } else { "s" })
+    };
+    match seconds {
+        i64::MIN..=0 => "now".to_owned(),
+        1..HOUR => plural((seconds / MINUTE).max(1), "minute"),
+        HOUR..DAY => plural(seconds / HOUR, "hour"),
+        _ => plural(seconds / DAY, "day"),
     }
 }
 
@@ -150,7 +224,10 @@ struct ClaimPage {
     /// The token, so the form can post it back.
     token: String,
     /// What the link grants, in words.
-    grant: &'static str,
+    grant: String,
+    /// The container, the role, who minted it and when it runs out — empty for
+    /// a verification link, which has none of them.
+    facts: Vec<Fact>,
     /// Whether the reader is somebody yet.
     signed_in: bool,
     /// Where a sign-in should return to.
@@ -160,12 +237,19 @@ struct ClaimPage {
 }
 
 impl ClaimPage {
-    fn new(state: &AppState, headers: &HeaderMap, bearer: &Bearer, visitor: &Visitor) -> Self {
+    fn new(
+        state: &AppState,
+        headers: &HeaderMap,
+        bearer: &Bearer,
+        visitor: &Visitor,
+        grant: &Grant,
+    ) -> Self {
         Self {
             theme: theme_for(headers).as_str(),
             version: state.version.to_string(),
             token: bearer.token.clone(),
-            grant: Grant::of(&bearer.link).label(),
+            grant: grant.headline(),
+            facts: grant.facts(state.store.clock().now()),
             signed_in: matches!(visitor.principal, Principal::Member { .. }),
             next: format!("/links/{}", bearer.token),
             error: String::new(),
@@ -179,7 +263,8 @@ async fn page(
     visitor: Visitor,
     headers: HeaderMap,
 ) -> Response {
-    ClaimPage::new(&state.0, &headers, &bearer, &visitor).into_response()
+    let grant = Grant::of(&state.0.store.reads(), &bearer.link).await;
+    ClaimPage::new(&state.0, &headers, &bearer, &visitor, &grant).into_response()
 }
 
 /// Claim the link, as whoever the cookie says is holding it.
@@ -205,7 +290,7 @@ async fn claim(
             .into_response();
     };
 
-    let outcome = match Grant::of(&bearer.link) {
+    let outcome = match Grant::of(&state.0.store.reads(), &bearer.link).await {
         // The one grant this cut mints. `VerifyEmail` consumes the token and
         // marks the link claimed in the same transaction.
         Grant::Email => {
@@ -220,8 +305,11 @@ async fn claim(
         }
         // An invitation. The bearer opened the page; `ClaimLink` reads the
         // token again itself, because what the token grants and who the grant
-        // lands on are two separate facts and the command needs both.
-        Grant::Unknown => {
+        // lands on are two separate facts and the command needs both. A link
+        // this build could not describe goes the same way and is declined
+        // there: the command is the authority on what a token is worth, not
+        // the page.
+        Grant::Invitation(_) | Grant::Unknown => {
             cmd::invoke(
                 &state.0,
                 visitor.principal,
@@ -254,19 +342,74 @@ mod tests {
         }
     }
 
+    fn invitation() -> Grant {
+        Grant::Invitation(invite::Description {
+            container: "Isoastra".to_owned(),
+            container_kind: "organization".to_owned(),
+            role: "admin".to_owned(),
+            minted_by: Some("Ronit Nath".to_owned()),
+            expires_at: 1_000 + 3 * 24 * 60 * 60,
+        })
+    }
+
     #[test]
-    fn a_verification_link_says_what_it_proves() {
-        assert_eq!(Grant::of(&link(Some(9))), Grant::Email);
+    fn a_verification_link_says_what_it_proves_and_nothing_else() {
+        assert_eq!(Grant::Email.headline(), "Confirm an email address");
+        // The wording R1 found correct stays exactly as it was, and a
+        // verification link has no container, role or minter to list.
+        assert!(Grant::Email.facts(1_000).is_empty());
+    }
+
+    #[test]
+    fn an_invitation_names_the_container_the_role_the_minter_and_the_expiry() {
+        let grant = invitation();
+        assert_eq!(grant.headline(), "Join Isoastra");
+        let said: Vec<(&str, String)> = grant
+            .facts(1_000)
+            .into_iter()
+            .map(|fact| (fact.label, fact.value))
+            .collect();
         assert_eq!(
-            Grant::of(&link(Some(9))).label(),
-            "Confirm an email address"
+            said,
+            vec![
+                ("Organization", "Isoastra".to_owned()),
+                ("Role", "admin".to_owned()),
+                ("From", "Ronit Nath".to_owned()),
+                ("Expires", "in 3 days".to_owned()),
+            ]
         );
     }
 
     #[test]
+    fn a_grant_with_no_minter_still_names_what_it_grants() {
+        let Grant::Invitation(mut what) = invitation() else {
+            unreachable!()
+        };
+        what.minted_by = None;
+        what.container_kind = "group".to_owned();
+        let grant = Grant::Invitation(what);
+        let labels: Vec<&str> = grant.facts(1_000).iter().map(|fact| fact.label).collect();
+        assert_eq!(labels, vec!["Group", "Role", "Expires"]);
+    }
+
+    #[test]
     fn a_grant_this_build_cannot_name_is_not_described_as_one_it_can() {
-        assert_eq!(Grant::of(&link(None)), Grant::Unknown);
-        assert_ne!(Grant::Unknown.label(), Grant::Email.label());
+        assert_eq!(Grant::Unknown.headline(), "An invitation");
+        assert!(Grant::Unknown.facts(1_000).is_empty());
+        assert_ne!(Grant::Unknown.headline(), Grant::Email.headline());
+    }
+
+    #[test]
+    fn how_long_is_left_is_said_in_whole_units_of_the_largest_that_fits() {
+        assert_eq!(within(0), "now");
+        assert_eq!(within(-5), "now");
+        assert_eq!(within(30), "in 1 minute");
+        assert_eq!(within(60), "in 1 minute");
+        assert_eq!(within(59 * 60), "in 59 minutes");
+        assert_eq!(within(60 * 60), "in 1 hour");
+        assert_eq!(within(23 * 60 * 60), "in 23 hours");
+        assert_eq!(within(24 * 60 * 60), "in 1 day");
+        assert_eq!(within(30 * 24 * 60 * 60), "in 30 days");
     }
 
     #[test]

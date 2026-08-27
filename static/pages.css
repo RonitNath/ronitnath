@@ -92,6 +92,26 @@ a.commit:hover {
     color: var(--fg);
 }
 
+/* Label and value sit on one tight pair of columns rather than across the
+   panel: four short rows, so a stretched gap would separate things that are
+   read together. */
+.claim .facts {
+    display: grid;
+    grid-template-columns: auto auto;
+    column-gap: 1.5rem;
+    row-gap: 0.35rem;
+    margin: 0;
+}
+
+.claim .facts dt {
+    color: var(--fg-muted);
+}
+
+.claim .facts dd {
+    margin: 0;
+    color: var(--fg);
+}
+
 .leave {
     font-size: var(--text-1);
 }

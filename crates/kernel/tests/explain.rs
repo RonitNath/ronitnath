@@ -222,3 +222,18 @@ async fn explain_minted_invitations_rides_the_granted_by_index() {
     .await;
     rides(&plan, "relation_granted_by_idx");
 }
+
+#[tokio::test]
+async fn explain_describing_an_invitation_seeks_the_link_and_its_grant() {
+    let harness = Local::new();
+    harness
+        .register("Ronit", "plan-describe@example.test")
+        .await
+        .expect("registers");
+    // The claim page runs this for every reader who opens a link, signed in or
+    // not, which makes it as public as sign-in is. The link is a rowid seek and
+    // the grant rides the subject index; the two display-name joins are primary
+    // keys.
+    let plan = plan(&harness, rn_kernel::invite::DESCRIBE_SQL, bind![1_i64]).await;
+    rides(&plan, "relation_subject");
+}

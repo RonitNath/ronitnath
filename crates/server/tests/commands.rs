@@ -111,6 +111,12 @@ fn id_of(result: &Value, field: &str, prefix: &str) -> String {
     id.to_owned()
 }
 
+/// Three days and a minute from now: far enough that the page says "in 3 days"
+/// however long the test takes, and inside the invitation cap.
+fn in_three_days() -> i64 {
+    soon() - 3600 + 3 * 24 * 60 * 60 + 60
+}
+
 /// An hour from now, which is inside the invitation cap.
 fn soon() -> i64 {
     std::time::SystemTime::now()
@@ -285,6 +291,79 @@ fn an_organization_is_founded_grown_and_left_over_http() {
             server.get(&format!("/links/{token}")).await.status_code(),
             StatusCode::NOT_FOUND
         );
+    });
+}
+
+#[test]
+fn the_claim_page_names_the_invitation_it_opens_on() {
+    harness::run(async {
+        let state = state().await;
+        let server = harness::server(&state);
+        let chair = harness::register(&state, "Chair", "cmd-claimpage@example.invalid").await;
+        let chair = Caller::new(&server, &chair.token);
+        let mut at = 0;
+
+        let organization = chair
+            .run(
+                &mut at,
+                "create-organization",
+                json!({ "display_name": "Claim Page Works" }),
+            )
+            .await;
+        let org = id_of(&organization, "organization", "o_");
+        let created = chair
+            .run(
+                &mut at,
+                "create-group",
+                json!({ "display_name": "Claim Page Council", "organization": org }),
+            )
+            .await;
+        let group = id_of(&created, "group", "g_");
+
+        // The one grant this cut mints, read by the reader it was sent to —
+        // anonymous, because an invitation arrives before an account does.
+        for (container, kind, display, role) in [
+            (&org, "Organization", "Claim Page Works", "admin"),
+            (&group, "Group", "Claim Page Council", "member"),
+        ] {
+            let invited = chair
+                .run(
+                    &mut at,
+                    "invite",
+                    json!({ "group": container, "role": role, "expires_at": in_three_days() }),
+                )
+                .await;
+            let token = invited["token"].as_str().expect("a link token");
+
+            let page = server.get(&format!("/links/{token}")).await;
+            page.assert_status_ok();
+            let body = page.text();
+
+            assert!(
+                body.contains(&format!("Join {display}")),
+                "the page does not name what it opens on: {body}"
+            );
+            for said in [kind, display, role, "Chair", "in 3 days"] {
+                assert!(body.contains(said), "the page does not say {said}: {body}");
+            }
+            // The wording R1 read as wrong is gone, and no id leaked in its
+            // place: a claim page is for a reader, not for an operator.
+            assert!(!body.contains("An invitation"), "{body}");
+            assert!(!body.contains(container.as_str()), "the page prints an id");
+        }
+
+        // A verification link keeps the wording it had, and grows no facts it
+        // does not have.
+        let somebody =
+            harness::register(&state, "Verifier", "cmd-claimverify@example.invalid").await;
+        let token = harness::mint_link(&state, somebody.identity).await;
+        let body = server.get(&format!("/links/{token}")).await.text();
+        assert!(body.contains("Confirm an email address"), "{body}");
+        assert!(
+            !body.contains("Role"),
+            "a verification link has no role: {body}"
+        );
+        assert!(!body.contains("Expires"), "{body}");
     });
 }
 
