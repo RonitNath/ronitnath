@@ -59,6 +59,7 @@ impl FromRow for Invitation {
                 expires_at: row.int("expires_at")?,
                 claimed_by_identity_id: row.id_opt("claimed_by_identity_id")?,
                 verifies_factor_id: None,
+                suspended_at: row.int_opt("suspended_at")?,
             },
             container,
             role: match Relation::parse(&role) {
@@ -84,7 +85,7 @@ impl FromRow for Invitation {
 /// Both are seeks, which matters because this runs on a public page anybody
 /// can post a guess to.
 pub const LOOKUP_SQL: &str = "SELECT l.id, l.expires_at, l.claimed_by_identity_id, \
-     rel.object_id AS container_id, rel.relation AS role \
+     l.suspended_at, rel.object_id AS container_id, rel.relation AS role \
      FROM link l \
      JOIN relation rel ON rel.subject_kind = 'link' AND rel.subject_id = l.id \
      WHERE l.token_hash = $1 AND rel.object_kind IN ('group', 'organization')";

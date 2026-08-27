@@ -102,6 +102,11 @@ pub async fn invite<S: Sql, F: Feed>(ctx: &Ctx<'_, S, F>, args: &Invite) -> Outc
                 link.column("id"),
             ],
         );
+        batch.push(crate::audit::object_stmt(
+            ctx.key,
+            crate::audit::object::PARTY,
+            object.id,
+        ));
         Ok(batch)
     })
     .await?;

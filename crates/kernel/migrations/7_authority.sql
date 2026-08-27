@@ -105,3 +105,12 @@ CREATE INDEX audit_acting_as_idx ON audit (acting_as, id);
 -- And the time range, which is the one filter a reader reaches for without
 -- naming anybody at all.
 CREATE INDEX audit_at_idx ON audit (at);
+
+-- --------------------------------------------------- oidc_consent by person -
+-- The consent table's primary key is `(client_id, person_id)`, which answers
+-- "has this person consented to *this* client" — the question the OpenID flow
+-- asks. The disable cascade asks the other one, "everything this person has
+-- consented to", and with no index on the second column that is a walk of
+-- every consent in the deployment on the confirm control an operator is
+-- waiting on.
+CREATE INDEX oidc_consent_person_idx ON oidc_consent (person_id);

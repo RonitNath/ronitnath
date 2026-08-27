@@ -46,6 +46,15 @@ pub async fn enable<S: Sql, F: Feed>(ctx: &Ctx<'_, S, F>, args: &Enable) -> Outc
                 target
             ],
         );
+        batch.push(crate::audit::object_stmt(
+            ctx.key,
+            crate::audit::object::PARTY,
+            target.get(),
+        ));
+        // The other half of the cascade being reversible: the invitations the
+        // disable put to sleep wake up. Not the ones `RevokeLink` deleted —
+        // those are gone for good, which is why suspension is a column.
+        batch.any(crate::cascade::RESUME_LINKS_SQL, bind![target]);
         Ok(batch)
     })
     .await?;

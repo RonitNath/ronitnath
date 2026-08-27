@@ -69,6 +69,16 @@ pub async fn remove_factor<S: Sql, F: Feed>(
                 target
             ],
         );
+        batch.push(crate::audit::object_stmt(
+            ctx.key,
+            crate::audit::object::IDENTITY,
+            identity.get(),
+        ));
+        batch.push(crate::audit::object_stmt(
+            ctx.key,
+            crate::audit::object::FACTOR,
+            target.get(),
+        ));
         Ok(batch)
     })
     .await?;

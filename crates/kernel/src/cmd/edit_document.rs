@@ -106,6 +106,11 @@ pub async fn edit_document<S: Sql, F: Feed>(
                 next
             ],
         );
+        batch.push(crate::audit::object_stmt(
+            ctx.key,
+            crate::audit::object::RESOURCE,
+            document_id.get(),
+        ));
         Ok(batch)
     })
     .await?;

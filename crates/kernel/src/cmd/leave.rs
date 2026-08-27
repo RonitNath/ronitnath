@@ -64,6 +64,16 @@ pub async fn leave<S: Sql, F: Feed>(ctx: &Ctx<'_, S, F>, args: &Leave) -> Outcom
                 person
             ],
         );
+        batch.push(crate::audit::object_stmt(
+            ctx.key,
+            crate::audit::object::PARTY,
+            container.get(),
+        ));
+        batch.push(crate::audit::object_stmt(
+            ctx.key,
+            crate::audit::object::PARTY,
+            person.get(),
+        ));
         Ok(batch)
     })
     .await?;

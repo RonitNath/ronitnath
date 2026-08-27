@@ -234,6 +234,11 @@ pub async fn update_client<S: Sql, F: Feed>(
                 Value::from(id),
             ],
         );
+        batch.push(crate::audit::object_stmt(
+            ctx.key,
+            crate::audit::object::CLIENT,
+            id.get(),
+        ));
         Ok(batch)
     })
     .await?;
@@ -282,6 +287,14 @@ pub async fn rotate_client_secret<S: Sql, F: Feed>(
                 Value::from(client.id),
             ],
         );
+        // After the audit row and never before it: this statement finds that
+        // row by its key, and a `changes() > 0` guard in front of it would be
+        // reading *this* insert's count instead of the one it means.
+        batch.push(crate::audit::object_stmt(
+            ctx.key,
+            crate::audit::object::CLIENT,
+            client.id.get(),
+        ));
         Ok(batch)
     })
     .await?;
@@ -330,6 +343,11 @@ pub async fn delete_client<S: Sql, F: Feed>(
                 Value::from(client.id),
             ],
         );
+        batch.push(crate::audit::object_stmt(
+            ctx.key,
+            crate::audit::object::CLIENT,
+            client.id.get(),
+        ));
         batch.any(
             registry::REVOKE_CLIENT_TOKENS_SQL,
             vec![Value::from(now), Value::from(client.id)],

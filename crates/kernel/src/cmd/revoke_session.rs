@@ -87,6 +87,16 @@ pub async fn revoke_session<S: Sql, F: Feed>(
                 clients.as_str()
             ],
         );
+        batch.push(crate::audit::object_stmt(
+            ctx.key,
+            crate::audit::object::SESSION,
+            target.get(),
+        ));
+        batch.push(crate::audit::object_stmt(
+            ctx.key,
+            crate::audit::object::IDENTITY,
+            whose.get(),
+        ));
         Ok(batch)
     })
     .await?;

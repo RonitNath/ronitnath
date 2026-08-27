@@ -108,6 +108,7 @@ async fn every_named_index_exists() {
         "identity_person_idx",
         "identity_source_idx",
         "match_candidate_a_idx",
+        "oidc_consent_person_idx",
         "match_candidate_b_idx",
         "match_candidate_pair_idx",
         "match_candidate_queue_idx",

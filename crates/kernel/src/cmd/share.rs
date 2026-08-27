@@ -107,6 +107,16 @@ pub async fn share<S: Sql, F: Feed>(ctx: &Ctx<'_, S, F>, args: &Share) -> Outcom
                 Value::from(relation.as_str()),
             ],
         );
+        batch.push(crate::audit::object_stmt(
+            ctx.key,
+            crate::audit::object::RESOURCE,
+            object.id,
+        ));
+        batch.push(crate::audit::object_stmt(
+            ctx.key,
+            crate::audit::object::PARTY,
+            subject.id,
+        ));
         Ok(batch)
     })
     .await?;

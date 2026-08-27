@@ -53,7 +53,12 @@ impl FromRef<LinkState> for AppState {
 
 /// The lookup a token resolves through. `token_hash` is UNIQUE, so this is a
 /// seek and a forged token costs one index probe.
-const BY_TOKEN: &str = "SELECT id, expires_at, claimed_by_identity_id, verifies_factor_id \
+/// The columns are [`LinkRow::COLUMNS`] spelled out — `&'static str` cannot be
+/// concatenated in a const — and `suspended_at` is one of them, because
+/// `is_claimable` reads it: a link whose minter this deployment has disabled
+/// answers the uniform decline here, exactly as an expired one does.
+const BY_TOKEN: &str = "SELECT id, expires_at, claimed_by_identity_id, verifies_factor_id, \
+                        suspended_at \
                         FROM link WHERE token_hash = $1";
 
 /// The holder of a link token.
@@ -339,6 +344,7 @@ mod tests {
             expires_at: 2_000_000_000,
             claimed_by_identity_id: None,
             verifies_factor_id: verifies.map(Id::new),
+            suspended_at: None,
         }
     }
 

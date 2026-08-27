@@ -93,6 +93,16 @@ pub async fn claim_link<S: Sql, F: Feed>(
                 person
             ],
         );
+        batch.push(crate::audit::object_stmt(
+            ctx.key,
+            crate::audit::object::PARTY,
+            invitation.container.get(),
+        ));
+        batch.push(crate::audit::object_stmt(
+            ctx.key,
+            crate::audit::object::LINK,
+            invitation.id().get(),
+        ));
         Ok(batch)
     })
     .await?;

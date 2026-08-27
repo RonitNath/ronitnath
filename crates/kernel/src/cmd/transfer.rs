@@ -132,6 +132,17 @@ pub async fn transfer<S: Sql, F: Feed>(ctx: &Ctx<'_, S, F>, args: &Transfer) -> 
                 to
             ],
         );
+        batch.push(crate::audit::object_stmt(
+            ctx.key,
+            crate::audit::object::RESOURCE,
+            resource_id.get(),
+        ));
+        batch.push(crate::audit::object_stmt(
+            ctx.key,
+            crate::audit::object::PARTY,
+            to.get(),
+        ));
+
         ownership(&mut batch, object, resource_id, to, to_kind, identity, now);
         if party.is_some() {
             memberships(&mut batch, object.id, from, to, now);

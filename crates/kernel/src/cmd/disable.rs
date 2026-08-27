@@ -34,7 +34,7 @@ const AUDIT: &str = "INSERT INTO audit \
                      (key, command, actor_identity_id, acting_as, at, request_digest, payload) \
                      SELECT $1, 'disable', $2, $3, $4, $5, \
                             json_object('event', 'disable', 'party', $6, 'reason', $7, \
-                                        'clients', json($8)) \
+                                        'clients', json($8), 'counts', json($9)) \
                      WHERE changes() > 0";
 
 /// Every session of every identity resolved onto the party goes with it — a
@@ -66,6 +66,12 @@ pub async fn disable<S: Sql, F: Feed>(ctx: &Ctx<'_, S, F>, args: &Disable) -> Ou
     // they are" means.
     let targets = crate::oidc::token::logout_targets_of_person(&ctx.store.reads(), target).await?;
     let clients = crate::oidc::token::target_ids_json(&targets);
+    // What is about to go, counted the same way the confirm control counted it
+    // — one function, so the preview and the record cannot describe different
+    // cascades (requirement C9.3). Where the two differ the row is the truth
+    // and the preview said *at the time of asking*.
+    let counts = crate::cascade::counts(&ctx.store.reads(), target).await?;
+    let counts = counts.as_json();
 
     let Applied { committed, .. } = run(ctx, args, async || {
         let mut batch = Batch::new();
@@ -80,15 +86,25 @@ pub async fn disable<S: Sql, F: Feed>(ctx: &Ctx<'_, S, F>, args: &Disable) -> Ou
                 crate::audit::digest_of(args),
                 target,
                 args.reason.as_str(),
-                clients.as_str()
+                clients.as_str(),
+                counts.as_str()
             ],
         );
+        batch.push(crate::audit::object_stmt(
+            ctx.key,
+            crate::audit::object::PARTY,
+            target.get(),
+        ));
         // The tokens go before the sessions they reference, and the codes with
         // them: `oidc_token.session_id` points at a row that is about to stop
         // existing.
         batch.any(crate::oidc::token::DELETE_PERSON_TOKENS_SQL, bind![target]);
         batch.any(crate::oidc::token::DELETE_PERSON_CODES_SQL, bind![target]);
         batch.any(SESSIONS, bind![target]);
+        // Finding F3: a disable used to delete sessions, tokens and codes and
+        // leave the party's outstanding invitations working. They go to sleep
+        // rather than away, because `Enable` has to put them back.
+        batch.any(crate::cascade::SUSPEND_LINKS_SQL, bind![now, target]);
         Ok(batch)
     })
     .await?;

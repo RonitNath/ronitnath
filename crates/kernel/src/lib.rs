@@ -29,6 +29,7 @@
 
 pub mod audit;
 pub mod authority;
+pub mod cascade;
 pub mod cmd;
 /// The developer sign-in bypass, in debug builds only.
 ///

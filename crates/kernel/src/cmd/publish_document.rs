@@ -69,6 +69,11 @@ pub async fn publish_document<S: Sql, F: Feed>(
         // Already `published` after the first time, and a resource that was
         // deleted is not brought back — hence the status in the guard.
         batch.any(document::PUBLISH_RESOURCE_SQL, bind![document_id]);
+        batch.push(crate::audit::object_stmt(
+            ctx.key,
+            crate::audit::object::RESOURCE,
+            document_id.get(),
+        ));
         Ok(batch)
     })
     .await?;

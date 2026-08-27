@@ -107,6 +107,11 @@ pub async fn add_factor<S: Sql, F: Feed>(
                 Value::from(<FactorKind as crate::domain::Vocabulary>::as_str(kind)),
             ],
         );
+        batch.push(crate::audit::object_stmt(
+            ctx.key,
+            crate::audit::object::IDENTITY,
+            identity.get(),
+        ));
         Ok(batch)
     })
     .await?;

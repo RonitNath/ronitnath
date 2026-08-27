@@ -116,6 +116,11 @@ pub async fn create_document<S: Sql, F: Feed>(
                 Value::from(owner),
             ],
         );
+        batch.push(crate::audit::object_stmt(
+            ctx.key,
+            crate::audit::object::PARTY,
+            owner.get(),
+        ));
         Ok(batch)
     })
     .await?;

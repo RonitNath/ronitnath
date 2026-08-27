@@ -67,9 +67,10 @@ pub use impersonate::{end_impersonation, sign_in_as};
 pub use invite::invite;
 pub use leave::leave;
 pub use oidc::{
-    Authorized, Granted, Issued, Registered, authorize, client_credentials, delete_client,
-    end_session, exchange_code, refresh_token, register_client, retire_key, revoke_consent,
-    revoke_token, rotate_client_secret, rotate_signing_key, set_handle, update_client,
+    Authorized, Granted, Issued, RETIRE_ALIVE_SQL, Registered, authorize, client_credentials,
+    delete_client, end_session, exchange_code, refresh_token, register_client, retire_key,
+    revoke_consent, revoke_token, rotate_client_secret, rotate_signing_key, set_handle,
+    update_client,
 };
 pub use operator::{grant_operator, revoke_operator};
 pub use publish_document::publish_document;

@@ -103,6 +103,16 @@ pub async fn revoke_link<S: Sql, F: Feed>(
                 link
             ],
         );
+        batch.push(crate::audit::object_stmt(
+            ctx.key,
+            crate::audit::object::LINK,
+            link.get(),
+        ));
+        batch.push(crate::audit::object_stmt(
+            ctx.key,
+            crate::audit::object::PARTY,
+            container.get(),
+        ));
         Ok(batch)
     })
     .await?;

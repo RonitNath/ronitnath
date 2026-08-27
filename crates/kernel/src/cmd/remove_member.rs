@@ -83,6 +83,16 @@ pub async fn remove_member<S: Sql, F: Feed>(
                 target
             ],
         );
+        batch.push(crate::audit::object_stmt(
+            ctx.key,
+            crate::audit::object::PARTY,
+            container.get(),
+        ));
+        batch.push(crate::audit::object_stmt(
+            ctx.key,
+            crate::audit::object::PARTY,
+            target.get(),
+        ));
         Ok(batch)
     })
     .await?;

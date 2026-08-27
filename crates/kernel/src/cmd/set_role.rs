@@ -84,6 +84,16 @@ pub async fn set_role<S: Sql, F: Feed>(ctx: &Ctx<'_, S, F>, args: &SetRole) -> O
                 target
             ],
         );
+        batch.push(crate::audit::object_stmt(
+            ctx.key,
+            crate::audit::object::PARTY,
+            container.get(),
+        ));
+        batch.push(crate::audit::object_stmt(
+            ctx.key,
+            crate::audit::object::PARTY,
+            target.get(),
+        ));
         Ok(batch)
     })
     .await?;
