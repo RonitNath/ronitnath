@@ -55,7 +55,6 @@ use crate::state::AppState;
 /// closes over the projection this process holds — the same `Arc` the feed
 /// consumer replaces, so a toggle is visible to a route that was mounted
 /// before the deployment had ever heard of it.
-#[must_use]
 pub fn router(state: &AppState) -> Router<AppState> {
     let mut router = Router::new();
     for (index, product) in product::CATALOGUE.iter().enumerate() {
