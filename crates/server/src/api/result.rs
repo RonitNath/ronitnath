@@ -33,7 +33,7 @@ use serde_json::{Value, json};
 
 /// The `party` row an event names whose kind the event does not fix.
 ///
-/// At most one per event, and only these four: everywhere else the command's
+/// At most one per event, and only these five: everywhere else the command's
 /// own semantics settle it — a merge is between persons, a claimant is the
 /// person who claimed, an organization's founder is a person.
 #[must_use]
@@ -47,6 +47,8 @@ pub const fn ambiguous_party(event: &Event) -> Option<i64> {
         Event::Transferred { to, .. } => Some(to.get()),
         // A member may be a person, an organization or a group.
         Event::RoleSet { party, .. } => Some(party.get()),
+        // Any party may be disabled, and the four kinds share no tag.
+        Event::PartyDisabled { party } | Event::PartyEnabled { party } => Some(party.get()),
         _ => None,
     }
 }
@@ -70,8 +72,8 @@ pub fn result_of(event: &Event, key: &IdKey, party: Option<PublicId>) -> Value {
         Event::FactorAdded { factor, .. }
         | Event::FactorRemoved { factor, .. }
         | Event::EmailVerified { factor, .. } => json!({ "factor": factor.public(key) }),
-        Event::PartyDisabled { party } | Event::PartyEnabled { party } => {
-            json!({ "party": party.public(key) })
+        Event::PartyDisabled { .. } | Event::PartyEnabled { .. } => {
+            json!({ "party": ambiguous() })
         }
 
         // --- merge --------------------------------------------------------
