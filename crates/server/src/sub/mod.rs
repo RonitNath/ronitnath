@@ -23,6 +23,7 @@ pub mod invalidate;
 pub mod limits;
 pub mod outbox;
 
+use std::collections::BTreeMap;
 use std::time::Duration;
 
 use axum::Router;
@@ -39,7 +40,7 @@ use serde_json::Value;
 pub use limits::{ConnectionGuard, Connections, Refused};
 pub use outbox::Outbox;
 
-use crate::api::query::{self, Named};
+use crate::api::query::{self, Named, Params, Row, Touch};
 use crate::auth::session::Session;
 use crate::state::AppState;
 
@@ -133,11 +134,36 @@ async fn flush(
     true
 }
 
+/// One subscribed query: which one, what it was asked for, and what this
+/// connection has actually sent.
+///
+/// The parameters are part of the subscription rather than of the query,
+/// because two subscriptions to `org-members` for two organizations are two
+/// different result sets — and re-reading one with the other's scope would
+/// answer the wrong tenant. `sent` is what a whole-set diff compares against
+/// (`query::set_ops`), so a `del` can only ever name a key this connection
+/// previously put.
+struct Subscribed {
+    named: Named,
+    params: Params,
+    sent: BTreeMap<String, serde_json::Value>,
+}
+
+impl Subscribed {
+    fn new(named: Named, params: Params) -> Self {
+        Self {
+            named,
+            params,
+            sent: BTreeMap::new(),
+        }
+    }
+}
+
 /// One connection's subscription state.
 struct Connection {
     state: AppState,
     principal: Principal,
-    queries: Vec<Named>,
+    queries: Vec<Subscribed>,
     cursor: Offset,
     outbox: Outbox,
     started: bool,
@@ -156,12 +182,25 @@ impl Connection {
             self.outbox.push(SubMessage::Resync);
         }
 
-        self.queries = request
-            .subscribe
-            .iter()
-            .filter_map(|reference| Named::parse(&reference.query))
+        let mut wanted: Vec<(Named, Params)> = Vec::new();
+        for reference in &request.subscribe {
+            let Some(named) = Named::parse(&reference.query) else {
+                continue;
+            };
+            let params = Params::from_pairs(
+                reference
+                    .params
+                    .iter()
+                    .map(|(name, value)| (name.as_str(), value.as_str())),
+            );
+            if !wanted.iter().any(|held| *held == (named, params.clone())) {
+                wanted.push((named, params));
+            }
+        }
+        self.queries = wanted
+            .into_iter()
+            .map(|(named, params)| Subscribed::new(named, params))
             .collect();
-        self.queries.dedup();
         self.cursor = request.from;
         self.started = true;
 
@@ -179,29 +218,48 @@ impl Connection {
     /// Send every subscribed query's whole result set, at the current head.
     async fn seed(&mut self) {
         let head = self.head().await;
-        for query in self.queries.clone() {
-            let rows = match query::read(
-                &self.state.store.reads(),
-                query,
-                &self.principal,
-                &query::Params::default(),
-            )
-            .await
-            {
-                Ok(rows) => rows,
-                Err(error) => {
-                    tracing::warn!(%error, query = query.as_str(), "a subscription seed failed");
-                    continue;
-                }
+        for index in 0..self.queries.len() {
+            let Some(rows) = self.rows(index).await else {
+                continue;
             };
+            let query = self.queries[index].named;
             let keys: Vec<String> = rows.iter().map(|row| row.key.clone()).collect();
+            let ops = query::ops(&keys, rows);
+            query::remember(&mut self.queries[index].sent, &ops);
             self.outbox.push(SubMessage::Diff {
                 offset: head,
                 query: query.as_str().to_owned(),
-                ops: query::ops(&keys, rows),
+                ops,
             });
         }
         self.cursor = head;
+    }
+
+    /// One subscribed query's rows, read with its own parameters.
+    ///
+    /// A read that declines is not an error to shout about: it is what an
+    /// organization the reader has just been removed from looks like.
+    async fn rows(&self, index: usize) -> Option<Vec<Row>> {
+        let subscribed = &self.queries[index];
+        match query::read(
+            &self.state.store.reads(),
+            subscribed.named,
+            &self.principal,
+            &subscribed.params,
+        )
+        .await
+        {
+            Ok(rows) => Some(rows),
+            Err(error) if error.is_decline() => Some(Vec::new()),
+            Err(error) => {
+                tracing::warn!(
+                    %error,
+                    query = subscribed.named.as_str(),
+                    "a subscription read failed"
+                );
+                None
+            }
+        }
     }
 
     /// A wake-up says there is something at or before `offset` to read.
@@ -220,29 +278,37 @@ impl Connection {
         };
         let key = self.state.ids();
         for committed in events {
-            for query in self.queries.clone() {
-                let keys = query.changed(&committed.event, &self.principal, key);
-                if keys.is_empty() {
+            for index in 0..self.queries.len() {
+                let subscribed = &self.queries[index];
+                let touch = subscribed.named.touched(
+                    &committed.event,
+                    &self.principal,
+                    key,
+                    &subscribed.params,
+                );
+                if touch == Touch::None {
                     continue;
                 }
-                let rows = match query::read(
-                    &self.state.store.reads(),
-                    query,
-                    &self.principal,
-                    &query::Params::default(),
-                )
-                .await
-                {
-                    Ok(rows) => rows,
-                    Err(error) => {
-                        tracing::warn!(%error, query = query.as_str(), "a diff could not be read");
-                        continue;
-                    }
+                let Some(rows) = self.rows(index).await else {
+                    continue;
                 };
+                let sent = &mut self.queries[index].sent;
+                let ops = match touch {
+                    Touch::Keys(keys) => {
+                        let ops = query::ops(&keys, rows);
+                        query::remember(sent, &ops);
+                        ops
+                    }
+                    Touch::Set => query::set_ops(sent, rows),
+                    Touch::None => Vec::new(),
+                };
+                if ops.is_empty() {
+                    continue;
+                }
                 self.outbox.push(SubMessage::Diff {
                     offset: committed.offset,
-                    query: query.as_str().to_owned(),
-                    ops: query::ops(&keys, rows),
+                    query: self.queries[index].named.as_str().to_owned(),
+                    ops,
                 });
             }
             self.cursor = self.cursor.max(committed.offset);

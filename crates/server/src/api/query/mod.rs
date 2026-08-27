@@ -19,16 +19,21 @@
 //! parameterised one: the statement a subscription runs is the statement the
 //! GET runs, which is what stops the two answering differently.
 
+pub mod org;
+pub mod org_feed;
+pub mod org_rows;
 mod rows;
 
 use std::collections::BTreeMap;
 
-use rn_api::DiffOp;
+use rn_api::{DiffOp, PublicId};
 use rn_kernel::domain::{FactorKind, Vocabulary};
 use rn_kernel::ids::IdKey;
 use rn_kernel::store::Reads;
 use rn_kernel::{Event, Outcome, Principal};
 use serde_json::Value;
+
+pub use org::Touch;
 
 /// How many audit rows one page carries.
 pub const AUDIT_PAGE: usize = 100;
@@ -58,10 +63,35 @@ pub enum Named {
     Identities,
     /// The acting identity's own audit rows, forward-paginated by offset.
     Audit,
+    /// One organization: who owns it, when it was founded, and its counts.
+    Org,
+    /// The memberships of an organization, or of one of its groups.
+    OrgMembers,
+    /// The groups an organization owns.
+    OrgGroups,
+    /// Whose contact details are visible inside one of its groups.
+    OrgContacts,
+    /// The documents an organization owns, and the grants on each.
+    OrgDocuments,
+    /// The invitation links minted into its containers.
+    OrgInvitations,
+    /// Its audit tail, forward-paginated by offset.
+    OrgAudit,
 }
 
 /// Every query name this build serves, for the route matrix.
-pub const ALL: &[Named] = &[Named::Sessions, Named::Identities, Named::Audit];
+pub const ALL: &[Named] = &[
+    Named::Sessions,
+    Named::Identities,
+    Named::Audit,
+    Named::Org,
+    Named::OrgMembers,
+    Named::OrgGroups,
+    Named::OrgContacts,
+    Named::OrgDocuments,
+    Named::OrgInvitations,
+    Named::OrgAudit,
+];
 
 impl Named {
     /// The `<name>` in `/api/q/<name>`.
@@ -71,6 +101,52 @@ impl Named {
             Self::Sessions => "sessions",
             Self::Identities => "identities",
             Self::Audit => "audit",
+            Self::Org => "org",
+            Self::OrgMembers => "org-members",
+            Self::OrgGroups => "org-groups",
+            Self::OrgContacts => "org-contacts",
+            Self::OrgDocuments => "org-documents",
+            Self::OrgInvitations => "org-invitations",
+            Self::OrgAudit => "org-audit",
+        }
+    }
+
+    /// Whether this query is scoped to an organization rather than to the
+    /// acting identity — which is what decides whether it needs the `org`
+    /// parameter and the membership re-read behind it.
+    #[must_use]
+    pub const fn is_org(self) -> bool {
+        matches!(
+            self,
+            Self::Org
+                | Self::OrgMembers
+                | Self::OrgGroups
+                | Self::OrgContacts
+                | Self::OrgDocuments
+                | Self::OrgInvitations
+                | Self::OrgAudit
+        )
+    }
+
+    /// What an event did to this query's rows, for the socket.
+    ///
+    /// The member tier's queries name the keys that moved; the organization's
+    /// answer in whole sets where an event cannot say which of its rows is
+    /// ours ([`org::touched`]).
+    #[must_use]
+    pub fn touched(
+        self,
+        event: &Event,
+        principal: &Principal,
+        key: &IdKey,
+        params: &Params,
+    ) -> Touch {
+        if self.is_org() {
+            return org::touched(self, event, key, params);
+        }
+        match self.changed(event, principal, key) {
+            keys if keys.is_empty() => Touch::None,
+            keys => Touch::Keys(keys),
         }
     }
 
@@ -113,17 +189,26 @@ impl Named {
             }
             (Self::Identities, _) => Vec::new(),
             (Self::Audit, _) => Vec::new(),
+            // An organization's rows are not the acting identity's, so they
+            // are decided by `org::touched` and never reach here.
+            _ => Vec::new(),
         }
     }
 }
 
 /// What a query was asked for.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Params {
     /// `audit`: the offset already seen.
     pub after: u64,
     /// `audit`: how many rows to return.
     pub limit: Option<usize>,
+    /// The organization every `org*` query is scoped to.
+    pub org: Option<PublicId>,
+    /// A group inside it, where a query drills into one.
+    pub group: Option<PublicId>,
+    /// `org-audit`: show only this command. Empty means all of them.
+    pub command: Option<String>,
 }
 
 impl Params {
@@ -135,6 +220,12 @@ impl Params {
             match name {
                 "after" => params.after = value.parse().unwrap_or(0),
                 "limit" => params.limit = value.parse().ok(),
+                // A malformed id is dropped rather than carried: the query it
+                // was meant for then declines for want of a scope, which is
+                // the same answer as naming somebody else's organization.
+                "org" => params.org = value.parse().ok(),
+                "group" => params.group = value.parse().ok(),
+                "command" => params.command = command_name(value),
                 _ => {}
             }
         }
@@ -146,6 +237,19 @@ impl Params {
     }
 }
 
+/// A command name the contract declares, or nothing.
+///
+/// The audit filter goes into a statement as a value, never as text spliced
+/// into SQL — but it is still checked against the vocabulary, because a filter
+/// naming a command that does not exist is a caller bug worth answering with
+/// every row rather than none.
+fn command_name(raw: &str) -> Option<String> {
+    rn_api::commands::ALL_COMMAND_NAMES
+        .iter()
+        .find(|name| **name == raw)
+        .map(|name| (*name).to_owned())
+}
+
 /// Run a query for a principal.
 pub async fn read(
     reads: &impl Reads,
@@ -153,6 +257,9 @@ pub async fn read(
     principal: &Principal,
     params: &Params,
 ) -> Outcome<Vec<Row>> {
+    if query.is_org() {
+        return org::read(reads, query, principal, params).await;
+    }
     let Some(identity) = principal.identity() else {
         return Ok(Vec::new());
     };
@@ -161,6 +268,8 @@ pub async fn read(
         Named::Sessions => rows::sessions(reads, identity, principal, key).await,
         Named::Identities => rows::identities(reads, identity, principal, key).await,
         Named::Audit => rows::audit(reads, identity, params).await,
+        // Every organization query returned above.
+        _ => Ok(Vec::new()),
     }
 }
 
@@ -181,6 +290,50 @@ pub fn ops(keys: &[String], rows: Vec<Row>) -> Vec<DiffOp> {
             None => DiffOp::Del { key: key.clone() },
         })
         .collect()
+}
+
+/// Turn a whole-set re-read into diff ops against what was last sent.
+///
+/// The socket uses this for the queries whose events cannot name a key —
+/// "somebody created a group" does not say whose organization it landed in.
+/// Diffing against what this connection actually sent is what keeps such a
+/// query correct without ever naming a row the reader is not entitled to: a
+/// `del` can only mention a key that was previously `put`.
+#[must_use]
+pub fn set_ops(sent: &mut BTreeMap<String, Value>, rows: Vec<Row>) -> Vec<DiffOp> {
+    let current: BTreeMap<String, Value> =
+        rows.into_iter().map(|row| (row.key, row.value)).collect();
+    let mut ops = Vec::new();
+    for (key, value) in &current {
+        if sent.get(key) != Some(value) {
+            ops.push(DiffOp::Put {
+                key: key.clone(),
+                row: value.clone(),
+            });
+        }
+    }
+    for key in sent.keys() {
+        if !current.contains_key(key) {
+            ops.push(DiffOp::Del { key: key.clone() });
+        }
+    }
+    *sent = current;
+    ops
+}
+
+/// Remember what a keyed diff sent, so a later whole-set diff over the same
+/// query has something to compare against.
+pub fn remember(sent: &mut BTreeMap<String, Value>, ops: &[DiffOp]) {
+    for op in ops {
+        match op {
+            DiffOp::Put { key, row } => {
+                sent.insert(key.clone(), row.clone());
+            }
+            DiffOp::Del { key } => {
+                sent.remove(key);
+            }
+        }
+    }
 }
 
 /// The whole result set as the array a `GET` returns.
