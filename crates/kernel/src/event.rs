@@ -136,17 +136,23 @@ pub enum Event {
         /// Who left.
         party: Id<Person>,
     },
-    /// A relation was granted on a resource.
+    /// A relation was granted. The object is a kind and a row rather than a
+    /// typed id, because a share is over anything the vocabulary registers —
+    /// a document by its resource row, a person by their party row.
     Shared {
-        /// The resource.
-        resource: Id<Resource>,
+        /// The registered kind.
+        object_kind: String,
+        /// The row it addresses.
+        object_id: i64,
         /// What was granted.
         relation: Relation,
     },
     /// A relation was withdrawn.
     Revoked {
-        /// The resource.
-        resource: Id<Resource>,
+        /// The registered kind.
+        object_kind: String,
+        /// The row it addresses.
+        object_id: i64,
         /// What was withdrawn.
         relation: Relation,
     },
@@ -314,11 +320,13 @@ impl Event {
                 party: field(&json, "party")?,
             },
             "share" => Self::Shared {
-                resource: field(&json, "resource")?,
+                object_kind: json.get("object_kind")?.as_str()?.to_owned(),
+                object_id: json.get("object_id")?.as_i64()?,
                 relation: Relation::parse(json.get("relation")?.as_str()?)?,
             },
             "revoke" => Self::Revoked {
-                resource: field(&json, "resource")?,
+                object_kind: json.get("object_kind")?.as_str()?.to_owned(),
+                object_id: json.get("object_id")?.as_i64()?,
                 relation: Relation::parse(json.get("relation")?.as_str()?)?,
             },
             "transfer" => Self::Transferred {

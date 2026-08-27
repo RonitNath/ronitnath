@@ -289,3 +289,104 @@ async fn a_container_is_not_shared_by_its_resource_id() {
         "an organization is addressed by its party, and its members are a membership"
     );
 }
+
+#[tokio::test]
+async fn contact_details_are_shared_by_the_person_and_only_into_a_group() {
+    let harness = Local::new();
+    let ronit = world::person(&harness, "Ronit", "contact-me@example.test").await;
+    let abeer = world::person(&harness, "Abeer", "contact-them@example.test").await;
+    let team = world::group(&harness, &ronit, "Team", None)
+        .await
+        .expect("creates");
+    let me = public(key(&harness), ronit.person());
+    let group_id = public(key(&harness), team);
+
+    // Nobody else hands your details on — no relation makes them able to.
+    let theirs = cmd::share(
+        &harness.ctx(abeer.principal.clone()),
+        &Share {
+            resource: me.clone(),
+            subject: group_id.clone(),
+            relation: DocRole::Contact,
+        },
+    )
+    .await;
+    assert!(theirs.is_err_and(|err| err.is_decline()));
+
+    // A person accepts `contact` and nothing else…
+    let wrong = cmd::share(
+        &harness.ctx(ronit.principal.clone()),
+        &Share {
+            resource: me.clone(),
+            subject: group_id.clone(),
+            relation: DocRole::Editor,
+        },
+    )
+    .await;
+    assert!(wrong.is_err_and(|err| err.is_decline()));
+
+    // …and a document accepts everything but.
+    let doc = world::document(&harness, &ronit, "Kernel report", None)
+        .await
+        .expect("creates");
+    let on_a_document = cmd::share(
+        &harness.ctx(ronit.principal.clone()),
+        &Share {
+            resource: public(key(&harness), doc),
+            subject: group_id.clone(),
+            relation: DocRole::Contact,
+        },
+    )
+    .await;
+    assert!(on_a_document.is_err_and(|err| err.is_decline()));
+
+    cmd::share(
+        &harness.ctx(ronit.principal.clone()),
+        &Share {
+            resource: me.clone(),
+            subject: group_id.clone(),
+            relation: DocRole::Contact,
+        },
+    )
+    .await
+    .expect("my details, my group");
+
+    // And the scoping query is what proves where they landed.
+    let inside = expand(harness.store(), &ronit.principal)
+        .await
+        .expect("expands");
+    assert_eq!(
+        relation::visible_contacts(harness.store(), &inside, team)
+            .await
+            .expect("lists"),
+        vec![ronit.person()]
+    );
+    let outside = expand(harness.store(), &abeer.principal)
+        .await
+        .expect("expands");
+    assert!(
+        relation::visible_contacts(harness.store(), &outside, team)
+            .await
+            .expect("lists")
+            .is_empty(),
+        "a person outside the group sees nobody in it"
+    );
+
+    // Revoking takes it back the same way.
+    cmd::revoke(
+        &harness.ctx(ronit.principal.clone()),
+        &Revoke {
+            resource: me,
+            subject: group_id,
+            relation: DocRole::Contact,
+        },
+    )
+    .await
+    .expect("revokes");
+    assert!(
+        relation::visible_contacts(harness.store(), &inside, team)
+            .await
+            .expect("lists")
+            .is_empty()
+    );
+}

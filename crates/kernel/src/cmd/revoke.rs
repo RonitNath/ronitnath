@@ -11,19 +11,19 @@
 
 use rn_api::commands::Revoke;
 
-use super::share::{SHARER, object_of, relation_of};
+use super::share::{may_share, object_of, relation_of};
 use super::{Batch, Ctx, refs, run};
 use crate::error::{Outcome, decline};
 use crate::event::Committed;
 use crate::feed::Feed;
-use crate::principal::expand;
 use crate::relation;
 use crate::store::{Reads, Sql, Value};
 
 const AUDIT: &str = "INSERT INTO audit \
      (key, command, actor_identity_id, acting_as, at, request_digest, payload) \
      VALUES ($1, 'revoke', $2, $3, $4, $5, \
-             json_object('event', 'revoke', 'resource', $6, 'relation', $7))";
+             json_object('event', 'revoke', 'object_kind', $6, 'object_id', $7, \
+                         'relation', $8))";
 
 /// Withdraw a relation on a resource.
 pub async fn revoke<S: Sql, F: Feed>(ctx: &Ctx<'_, S, F>, args: &Revoke) -> Outcome<Committed> {
@@ -32,8 +32,7 @@ pub async fn revoke<S: Sql, F: Feed>(ctx: &Ctx<'_, S, F>, args: &Revoke) -> Outc
     let subject = refs::subject(ctx.store.ids(), &args.subject)?;
     let relation = relation_of(args.relation);
 
-    let subjects = expand(ctx.store, &ctx.principal).await?;
-    if !relation::check(ctx.store, &subjects, SHARER, object).await? {
+    if !may_share(ctx, object, person).await? {
         return decline();
     }
     let now = ctx.now();
@@ -49,6 +48,7 @@ pub async fn revoke<S: Sql, F: Feed>(ctx: &Ctx<'_, S, F>, args: &Revoke) -> Outc
                 Value::from(person),
                 Value::from(now),
                 Value::from(crate::audit::digest_of(args)),
+                Value::from(object.kind),
                 Value::from(object.id),
                 Value::from(relation.as_str()),
             ],

@@ -51,7 +51,13 @@ pub enum MemberRole {
     Owner,
 }
 
-/// Relation on a document (`viewer < commenter < editor`).
+/// What a `Share` can name. `viewer < commenter < editor` nests on a
+/// document; `contact` nests with nothing and is admitted by exactly one kind.
+///
+/// One enum rather than one per kind, because a share is one command: the
+/// *kind* decides which of these words it accepts, and the kernel refuses the
+/// rest. A document does not accept `contact`, and a person accepts nothing
+/// else.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum DocRole {
@@ -61,6 +67,9 @@ pub enum DocRole {
     Commenter,
     /// May read, comment and edit.
     Editor,
+    /// May see this person's contact details. Only a person admits it, and
+    /// only a group may be granted it — which is the whole of contact scoping.
+    Contact,
 }
 
 /// Any party, named the way a UI names it.
