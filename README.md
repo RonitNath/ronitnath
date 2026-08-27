@@ -62,6 +62,9 @@ tools/perf/run.sh                       # oha + samply against that cluster
 tools/size-gate.sh                      # the structure limits, as CI runs them
 ```
 
+`just` fronts all of these — `just gate` is the CI gate in order, `just --list`
+the rest (bundles, e2e, cluster, perf, drill, image).
+
 Dev mode reads the bundles and the static tree from disk, so a stylesheet edit
 is a reload. Building a bundle at all takes trunk:
 
