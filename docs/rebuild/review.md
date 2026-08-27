@@ -26,19 +26,19 @@ worktree   /Users/ronitnath/dev/worktrees/rn-site--r1
 | 6 | **medium** | `crates/server/src/api/cmd/mod.rs:180` (pre-fix) | `x-rn-after` was a pre-auth tarpit: the read-your-writes barrier runs before the cookie is resolved, and waited the full 2 s for any offset a caller typed. Anonymous `curl` with `sec-fetch-site: same-origin` held a request slot for **2.002 s** before its 403. | §Trust boundaries — *a forged/huge `x-rn-after`* | **yes** `3165f28` |
 | 7 | **medium** | `crates/server/src/sub/mod.rs` (pre-fix) | No cap on `SubRequest.subscribe`. Each subscribed query is re-read once per feed event; 16 sockets (`PER_IDENTITY`) × N parameterisations from one account is N×16 reads per commit. `Params::subject` also took a string of any length while its sibling `id` capped at 32. | §Resource/lifecycle matrix | **yes** `3165f28` |
 | 8 | **medium** | `crates/server/src/api/query/org.rs:259` (pre-fix) | `org-members`' `PartyDisabled`/`PartyEnabled` arm named the party's key with no container guard, so a deployment-wide disable handed one organization's reader the public id of a party that may be nobody's member. | §Trust boundaries — *another tenant's `?org=`* | **yes** `28c6e7c` |
-| 9 | **low** | `crates/kernel/migrations/1_kernel.sql:47`, `:210` | Two status values in the schema have no producing command, which §Model says makes them non-existent: `identity.status = 'disabled'` (only `Disable` writes a status, and it writes `party.status`) and `resource.status = 'deleted'` (read as a filter in six statements, written by none). | `rg "status = 'deleted'" crates/*/src` → one test fixture and six `<> 'deleted'` filters. `properties.rs:163 a_status_is_only_ever_what_a_command_made_it` checks the forward direction — every status a command wrote is legal — and cannot catch a legal status no command writes. | no — see §Not fixed |
-| 10 | **low** | `crates/server/src/db/migrations.rs:1-12` | Module docs say "Until K1 hands over `rn_kernel::migrations()`, `Migrations::default` is the empty set and boot applies nothing". K1 landed: `main.rs:29` reads `Migrations::embedded::<rn_kernel::Migrations>()`. Stale prose in a live file. | read the two files | no — see §Not fixed |
-| 11 | **low** | `crates/ui/tokens.css:68` | `--radius: 0.25rem` against `interface-taste.md` §Color, shape: "no rounded corners". Applied to four token rules and six call sites. A taste call, so presented rather than changed. | §Visual conformance | no — owner's call |
-| 12 | **low** | `crates/ui/Cargo.toml`, `crates/app-member/Cargo.toml`, `crates/app-org/Cargo.toml` | Six unused direct dependencies: `ui: uuid, wasm-bindgen, wasm-bindgen-futures`; `app-member: wasm-bindgen, wasm-bindgen-futures`; `app-org: web-sys`. `clap` sits in `[workspace.dependencies]` and no member names it. | §Dependency hygiene | no — see §Not fixed |
-| 13 | **low** | `crates/server/tests/surface.rs:602` | `the_deleted_vocabulary_is_gone_from_the_tree` walks `crates/server/src` only; the plan says "no `manage`/`capability`/`resource_grants` symbol **in the tree**". Verified by hand tree-wide and clean, so this is a gap in the gate rather than a hole in the code. | §Negative space | no — see §Not fixed |
-| 14 | **low** | `crates/kernel/src/cmd/sign_in.rs:96` | `acting_as = person_id.unwrap_or(Id::<Person>::new(identity_id.get()))` re-reads an *identity* rowid as a *party* rowid — the same table-confusion `disable.rs:41` calls out as a bug it removed. Unreachable in this cut (`Register` always writes `person_id`), so it is a latent trap rather than a defect. | read `sign_in.rs:94-98` | no — see §Not fixed |
-| 15 | **medium** | `crates/server/src/links/mod.rs:120` | The claim page cannot name the one grant this cut mints. `Grant::of` reads only `link.verifies_factor_id`; an invitation carries its grant as a relation row, so it falls to `Grant::Unknown` and the page says "An invitation" — not which organization, who minted it, or at what role. | §Visual conformance V2 | no — owner's call |
-| 16 | **low** | `crates/app-platform/src/…` (the audit table) | `/platform/audit` renders **Acting as** as a raw public id while **Actor** beside it renders a display name. | §Visual conformance V3 | no — owner's call |
-| 17 | **low** | `templates/landing.html` / `crates/ui/tokens.css` | The wordmark is red on the dark landing, amber on the light landing, white on `/auth`, near-black on the light claim page — and light mode *inverts* the name/company pair. "A wordmark is one color" (2026-06-06). | §Visual conformance V1 | no — owner's call |
-| 18 | **low** | `end2end/tests/starscape.spec.ts:217,381` | Two e2e tests read a label off a live animated sky and then act on it; both failed in one full serial run and passed alone and in a second full run. | §Golden flows | no — starscape's owner |
+| 9 | **low** | `crates/kernel/migrations/1_kernel.sql:47`, `:210` | Two status values in the schema have no producing command, which §Model says makes them non-existent: `identity.status = 'disabled'` (only `Disable` writes a status, and it writes `party.status`) and `resource.status = 'deleted'` (read as a filter in six statements, written by none). | `rg "status = 'deleted'" crates/*/src` → one test fixture and six `<> 'deleted'` filters. `properties.rs:163 a_status_is_only_ever_what_a_command_made_it` checks the forward direction — every status a command wrote is legal — and cannot catch a legal status no command writes. | **yes** `35fc4cf` — both values out of the Rust enums, declared as `Vocabulary::ADMITTED_UNPRODUCED`, plan.md §Model says the CHECK admits them until the next fresh formation |
+| 10 | **low** | `crates/server/src/db/migrations.rs:1-12` | Module docs say "Until K1 hands over `rn_kernel::migrations()`, `Migrations::default` is the empty set and boot applies nothing". K1 landed: `main.rs:29` reads `Migrations::embedded::<rn_kernel::Migrations>()`. Stale prose in a live file. | read the two files | **yes** `48f84a0` |
+| 11 | **low** | `crates/ui/tokens.css:68` | `--radius: 0.25rem` against `interface-taste.md` §Color, shape: "no rounded corners". Applied to four token rules and six call sites. A taste call, so presented rather than changed. | §Visual conformance | no — owner's call; the two options and their token lines are `docs/rebuild/taste-variants.md` §1 |
+| 12 | **low** | `crates/ui/Cargo.toml`, `crates/app-member/Cargo.toml`, `crates/app-org/Cargo.toml` | Six unused direct dependencies: `ui: uuid, wasm-bindgen, wasm-bindgen-futures`; `app-member: wasm-bindgen, wasm-bindgen-futures`; `app-org: web-sys`. `clap` sits in `[workspace.dependencies]` and no member names it. | §Dependency hygiene | **yes** `dd879c4`, and `clap` with them — except `rn-org: web-sys`, which is named for its *features* and not its symbols, so trunk's per-crate build fails without it (`83e6307`) |
+| 13 | **low** | `crates/server/tests/surface.rs:602` | `the_deleted_vocabulary_is_gone_from_the_tree` walks `crates/server/src` only; the plan says "no `manage`/`capability`/`resource_grants` symbol **in the tree**". Verified by hand tree-wide and clean, so this is a gap in the gate rather than a hole in the code. | §Negative space | **yes** `0e418f6` — the gate reads the crate list off the filesystem and walks all eight |
+| 14 | **low** | `crates/kernel/src/cmd/sign_in.rs:96` | `acting_as = person_id.unwrap_or(Id::<Person>::new(identity_id.get()))` re-reads an *identity* rowid as a *party* rowid — the same table-confusion `disable.rs:41` calls out as a bug it removed. Unreachable in this cut (`Register` always writes `person_id`), so it is a latent trap rather than a defect. | read `sign_in.rs:94-98` | no — still a decision about imported identities, which have not landed |
+| 15 | **medium** | `crates/server/src/links/mod.rs:120` | The claim page cannot name the one grant this cut mints. `Grant::of` reads only `link.verifies_factor_id`; an invitation carries its grant as a relation row, so it falls to `Grant::Unknown` and the page says "An invitation" — not which organization, who minted it, or at what role. | §Visual conformance V2 | **yes** `3ac5d52` — `invite::describe` reads the relation row; the page names container, role, minter and expiry |
+| 16 | **low** | `crates/app-platform/src/…` (the audit table) | `/platform/audit` renders **Acting as** as a raw public id while **Actor** beside it renders a display name. | §Visual conformance V3 | **yes** `112ca1c` — the name in the cell, the id on hover, both in the panel |
+| 17 | **low** | `templates/landing.html` / `crates/ui/tokens.css` | The wordmark is red on the dark landing, amber on the light landing, white on `/auth`, near-black on the light claim page — and light mode *inverts* the name/company pair. "A wordmark is one color" (2026-06-06). | §Visual conformance V1 | no — owner's call; the two options and their token lines are `docs/rebuild/taste-variants.md` §2 |
+| 18 | **low** | `end2end/tests/starscape.spec.ts:217,381` | Two e2e tests read a label off a live animated sky and then act on it; both failed in one full serial run and passed alone and in a second full run. | §Golden flows | **yes** `29fe4c7` — each test now reads its claims and acts on the label in one synchronous `evaluate`, which a frame callback cannot interleave with; the spec ran 3× serially, green each time |
 | 19 | **low** | `docs/rebuild/plan.md` §Product contract, §API, §Gate manifest (pre-fix) | Four plan claims the code contradicts: a "change-feed retention" recurring job that does not exist (the lane runs the last_seen drain, match scanning, and the session and link sweeps); `/api/q` described as "cacheable `private, no-store`", which is a contradiction and the code sends `no-store`; a command reply vocabulary of `200/409/403/404` that omits the `422` and the `503` the code sends; and a negative-space row naming "`/auth/*` GET-only SSR islands" — legacy wording, since `/auth` is now a live askama form and what the test actually asserts is `/manage`, `/api/realtime`, `/pkg/*`, `/metrics` and `/dev-dashboard`. | read `crates/server/src/observe.rs`, `http::cache_policy`, `api::decline`, `surface.rs:569` | **yes** — plan text corrected, not bannered |
-| 20 | **medium** | `crates/kernel/migrations/1_kernel.sql:236` (`audit`) | The audit table is the change feed and it has **no retention, no compaction and no bound**. Every command appends a row; every subscription, the invalidator and the observation lane read it forward by `id`. It is correct to keep an audit log forever, and it is not correct for the *feed* to be the same table with no horizon — the kernel report's log group has "retention by cursor horizon" precisely because of this. Unbounded, but bounded-growth-per-command and read by an index, so it degrades in disk rather than in latency. | `rg -n "DELETE FROM audit" crates` → nothing | no — rung 7 owns it |
-| 21 | **low** | `crates/server/tests/api.rs:541` | The secrets canary pushes the password and the session token through the log pipeline and asserts the capture is non-empty — the right shape. It does **not** push the `id_key` or the two raft secrets through it. Neither is formatted anywhere today, so this is a gap in the negative proof, not a leak. | §Secrets | no — two lines, but the sentinel list is `harness`'s |
+| 20 | **medium** | `crates/kernel/migrations/1_kernel.sql:236` (`audit`) | The audit table is the change feed and it has **no retention, no compaction and no bound**. Every command appends a row; every subscription, the invalidator and the observation lane read it forward by `id`. It is correct to keep an audit log forever, and it is not correct for the *feed* to be the same table with no horizon — the kernel report's log group has "retention by cursor horizon" precisely because of this. Unbounded, but bounded-growth-per-command and read by an index, so it degrades in disk rather than in latency. | `rg -n "DELETE FROM audit" crates` → nothing | no — rung 7 owns it, and plan.md §Non-goals now says so (`c6afc4d`) |
+| 21 | **low** | `crates/server/tests/api.rs:541` | The secrets canary pushes the password and the session token through the log pipeline and asserts the capture is non-empty — the right shape. It does **not** push the `id_key` or the two raft secrets through it. Neither is formatted anywhere today, so this is a gap in the negative proof, not a leak. | §Secrets | **yes** `3df1edb` — five secrets through the pipeline now, and the node's id key is itself the sentinel |
 
 ## Gate manifest — every row, with its command
 
@@ -362,10 +362,18 @@ $ cd end2end && npx playwright test --workers=1 --project=chromium
 So the suite is green and **two starscape tests are flaky** — they read a
 label off a live, animated sky and then act on it, and the sky moves between
 the read and the act. The first run followed an `npm ci` on the same machine,
-which is the load that made it show. Not a regression (R1 touched no starscape
-code) and not fixed here, because the fix belongs to whoever owns
-`crates/starscape`: pause the clock for the assertion, or assert against the
-label the atlas actually opened rather than the one that was read first.
+which is the load that made it show. Not a regression: R1 touched no starscape
+code.
+
+Fixed in leg F6 (`29fe4c7`), and in the assertions rather than in the sky. The
+sky runs at 60×, so which stars are labelled changes every few seconds and the
+whole label set is rebuilt when it does; a value read through a locator and
+then acted on through the same locator can land either side of that rebuild.
+Both tests now take everything they need in one synchronous `page.evaluate` —
+the overlap count and the first label's text in one, the star's name and the
+click on that same element in the other — and a frame callback cannot
+interleave with a function that is already running. No clock to freeze and no
+`waitForTimeout`. The spec ran three times serially: **18 passed** each time.
 
 The three journeys the plan names are covered by `member.spec.ts`,
 `org.spec.ts` and `platform.spec.ts` and all passed in both runs.
@@ -413,6 +421,10 @@ breakpoint hack. Every id a human might have to transfer has a copy button.
 None of these is a layout *break*: nothing overflows, nothing scrolls
 unintentionally, and both themes render completely at both widths. V1, V2 and
 V3 are the three worth fixing before the owner drives it.
+
+V2 and V3 were fixed in leg F6 — findings 15 and 16 above carry their commits.
+V1 and V7 are the taste calls, and their options are in
+`docs/rebuild/taste-variants.md`. V4, V5, V6 and V8 stand as written.
 
 ## Performance
 
@@ -499,37 +511,20 @@ $ pgrep -f rn-site                                          # empty after cleanu
 Each of these is a finding with a repro rather than a fix, because fixing it
 is a decision this leg does not own.
 
-* **9 — two statuses no command produces.** `identity.status = 'disabled'` and
-  `resource.status = 'deleted'`. Both are plausible as schema-ahead-of-code
-  the way `factor.kind IN ('passkey','oidc')` is — and *that* one carries its
-  reason in the migration, which is what makes it legible. The fix is either a
-  migration comment saying which rung writes them, or the values coming out.
-  Either is an owner call about the ladder, and migrations 1–3 are frozen, so
-  removing a `CHECK` value is a new migration and not an edit.
-* **10 — stale module docs in `db/migrations.rs`.** A one-line edit, but the
-  file is the server's and correcting prose in somebody else's module while
-  claiming to be read-only is how a review starts rewriting. Reported so its
-  owner can strike the sentence rather than banner it.
-* **12 — six unused direct dependencies.** `wasm-bindgen` and
-  `wasm-bindgen-futures` are the ones to be careful with: they are not named
-  in the source of the crates that declare them, but the *version* of
-  `wasm-bindgen` in the graph has to match the `wasm-bindgen-cli` trunk runs,
-  and a pin that only exists transitively is a pin nobody controls. Removing
-  them is a five-minute change and a real risk of a bundle that builds today
-  and not next week, so it is a finding rather than a fix.
-* **13 — the deleted-vocabulary gate walks one crate.** Widening it to the
-  workspace is `crates/server/tests/surface.rs`'s to do, and the tree-wide
-  check is already clean (§Negative space), so the code is right and the gate
-  is narrow. Left as a note rather than a change, because widening a scan
-  across seven crates without owning them invites a red gate the next leg has
-  to interpret.
 * **14 — the identity-rowid-as-party-rowid fallback in `sign_in`.** Dead in
   this cut. Making it unrepresentable means either `identity.person_id NOT
   NULL` (a migration) or `sign_in` declining an unresolved identity (a
   behaviour change to a path nothing reaches). Both are decisions about a
   feature — imported identities — that has not landed.
-* **The two flaky starscape e2e tests.** §Golden flows. They belong to
-  `crates/starscape`'s owner, and the fix is about how the assertion reads a
-  moving sky rather than about the sky.
-* **V1–V8 visual.** Presented, not silently picked: taste calls go to the
-  owner as variants (`interface-taste.md` §What done looks like).
+* **20 — the change feed has no horizon.** Rung 7's, and `plan.md` §Non-goals
+  now says so with the reason it can wait.
+* **11 and 17 — the radius, and the wordmark's colour.** Taste calls, so they
+  go to the owner as variants rather than being picked here
+  (`interface-taste.md` §What done looks like): two options each, with the
+  exact token lines, in `docs/rebuild/taste-variants.md`.
+* **V3–V6, V8 visual.** Presented, not fixed: they are layout decisions about
+  surfaces the owner has not driven yet.
+
+The rest of this section's original entries — 9, 10, 12, 13, the two flaky
+starscape tests, 21, and V2 — were fixed in leg F6; the table above carries
+each one's commit.
