@@ -40,15 +40,15 @@ const AUDIT: &str = "INSERT INTO audit \
 /// runs after the audit row, because it is a consequence of the decision
 /// rather than part of it, and its count carries no information.
 ///
-/// The `EXISTS` is not decoration. `identity.id = $1` is here for the
-/// unresolved registration that acts as itself, and `identity` and `party` are
-/// different tables with independent rowids — so without it, disabling
-/// organization 5 would sign out whoever happens to be identity 5.
-const SESSIONS: &str = "DELETE FROM session WHERE identity_id IN \
-                        (SELECT i.id FROM identity i \
-                          WHERE (i.person_id = $1 OR i.id = $1) \
-                            AND EXISTS (SELECT 1 FROM party p \
-                                         WHERE p.id = $1 AND p.kind = 'person'))";
+/// `person_id` is the whole of it, and the `OR i.id = $1` that used to sit
+/// beside it was a bug rather than a fallback: it was meant for an unresolved
+/// registration acting as itself, but `identity` and `party` are different
+/// tables with independent rowids, so it signed out whoever happened to be
+/// identity N whenever party N was disabled. An unresolved registration has no
+/// `party` row at all, so the update above already writes nothing for one and
+/// there is nothing here to catch.
+const SESSIONS: &str =
+    "DELETE FROM session WHERE identity_id IN (SELECT id FROM identity WHERE person_id = $1)";
 
 /// Move a party to `disabled`.
 pub async fn disable<S: Sql, F: Feed>(ctx: &Ctx<'_, S, F>, args: &Disable) -> Outcome<Committed> {

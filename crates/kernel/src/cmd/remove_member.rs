@@ -95,9 +95,8 @@ pub async fn remove_member<S: Sql, F: Feed>(
 /// owner may remove another owner, because somebody has to be able to and the
 /// last-owner rule is what keeps that safe.
 const fn may_remove(actor: MemberRole, target: MemberRole) -> bool {
-    match (actor, target) {
-        (MemberRole::Owner, _) => true,
-        (MemberRole::Admin, MemberRole::Member) => true,
-        _ => false,
-    }
+    matches!(
+        (actor, target),
+        (MemberRole::Owner, _) | (MemberRole::Admin, MemberRole::Member)
+    )
 }
