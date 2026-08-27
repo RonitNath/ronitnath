@@ -188,6 +188,7 @@ where
     P: Fn() -> Plan,
     Plan: Future<Output = Outcome<Batch>> + Send,
 {
+    let started = std::time::Instant::now();
     let digest = audit::digest_of(args);
     if let Some(committed) = audit::replay(ctx.store, ctx.key, &digest).await? {
         return Ok(Applied {
@@ -195,10 +196,14 @@ where
             fresh: false,
         });
     }
+    let replayed = started.elapsed();
 
+    let mut planning = std::time::Duration::ZERO;
     let mut attempt = 0;
     loop {
+        let phase = std::time::Instant::now();
         let batch = plan().await?;
+        planning += phase.elapsed();
         match ctx.store.commit(batch.into_stmts()).await {
             Ok(_) => break,
             Err(StoreError::GuardMissed) if attempt == 0 => attempt += 1,
@@ -221,10 +226,29 @@ where
         }
     }
 
+    let commit_ended = started.elapsed();
     let committed = audit::replay(ctx.store, ctx.key, &digest)
         .await?
         .ok_or_else(|| KernelError::Invariant("committed batch left no audit row".to_owned()))?;
+    let read_back_ended = started.elapsed();
     ctx.feed.notify(committed.offset).await;
+    let done = started.elapsed();
+
+    // The decomposition of a command's wall time, on the node that ran it.
+    // Off by default and free when it is off; `RUST_LOG=rn_kernel::cmd=debug`
+    // is what turns a commit-latency number into an account of where it went
+    // (`docs/perf/2026-08-27-f5.md`). Microseconds, because the budget is
+    // "one intra-zone RTT plus a millisecond".
+    tracing::debug!(
+        replay_us = replayed.as_micros() as u64,
+        plan_us = planning.as_micros() as u64,
+        commit_us = (commit_ended - replayed - planning).as_micros() as u64,
+        read_back_us = (read_back_ended - commit_ended).as_micros() as u64,
+        notify_us = (done - read_back_ended).as_micros() as u64,
+        total_us = done.as_micros() as u64,
+        attempts = attempt + 1,
+        "command phases"
+    );
     Ok(Applied {
         committed,
         fresh: true,

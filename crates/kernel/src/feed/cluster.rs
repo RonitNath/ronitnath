@@ -78,6 +78,17 @@ async fn pump(client: Client, wake: broadcast::Sender<Offset>) {
 
 impl Feed for ClusterFeed {
     async fn notify(&self, offset: Offset) {
+        // This node's own subscribers first, and without leaving the process.
+        // hiqlite's `notify` is a write to the *cache* raft group: every node
+        // hears it, including this one, but only after a quorum round trip
+        // and only back through the pump. Sockets held by the node that just
+        // committed were paying that round trip to hear about a row already
+        // in their own state machine — 17.7 ms of the 18.4 ms the fan-out
+        // probe measured (finding 5, `docs/perf/2026-08-27.md`). A duplicate
+        // wake-up when the pump repeats it costs nothing: a wake-up is a hint
+        // that there is something to read, and a subscriber past that offset
+        // ignores it.
+        let _ = self.wake.send(offset);
         if let Err(err) = self.store.engine().notify(&offset).await {
             tracing::warn!(%err, offset, "change feed notification not sent");
         }
