@@ -1,0 +1,51 @@
+profile: documents
+url: http://127.0.0.1:3161/api/q/documents
+load average at start: 4.12
+started: 2026-08-27T03:03:16-07:00
+
+Summary:
+  Success rate:	100.00%
+  Total:	30.0039 sec
+  Slowest:	4.2135 sec
+  Fastest:	0.7570 sec
+  Average:	2.0807 sec
+  Requests/sec:	3.9661
+
+  Total data:	6.47 MiB
+  Size/request:	59.69 KiB
+  Size/sec:	220.81 KiB
+
+Response time histogram:
+  0.757 sec [1]  |
+  1.103 sec [6]  |■■■■
+  1.448 sec [10] |■■■■■■■
+  1.794 sec [43] |■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■
+  2.140 sec [7]  |■■■■■
+  2.485 sec [5]  |■■■
+  2.831 sec [13] |■■■■■■■■■
+  3.177 sec [22] |■■■■■■■■■■■■■■■■
+  3.522 sec [0]  |
+  3.868 sec [0]  |
+  4.214 sec [4]  |■■
+
+Response time distribution:
+  10.00% in 1.4287 sec
+  25.00% in 1.5016 sec
+  50.00% in 1.7614 sec
+  75.00% in 2.8287 sec
+  90.00% in 2.9180 sec
+  95.00% in 3.0111 sec
+  99.00% in 4.1508 sec
+  99.90% in 4.2135 sec
+  99.99% in 4.2135 sec
+
+
+Details (average, fastest, slowest):
+  DNS+dialup:	0.0002 sec, 0.0001 sec, 0.0003 sec
+  DNS-lookup:	0.0000 sec, 0.0000 sec, 0.0001 sec
+
+Status code distribution:
+  [200] 111 responses
+
+Error distribution:
+  [8] aborted due to deadline

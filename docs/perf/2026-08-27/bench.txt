@@ -1,0 +1,135 @@
+cargo bench -p rn-kernel
+load average at start: 3.59 6.99 7.38
+started: 2026-08-27T03:23:10-07:00
+
+    Finished `bench` profile [optimized] target(s) in 0.58s
+     Running benches/check.rs (target/release/deps/check-886fea97f931910e)
+Gnuplot not found, using plotters backend
+Benchmarking check/ordinary
+Benchmarking check/ordinary: Warming up for 3.0000 s
+Benchmarking check/ordinary: Collecting 100 samples in estimated 5.0116 s (1.3M iterations)
+Benchmarking check/ordinary: Analyzing
+check/ordinary          time:   [3.9940 µs 4.0165 µs 4.0433 µs]
+Found 4 outliers among 100 measurements (4.00%)
+  2 (2.00%) high mild
+  2 (2.00%) high severe
+
+Benchmarking check/wide
+Benchmarking check/wide: Warming up for 3.0000 s
+Benchmarking check/wide: Collecting 100 samples in estimated 5.0252 s (2000 iterations)
+Benchmarking check/wide: Analyzing
+check/wide              time:   [2.4915 ms 2.5039 ms 2.5221 ms]
+Found 4 outliers among 100 measurements (4.00%)
+  3 (3.00%) high mild
+  1 (1.00%) high severe
+
+  budget  check cold (expand + check): 3.538µs per op, within 300µs
+  budget  check warm: 4.369µs per op, within 20µs
+  budget  check warm, subject in 10⁴ groups: 2.526204ms per op, OVER 20µs
+  budget  expand alone, subject in 10⁴ groups: 1.36836ms per op, OVER 300µs
+     Running benches/kernel.rs (target/release/deps/kernel-4b028bdec4010113)
+Gnuplot not found, using plotters backend
+Benchmarking id/encode
+Benchmarking id/encode: Warming up for 3.0000 s
+Benchmarking id/encode: Collecting 100 samples in estimated 5.0002 s (52M iterations)
+Benchmarking id/encode: Analyzing
+id/encode               time:   [96.463 ns 96.895 ns 97.349 ns]
+Found 3 outliers among 100 measurements (3.00%)
+  3 (3.00%) high mild
+
+Benchmarking id/decode
+Benchmarking id/decode: Warming up for 3.0000 s
+Benchmarking id/decode: Collecting 100 samples in estimated 5.0000 s (404M iterations)
+Benchmarking id/decode: Analyzing
+id/decode               time:   [12.219 ns 12.254 ns 12.294 ns]
+Found 10 outliers among 100 measurements (10.00%)
+  7 (7.00%) high mild
+  3 (3.00%) high severe
+
+  budget  id round trip: 128ns per op, within 5µs
+Benchmarking principal/cold
+Benchmarking principal/cold: Warming up for 3.0000 s
+Benchmarking principal/cold: Collecting 100 samples in estimated 5.0006 s (4.4M iterations)
+Benchmarking principal/cold: Analyzing
+principal/cold          time:   [1.1186 µs 1.1225 µs 1.1264 µs]
+
+Benchmarking principal/warm
+Benchmarking principal/warm: Warming up for 3.0000 s
+Benchmarking principal/warm: Collecting 100 samples in estimated 5.0002 s (82M iterations)
+Benchmarking principal/warm: Analyzing
+principal/warm          time:   [59.863 ns 60.069 ns 60.303 ns]
+Found 1 outliers among 100 measurements (1.00%)
+  1 (1.00%) high severe
+
+  budget  principal cold: 1.246µs per op, within 2ms
+  budget  principal warm: 64ns per op, within 50µs
+Benchmarking commit/register/rusqlite
+Benchmarking commit/register/rusqlite: Warming up for 3.0000 s
+Benchmarking commit/register/rusqlite: Collecting 100 samples in estimated 5.6310 s (500 iterations)
+Benchmarking commit/register/rusqlite: Analyzing
+commit/register/rusqlite
+                        time:   [11.497 ms 11.724 ms 11.973 ms]
+Found 7 outliers among 100 measurements (7.00%)
+  5 (5.00%) high mild
+  2 (2.00%) high severe
+
+  budget  register (rusqlite): 11.20767ms per op, of which 10.636026ms is argon2id; commit 571.644µs, within 1ms
+Benchmarking commit/register/hiqlite
+Benchmarking commit/register/hiqlite: Warming up for 3.0000 s
+Benchmarking commit/register/hiqlite: Collecting 100 samples in estimated 5.2649 s (400 iterations)
+Benchmarking commit/register/hiqlite: Analyzing
+commit/register/hiqlite time:   [33.394 ms 36.548 ms 39.979 ms]
+Found 9 outliers among 100 measurements (9.00%)
+  8 (8.00%) high mild
+  1 (1.00%) high severe
+
+  budget  register (hiqlite, one node): 52.423532ms per op, of which 54.353093ms is argon2id; commit 0ns, within 1ms
+     Running benches/list.rs (target/release/deps/list-e5c938448d1a7a5c)
+Gnuplot not found, using plotters backend
+Benchmarking list_visible/owner/first-page
+Benchmarking list_visible/owner/first-page: Warming up for 3.0000 s
+Benchmarking list_visible/owner/first-page: Collecting 100 samples in estimated 5.0580 s (2100 iterations)
+Benchmarking list_visible/owner/first-page: Analyzing
+list_visible/owner/first-page
+                        time:   [2.3193 ms 2.4349 ms 2.5922 ms]
+Found 7 outliers among 100 measurements (7.00%)
+  2 (2.00%) high mild
+  5 (5.00%) high severe
+
+Benchmarking list_visible/owner/second-page
+Benchmarking list_visible/owner/second-page: Warming up for 3.0000 s
+Benchmarking list_visible/owner/second-page: Collecting 100 samples in estimated 5.0302 s (2100 iterations)
+Benchmarking list_visible/owner/second-page: Analyzing
+list_visible/owner/second-page
+                        time:   [2.5248 ms 2.7001 ms 2.9005 ms]
+Found 5 outliers among 100 measurements (5.00%)
+  3 (3.00%) high mild
+  2 (2.00%) high severe
+
+Benchmarking list_visible/reader/first-page
+Benchmarking list_visible/reader/first-page: Warming up for 3.0000 s
+
+Warning: Unable to complete 100 samples in 5.0s. You may wish to increase target time to 9.2s, enable flat sampling, or reduce sample count to 50.
+Benchmarking list_visible/reader/first-page: Collecting 100 samples in estimated 9.1520 s (5050 iterations)
+Benchmarking list_visible/reader/first-page: Analyzing
+list_visible/reader/first-page
+                        time:   [1.2988 ms 1.4902 ms 1.6987 ms]
+Found 9 outliers among 100 measurements (9.00%)
+  8 (8.00%) high mild
+  1 (1.00%) high severe
+
+  budget  list_visible owner, first page: 3.545238ms per op, within 5ms
+  budget  list_visible owner, second page: 3.207198ms per op, within 5ms
+  budget  list_visible reader, first page: 555.773µs per op, within 5ms
+     Running benches/merge.rs (target/release/deps/merge-4dfedad10dcce2f4)
+Gnuplot not found, using plotters backend
+  budget  merge at 10000 affected rows: 39.81525ms, within 50ms
+Benchmarking merge/ten thousand affected rows
+Benchmarking merge/ten thousand affected rows: Warming up for 3.0000 s
+
+Warning: Unable to complete 10 samples in 5.0s. You may wish to increase target time to 9.2s or enable flat sampling.
+Benchmarking merge/ten thousand affected rows: Collecting 10 samples in estimated 9.2000 s (55 iterations)
+Benchmarking merge/ten thousand affected rows: Analyzing
+merge/ten thousand affected rows
+                        time:   [37.884 ms 39.881 ms 43.810 ms]
+

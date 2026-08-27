@@ -53,6 +53,14 @@ jobs:
             # against the wasm target here, not just the one that broke.
             cargo check --target wasm32-unknown-unknown \
               -p rn-api -p rn-ui -p rn-app -p rn-org -p rn-platform -p rn-starscape
+            # The kernel's budgets, run short. `--quick` is criterion's own
+            # reduced sampling and the hand-timed budget lines run in full, so
+            # a regression that takes `check` from microseconds to
+            # milliseconds fails here rather than in a perf report a week
+            # later. 28 s on the P1 laptop against a warm target directory;
+            # the full run, the flame graphs and the cluster drills stay in
+            # the release suite (tools/perf/run.sh, docs/perf/<date>.md).
+            cargo bench -p rn-kernel -- --quick --noplot
             # Every shell script in the repository, not only the deploy ones:
             # tools/cluster.sh and tools/seed.sh are how the resilience and
             # perf drills run, and a syntax error in one of them is found at

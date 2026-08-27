@@ -1,0 +1,3 @@
+node 1  pid 16901    {"status":"ok","node":"local-1","version":"dev","raft":{"sqlite":{"healthy":true,"voters":3,"expected_voters":3,"leader":1},"cache":{"healthy":true,"voters":3,"expected_voters":3,"leader":1}}}
+node 2  pid 16907    {"status":"ok","node":"local-2","version":"dev","raft":{"sqlite":{"healthy":true,"voters":3,"expected_voters":3,"leader":1},"cache":{"healthy":true,"voters":3,"expected_voters":3,"leader":1}}}
+node 3  pid 16913    {"status":"ok","node":"local-3","version":"dev","raft":{"sqlite":{"healthy":true,"voters":3,"expected_voters":3,"leader":1},"cache":{"healthy":true,"voters":3,"expected_voters":3,"leader":1}}}

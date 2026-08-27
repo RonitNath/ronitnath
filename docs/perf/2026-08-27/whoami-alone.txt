@@ -1,0 +1,51 @@
+profile: whoami-alone
+url: http://127.0.0.1:3161/api/whoami
+load average at start: 4.82
+started: 2026-08-27T03:02:41-07:00
+
+Summary:
+  Success rate:	100.00%
+  Total:	30004.4369 ms
+  Slowest:	2.7448 ms
+  Fastest:	0.0645 ms
+  Average:	0.1104 ms
+  Requests/sec:	8988.0374
+
+  Total data:	79.99 MiB
+  Size/request:	311 B
+  Size/sec:	2.67 MiB
+
+Response time histogram:
+  0.064 ms [1]      |
+  0.333 ms [268761] |■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■
+  0.601 ms [865]    |
+  0.869 ms [35]     |
+  1.137 ms [4]      |
+  1.405 ms [7]      |
+  1.673 ms [1]      |
+  1.941 ms [1]      |
+  2.209 ms [3]      |
+  2.477 ms [1]      |
+  2.745 ms [1]      |
+
+Response time distribution:
+  10.00% in 0.0797 ms
+  25.00% in 0.0833 ms
+  50.00% in 0.0918 ms
+  75.00% in 0.1292 ms
+  90.00% in 0.1523 ms
+  95.00% in 0.1795 ms
+  99.00% in 0.2825 ms
+  99.90% in 0.4052 ms
+  99.99% in 0.6844 ms
+
+
+Details (average, fastest, slowest):
+  DNS+dialup:	0.8426 ms, 0.8426 ms, 0.8426 ms
+  DNS-lookup:	0.0348 ms, 0.0348 ms, 0.0348 ms
+
+Status code distribution:
+  [200] 269680 responses
+
+Error distribution:
+  [1] aborted due to deadline

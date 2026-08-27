@@ -1,0 +1,51 @@
+profile: landing
+url: http://127.0.0.1:3161/
+load average at start: 5.60
+started: 2026-08-27T03:04:27-07:00
+
+Summary:
+  Success rate:	100.00%
+  Total:	30003.0105 ms
+  Slowest:	15.2751 ms
+  Fastest:	0.0338 ms
+  Average:	0.1214 ms
+  Requests/sec:	64863.6242
+
+  Total data:	7.06 GiB
+  Size/request:	3.80 KiB
+  Size/sec:	240.82 MiB
+
+Response time histogram:
+   0.034 ms [1]       |
+   1.558 ms [1945994] |■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■
+   3.082 ms [77]      |
+   4.606 ms [20]      |
+   6.130 ms [1]       |
+   7.654 ms [2]       |
+   9.179 ms [1]       |
+  10.703 ms [0]       |
+  12.227 ms [0]       |
+  13.751 ms [2]       |
+  15.275 ms [1]       |
+
+Response time distribution:
+  10.00% in 0.0873 ms
+  25.00% in 0.0993 ms
+  50.00% in 0.1159 ms
+  75.00% in 0.1357 ms
+  90.00% in 0.1580 ms
+  95.00% in 0.1755 ms
+  99.00% in 0.2340 ms
+  99.90% in 0.4693 ms
+  99.99% in 1.1219 ms
+
+
+Details (average, fastest, slowest):
+  DNS+dialup:	0.2398 ms, 0.1242 ms, 0.3670 ms
+  DNS-lookup:	0.0357 ms, 0.0128 ms, 0.0728 ms
+
+Status code distribution:
+  [200] 1946099 responses
+
+Error distribution:
+  [5] aborted due to deadline
