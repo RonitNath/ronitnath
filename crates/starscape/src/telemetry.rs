@@ -20,7 +20,7 @@ pub fn install() {
     let telemetry = js_sys::Object::new();
     set(&telemetry, "enabled", &JsValue::TRUE);
     set(&telemetry, "startedAtMs", &JsValue::from_f64(dom::now_ms()));
-    for section in ["stars", "sky", "globe", "annotations"] {
+    for section in ["stars", "sky", "globe", "annotations", "explorer"] {
         set(&telemetry, section, &js_sys::Object::new());
     }
     set(&telemetry, "events", &js_sys::Array::new());

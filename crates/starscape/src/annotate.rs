@@ -16,6 +16,9 @@ use crate::sky::FOCAL;
 pub struct Placement {
     /// Index into the named catalog that was passed in.
     pub star: usize,
+    /// The star's J2000 unit vector — the direction the atlas opens on when
+    /// this label is clicked, carried here so the click needs no second lookup.
+    pub position: [f64; 3],
     /// `-1.0 ..= 1.0`, left to right.
     pub x: f64,
     /// `-1.0 ..= 1.0`, bottom to top.
@@ -66,6 +69,7 @@ pub fn place(stars: &[[f64; 3]], matrix: [f32; 9], aspect: f64, limit: usize) ->
         if x.abs() <= MARGIN_X && y.abs() <= MARGIN_Y {
             inside.push(Placement {
                 star,
+                position: *vector,
                 x,
                 y,
                 forced: false,
@@ -76,6 +80,7 @@ pub fn place(stars: &[[f64; 3]], matrix: [f32; 9], aspect: f64, limit: usize) ->
         } else if best_forced.is_none() {
             best_forced = Some(Placement {
                 star,
+                position: *vector,
                 x: x.clamp(-MARGIN_X, MARGIN_X),
                 y: y.clamp(-MARGIN_Y, MARGIN_Y),
                 forced: true,
@@ -149,6 +154,8 @@ mod tests {
         assert_eq!(placed.len(), 1);
         assert!(placed[0].forced);
         assert!(placed[0].x.abs() <= MARGIN_X);
+        // The clamp moves the label, never the star it names.
+        assert_eq!(placed[0].position, edge(1.5));
     }
 
     #[test]

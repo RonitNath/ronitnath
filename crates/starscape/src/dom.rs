@@ -96,6 +96,41 @@ pub async fn fetch_text(url: &str) -> Result<String, JsValue> {
         .ok_or_else(|| JsValue::from_str("response body was not text"))
 }
 
+/// Fetch one inclusive byte range. The regional star catalog is 49 MB and is
+/// only ever read this way — a tile at a time, at offsets its manifest names.
+///
+/// A server that ignores `Range` answers 200 with the whole file; the slice is
+/// then taken here rather than trusted, because a client that assumed 206 would
+/// decode the head of the file as if it were the tile it asked for.
+pub async fn fetch_range(url: &str, start: u64, end: u64) -> Result<Vec<u8>, JsValue> {
+    let window = window().ok_or_else(|| JsValue::from_str("no window"))?;
+    let headers = web_sys::Headers::new()?;
+    headers.set("Range", &format!("bytes={start}-{end}"))?;
+    let init = web_sys::RequestInit::new();
+    init.set_method("GET");
+    init.set_headers(&headers);
+    let request = web_sys::Request::new_with_str_and_init(url, &init)?;
+    let response: Response = JsFuture::from(window.fetch_with_request(&request))
+        .await?
+        .dyn_into()?;
+    if !response.ok() {
+        return Err(JsValue::from_str(&format!(
+            "{url} responded {}",
+            response.status()
+        )));
+    }
+    let buffer = JsFuture::from(response.array_buffer()?).await?;
+    let bytes = js_sys::Uint8Array::new(&buffer).to_vec();
+    if response.status() == 206 {
+        return Ok(bytes);
+    }
+    let (start, end) = (start as usize, end as usize);
+    bytes
+        .get(start..=end.min(bytes.len().saturating_sub(1)))
+        .map(<[u8]>::to_vec)
+        .ok_or_else(|| JsValue::from_str("the range is outside the file"))
+}
+
 pub async fn fetch(url: &str) -> Result<Response, JsValue> {
     let window = window().ok_or_else(|| JsValue::from_str("no window"))?;
     let response: Response = JsFuture::from(window.fetch_with_str(url))

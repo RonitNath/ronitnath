@@ -1,0 +1,274 @@
+/* The atlas, and the control that opens it.
+ *
+ * This ships with the bundle rather than with the site stylesheet: every rule
+ * here dresses something the bundle itself creates, and a page that does not
+ * load the bundle has nothing for any of it to match. Trunk copies it into the
+ * bundle's dist as `explorer.css`, and the landing links it by that name.
+ *
+ * Layer order over the landing: the sky is z-index 2, the page chrome 3-5, and
+ * the atlas is above all of it, because it is the whole viewport.
+ */
+
+/* ------------------------------------------------------------ launcher --- */
+
+.starscape-launch {
+    padding: 0.4rem 0.65rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface-glass);
+    color: var(--fg);
+    font: inherit;
+    font-size: 0.78rem;
+    cursor: pointer;
+    pointer-events: auto;
+}
+
+.starscape-launch:hover:not([disabled]) {
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+.starscape-launch:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+.starscape-launch[disabled] {
+    color: var(--fg-subtle);
+    cursor: default;
+}
+
+.starscape-launch[hidden] {
+    display: none;
+}
+
+/* A star label points at a star; clicking it opens the atlas there. It is a
+ * button, so it needs the UA's button dressing taken back off — the label's
+ * own typography is set by the site stylesheet. */
+.star-callout {
+    appearance: none;
+    padding: 0;
+    border: 0;
+    background: none;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    pointer-events: auto;
+}
+
+/* -------------------------------------------------------------- atlas ---- */
+
+.starscape-explorer {
+    --atlas-ground: var(--bg);
+
+    position: fixed;
+    inset: 0;
+    z-index: 20;
+    color: var(--fg);
+    background: var(--atlas-ground);
+    animation: atlas-in 0.45s ease both;
+}
+
+/* Light mode's page is a dusk gradient that runs to near-white at the bottom,
+ * and a star map on near-white is not a star map. The atlas takes the dark end
+ * of that same gradient as its ground and its chrome takes the on-dusk ink,
+ * exactly as the landing's own top bar does. */
+:root[data-theme="light"] .starscape-explorer {
+    --atlas-ground: oklch(0.24 0.065 265);
+    --fg: var(--on-dusk-fg);
+    --fg-muted: var(--on-dusk-muted);
+    --fg-subtle: var(--on-dusk-muted);
+    --border: var(--on-dusk-border);
+    --accent: var(--on-dusk-accent);
+    --surface-glass: var(--on-dusk-glass);
+    --surface-glass-hover: var(--on-dusk-glass-hover);
+}
+
+@media (prefers-color-scheme: light) {
+    :root:not([data-theme="dark"]) .starscape-explorer {
+        --atlas-ground: oklch(0.24 0.065 265);
+        --fg: var(--on-dusk-fg);
+        --fg-muted: var(--on-dusk-muted);
+        --fg-subtle: var(--on-dusk-muted);
+        --border: var(--on-dusk-border);
+        --accent: var(--on-dusk-accent);
+        --surface-glass: var(--on-dusk-glass);
+        --surface-glass-hover: var(--on-dusk-glass-hover);
+    }
+}
+
+.atlas-canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    cursor: grab;
+    touch-action: none;
+}
+
+.atlas-canvas:active {
+    cursor: grabbing;
+}
+
+.starscape-explorer:focus-visible {
+    outline: none;
+}
+
+.atlas-bar,
+.atlas-links {
+    position: absolute;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface-glass);
+    backdrop-filter: blur(14px);
+}
+
+.atlas-bar {
+    top: 0.75rem;
+    right: 0.75rem;
+    left: 0.75rem;
+    min-height: 3rem;
+    padding: 0.35rem 0.45rem 0.35rem 0.8rem;
+}
+
+.atlas-bar > strong {
+    font-family: var(--font-display);
+    font-weight: var(--weight-semibold);
+    letter-spacing: 0.06em;
+}
+
+.atlas-spacer {
+    flex: 1;
+}
+
+.atlas-target {
+    color: var(--fg-muted);
+    font-size: 0.78rem;
+}
+
+.atlas-fov {
+    min-width: 3.3rem;
+    color: var(--fg-muted);
+    font-size: 0.78rem;
+    font-variant-numeric: tabular-nums;
+    text-align: center;
+}
+
+.atlas-bar button {
+    min-width: 2.5rem;
+    min-height: 2.25rem;
+    padding-inline: 0.5rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    font-size: 0.82rem;
+    cursor: pointer;
+}
+
+.atlas-bar button:hover {
+    border-color: var(--accent);
+    background: var(--surface-glass-hover);
+    color: var(--accent);
+}
+
+.atlas-bar button:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+.atlas-links {
+    top: 4.4rem;
+    right: 0.75rem;
+    padding: 0.55rem 0.8rem;
+    font-size: 0.75rem;
+}
+
+.atlas-links strong {
+    font-family: var(--font-display);
+    font-weight: var(--weight-semibold);
+    letter-spacing: 0.06em;
+}
+
+.atlas-links a {
+    color: var(--fg-muted);
+    text-decoration: none;
+}
+
+.atlas-links a:hover,
+.atlas-links a:focus-visible {
+    color: var(--accent);
+}
+
+/* A full-screen canvas has no visible affordances of its own. This is the
+ * legend for the ones it has, not a caption for the sky. */
+.atlas-keys {
+    position: absolute;
+    right: 0.85rem;
+    bottom: 0.85rem;
+    margin: 0;
+    color: var(--fg-subtle);
+    font-size: 0.7rem;
+}
+
+/* The atlas is the viewport. The page underneath keeps its layout — closing
+ * must put it back exactly — but nothing of it shows through. */
+:root.starscape-explorer-open,
+:root.starscape-explorer-open body {
+    overflow: hidden;
+}
+
+:root.starscape-explorer-open .topbar,
+:root.starscape-explorer-open .home-card,
+:root.starscape-explorer-open .sky-chrome,
+:root.starscape-explorer-open .star-annotations {
+    visibility: hidden;
+}
+
+@keyframes atlas-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@media (max-width: 768px) {
+    .atlas-target,
+    .atlas-keys {
+        display: none;
+    }
+
+    .atlas-bar {
+        gap: 0.25rem;
+        padding-inline: 0.35rem;
+    }
+
+    .atlas-bar > strong {
+        font-size: 0.9rem;
+    }
+
+    .atlas-bar button {
+        min-width: 2.25rem;
+        padding-inline: 0.3rem;
+    }
+
+    .atlas-fov {
+        min-width: 2.6rem;
+    }
+
+    .atlas-links {
+        right: 0.75rem;
+        left: 0.75rem;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .starscape-explorer {
+        animation: none;
+    }
+}

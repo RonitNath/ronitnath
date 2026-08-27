@@ -16,6 +16,7 @@ pub mod callouts;
 pub mod catalog;
 pub mod cities;
 pub mod dom;
+pub mod explorer;
 pub mod globe;
 pub mod interop;
 pub mod label;
