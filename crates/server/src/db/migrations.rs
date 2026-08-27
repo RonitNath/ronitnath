@@ -1,9 +1,13 @@
 //! The migration set, as a value, plus the integrity check that runs before it.
 //!
-//! The kernel owns the schema (`docs/rebuild/plan.md` §Workspace). Until K1
-//! hands over `rn_kernel::migrations()`, [`Migrations::default`] is the empty
-//! set and boot applies nothing — the seam is a value the caller passes in, so
-//! adopting the kernel's set is one line at the call site and no change here.
+//! The kernel owns the schema (`docs/rebuild/plan.md` §Workspace) and this
+//! module owns nothing but the reading of it. The seam is a value the caller
+//! passes in: `main` builds it with
+//! [`Migrations::embedded::<rn_kernel::Migrations>`](Migrations::embedded) and
+//! hands it to [`crate::db::open`], so the history is `rn-kernel`'s and the
+//! drift check over it is the server's, and neither knows about the other.
+//! [`Migrations::default`] is still the empty set, which is what a test that
+//! wants a database and no schema asks for.
 //!
 //! The integrity check is the part worth keeping verbatim in behaviour: a
 //! migration whose recorded name or content hash no longer matches the embedded
