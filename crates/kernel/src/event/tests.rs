@@ -55,11 +55,17 @@ const fn index(event: &Event) -> usize {
         Event::TokenRevoked { .. } => 39,
         Event::ConsentRevoked { .. } => 40,
         Event::SessionEnded { .. } => 41,
+        Event::OperatorGranted { .. } => 42,
+        Event::OperatorRevoked { .. } => 43,
+        Event::ReAuthenticated { .. } => 44,
+        Event::Impersonated { .. } => 45,
+        Event::ImpersonationEnded { .. } => 46,
+        Event::SigningKeyRetired { .. } => 47,
     }
 }
 
 /// How many there are. Stated once, asserted against both lists.
-const VARIANTS: usize = 42;
+const VARIANTS: usize = 48;
 
 /// One of each, with ids that are obviously placeholders.
 fn every_variant() -> Vec<Event> {
@@ -218,6 +224,26 @@ fn every_variant() -> Vec<Event> {
             identity: Id::new(1),
             session: Id::new(1),
             clients: vec![Id::new(2), Id::new(3)],
+        },
+        Event::OperatorGranted { person: Id::new(1) },
+        Event::OperatorRevoked { person: Id::new(1) },
+        Event::ReAuthenticated {
+            identity: Id::new(1),
+            session: Id::new(1),
+        },
+        Event::Impersonated {
+            operator: Id::new(1),
+            person: Id::new(2),
+            session: Id::new(3),
+        },
+        Event::ImpersonationEnded {
+            operator: Id::new(1),
+            person: Id::new(2),
+            session: Id::new(3),
+        },
+        Event::SigningKeyRetired {
+            kid: "a-kid".to_owned(),
+            forced: true,
         },
     ]
 }

@@ -25,6 +25,7 @@ mod client;
 mod handle;
 mod keys;
 mod mint;
+mod retire;
 mod session;
 mod token;
 
@@ -32,6 +33,7 @@ pub use client::{Registered, delete_client, register_client, rotate_client_secre
 pub use handle::set_handle;
 pub use keys::rotate_signing_key;
 pub use mint::{Granted, Issued};
+pub use retire::retire_key;
 pub use session::{end_session, revoke_consent};
 pub use token::{
     Authorized, authorize, client_credentials, exchange_code, refresh_token, revoke_token,

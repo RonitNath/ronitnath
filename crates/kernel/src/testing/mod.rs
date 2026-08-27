@@ -96,6 +96,9 @@ impl<S: Sql> Harness<S> {
             provider: &self.provider,
             principal,
             key,
+            // A fixture is a dev process: the commands that are gated on it
+            // have tests of their own for the off case.
+            impersonation: true,
         }
     }
 

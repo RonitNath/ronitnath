@@ -46,7 +46,13 @@ pub async fn claim_link<S: Sql, F: Feed>(
     ctx: &Ctx<'_, S, F>,
     args: &ClaimLink,
 ) -> Outcome<Committed> {
-    let (identity, person, acting_as) = refs::actor(&ctx.principal)?;
+    let (actor, person, acting_as) = refs::actor(&ctx.principal)?;
+    // The session's *own* identity, not the actor's: `claimed_by_identity_id`
+    // records who now holds the invitation, and under impersonation the actor
+    // is the operator while the registration joining the container is the
+    // target's. The audit row keeps the actor, which is the other half of the
+    // same distinction.
+    let (identity, _, _) = super::member(&ctx.principal)?;
     let token = Token::from_wire(&args.token);
     let now = ctx.now();
 
@@ -79,7 +85,7 @@ pub async fn claim_link<S: Sql, F: Feed>(
             AUDIT,
             bind![
                 ctx.key.to_string(),
-                identity,
+                actor,
                 acting_as,
                 now,
                 crate::audit::digest_of(args),

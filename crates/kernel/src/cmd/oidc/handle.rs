@@ -8,6 +8,7 @@
 
 use rn_api::commands::SetHandle;
 
+use crate::authority;
 use crate::bind;
 use crate::cmd::{Applied, Batch, Ctx, refs, run};
 use crate::error::{Outcome, decline};
@@ -33,6 +34,9 @@ pub async fn set_handle<S: Sql, F: Feed>(
     ctx: &Ctx<'_, S, F>,
     args: &SetHandle,
 ) -> Outcome<Committed> {
+    // An impersonated session may not change what the person is, or who
+    // may become them (`authority::FORBIDDEN_WHILE_IMPERSONATING`).
+    authority::not_impersonating(&ctx.principal)?;
     let (identity, person, acting_as) = refs::actor(&ctx.principal)?;
     let wanted = handle::validate(&args.handle)?;
 

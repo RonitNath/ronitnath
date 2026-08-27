@@ -38,9 +38,10 @@ use std::future::Future;
 use rn_api::commands::{ALL_COMMAND_NAMES, MatchSignal};
 use rn_api::commands::{
     AddFactor, CreateDocument, CreateGroup, CreateOrganization, DeleteClient, Disable,
-    EditDocument, Enable, FactorKind, Invite, Leave, ProposeMatch, PublishDocument, RegisterClient,
-    RemoveFactor, RemoveMember, Revoke, RevokeLink, RevokeSession, RotateClientSecret,
-    RotateSigningKey, RuleMatch, SetRole, Share, Split, Transfer, UpdateClient,
+    EditDocument, Enable, FactorKind, GrantOperator, Invite, Leave, ProposeMatch, PublishDocument,
+    RegisterClient, RemoveFactor, RemoveMember, RetireKey, Revoke, RevokeLink, RevokeOperator,
+    RevokeSession, RotateClientSecret, RotateSigningKey, RuleMatch, SetRole, Share, SignInAs,
+    Split, Transfer, UpdateClient,
 };
 use rn_api::oidc::{ClientAuthMethod, ClientMetadata, GrantType, Scope};
 use rn_api::whoami::{DocRole, MemberRole as WireRole};
@@ -104,8 +105,14 @@ enum Then {
 /// sentence in it rather than a silently uncovered route.
 const fn classify(name: &str) -> Result<(), Ungated> {
     match name.as_bytes() {
-        b"register" | b"sign-in" => Err(Ungated::Credential),
-        b"sign-out" | b"act-as" => Err(Ungated::OwnSession),
+        // `re-authenticate` is a password presented again on a session that
+        // already exists. The password is the authorisation, and an operator
+        // does not have anybody else's.
+        b"register" | b"sign-in" | b"re-authenticate" => Err(Ungated::Credential),
+        // `end-impersonation` deletes the session that ran it, so an
+        // operator's claim on it is the same claim anybody has on their own
+        // cookie: the one they are holding.
+        b"sign-out" | b"act-as" | b"end-impersonation" => Err(Ungated::OwnSession),
         b"claim-link" | b"verify-email" => Err(Ungated::Bearer),
         b"authorize"
         | b"exchange-code"
@@ -151,6 +158,10 @@ const GATED: &[&str] = &[
     "rotate-signing-key",
     "disable",
     "enable",
+    "grant-operator",
+    "revoke-operator",
+    "sign-in-as",
+    "retire-key",
 ];
 
 #[test]
@@ -440,6 +451,28 @@ async fn an_operator_reaches_every_command_a_principal_authorises() {
     };
     refused("disable", cmd::disable(&ctx(), &disable).await).await;
 
+    let grant = GrantOperator {
+        person: public(key, member.person()),
+        reason: "a second pair of hands for the cutover".into(),
+    };
+    refused("grant-operator", cmd::grant_operator(&ctx(), &grant).await).await;
+
+    let revoke_operator = RevokeOperator {
+        person: public(key, member.person()),
+        reason: "the cutover is done".into(),
+    };
+    refused(
+        "revoke-operator",
+        cmd::revoke_operator(&ctx(), &revoke_operator).await,
+    )
+    .await;
+
+    let sign_in_as = SignInAs {
+        person: public(key, member.person()),
+        reason: "reproducing the bug they reported".into(),
+    };
+    refused("sign-in-as", cmd::sign_in_as(&ctx(), &sign_in_as).await).await;
+
     let remove_member = RemoveMember {
         group: public(key, org),
         party: public(key, member.person()),
@@ -640,6 +673,44 @@ async fn an_operator_reaches_every_command_a_principal_authorises() {
     })
     .await;
 
+    // Delegation, and taking it back. In that order and about somebody else,
+    // because the last-operator rule means an operator cannot revoke the only
+    // one there is — including themselves.
+    sweep(&mut seen, "grant-operator", Then::Works, || async {
+        cmd::grant_operator(&ctx(), &grant).await.map(|_| ())
+    })
+    .await;
+    sweep(&mut seen, "revoke-operator", Then::Works, || async {
+        cmd::revoke_operator(&ctx(), &revoke_operator)
+            .await
+            .map(|_| ())
+    })
+    .await;
+    sweep(&mut seen, "sign-in-as", Then::Works, || async {
+        cmd::sign_in_as(&ctx(), &sign_in_as).await.map(|_| ())
+    })
+    .await;
+
+    // A second rotation is what puts the first key into `retiring`, which is
+    // the only status this command acts on: the active key is what everything
+    // is being signed under right now.
+    let second = cmd::rotate_signing_key(&ctx(), &RotateSigningKey {})
+        .await
+        .expect("an operator rotates");
+    let crate::Event::SigningKeyRotated { kid: newest } = second.event else {
+        panic!("rotating produces a rotation");
+    };
+    let retiring = retiring_kid(&harness, &newest).await;
+    let retire = RetireKey {
+        kid: retiring,
+        force: false,
+        reason: "nothing signed under it is alive".into(),
+    };
+    sweep(&mut seen, "retire-key", Then::Works, || async {
+        cmd::retire_key(&ctx(), &retire).await.map(|_| ())
+    })
+    .await;
+
     // Last, because they end sessions and change what everything above could
     // still have read.
     sweep(&mut seen, "disable", Then::Works, || async {
@@ -710,3 +781,16 @@ async fn count_of(harness: &Local, sql: &'static str, params: Vec<crate::store::
 // on a build where the assertions above are compiled out.
 const _: Option<Id<Person>> = None;
 const _: Option<Id<Resource>> = None;
+
+/// The `kid` of the one key that is `retiring` — everything except the one
+/// just minted.
+async fn retiring_kid(harness: &Local, active: &str) -> String {
+    let published = crate::oidc::key::published(harness.store())
+        .await
+        .expect("the JWKS reads");
+    published
+        .into_iter()
+        .find(|row| row.kid != active)
+        .expect("a second rotation leaves one key retiring")
+        .kid
+}

@@ -199,6 +199,7 @@ async fn one_id<T: rn_kernel::ids::Table>(
 
 fn context(state: &AppState) -> Ctx<'_, hiqlite::Client, rn_kernel::feed::ClusterFeed> {
     Ctx {
+        impersonation: state.config.mode == crate::config::Mode::Dev,
         provider: state.provider.as_ref(),
         store: state.store.as_ref(),
         feed: state.feed.as_ref(),

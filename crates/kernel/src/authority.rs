@@ -36,10 +36,11 @@
 
 use crate::bind;
 use crate::cmd::{Ctx, member};
-use crate::error::{Outcome, decline};
+use crate::error::{KernelError, Outcome, decline};
 use crate::feed::Feed;
 use crate::ids::{Id, Person};
 use crate::org::{self, MemberRole};
+use crate::principal::Principal;
 use crate::relation::{self, Object, Relation};
 use crate::store::{Count, Reads, Sql};
 
@@ -155,4 +156,124 @@ pub async fn operator_count(store: &impl Reads) -> Outcome<i64> {
         .await?
         .first()
         .map_or(0, |row| row.0))
+}
+
+// ------------------------------------------------------ re-authentication ---
+
+/// How long an operator's session lasts before a platform command asks for the
+/// password again. Fifteen minutes: long enough to do a piece of work, short
+/// enough that an unattended screen is not a delegation.
+pub const PLATFORM_REAUTH_WINDOW: crate::Timestamp = 15 * 60;
+
+/// The commands that decline outside [`PLATFORM_REAUTH_WINDOW`].
+///
+/// Named rather than derived, because "sensitive" is a judgement about
+/// consequences and not a property of the code: what is on this list is what
+/// somebody decided a stolen screen must not be able to do. It is also the
+/// seam a second factor would gate when passkeys land (requirement A3.3), so
+/// it is one list rather than a predicate spread over seven files.
+///
+/// `disable` is on it for a *person* only. Disabling an organization is
+/// undone by enabling it; disabling a person ends every session they hold and
+/// stops them signing back in to argue, which is the difference.
+pub const SENSITIVE: &[&str] = &[
+    "delete-client",
+    "disable",
+    "grant-operator",
+    "retire-key",
+    "revoke-operator",
+    "rotate-signing-key",
+    "sign-in-as",
+];
+
+/// Whether a command name is in the sensitive set.
+#[must_use]
+pub fn is_sensitive(command: &str) -> bool {
+    SENSITIVE.contains(&command)
+}
+
+/// When the session behind this principal last presented a password.
+///
+/// One read by primary key, made only by a sensitive command. It is not on
+/// [`Principal`] on purpose: a cached principal would carry a stale
+/// `auth_time`, and the one field a re-authentication window must not be stale
+/// about is the one it is made of.
+const AUTH_TIME_SQL: &str = "SELECT auth_time AS n FROM session WHERE id = $1";
+
+/// Refuse a sensitive command whose session has not seen a password lately.
+///
+/// The one refusal in this crate a caller is told apart from the others, and
+/// the reason is that it is *actionable*. Every other decline is uniform
+/// because the difference between "no such thing" and "not yours" is what an
+/// attacker is trying to learn; this one tells a caller who is already inside
+/// the tier that they must do something they have not been asked to do, and
+/// saying nothing would leave them retrying a command that will never work.
+/// The server renders it `401`.
+///
+/// # Errors
+///
+/// [`KernelError::ReAuthRequired`] when more than [`PLATFORM_REAUTH_WINDOW`]
+/// has passed, and the uniform decline when there is no session at all.
+pub async fn fresh_enough<S: Sql, F: Feed>(ctx: &Ctx<'_, S, F>) -> Outcome<()> {
+    let (_, _, session) = member(&ctx.principal)?;
+    let auth_time = ctx
+        .store
+        .reads()
+        .query::<Count>(AUTH_TIME_SQL, bind![session])
+        .await?
+        .first()
+        .map_or(0, |row| row.0);
+    if ctx.now() - auth_time > PLATFORM_REAUTH_WINDOW {
+        return Err(KernelError::ReAuthRequired);
+    }
+    Ok(())
+}
+
+// ---------------------------------------------------------- impersonation ---
+
+/// What an impersonated session may not do.
+///
+/// One sentence: *an impersonated session may not change what the person is,
+/// or who may become them.* Everything on this list is one of those two, and
+/// nothing else is — an operator wearing somebody's hat may write their
+/// documents, because that is what the hat is for, and may not add a factor to
+/// their account, because a factor outlives the thirty minutes.
+pub const FORBIDDEN_WHILE_IMPERSONATING: &[&str] = &[
+    "add-factor",
+    "disable",
+    "grant-operator",
+    "re-authenticate",
+    "register-client",
+    "remove-factor",
+    "revoke-operator",
+    "rotate-client-secret",
+    "set-handle",
+    "sign-in-as",
+];
+
+/// Whether a command name is refused from an impersonated session.
+#[must_use]
+pub fn is_forbidden_while_impersonating(command: &str) -> bool {
+    FORBIDDEN_WHILE_IMPERSONATING.contains(&command)
+}
+
+/// Refuse a command that an impersonated session may not run.
+///
+/// Asked inside the command rather than in the dispatcher, for the reason
+/// every other authorisation in this crate is: a route that forgot to call it
+/// would be a hole the type system cannot see, and the ten commands that must
+/// refuse are ten places a middleware's list could silently stop matching.
+///
+/// The uniform decline, unlike [`fresh_enough`]: there is nothing the caller
+/// can do about it inside this session, and saying "you are impersonating"
+/// back to the one principal that already knows buys nothing.
+///
+/// # Errors
+///
+/// The uniform decline when [`Principal::impersonated_by`] is set.
+pub fn not_impersonating(principal: &Principal) -> Outcome<()> {
+    if principal.impersonated_by().is_some() {
+        return decline();
+    }
+    Ok(())
 }

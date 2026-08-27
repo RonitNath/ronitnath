@@ -36,6 +36,9 @@ pub async fn remove_factor<S: Sql, F: Feed>(
     ctx: &Ctx<'_, S, F>,
     args: &RemoveFactor,
 ) -> Outcome<Committed> {
+    // An impersonated session may not change what the person is, or who
+    // may become them (`authority::FORBIDDEN_WHILE_IMPERSONATING`).
+    authority::not_impersonating(&ctx.principal)?;
     let (actor, person, acting_as) = refs::actor(&ctx.principal)?;
     let identity =
         match target_identity(&ctx.store.reads(), actor, person, args.identity.as_ref()).await {

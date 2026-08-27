@@ -44,9 +44,15 @@ const USABLE: &str = "SELECT i.id AS identity_id, i.person_id \
 
 /// [`crate::cmd::sign_in`]'s statement, verbatim: the guard is the whole rule,
 /// and a copy that relaxed it would be a session the disable did not stop.
+/// The `auth_time` a bypass writes is the moment it ran, and that is the
+/// honest answer: no password was presented, and a column saying one was five
+/// minutes ago would be a lie in the same row as the `dev-sign-in` that says
+/// otherwise. What keeps it defensible is that this module is not in a release
+/// binary at all.
 const SESSION: &str = "INSERT INTO session \
-                       (identity_id, acting_as, token_hash, expires_at, created_at, last_seen_at) \
-                       SELECT $1, $2, $3, $4, $5, $5 \
+                       (identity_id, acting_as, token_hash, expires_at, created_at, \
+                        last_seen_at, auth_time) \
+                       SELECT $1, $2, $3, $4, $5, $5, $5 \
                        WHERE EXISTS (SELECT 1 FROM identity i \
                                      LEFT JOIN party who ON who.id = i.person_id \
                                      WHERE i.id = $1 AND i.status = 'active' \

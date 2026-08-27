@@ -419,6 +419,7 @@ mod tests {
             person: Some(Id::new(2)),
             acting_as: Id::new(2),
             session: Id::new(3),
+            impersonated_by: None,
         };
         let merged = committed(Event::PersonMerged {
             survivor: Id::new(2),
@@ -457,6 +458,7 @@ mod tests {
             person: Some(Id::new(2)),
             acting_as: Id::new(2),
             session: Id::new(3),
+            impersonated_by: None,
         };
         let theirs = committed(Event::SignedIn {
             identity: Id::new(99),
@@ -536,6 +538,7 @@ mod tests {
             person: Some(Id::new(2)),
             acting_as: Id::new(2),
             session: Id::new(3),
+            impersonated_by: None,
         };
         let claimed = committed(Event::LinkClaimed {
             container: Id::new(1),

@@ -62,6 +62,9 @@ async fn the_migration_creates_exactly_the_reports_tables() {
         names(&store, "table").await,
         vec![
             "audit",
+            // Migration 7's, the side table that makes "every ruling about
+            // this row" a seek instead of a scan of the whole change feed.
+            "audit_object",
             // K2's migration adds `document` and `party_resource`; the list is
             // exhaustive on purpose, so a table nobody meant to add fails here.
             "document",
@@ -95,7 +98,10 @@ async fn every_named_index_exists() {
     let store = store();
     let indexes = names(&store, "index").await;
     for wanted in [
+        "audit_acting_as_idx",
         "audit_actor_idx",
+        "audit_at_idx",
+        "audit_object_audit_idx",
         "factor_email_unique_idx",
         "factor_identity_idx",
         "factor_verified_value_idx",
@@ -118,6 +124,7 @@ async fn every_named_index_exists() {
         "resource_owner_idx",
         "session_expires_idx",
         "session_identity_idx",
+        "session_impersonated_idx",
     ] {
         assert!(indexes.contains(&wanted.to_owned()), "missing {wanted}");
     }
@@ -335,18 +342,20 @@ fn a_clock_a_test_owns_moves_only_when_told() {
 #[test]
 fn the_embedded_migrations_are_the_files_on_disk() {
     let sql = migrations();
-    // Six files: `1_kernel.sql` creates every table, `2_relations.sql` adds
+    // Seven files: `1_kernel.sql` creates every table, `2_relations.sql` adds
     // what the relation store needs on top of them, `3_merge.sql` what merge
     // needs, `4_invitations.sql` the index "invitations I minted" seeks on,
     // `5_visibility.sql` the one that makes "the newest N I own" a bounded
-    // read, `6_oidc.sql` the OpenID Provider. Each is asserted below by
+    // read, `6_oidc.sql` the OpenID Provider, `7_authority.sql` what an
+    // operator's authority needs to be accountable. Each is asserted below by
     // something only that file contains.
-    assert_eq!(sql.len(), 6);
+    assert_eq!(sql.len(), 7);
     assert!(sql[0].contains("CREATE TABLE party"));
     assert!(sql[2].contains("person_link_is_append_only_update"));
     assert!(sql[3].contains("relation_granted_by_idx"));
     assert!(sql[4].contains("resource_owner_created_idx"));
     assert!(sql[5].contains("CREATE TABLE oidc_client"));
+    assert!(sql[6].contains("CREATE TABLE audit_object"));
     // Order is what makes the second file able to alter the first's tables.
     assert!(sql[1].contains("ALTER TABLE relation"));
 }

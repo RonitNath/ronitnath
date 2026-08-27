@@ -31,10 +31,13 @@ mod create_organization;
 mod disable;
 mod edit_document;
 mod enable;
+mod impersonate;
 mod invite;
 mod leave;
 pub(crate) mod oidc;
+mod operator;
 mod publish_document;
+mod reauthenticate;
 pub(crate) mod refs;
 mod register;
 mod remove_factor;
@@ -60,14 +63,17 @@ pub use create_organization::create_organization;
 pub use disable::disable;
 pub use edit_document::edit_document;
 pub use enable::enable;
+pub use impersonate::{end_impersonation, sign_in_as};
 pub use invite::invite;
 pub use leave::leave;
 pub use oidc::{
     Authorized, Granted, Issued, Registered, authorize, client_credentials, delete_client,
-    end_session, exchange_code, refresh_token, register_client, revoke_consent, revoke_token,
-    rotate_client_secret, rotate_signing_key, set_handle, update_client,
+    end_session, exchange_code, refresh_token, register_client, retire_key, revoke_consent,
+    revoke_token, rotate_client_secret, rotate_signing_key, set_handle, update_client,
 };
+pub use operator::{grant_operator, revoke_operator};
 pub use publish_document::publish_document;
+pub use reauthenticate::reauthenticate;
 pub use register::register;
 pub use remove_factor::remove_factor;
 pub use remove_member::remove_member;
@@ -124,6 +130,14 @@ pub struct Ctx<'a, S: Sql, F: Feed> {
     pub principal: Principal,
     /// The caller's idempotency key.
     pub key: Uuid,
+    /// Whether this deployment allows impersonation at all (requirement
+    /// C11.3, `RN_SITE__IMPERSONATION`).
+    ///
+    /// A flag rather than a config reference, because the kernel does not read
+    /// configuration: the server hands it in, and a deployment that never
+    /// wants an operator able to become a person turns it off and does not
+    /// have to trust a review of this crate. Default on in dev, off in prod.
+    pub impersonation: bool,
 }
 
 impl<S: Sql, F: Feed> Ctx<'_, S, F> {
@@ -359,6 +373,7 @@ pub(crate) fn member(principal: &Principal) -> Outcome<(Id<Identity>, Id<Person>
             person,
             acting_as,
             session,
+            ..
         } => Ok((*identity, person.unwrap_or(*acting_as), *session)),
         Principal::Bearer { .. } | Principal::Anonymous => decline(),
     }

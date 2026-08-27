@@ -15,6 +15,7 @@ use rn_api::commands::{DeleteClient, RegisterClient, RotateClientSecret, UpdateC
 use rn_api::oidc::{ClientAuthMethod, ClientMetadata, GrantType, Scope};
 
 use super::{client_of, may_administer, operator};
+use crate::authority;
 use crate::cmd::{Applied, Batch, Ctx, refs, run};
 use crate::domain::Token;
 use crate::error::{Invalid, Outcome, decline};
@@ -134,6 +135,9 @@ pub async fn register_client<S: Sql, F: Feed>(
     ctx: &Ctx<'_, S, F>,
     args: &RegisterClient,
 ) -> Outcome<Registered> {
+    // An impersonated session may not change what the person is, or who
+    // may become them (`authority::FORBIDDEN_WHILE_IMPERSONATING`).
+    authority::not_impersonating(&ctx.principal)?;
     let (identity, _, acting_as) = operator(ctx).await?;
     validate(&args.metadata)?;
 
@@ -241,6 +245,9 @@ pub async fn rotate_client_secret<S: Sql, F: Feed>(
     ctx: &Ctx<'_, S, F>,
     args: &RotateClientSecret,
 ) -> Outcome<Registered> {
+    // An impersonated session may not change what the person is, or who
+    // may become them (`authority::FORBIDDEN_WHILE_IMPERSONATING`).
+    authority::not_impersonating(&ctx.principal)?;
     let (identity, person, acting_as) = refs::actor(&ctx.principal)?;
     let client = client_of(ctx, args.client.as_str()).await?;
     if !may_administer(ctx, person, &client).await? {

@@ -241,6 +241,7 @@ pub fn ctx(
     principal: Principal,
 ) -> Ctx<'_, hiqlite::Client, rn_kernel::feed::ClusterFeed> {
     Ctx {
+        impersonation: true,
         provider: state.provider.as_ref(),
         store: state.store.as_ref(),
         feed: state.feed.as_ref(),

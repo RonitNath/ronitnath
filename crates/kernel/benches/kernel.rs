@@ -212,6 +212,7 @@ fn commit_on_a_node(c: &mut Criterion) {
 
     let provider = rn_kernel::oidc::Provider::dev();
     let ctx = |key: uuid::Uuid| cmd::Ctx {
+        impersonation: false,
         store: store.as_ref(),
         feed: &feed,
         provider: &provider,

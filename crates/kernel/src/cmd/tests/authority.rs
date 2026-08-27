@@ -331,6 +331,7 @@ async fn a_session_speaks_as_an_organization_it_administers_and_as_no_other() {
         person: Some(founder.person()),
         acting_as: Id::new(org.get()),
         session,
+        impersonated_by: None,
     };
     cmd::create_document(
         &harness.ctx(acting_principal),

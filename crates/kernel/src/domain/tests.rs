@@ -136,6 +136,8 @@ fn a_session_expires_and_slides() {
         expires_at: 1_000 + SESSION_TTL,
         created_at: 1_000,
         last_seen_at: 1_000,
+        auth_time: 0,
+        impersonated_by_identity_id: None,
     };
     assert!(session.is_live(1_000));
     assert!(!session.is_live(1_000 + SESSION_TTL));

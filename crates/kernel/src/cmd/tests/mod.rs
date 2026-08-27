@@ -11,6 +11,7 @@ mod factors;
 mod identity;
 mod operator;
 mod orgs;
+mod platform;
 mod sessions;
 mod sharing;
 mod status;

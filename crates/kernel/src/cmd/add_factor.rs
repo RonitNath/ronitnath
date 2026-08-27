@@ -34,6 +34,9 @@ pub async fn add_factor<S: Sql, F: Feed>(
     ctx: &Ctx<'_, S, F>,
     args: &AddFactor,
 ) -> Outcome<Committed> {
+    // An impersonated session may not change what the person is, or who
+    // may become them (`authority::FORBIDDEN_WHILE_IMPERSONATING`).
+    authority::not_impersonating(&ctx.principal)?;
     let (actor, person, acting_as) = refs::actor(&ctx.principal)?;
     // The acting identity by default, one of the person's others when the
     // caller names it — `crate::merge::recovery` is where that rule lives.

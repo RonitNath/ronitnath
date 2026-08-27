@@ -54,6 +54,9 @@ const SESSIONS: &str =
 
 /// Move a party to `disabled`.
 pub async fn disable<S: Sql, F: Feed>(ctx: &Ctx<'_, S, F>, args: &Disable) -> Outcome<Committed> {
+    // An impersonated session may not change what the person is, or who
+    // may become them (`authority::FORBIDDEN_WHILE_IMPERSONATING`).
+    authority::not_impersonating(&ctx.principal)?;
     let (identity, _person, acting_as) = refs::actor(&ctx.principal)?;
     let target = authorised(ctx, &args.party).await?;
     let now = ctx.now();

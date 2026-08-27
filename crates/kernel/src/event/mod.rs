@@ -348,6 +348,63 @@ pub enum Event {
         /// The client.
         client: Id<OidcClient>,
     },
+    /// Somebody was granted `platform:* #operator`.
+    ///
+    /// [`Self::touches_person`] names them, which is what evicts their warm
+    /// principal on every node: a grant that only took effect when a cache
+    /// entry aged out would be a promotion nobody could time.
+    OperatorGranted {
+        /// Who now operates the deployment.
+        person: Id<Person>,
+    },
+    /// Somebody's `platform:* #operator` was taken away.
+    ///
+    /// Evicts for the stronger reason: a revoked operator who kept the tier
+    /// until their entry aged out would be a revocation that is really only an
+    /// expiry, and expiry is not revocation.
+    OperatorRevoked {
+        /// Who no longer operates the deployment.
+        person: Id<Person>,
+    },
+    /// A password was presented again on a session that already existed.
+    ///
+    /// No new session and no new cookie: what moved is `session.auth_time`,
+    /// which is what the sensitive commands measure against.
+    ReAuthenticated {
+        /// Whose session.
+        identity: Id<Identity>,
+        /// Which one.
+        session: Id<Session>,
+    },
+    /// An operator minted a session that speaks as somebody else.
+    Impersonated {
+        /// The operator's registration — the actor on every audit row the
+        /// session goes on to write.
+        operator: Id<Identity>,
+        /// The person whose hat it is.
+        person: Id<Person>,
+        /// The session that was minted. Its token is in the reply and nowhere
+        /// else.
+        session: Id<Session>,
+    },
+    /// An impersonated session was ended by the operator wearing it.
+    ImpersonationEnded {
+        /// The operator.
+        operator: Id<Identity>,
+        /// The person whose hat it was.
+        person: Id<Person>,
+        /// The session that is gone.
+        session: Id<Session>,
+    },
+    /// A signing key left the JWKS for good.
+    SigningKeyRetired {
+        /// The `kid` an RP will no longer find.
+        kid: String,
+        /// Whether tokens signed under it were still alive. A forced retire is
+        /// a decision to make them unverifiable, so the event says which kind
+        /// of retire it was and the payload carries the reason.
+        forced: bool,
+    },
     /// A person withdrew a consent, and every token it produced with it.
     ConsentRevoked {
         /// The client.
@@ -407,6 +464,12 @@ impl Event {
             Self::TokenRevoked { .. } => "revoke-token",
             Self::ConsentRevoked { .. } => "revoke-consent",
             Self::SessionEnded { .. } => "end-session",
+            Self::OperatorGranted { .. } => "grant-operator",
+            Self::OperatorRevoked { .. } => "revoke-operator",
+            Self::ReAuthenticated { .. } => "re-authenticate",
+            Self::Impersonated { .. } => "sign-in-as",
+            Self::ImpersonationEnded { .. } => "end-impersonation",
+            Self::SigningKeyRetired { .. } => "retire-key",
         }
     }
 
@@ -455,7 +518,15 @@ impl Event {
             | Self::PersonSplit { identity, .. }
             | Self::IdentityLinked { identity, .. }
             | Self::LinkClaimed { identity, .. }
-            | Self::SessionEnded { identity, .. } => Some(*identity),
+            | Self::SessionEnded { identity, .. }
+            | Self::ReAuthenticated { identity, .. } => Some(*identity),
+            // The operator's own registration, not the session's: an
+            // impersonated session's warm entry is keyed on the identity it
+            // was minted for, and what has to be evicted when a hat goes on or
+            // comes off is the operator's view of themselves.
+            Self::Impersonated { operator, .. } | Self::ImpersonationEnded { operator, .. } => {
+                Some(*operator)
+            }
             _ => None,
         }
     }
@@ -478,7 +549,11 @@ impl Event {
             Self::Transferred { to, .. } => Some(*to),
             Self::HandleSet { person }
             | Self::Authorized { person, .. }
-            | Self::ConsentRevoked { person, .. } => Some(*person),
+            | Self::ConsentRevoked { person, .. }
+            | Self::OperatorGranted { person }
+            | Self::OperatorRevoked { person }
+            | Self::Impersonated { person, .. }
+            | Self::ImpersonationEnded { person, .. } => Some(*person),
             _ => None,
         }
     }
