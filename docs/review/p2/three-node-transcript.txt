@@ -1,0 +1,40 @@
+
+$ tools/cluster.sh start
+==> building rn-site
+==> node 1 started (pid 94677, app 127.0.0.1:3161, log /Users/ronitnath/dev/worktrees/rn-site--p2/target/cluster/node1/rn-site.log)
+==> node 2 started (pid 94683, app 127.0.0.1:3162, log /Users/ronitnath/dev/worktrees/rn-site--p2/target/cluster/node2/rn-site.log)
+==> node 3 started (pid 94689, app 127.0.0.1:3163, log /Users/ronitnath/dev/worktrees/rn-site--p2/target/cluster/node3/rn-site.log)
+==> all 3 nodes are ready
+
+$ pgrep -f rn-site   # before
+94677 94683 94689 
+
+$ curl each node's product route
+http://127.0.0.1:3161/sky -> 404
+http://127.0.0.1:3162/sky -> 404
+http://127.0.0.1:3163/sky -> 404
+
+$ register the configured operator on node 1
+POST /auth/register -> 303, session minted: yes
+the configured address becomes this deployment's operator on its own Registered event
+
+$ POST /api/cmd/enable-product on node 1 only
+{"offset":2,"result":{"slug":"starscape"}}
+200
+
+$ poll all three
+node1 200  node2 200  node3 200   (within 2s of the command returning)
+
+$ pgrep -f rn-site   # after
+94677 94683 94689 
+the same three pids: nothing restarted
+
+$ POST /api/cmd/disable-product on node 3
+{"offset":3,"result":{"slug":"starscape"}}
+200
+
+$ poll all three
+node1 404  node2 404  node3 404
+
+$ pgrep -f rn-site   # still the same three
+94677 94683 94689 
