@@ -1,0 +1,8 @@
+[package]
+name = "holding-sites"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+askama = "0.16.0"
+
