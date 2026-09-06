@@ -15,6 +15,10 @@ export const TUNING = {
   alphaMax: 1,
   /** Halo falloff: the exponential rate the point's brightness drops at. */
   glow: 2.5,
+  /** How much the halo widens with brightness. The shipped value is 0, which
+   * is the fixed falloff `glow` alone; it is carried rather than folded away
+   * so the two stay one knob (`tuning.rs`'s `halo`). */
+  halo: 0,
   /** Atmospheric extinction, magnitudes per airmass. 0.28 is a humid
    * low-altitude site rather than a mountaintop's 0.20 — the honest end of the
    * real range, chosen because it makes the band visibly dim toward the frame
