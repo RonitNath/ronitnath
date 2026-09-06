@@ -17,6 +17,13 @@ vi.mock('next/navigation', () => ({
 const principal = vi.fn();
 vi.mock('@/features/auth/session', () => ({ currentPrincipal: () => principal() }));
 
+/* The org tier asks one more question — whether this asker operates that
+ * handle — and `allows` is tested on its own in authority.test.ts. */
+const operated = vi.fn();
+vi.mock('@/features/organizations/queries', () => ({
+  operatedOrganization: (handle: string, actor: unknown) => operated(handle, actor),
+}));
+
 const tiers = await import('../tiers');
 
 const OPERATOR = {
@@ -67,8 +74,27 @@ describe('tier helpers', () => {
     });
   });
 
-  it('declines the org tier for everybody until R5 fills it', async () => {
-    principal.mockResolvedValue(OPERATOR);
+  it('sends a signed-out visitor from an org page to the door, carrying it', async () => {
+    principal.mockResolvedValue(null);
+    operated.mockResolvedValue(null);
+    await expect(tiers.requireOrgOperator('isoastra')).rejects.toThrow(
+      '/auth?next=%2Forg%2Fisoastra',
+    );
+  });
+
+  it('declines a member who does not operate that organization as 404', async () => {
+    principal.mockResolvedValue(MEMBER);
+    operated.mockResolvedValue(null);
     await expect(tiers.requireOrgOperator('isoastra')).rejects.toBeInstanceOf(NotFound);
+  });
+
+  it('lets an admin of that organization in, and hands the page the row', async () => {
+    principal.mockResolvedValue(MEMBER);
+    operated.mockResolvedValue({ id: 4, handle: 'isoastra', name: 'Isoastra' });
+    await expect(tiers.requireOrgOperator('isoastra')).resolves.toMatchObject({
+      tier: 'orgOperator',
+      personId: 8,
+      organization: { handle: 'isoastra' },
+    });
   });
 });

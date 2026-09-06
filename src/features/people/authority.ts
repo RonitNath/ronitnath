@@ -12,10 +12,9 @@ import { and, eq, isNull } from 'drizzle-orm';
 import { schema } from '@/db/client';
 import type { Transaction } from '@/features/auth/db';
 
-export interface Actor {
-  personId: number;
-  isOperator: boolean;
-}
+/* One actor shape for the whole deployment (src/lib/authority.ts). */
+export type { Actor } from '@/lib/authority';
+import type { Actor } from '@/lib/authority';
 
 export type Want =
   /* Act on this person: be them, or hold them. */

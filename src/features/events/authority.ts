@@ -16,10 +16,9 @@ import { and, eq } from 'drizzle-orm';
 import { schema } from '@/db/client';
 import type { Transaction } from '@/features/auth/db';
 
-export interface Actor {
-  personId: number;
-  isOperator: boolean;
-}
+/* One actor shape for the whole deployment (src/lib/authority.ts). */
+export type { Actor } from '@/lib/authority';
+import type { Actor } from '@/lib/authority';
 
 export const HOST = 'host';
 export const INVITED = 'invited';
