@@ -1,0 +1,27 @@
+Star catalog provenance
+=======================
+
+bright.bin
+  Magnitude-sorted naked-eye catalog carried by rn-site. Each record contains
+  a J2000/ICRS direction, apparent magnitude, and display color.
+
+Named-star callouts
+  The checked-in 50-entry catalog at public/stars/named.json is
+  position-matched to bright.bin. Proper names follow the IAU Catalog of Star
+  Names. Constellations, spectral classifications, and parallaxes were checked
+  against SIMBAD and the Hipparcos New Reduction (CDS VizieR I/311). Distances
+  are rounded for legibility; values for luminous supergiants whose parallax is
+  poorly constrained are approximate rather than false-precision reciprocals.
+
+Gaia LOD
+  public/stars/lod is generated from ESA Gaia DR3 gaia_source fields source_id,
+  ra, dec, phot_g_mean_mag, and bp_rp with phot_g_mean_mag <= 12. It is produced
+  offline by tools/build_star_lod.py. The web application never contacts ESA or
+  CDS at runtime.
+
+Sources
+  ESA Gaia Archive: https://gea.esac.esa.int/archive/
+  Gaia DR3 documentation: https://gea.esac.esa.int/archive/documentation/GDR3/
+  IAU Catalog of Star Names: https://www.iau.org/public/themes/naming_stars/
+  SIMBAD: https://simbad.cds.unistra.fr/simbad/
+  Hipparcos New Reduction: https://cdsarc.cds.unistra.fr/viz-bin/cat/I/311

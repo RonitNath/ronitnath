@@ -1,74 +1,155 @@
-/** The star catalog the landing sky draws.
+/** The two fetched star assets, and the validation that stands between the
+ * network and the canvas.
  *
- * Not a real catalog: a seeded sample of the real *statistics*. Positions are
- * uniform on the sphere and magnitudes follow the observed count law — the
- * number of stars brighter than m goes as 10^0.6m, which is why the sky is a
- * scattering of faint points with a handful of bright ones rather than an even
- * dusting. A real catalog would buy constellations at the cost of shipping a
- * table; the brief takes the generator, and the seed is fixed, so every
- * visitor and every render sees the same sky (docs/design.md: star positions
- * are a designed asset, not something to regenerate per load).
+ * `bright.bin` is the catalog: an 8-byte `STR1` header and then one 20-byte
+ * record per star — three f32 of unit position, one f32 magnitude, four bytes
+ * of RGBA colour — sorted brightest first, so a partial read is still the
+ * brightest sky rather than a random subset of it.
  *
- * Structure-of-arrays because the canvas walks all of it every frame.
+ * `named.json` is the annotation catalog: a small IAU/SIMBAD-attributed list
+ * that points at records in `bright.bin` by index.
  */
 
-/** The seed. Changing it changes the sky, so it does not change. */
-export const SKY_SEED = 0x5eed_5c09;
+import type { Vec3 } from './sidereal';
 
-/** Naked-eye limits: Sirius at −1.46, the faintest star a dark sky gives up. */
-const MAG_MIN = -1.5;
-const MAG_MAX = 6;
+export const HEADER_LEN = 8;
+export const STRIDE = 20;
+const MAGIC = 0x31_52_54_53; // "STR1", little-endian.
+const MAX_STARS = 1_000_000;
 
+export class CatalogError extends Error {}
+
+/** Structure of arrays, because the canvas walks all of it every frame. */
 export interface StarCatalog {
-  /** Right ascension, radians in [0, 2π). */
-  ra: Float64Array;
-  /** Declination, radians in [−π/2, π/2]. */
-  dec: Float64Array;
-  /** Apparent magnitude, smaller is brighter. */
-  mag: Float64Array;
-  /** Colour, 0 = blue-white, 1 = warm — a stand-in for the colour index. */
-  tint: Float64Array;
+  /** J2000 unit vectors, three per star. */
+  position: Float32Array;
+  magnitude: Float32Array;
+  /** RGB in 0..1, three per star. */
+  color: Float32Array;
   count: number;
 }
 
-/** mulberry32: 32 bits of state, uniform enough for a sky and identical on
- * every engine, which a shared Math.random would not be. */
-function mulberry32(seed: number): () => number {
-  let a = seed >>> 0;
-  return () => {
-    a = (a + 0x6d2b79f5) >>> 0;
-    let t = a;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4_294_967_296;
-  };
+/** Parse and check the header, returning the star count it declares. */
+export function headerCount(bytes: Uint8Array): number {
+  if (bytes.byteLength < HEADER_LEN) throw new CatalogError('bad star asset header');
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  if (view.getUint32(0, true) !== MAGIC) throw new CatalogError('bad star asset header');
+  const count = view.getUint32(4, true);
+  if (count === 0 || count > MAX_STARS) throw new CatalogError('star count out of bounds');
+  return count;
 }
 
-/** Inverse of the cumulative count law, so a uniform draw lands on a
- * magnitude with the right frequency. */
-function magnitudeAt(u: number): number {
-  const lo = Math.pow(10, 0.6 * MAG_MIN);
-  const hi = Math.pow(10, 0.6 * MAG_MAX);
-  return Math.log10(u * (hi - lo) + lo) / 0.6;
-}
-
-/** Build the sky. Pure in (count, seed): same arguments, same arrays. */
-export function generateCatalog(count = 2000, seed: number = SKY_SEED): StarCatalog {
-  const random = mulberry32(seed);
-  const ra = new Float64Array(count);
-  const dec = new Float64Array(count);
-  const mag = new Float64Array(count);
-  const tint = new Float64Array(count);
-
-  for (let i = 0; i < count; i += 1) {
-    ra[i] = random() * Math.PI * 2;
-    // asin of a uniform draw, not a uniform declination: the latter would
-    // crowd both celestial poles and leave the equator bare.
-    dec[i] = Math.asin(random() * 2 - 1);
-    mag[i] = magnitudeAt(random());
-    // Two draws averaged: most stars sit mid-range, few are strongly coloured.
-    tint[i] = (random() + random()) / 2;
+/** Full structural validation and unpacking: exact length, and every record a
+ * finite unit vector. A star at the origin or with a NaN coordinate renders as
+ * a full-screen artefact rather than as nothing, which is why this is checked
+ * rather than trusted. */
+export function parseStars(bytes: Uint8Array): StarCatalog {
+  const count = headerCount(bytes);
+  if (bytes.byteLength !== HEADER_LEN + count * STRIDE) {
+    throw new CatalogError('star asset length mismatch');
   }
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const position = new Float32Array(count * 3);
+  const magnitude = new Float32Array(count);
+  const color = new Float32Array(count * 3);
 
-  return { ra, dec, mag, tint, count };
+  for (let index = 0; index < count; index += 1) {
+    const at = HEADER_LEN + index * STRIDE;
+    const x = view.getFloat32(at, true);
+    const y = view.getFloat32(at + 4, true);
+    const z = view.getFloat32(at + 8, true);
+    const mag = view.getFloat32(at + 12, true);
+    const normSquared = x * x + y * y + z * z;
+    if (!Number.isFinite(mag) || !(normSquared >= 0.98 && normSquared <= 1.02)) {
+      throw new CatalogError('invalid star record');
+    }
+    position[index * 3] = x;
+    position[index * 3 + 1] = y;
+    position[index * 3 + 2] = z;
+    magnitude[index] = mag;
+    color[index * 3] = view.getUint8(at + 16) / 255;
+    color[index * 3 + 1] = view.getUint8(at + 17) / 255;
+    color[index * 3 + 2] = view.getUint8(at + 18) / 255;
+  }
+  return { position, magnitude, color, count };
+}
+
+/** The J2000 unit vector of the star at `index`. */
+export function starPosition(catalog: StarCatalog, index: number): Vec3 | null {
+  if (!Number.isInteger(index) || index < 0 || index >= catalog.count) return null;
+  return [
+    catalog.position[index * 3]!,
+    catalog.position[index * 3 + 1]!,
+    catalog.position[index * 3 + 2]!,
+  ];
+}
+
+export interface NamedStar {
+  brightIndex: number;
+  name: string;
+  constellation: string;
+  classification: string;
+  distanceLy: number;
+}
+
+export interface NamedCatalog {
+  version: number;
+  sources: string[];
+  stars: NamedStar[];
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+/** Parse `named.json`. Nothing about a catalog that arrived over the network
+ * is trusted: a name that is not a string would end up in the DOM, and an
+ * index that is not one would label the wrong star. */
+export function parseNamed(json: string): NamedCatalog {
+  const parsed: unknown = JSON.parse(json);
+  if (!isRecord(parsed) || typeof parsed.version !== 'number') {
+    throw new CatalogError('named.json is not a catalog');
+  }
+  const sources = Array.isArray(parsed.sources)
+    ? parsed.sources.filter((source): source is string => typeof source === 'string')
+    : [];
+  if (!Array.isArray(parsed.stars) || parsed.stars.length === 0) {
+    throw new CatalogError('named.json has no stars');
+  }
+  const stars = parsed.stars.map((entry): NamedStar => {
+    if (
+      !isRecord(entry) ||
+      !Number.isInteger(entry.brightIndex) ||
+      typeof entry.name !== 'string' ||
+      entry.name === '' ||
+      typeof entry.constellation !== 'string' ||
+      entry.constellation === '' ||
+      typeof entry.classification !== 'string' ||
+      entry.classification === '' ||
+      typeof entry.distanceLy !== 'number' ||
+      !Number.isFinite(entry.distanceLy) ||
+      entry.distanceLy <= 0
+    ) {
+      throw new CatalogError('named.json holds a malformed star');
+    }
+    return {
+      brightIndex: entry.brightIndex as number,
+      name: entry.name,
+      constellation: entry.constellation,
+      classification: entry.classification,
+      distanceLy: entry.distanceLy,
+    };
+  });
+  return { version: parsed.version, sources, stars };
+}
+
+/** The J2000 vectors the named catalog points at. A catalog whose indices do
+ * not all resolve is a mismatched pair of assets, and labelling the wrong
+ * stars is worse than labelling none. */
+export function namedVectors(catalog: StarCatalog, named: NamedCatalog): Vec3[] {
+  return named.stars.map((star) => {
+    const position = starPosition(catalog, star.brightIndex);
+    if (!position) throw new CatalogError('named.json points outside the star catalog');
+    return position;
+  });
 }

@@ -1,66 +1,100 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
-import { generateCatalog, SKY_SEED } from '../catalog';
+import {
+  CatalogError,
+  HEADER_LEN,
+  headerCount,
+  namedVectors,
+  parseNamed,
+  parseStars,
+  starPosition,
+  STRIDE,
+} from '../catalog';
 
-describe('generateCatalog', () => {
-  it('is deterministic: the same seed gives the same sky', () => {
-    const a = generateCatalog(500, 1234);
-    const b = generateCatalog(500, 1234);
-    expect(Array.from(a.ra)).toEqual(Array.from(b.ra));
-    expect(Array.from(a.dec)).toEqual(Array.from(b.dec));
-    expect(Array.from(a.mag)).toEqual(Array.from(b.mag));
-    expect(Array.from(a.tint)).toEqual(Array.from(b.tint));
+const BRIGHT = new Uint8Array(readFileSync('public/stars/bright.bin'));
+const NAMED = readFileSync('public/stars/named.json', 'utf8');
+
+function oneRecord(x: number, y: number, z: number): Uint8Array {
+  const bytes = new Uint8Array(HEADER_LEN + STRIDE);
+  bytes.set([0x53, 0x54, 0x52, 0x31, 1, 0, 0, 0]);
+  const view = new DataView(bytes.buffer);
+  [x, y, z, 2].forEach((value, i) => view.setFloat32(HEADER_LEN + i * 4, value, true));
+  bytes.set([255, 255, 255, 255], HEADER_LEN + 16);
+  return bytes;
+}
+
+describe('the shipped star catalog', () => {
+  it('validates and has its published count', () => {
+    expect(parseStars(BRIGHT).count).toBe(12_191);
   });
 
-  it('gives a different sky for a different seed', () => {
-    const a = generateCatalog(500, 1234);
-    const b = generateCatalog(500, 5678);
-    expect(Array.from(a.ra)).not.toEqual(Array.from(b.ra));
-  });
-
-  it('holds the shipped sky at the count the canvas draws', () => {
-    const sky = generateCatalog();
-    expect(sky.count).toBe(2000);
-    expect(sky.ra).toHaveLength(2000);
-    expect(SKY_SEED).toBe(0x5eed_5c09);
-  });
-
-  it('keeps every star inside the coordinate and magnitude ranges', () => {
-    const sky = generateCatalog(4000, 99);
-    for (let i = 0; i < sky.count; i += 1) {
-      expect(sky.ra[i]!).toBeGreaterThanOrEqual(0);
-      expect(sky.ra[i]!).toBeLessThan(Math.PI * 2);
-      expect(Math.abs(sky.dec[i]!)).toBeLessThanOrEqual(Math.PI / 2);
-      expect(sky.mag[i]!).toBeGreaterThanOrEqual(-1.5);
-      expect(sky.mag[i]!).toBeLessThanOrEqual(6);
-      expect(sky.tint[i]!).toBeGreaterThanOrEqual(0);
-      expect(sky.tint[i]!).toBeLessThanOrEqual(1);
+  it('is sorted brightest first, so a partial read is still the sky', () => {
+    const { magnitude } = parseStars(BRIGHT);
+    for (let i = 1; i < magnitude.length; i += 1) {
+      expect(magnitude[i]!).toBeGreaterThanOrEqual(magnitude[i - 1]!);
     }
   });
 
-  it('follows the observed count law: each magnitude step holds ~4x the last', () => {
-    const sky = generateCatalog(200_000, 7);
-    const buckets = [0, 0, 0, 0, 0, 0, 0];
-    for (let i = 0; i < sky.count; i += 1) {
-      const b = Math.floor(sky.mag[i]!) + 1;
-      if (b >= 0 && b < buckets.length) buckets[b]! += 1;
-    }
-    for (let b = 2; b < buckets.length; b += 1) {
-      const ratio = buckets[b]! / buckets[b - 1]!;
-      // 10^0.6 = 3.98 per magnitude; loose bounds so the test is about the
-      // law, not about the sampler's noise.
-      expect(ratio).toBeGreaterThan(3);
-      expect(ratio).toBeLessThan(5);
-    }
+  it('reads a star position by index, bounded by the catalog', () => {
+    const catalog = parseStars(BRIGHT);
+    const vector = starPosition(catalog, 0)!;
+    expect(Math.abs(Math.hypot(...vector) - 1)).toBeLessThan(0.01);
+    expect(starPosition(catalog, 12_191)).toBeNull();
+    expect(starPosition(catalog, -1)).toBeNull();
+  });
+});
+
+describe('a refused star asset', () => {
+  it('refuses a truncated or absurd header', () => {
+    expect(() => headerCount(new Uint8Array([0x53, 0x54, 0x52, 0x31, 0, 0, 0, 0]))).toThrow(
+      /out of bounds/,
+    );
+    expect(() =>
+      headerCount(new Uint8Array([0x53, 0x54, 0x52, 0x31, 255, 255, 255, 255])),
+    ).toThrow(/out of bounds/);
+    expect(() => headerCount(new Uint8Array([0x4e, 0x4f, 0x50, 0x45, 1, 0, 0, 0]))).toThrow(
+      /bad star asset header/,
+    );
+    expect(() => parseStars(oneRecord(1, 0, 0).subarray(0, HEADER_LEN + STRIDE - 1))).toThrow(
+      /length mismatch/,
+    );
   });
 
-  it('spreads stars evenly over the sphere rather than crowding the poles', () => {
-    const sky = generateCatalog(100_000, 11);
-    // Equal-area bands in sin(dec): four of them should hold a quarter each.
-    const bands = [0, 0, 0, 0];
-    for (let i = 0; i < sky.count; i += 1) {
-      bands[Math.min(3, Math.floor(((Math.sin(sky.dec[i]!) + 1) / 2) * 4))]! += 1;
+  it('refuses a record that is not a finite unit vector', () => {
+    for (const bad of [oneRecord(0, 0, 0), oneRecord(Number.NaN, 0, 1), oneRecord(2, 0, 0)]) {
+      expect(() => parseStars(bad)).toThrow(CatalogError);
     }
-    for (const n of bands) expect(n / sky.count).toBeCloseTo(0.25, 2);
+  });
+});
+
+describe('the named catalog', () => {
+  it('is structured, attributed, and points inside the star catalog', () => {
+    const catalog = parseNamed(NAMED);
+    expect(catalog.version).toBe(1);
+    expect(catalog.stars.length).toBeGreaterThanOrEqual(50);
+    expect(catalog.sources.some((source) => source.includes('IAU'))).toBe(true);
+    expect(catalog.sources.some((source) => source.includes('SIMBAD'))).toBe(true);
+    const vectors = namedVectors(parseStars(BRIGHT), catalog);
+    expect(vectors).toHaveLength(catalog.stars.length);
+    for (const vector of vectors)
+      expect(Math.abs(Math.hypot(...vector) - 1)).toBeLessThan(0.02);
+  });
+
+  it('refuses a catalog whose text is not a catalog', () => {
+    expect(() => parseNamed('{"version":1,"stars":[]}')).toThrow(CatalogError);
+    expect(() => parseNamed('{"version":1,"stars":[{"name":"x"}]}')).toThrow(CatalogError);
+    expect(() =>
+      parseNamed('{"version":1,"stars":[{"brightIndex":0,"name":"","constellation":"a"}]}'),
+    ).toThrow(CatalogError);
+  });
+
+  it('refuses a named catalog that points outside the star catalog', () => {
+    const stars = parseStars(BRIGHT);
+    const named = parseNamed(
+      '{"version":1,"sources":[],"stars":[{"brightIndex":999999,"name":"Nowhere",' +
+        '"constellation":"None","classification":"none","distanceLy":1}]}',
+    );
+    expect(() => namedVectors(stars, named)).toThrow(/outside the star catalog/);
   });
 });
