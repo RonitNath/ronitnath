@@ -103,4 +103,12 @@ Deploys: after R2 and after R6 (owner). Not carried: hiqlite, Rust, OIDC
   decline (404 for unreachable, never 403 that leaks existence).
 - Visual work is done only with agent-browser screenshots actually viewed,
   both themes, desktop + phone width. `pnpm gate` green before reporting.
+- Behind the edge `request.url` is the container's bind address (`0.0.0.0:3140`),
+  never the public host. Absolute URLs — redirects, mail links, and the OIDC
+  `redirect_uri` openid-client rebuilds from the URL it is handed — come from
+  `src/lib/request-url.ts` (`PUBLIC_ORIGIN`); `request.url` may only be read
+  for path and query (`grep -rn 'request\.url' src` at review). Libraries that
+  check `instanceof` across routes (openid-client) are `serverExternalPackages`.
+  Auth is verified only by a completed login through the public edge with the
+  ZITADEL human `support@isoastra.com`, temporarily allowlisted and removed.
 - Report: what shipped, what was verified (commands run), what was left out.
