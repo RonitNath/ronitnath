@@ -187,18 +187,22 @@ export const link = pgTable(
   ],
 );
 
+/* A group is a bag of subjects with a name, owned by whoever made it — a
+ * person or an organization. It is not an organization's private furniture:
+ * a member's own circles are groups too, which is what the guest ordering on
+ * an event page reads. Nesting is a group inside a group, and the only thing
+ * forbidden is a cycle (src/lib/authority.ts). */
 export const group = pgTable(
   'group',
   {
     id: serial('id').primaryKey(),
-    organizationId: integer('organization_id')
+    ownerPartyId: integer('owner_party_id')
       .notNull()
-      .references(() => organization.id, { onDelete: 'cascade' }),
-    handle: text('handle').notNull(),
+      .references(() => party.id, { onDelete: 'cascade' }),
     name: text('name').notNull(),
     createdAt: now(),
   },
-  (t) => [uniqueIndex('group_org_handle_key').on(t.organizationId, t.handle)],
+  (t) => [index('group_owner_idx').on(t.ownerPartyId)],
 );
 
 /* The registry that lets a relation point at anything without a foreign key
@@ -251,11 +255,20 @@ export const document = pgTable(
       .notNull()
       .references(() => party.id, { onDelete: 'cascade' }),
     title: text('title').notNull(),
+    /* Markdown-lite, as it was typed; the HTML is rendered on the way out by
+     * the events `markup` module, so there is one place markup can be born. */
     body: text('body').notNull().default(''),
+    /* Derived from the title once, at creation, and then it belongs to the
+     * URL: a rewritten title does not break a link somebody already pasted. */
+    slug: text('slug'),
+    publishedAt: timestamp('published_at', { withTimezone: true }),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
     createdAt: now(),
   },
-  (t) => [index('document_owner_idx').on(t.ownerPartyId)],
+  (t) => [
+    index('document_owner_idx').on(t.ownerPartyId),
+    uniqueIndex('document_slug_key').on(t.slug),
+  ],
 );
 
 export const event = pgTable(

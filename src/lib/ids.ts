@@ -14,7 +14,10 @@ export const ID_TYPES = {
   identity: 'i',
   organization: 'o',
   group: 'g',
-  resource: 'r',
+  /* `r` is the document's, not the resource registry's: the registry row is
+   * bookkeeping that never reaches a URL, and a document is the only resource
+   * a member names by hand. */
+  document: 'r',
   session: 's',
   link: 'l',
   event: 'e',
