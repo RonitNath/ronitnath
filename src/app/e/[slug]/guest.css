@@ -1,0 +1,196 @@
+/* The guest page. Built in the site's own system — the tokens in globals.css,
+ * one radius, borders over shadows, five type sizes — and deliberately thin,
+ * because the owner's ruling is that this page gets a Figma pass before it is
+ * final (docs/events-guest-page.md). Everything a designer would want to move
+ * is a token or a single rule here; nothing is a magic number inside a
+ * component. */
+
+.invite {
+  max-width: 34rem;
+}
+
+.invite > h1 {
+  margin: 0 0 0.75rem;
+  font-size: var(--text-5);
+  line-height: 1.15;
+}
+
+.invite .lede {
+  margin: 0 0 2rem;
+}
+
+.invite .host {
+  color: var(--fg);
+}
+
+/* A colour is a token the host picked, not free CSS: it tints one hairline
+ * above the title and nothing else. */
+.invite[data-colour] {
+  border-top: 2px solid var(--accent);
+  padding-top: 2rem;
+}
+.invite[data-colour='ember'] {
+  border-top-color: var(--state-stopped);
+}
+.invite[data-colour='gold'] {
+  border-top-color: var(--hero-gold);
+}
+.invite[data-colour='moss'] {
+  border-top-color: var(--state-live);
+}
+
+.invite .poster {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin-bottom: 1.5rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.invite .body {
+  font-size: var(--text-3);
+  color: var(--fg-muted);
+}
+
+.invite .body p,
+.invite .body ul {
+  margin: 0 0 1rem;
+}
+
+.invite .body ul {
+  padding-left: 1.1rem;
+  /* Tailwind's reset takes the markers off every list; a body list is prose
+   * and wants them back. */
+  list-style: disc;
+}
+
+.invite h2 {
+  margin: 0 0 0.5rem;
+  font-size: var(--text-2);
+  font-weight: 600;
+  color: var(--fg-subtle);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.invite section {
+  margin: 2rem 0;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--border);
+}
+
+.invite .details p {
+  margin: 0 0 0.5rem;
+}
+
+.aside-line {
+  margin: 0.75rem 0 0;
+  font-size: var(--text-2);
+}
+
+/* Who's coming. Before an answer the names are softened — and they are first
+ * names in the HTML as well, because a blurred surname is still a surname to
+ * anyone who reads the source. */
+.names {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.85rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-2);
+  color: var(--fg-muted);
+}
+
+.who-list[data-blurred='true'] .name {
+  filter: blur(0.22rem);
+  user-select: none;
+  color: var(--fg-subtle);
+}
+
+.name[data-shared='true'] {
+  color: var(--fg);
+}
+
+.more {
+  color: var(--fg-subtle);
+}
+
+.full {
+  color: var(--state-stopped);
+  font-weight: 400;
+}
+
+/* The answer. Three words in a row, not three pills: the chosen one takes the
+ * accent and a heavier border, and nothing is a capsule. */
+.answer {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-top: 2rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--border);
+}
+
+.answers {
+  display: flex;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.answers legend {
+  padding: 0;
+  font-size: var(--text-1);
+  color: var(--fg-muted);
+}
+
+.choice {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.45rem 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: var(--text-2);
+  color: var(--fg-muted);
+  cursor: pointer;
+}
+
+.choice:hover {
+  border-color: var(--accent);
+  color: var(--fg);
+}
+
+.choice:has(input:checked),
+.choice[data-chosen='true'] {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.choice input {
+  accent-color: var(--accent);
+}
+
+.answer .field.narrow input {
+  width: 5rem;
+}
+
+.answer .field input,
+.answer .field select {
+  padding: 0.55rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--fg);
+  font: inherit;
+  font-size: var(--text-2);
+}
+
+@media (max-width: 30rem) {
+  .answers {
+    flex-wrap: wrap;
+  }
+}
