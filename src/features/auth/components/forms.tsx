@@ -10,11 +10,12 @@ import { useActionState } from 'react';
 import {
   register,
   requestPasswordReset,
+  requestVerification,
   resetPassword,
   signIn,
   verifyEmail,
 } from '@/features/auth/actions';
-import type { FormState } from '@/features/auth/form-state';
+import { UNVERIFIED, type FormState } from '@/features/auth/form-state';
 
 const EMPTY: FormState = {};
 
@@ -36,8 +37,29 @@ function Note({ state }: { state: FormState }) {
   return null;
 }
 
+/* What the door says to a correct password against an unconfirmed address.
+ * It takes the sign-in pane's place rather than sitting beside it: there is
+ * one thing to do here, and a form cannot be nested inside another one. */
+function ConfirmPane({ email }: { email: string }) {
+  const [state, action, pending] = useActionState(requestVerification, EMPTY);
+  return (
+    <form className="pane" action={action}>
+      <h2>Confirm your email</h2>
+      <input type="hidden" name="email" value={email} />
+      <p className="note">
+        {UNVERIFIED} The link was sent to <span className="mono">{email}</span>.
+      </p>
+      <Note state={state} />
+      <button type="submit" className="commit" disabled={pending}>
+        Send it again
+      </button>
+    </form>
+  );
+}
+
 export function SignInForm({ next }: { next: string }) {
   const [state, action, pending] = useActionState(signIn, EMPTY);
+  if (state.unverified && state.email) return <ConfirmPane email={state.email} />;
   return (
     <form className="pane" action={action}>
       <h2>Sign in</h2>

@@ -27,6 +27,9 @@ export interface Limit {
  * the per-address counter is what actually protects an account. */
 export const SIGN_IN_LIMIT: Limit = { scope: 'sign_in', max: 10, ipMax: 120, windowSeconds: 900 };
 export const RESET_LIMIT: Limit = { scope: 'reset', max: 5, ipMax: 60, windowSeconds: 3600 };
+/* Re-sending a confirmation is the same shape of favour as a reset — one
+ * letter to an address someone typed — so it is counted the same way. */
+export const VERIFY_LIMIT: Limit = { scope: 'verify', max: 5, ipMax: 60, windowSeconds: 3600 };
 
 /* Addresses are not stored in the clear here: the counter needs to tell two
  * keys apart, not to say what they were. */

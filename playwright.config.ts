@@ -23,7 +23,10 @@ export default defineConfig({
       'rm -rf .next/standalone/.next/static .next/standalone/public',
       'cp -R .next/static .next/standalone/.next/static',
       'cp -R public .next/standalone/public',
-      `MAIL_DIR=${process.cwd()}/.mail PORT=${port} node .next/standalone/server.js`,
+      /* `MAIL_FAIL` names a substring of a recipient the transport must
+       * refuse, so one run can watch a send fail for one visitor and land for
+       * everyone else (src/lib/mail.ts). */
+      `MAIL_DIR=${process.cwd()}/.mail MAIL_FAIL=mailfail PORT=${port} node .next/standalone/server.js`,
     ].join(' && '),
     url: `${baseURL}/healthz`,
     reuseExistingServer: !process.env.CI,

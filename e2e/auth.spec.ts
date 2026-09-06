@@ -187,3 +187,47 @@ test('a callback with no checks cookie declines without touching the database', 
   expect(response.status()).toBe(302);
   expect(response.headers()['location']).toContain('/auth?declined=1');
 });
+
+test('a confirmation that never went out can be asked for again', async ({ page }) => {
+  const email = address('unconfirmed');
+  await page.goto('/auth');
+  await page.getByLabel('Name').fill('Unconfirmed Member');
+  await page.locator('#register-email').fill(email);
+  await page.locator('#register-password').fill(PASSWORD);
+  await page.getByRole('button', { name: 'Register' }).click();
+  await expect(page.getByText('Check your inbox')).toBeVisible();
+
+  /* The password is right; the address is not confirmed. The door says so
+   * rather than declining, because the password already proved who is asking. */
+  await signIn(page, email);
+  await expect(page.getByRole('heading', { name: 'Confirm your email' })).toBeVisible();
+  await expect(page).toHaveURL(/\/auth/);
+
+  await page.getByRole('button', { name: 'Send it again' }).click();
+  await expect(page.getByText('Check your inbox')).toBeVisible();
+
+  await page.goto(await linkFor(email, '/auth/verify'));
+  await page.getByRole('button', { name: 'Confirm' }).click();
+  await expect(page.getByText('Address confirmed')).toBeVisible();
+
+  await signIn(page, email);
+  await expect(page).toHaveURL('/app');
+});
+
+test('registering when the mail transport fails still leaves an account', async ({ page }) => {
+  /* `MAIL_FAIL=mailfail` in the Playwright server makes the transport refuse
+   * this one address: the commit has happened, the letter has not, and the
+   * visitor must see the page everyone else sees — not a server exception. */
+  const email = address('mailfail');
+  await page.goto('/auth');
+  await page.getByLabel('Name').fill('Undelivered Member');
+  await page.locator('#register-email').fill(email);
+  await page.locator('#register-password').fill(PASSWORD);
+  await page.getByRole('button', { name: 'Register' }).click();
+  await expect(page.getByText('Check your inbox')).toBeVisible();
+  await expect(page.locator('.note[data-state="invalid"]')).toHaveCount(0);
+
+  /* The account exists: the door knows the password and says what is missing. */
+  await signIn(page, email);
+  await expect(page.getByRole('heading', { name: 'Confirm your email' })).toBeVisible();
+});

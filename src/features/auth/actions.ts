@@ -16,7 +16,7 @@ import { z } from 'zod';
 
 import { database, schema } from '@/db/client';
 import { tryDecodeId } from '@/lib/ids';
-import { passwordResetMail, sendMail, verificationMail } from '@/lib/mail';
+import { deliver, passwordResetMail, verificationMail } from '@/lib/mail';
 import { recordAudit } from './audit';
 import { isAllowlisted, looksLikeEmail, normalizeEmail } from './email-address';
 import { AUTH_FAILED, CHECK_INBOX, RESET_SENT, type FormState } from './form-state';
@@ -30,7 +30,12 @@ import {
   requestFingerprint,
   setSessionCookie,
 } from './session';
-import { RESET_LIMIT, SIGN_IN_LIMIT, clearLimit, overLimit } from './throttle';
+import { RESET_LIMIT, SIGN_IN_LIMIT, VERIFY_LIMIT, clearLimit, overLimit } from './throttle';
+
+/* Sign-in has three answers, not two: a session, a refusal, and an address
+ * whose password is right and whose confirmation never landed. */
+type SignInOutcome = { token: string } | { unconfirmed: true };
+const UNCONFIRMED: SignInOutcome = { unconfirmed: true };
 
 const PASSWORD_MIN = 10;
 const PASSWORD_MAX = 200;
@@ -107,8 +112,15 @@ export async function register(_prev: FormState, form: FormData): Promise<FormSt
     return { token, address };
   });
 
-  /* Mail goes out after the commit: a letter cannot be rolled back. */
-  if (sent) await sendMail(verificationMail(sent.address, linkUrl('verify_email', sent.token)));
+  /* Mail goes out after the commit — a letter cannot be rolled back — and a
+   * letter that fails to go out must not take the account with it. The
+   * visitor sees the same page either way and can ask for another one from
+   * the door; the failure is a line in the log, where it can be acted on. */
+  if (sent) {
+    await deliver(verificationMail(sent.address, linkUrl('verify_email', sent.token)), {
+      command: 'register',
+    });
+  }
   return { form: 'register', notice: CHECK_INBOX };
 }
 
@@ -150,7 +162,7 @@ export async function signIn(_prev: FormState, form: FormData): Promise<FormStat
   const { email: address, password: secret, next } = parsed.data;
   const where = await requestFingerprint();
 
-  const outcome = await database().transaction(async (tx) => {
+  const outcome = await database().transaction<SignInOutcome | null>(async (tx) => {
     if (await overLimit(tx, SIGN_IN_LIMIT, ['email', address])) return null;
     if (where.ip && (await overLimit(tx, SIGN_IN_LIMIT, ['ip', where.ip]))) return null;
 
@@ -174,11 +186,25 @@ export async function signIn(_prev: FormState, form: FormData): Promise<FormStat
     /* Every refusal costs one argon2 verification, so an address nobody
      * registered does not answer faster than a wrong password. */
     const row = rows[0];
-    if (!row || row.disabledAt !== null || row.verifiedAt === null || !row.phc) {
+    if (!row || row.disabledAt !== null || !row.phc) {
       await spendVerificationTime(secret);
       return null;
     }
     if (!(await verifyPassword(secret, row.phc))) return null;
+
+    /* The password is right and the address was never confirmed. Saying so
+     * here reveals nothing the person asking does not already hold. */
+    if (row.verifiedAt === null) {
+      await clearLimit(tx, SIGN_IN_LIMIT, ['email', address]);
+      if (where.ip) await clearLimit(tx, SIGN_IN_LIMIT, ['ip', where.ip]);
+      await recordAudit(tx, {
+        actorPersonId: row.personId,
+        command: 'sign-in-unconfirmed',
+        targetKind: 'identity',
+        targetId: row.identityId,
+      });
+      return UNCONFIRMED;
+    }
 
     const { token } = await createSession(tx, {
       personId: row.personId,
@@ -195,11 +221,12 @@ export async function signIn(_prev: FormState, form: FormData): Promise<FormStat
       targetId: row.identityId,
       payload: { source: 'local' },
     });
-    return token;
+    return { token };
   });
 
   if (outcome === null) return { form: 'sign-in', error: AUTH_FAILED };
-  await setSessionCookie(outcome);
+  if ('unconfirmed' in outcome) return { form: 'sign-in', unverified: true, email: address };
+  await setSessionCookie(outcome.token);
   redirect(safeNext(next));
 }
 
@@ -294,7 +321,11 @@ export async function requestPasswordReset(
     return token;
   });
 
-  if (sent) await sendMail(passwordResetMail(address, linkUrl('reset_password', sent)));
+  if (sent) {
+    await deliver(passwordResetMail(address, linkUrl('reset_password', sent)), {
+      command: 'request-password-reset',
+    });
+  }
   return { form: 'reset', notice: RESET_SENT };
 }
 
@@ -349,4 +380,44 @@ export async function resetPassword(_prev: FormState, form: FormData): Promise<F
   if (!ok) return { error: 'That link has been used or has expired.' };
   await clearSessionCookie();
   return { notice: 'Password set. Every other session has been signed out.' };
+}
+
+/** RequestVerification. The letter register sent may never have arrived — the
+ *  transport can fail after the account exists — so the door can send another
+ *  one. Throttled like a reset, and answered the same way whether or not the
+ *  address is one that could be confirmed. */
+export async function requestVerification(_prev: FormState, form: FormData): Promise<FormState> {
+  const parsed = resetRequestInput.safeParse({ email: field(form, 'email') });
+  if (!parsed.success) return { form: 'sign-in', unverified: true, notice: CHECK_INBOX };
+  const address = parsed.data.email;
+  const where = await requestFingerprint();
+
+  const sent = await database().transaction(async (tx) => {
+    if (await overLimit(tx, VERIFY_LIMIT, ['email', address])) return null;
+    if (where.ip && (await overLimit(tx, VERIFY_LIMIT, ['ip', where.ip]))) return null;
+    if (isAllowlisted(address)) return null;
+    const identity = await findIdentity(tx, 'local', address);
+    if (!identity || identity.verifiedAt !== null) return null;
+    const token = await issueLink(tx, {
+      kind: 'verify_email',
+      targetKind: 'identity',
+      targetId: identity.id,
+      ttlHours: VERIFY_TTL_HOURS,
+      createdBy: identity.personId,
+    });
+    await recordAudit(tx, {
+      actorPersonId: identity.personId,
+      command: 'request-verification',
+      targetKind: 'identity',
+      targetId: identity.id,
+    });
+    return token;
+  });
+
+  if (sent) {
+    await deliver(verificationMail(address, linkUrl('verify_email', sent)), {
+      command: 'request-verification',
+    });
+  }
+  return { form: 'sign-in', unverified: true, email: address, notice: CHECK_INBOX };
 }

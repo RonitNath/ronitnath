@@ -71,7 +71,17 @@ async function sendViaUseSend(base: string, key: string, message: Message): Prom
   }
 }
 
+/* A recipient the transport must refuse. `MAIL_FAIL=1` fails everything;
+ * anything else is a substring of the address that fails, so one Playwright
+ * run can watch a send fail for one visitor and succeed for the rest. */
+function refuses(to: string): boolean {
+  const fail = process.env.MAIL_FAIL;
+  if (!fail) return false;
+  return fail === '1' || to.includes(fail);
+}
+
 export async function sendMail(message: Message): Promise<void> {
+  if (refuses(message.to)) throw new Error('mail: refused by MAIL_FAIL');
   const apiUrl = process.env.USESEND_API_URL;
   const apiKey = process.env.USESEND_API_KEY;
   if (apiUrl && apiKey) {
@@ -101,7 +111,34 @@ export async function sendMail(message: Message): Promise<void> {
   console.log(message.text);
 }
 
-/* The two letters this rung sends. Both are one sentence, one link and the
+/* Sending, for the callers that have already committed. A letter cannot be
+ * rolled back and a letter that did not go out must not undo the row that
+ * asked for it: the visitor's account exists either way, and what they see is
+ * the same page. The failure is a structured line in the log, which is the
+ * only place it can be acted on. */
+export async function deliver(
+  message: Message,
+  context: Record<string, unknown> = {},
+): Promise<boolean> {
+  try {
+    await sendMail(message);
+    return true;
+  } catch (error) {
+    console.error(
+      JSON.stringify({
+        level: 'error',
+        event: 'mail.failed',
+        to: message.to,
+        subject: message.subject,
+        reason: error instanceof Error ? error.message : String(error),
+        ...context,
+      }),
+    );
+    return false;
+  }
+}
+
+/* The letters this rung sends. Both are one sentence, one link and the
  * time it dies: an email that explains itself at length reads as a phish. */
 
 export function verificationMail(to: string, url: string): Message {
