@@ -1,0 +1,117 @@
+/* The landing: one hero over the sky, one control in the corner.
+ *
+ * Everything here sits in its own stacking context above the atmosphere
+ * layers, which are fixed at z-index 0.
+ */
+
+:root {
+  --topbar-height: 4.45rem;
+  --card-narrow: 31rem;
+}
+
+.topbar {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  min-height: var(--topbar-height);
+  padding: 0 1.25rem;
+}
+
+/* In the light theme the topbar crosses the darkest end of the dusk ramp,
+ * where ordinary near-black ink is invisible. It re-tints its own token set
+ * rather than each child overriding a colour, so anything added to the header
+ * later inherits the correction. */
+:root[data-theme='light'] .topbar {
+  --fg: var(--on-dusk-fg);
+  --fg-muted: var(--on-dusk-muted);
+  --border: var(--on-dusk-border);
+  --accent: var(--on-dusk-accent);
+  --accent-hover: var(--on-dusk-fg);
+  --surface-glass: var(--on-dusk-glass);
+  --surface-glass-hover: var(--on-dusk-glass-hover);
+}
+
+.home-hero {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: calc(100vh - var(--topbar-height));
+  min-height: calc(100dvh - var(--topbar-height));
+  padding: 2rem 1rem 5rem;
+}
+
+.home-card {
+  max-width: var(--card-narrow);
+  text-align: center;
+}
+
+/* Headings sit near body scale: the distinction is family, letter-spacing and
+ * colour, not size. --text-5 is the ceiling, not a starting point. */
+.home-card h1 {
+  margin: 0 0 0.5rem;
+  font-family: var(--font-display);
+  font-size: var(--text-5);
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  color: var(--hero-fg);
+  text-shadow: var(--hero-shadow);
+}
+
+.home-card .tagline {
+  margin: 0 0 1.75rem;
+  font-size: var(--text-3);
+  color: var(--fg-muted);
+  text-shadow: var(--hero-shadow);
+}
+
+/* The other half of the identity pair. */
+.home-card .tagline a {
+  color: var(--company-fg);
+}
+
+.social-links {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.social-links a {
+  display: block;
+  /* 0.75rem of vertical padding brings the target to the 44px floor. */
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-glass);
+  color: var(--fg);
+  font-size: var(--text-2);
+  transition:
+    border-color 0.15s ease-out,
+    color 0.15s ease-out,
+    background-color 0.15s ease-out;
+}
+
+.social-links a:hover {
+  border-color: var(--accent);
+  background: var(--surface-glass-hover);
+  color: var(--accent);
+  text-decoration: none;
+}
+
+/* Two rows of two on a phone. Four in a row want ~460px before the gaps, so
+ * below that they either crowd the card's edges or wrap 3+1, which reads as a
+ * mistake rather than a layout. The grid wraps 2+2 deliberately and gives the
+ * columns equal width, which flex-wrap would not. */
+@media (max-width: 34rem) {
+  .social-links {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

@@ -37,15 +37,7 @@ export function ThemeToggle() {
       type="button"
       onClick={() => choose(theme === 'dark' ? 'light' : 'dark')}
       aria-label={theme === 'dark' ? 'Use the light theme' : 'Use the dark theme'}
-      style={{
-        border: '1px solid var(--border)',
-        borderRadius: 'var(--radius)',
-        padding: '0.25rem 0.625rem',
-        fontSize: 'var(--text-1)',
-        color: 'var(--fg-muted)',
-        background: 'var(--surface-glass)',
-        cursor: 'pointer',
-      }}
+      className="theme-toggle"
     >
       {theme === 'dark' ? 'Light' : 'Dark'}
     </button>

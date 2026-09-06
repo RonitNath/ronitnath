@@ -1,38 +1,48 @@
+import { Atmosphere } from '@/features/sky/atmosphere';
+
+import './landing.css';
 import { ThemeToggle } from './theme-toggle';
 
+/** The public landing. Server-rendered whole; the only client code on the page
+ * is the sky canvas and the theme toggle. */
 export default function Home() {
   return (
-    <main
-      style={{
-        minHeight: '100dvh',
-        display: 'grid',
-        gridTemplateRows: 'auto 1fr',
-        maxWidth: 'var(--content-max)',
-        margin: '0 auto',
-        padding: '1.5rem',
-        gap: 'var(--gap-section)',
-      }}
-    >
-      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+    <>
+      <Atmosphere />
+      <header className="topbar">
         <ThemeToggle />
-      </div>
-      <div style={{ alignSelf: 'center', display: 'grid', gap: '0.75rem' }}>
-        <h1
-          style={{
-            fontFamily: 'var(--font-display)',
-            fontSize: 'var(--text-5)',
-            fontWeight: 600,
-            letterSpacing: '-0.01em',
-            margin: 0,
-          }}
-        >
-          <span style={{ color: 'var(--hero-red)' }}>Ronit</span>{' '}
-          <span style={{ color: 'var(--hero-gold)' }}>Nath</span>
-        </h1>
-        <p style={{ color: 'var(--fg-muted)', fontSize: 'var(--text-2)', maxWidth: '34rem' }}>
-          The site is being rebuilt. The sky comes back next.
-        </p>
-      </div>
-    </main>
+      </header>
+      <main className="home-hero">
+        <div className="home-card">
+          <h1>Ronit Nath</h1>
+          <p className="tagline">
+            Founder of{' '}
+            <a href="https://isoastra.com" rel="noopener" target="_blank">
+              Isoastra
+            </a>
+          </p>
+          <ul className="social-links">
+            <li>
+              <a href="https://github.com/RonitNath" rel="me noopener" target="_blank">
+                GitHub
+              </a>
+            </li>
+            <li>
+              <a href="https://instagram.com/ronit_nath" rel="me noopener" target="_blank">
+                Instagram
+              </a>
+            </li>
+            <li>
+              <a href="https://linkedin.com/in/ronitn" rel="me noopener" target="_blank">
+                LinkedIn
+              </a>
+            </li>
+            <li>
+              <a href="mailto:ronit@isoastra.com">Email</a>
+            </li>
+          </ul>
+        </div>
+      </main>
+    </>
   );
 }

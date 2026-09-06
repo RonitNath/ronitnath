@@ -173,3 +173,25 @@ time,
   outline: 2px solid var(--accent);
   outline-offset: 1px;
 }
+
+/* Site chrome: the one control that appears on every surface. A word, not an
+ * icon — it names the theme it will switch to. */
+.theme-toggle {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.4rem 0.75rem;
+  font-size: var(--text-1);
+  color: var(--fg-muted);
+  background: var(--surface-glass);
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease-out,
+    color 0.15s ease-out,
+    background-color 0.15s ease-out;
+}
+
+.theme-toggle:hover {
+  border-color: var(--accent);
+  background: var(--surface-glass-hover);
+  color: var(--fg);
+}
