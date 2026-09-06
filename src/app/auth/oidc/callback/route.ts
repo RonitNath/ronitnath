@@ -21,11 +21,13 @@ import {
   sessionCookieOptions,
 } from '@/features/auth/session';
 import { isProduction, sessionCookieName } from '@/lib/env';
+import { publicRequestUrl, publicUrl } from '@/lib/request-url';
 
 export const dynamic = 'force-dynamic';
 
-function declined(request: Request) {
-  const response = NextResponse.redirect(new URL('/auth?declined=1', request.url), 302);
+function declined(reason: string) {
+  console.log(JSON.stringify({ level: 'warn', event: 'oidc.declined', reason }));
+  const response = NextResponse.redirect(publicUrl('/auth?declined=1'), 302);
   response.cookies.set(OIDC_COOKIE, '', { path: '/auth/oidc', maxAge: 0 });
   return response;
 }
@@ -56,10 +58,10 @@ function readChecks(request: Request): OidcChecks | null {
 
 export async function GET(request: Request) {
   const checks = readChecks(request);
-  if (!checks) return declined(request);
+  if (!checks) return declined('no-checks-cookie');
 
-  const accepted = await acceptCallback(new URL(request.url), checks);
-  if (!accepted) return declined(request);
+  const accepted = await acceptCallback(publicRequestUrl(request), checks);
+  if (!accepted) return declined('callback-rejected');
 
   const where = await requestFingerprint();
   const token = await database().transaction(async (tx) => {
@@ -135,7 +137,7 @@ export async function GET(request: Request) {
   });
 
   const next = /^\/[A-Za-z0-9\-._~/]*$/.test(checks.next) ? checks.next : '/app';
-  const response = NextResponse.redirect(new URL(next, request.url), 302);
+  const response = NextResponse.redirect(publicUrl(next), 302);
   response.cookies.set(sessionCookieName(), token, sessionCookieOptions());
   response.cookies.set(OIDC_COOKIE, '', {
     path: '/auth/oidc',

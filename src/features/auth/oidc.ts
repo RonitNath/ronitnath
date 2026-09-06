@@ -32,15 +32,20 @@ export interface OidcChecks {
 export const OIDC_COOKIE = 'rn_oidc';
 export const OIDC_COOKIE_MAX_AGE = 600;
 
-const globalForOidc = globalThis as unknown as { rnOidc?: Promise<client.Configuration> };
+/* Cached per module, not on globalThis: Next bundles a copy of openid-client
+ * into each route that imports it, and a Configuration made by one copy fails
+ * the other's `instanceof` check ("config" must be an instance of
+ * Configuration). openid-client is also listed in `serverExternalPackages`
+ * so production runs one copy from node_modules. */
+let cached: Promise<client.Configuration> | undefined;
 
 export function configuration(): Promise<client.Configuration> {
-  globalForOidc.rnOidc ??= client.discovery(
+  cached ??= client.discovery(
     new URL(required('OIDC_ISSUER')),
     required('OIDC_CLIENT_ID'),
     required('OIDC_CLIENT_SECRET'),
   );
-  return globalForOidc.rnOidc;
+  return cached;
 }
 
 export function redirectUri(): string {
@@ -75,6 +80,13 @@ export async function authorizationRequest(
   return { url, checks };
 }
 
+/* Why a round trip was refused, for the operator's log — never the claims,
+ * never a token. The visitor sees one uniform decline page. */
+function decline(reason: string, detail?: string): null {
+  console.log(JSON.stringify({ level: 'warn', event: 'oidc.declined', reason, ...(detail ? { detail } : {}) }));
+  return null;
+}
+
 export interface OidcSubject {
   subject: string;
   email: string;
@@ -98,14 +110,16 @@ export async function acceptCallback(
       expectedNonce: checks.nonce,
       idTokenExpected: true,
     });
-  } catch {
+  } catch (error) {
+    decline('token-exchange', error instanceof Error ? error.message : String(error));
     return null;
   }
 
   const claims = tokens.claims();
-  if (!claims?.sub) return null;
+  if (!claims?.sub) return decline('no-subject');
   const address = typeof claims.email === 'string' ? normalizeEmail(claims.email) : '';
-  if (claims.email_verified !== true || !address || !isAllowlisted(address)) return null;
+  if (claims.email_verified !== true) return decline('email-unverified');
+  if (!address || !isAllowlisted(address)) return decline('not-allowlisted');
 
   const name = typeof claims.name === 'string' && claims.name.trim() ? claims.name.trim() : address;
   return {

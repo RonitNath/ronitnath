@@ -17,7 +17,7 @@ export function middleware(request: NextRequest) {
    * name itself. This is a convenience, not the guard — `requireMember` still
    * decides, and a cookie that resolves to nothing is turned away there. */
   if (!token && request.nextUrl.pathname.startsWith('/app')) {
-    const door = new URL('/auth', request.url);
+    const door = new URL('/auth', process.env.PUBLIC_ORIGIN ?? request.url);
     door.searchParams.set('next', request.nextUrl.pathname);
     return NextResponse.redirect(door);
   }
