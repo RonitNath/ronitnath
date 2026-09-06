@@ -17,6 +17,7 @@ import { z } from 'zod';
 import { database, schema } from '@/db/client';
 import { tryDecodeId } from '@/lib/ids';
 import { deliver, passwordResetMail, verificationMail } from '@/lib/mail';
+import { proposeMatchesFor } from '@/features/people/matches';
 import { recordAudit } from './audit';
 import { isAllowlisted, looksLikeEmail, normalizeEmail } from './email-address';
 import { AUTH_FAILED, CHECK_INBOX, RESET_SENT, type FormState } from './form-state';
@@ -133,8 +134,18 @@ export async function verifyEmail(_prev: FormState, form: FormData): Promise<For
       .update(schema.identity)
       .set({ verifiedAt: sql`now()` })
       .where(and(eq(schema.identity.id, spent.targetId), isNull(schema.identity.verifiedAt)))
-      .returning({ personId: schema.identity.personId });
+      .returning({ personId: schema.identity.personId, subject: schema.identity.subject });
     const personId = rows[0]?.personId;
+    /* A newly confirmed address may be the address somebody else wrote on a
+     * contact card. Proposing is not merging: what this writes is a question
+     * for the person who just proved the address (src/features/people). */
+    if (rows[0]) {
+      await proposeMatchesFor(tx, {
+        identityId: spent.targetId,
+        personId: rows[0].personId,
+        subject: rows[0].subject,
+      });
+    }
     await tx
       .update(schema.factor)
       .set({ usedAt: sql`now()` })

@@ -57,7 +57,9 @@ function ConfirmPane({ email }: { email: string }) {
   );
 }
 
-export function SignInForm({ next }: { next: string }) {
+/* `email` is prefilled from a claim link, where the address is already known
+ * and typing it again would be a test the visitor can fail. */
+export function SignInForm({ next, email = '' }: { next: string; email?: string }) {
   const [state, action, pending] = useActionState(signIn, EMPTY);
   if (state.unverified && state.email) return <ConfirmPane email={state.email} />;
   return (
@@ -71,6 +73,7 @@ export function SignInForm({ next }: { next: string }) {
           name="email"
           type="email"
           inputMode="email"
+          defaultValue={email}
           autoComplete="username"
           required
         />

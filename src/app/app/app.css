@@ -134,3 +134,117 @@
     width: 100%;
   }
 }
+
+/* R3. The tables here carry a name and a sentence's worth of state, not six
+ * short values, so they are allowed the width the sessions table refused. */
+.rows.wide {
+  max-width: 60rem;
+}
+
+/* A state is a word in its own colour — never a capsule, never a dot. */
+.state[data-state='live'],
+.state[data-state='expired'] {
+  color: var(--fg-subtle);
+}
+.state[data-state='opened'] {
+  color: var(--state-open);
+}
+.state[data-state='claimed'] {
+  color: var(--state-live);
+}
+.state[data-state='revoked'] {
+  color: var(--state-gone);
+}
+
+/* A cell is a cell: `display: flex` on a `td` takes it out of the table's
+ * column model and the row loses its first column. The controls are laid out
+ * inline inside it instead. */
+.rows td.actions {
+  white-space: nowrap;
+}
+
+.rows td.actions > form,
+.rows td.actions > span {
+  display: inline-flex;
+  align-items: center;
+  vertical-align: middle;
+}
+
+.rows td.actions > form + form,
+.rows td.actions > form + span {
+  margin-left: 0.75rem;
+}
+
+/* The minted URL. It is here and nowhere else, so it is given room to be read
+ * and selected rather than truncated into a decoration. */
+/* The one place a table cell is allowed to be a paragraph: the URL is long,
+ * it exists here and nowhere else, and truncating it would make the Copy
+ * button the only way to read it. */
+.minted-row {
+  display: block;
+  max-width: 26rem;
+  white-space: normal;
+}
+
+.minted {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+}
+
+.minted .url {
+  padding: 0.25rem 0.4rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-muted);
+  color: var(--fg-muted);
+  user-select: all;
+  overflow-wrap: anywhere;
+}
+
+/* A form that lives inside a section rather than in a pane of its own: one
+ * field and its verb, on a line. */
+.inline-form {
+  margin-top: 1rem;
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.inline-form .field {
+  min-width: 18rem;
+}
+
+.inline-form .note {
+  flex-basis: 100%;
+}
+
+/* The one question the model asks a member. */
+.proposal {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-muted);
+  font-size: var(--text-2);
+}
+
+.proposal p {
+  margin: 0;
+  flex: 1 1 24rem;
+}
+
+.indoors .pane {
+  max-width: 28rem;
+}
+
+@media (max-width: 34rem) {
+  .inline-form .field {
+    min-width: 0;
+    width: 100%;
+  }
+}

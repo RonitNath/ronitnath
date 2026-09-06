@@ -13,6 +13,7 @@ export function Shell({ principal }: { principal: Principal }) {
       <nav>
         <Link href="/">Home</Link>
         <Link href="/app">Account</Link>
+        <Link href="/app/people">People</Link>
         <Link href="/app/sessions">Sessions</Link>
         {principal.isOperator ? <Link href="/platform">Platform</Link> : null}
       </nav>

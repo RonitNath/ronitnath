@@ -39,6 +39,11 @@ the Playwright run uses because Next's standalone server changes directory.
 `pnpm seed:operator --email ronit@isoastra.com` creates the platform operator
 with no factors, ready for ZITADEL to attach itself on first sign-in.
 
+`MAIL_FAIL` names a recipient the transport must refuse — `1` for every
+address, otherwise a substring of one. The Playwright run sets it so a send
+can be watched to fail for one visitor and land for the rest; nothing outside
+a test should set it.
+
 - `pnpm gate` — typecheck, lint, unit tests, build. Green before any report.
 - `pnpm e2e` — Playwright against the standalone server the image ships.
 - `pnpm db:generate` — a new SQL migration after a `src/db/schema.ts` change.

@@ -30,88 +30,6 @@
   }
 }
 
-.pane {
-  display: flex;
-  flex-direction: column;
-  gap: 0.9rem;
-  padding: 1.25rem;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--bg-muted);
-}
-
-.pane h2 {
-  margin: 0;
-  font-size: var(--text-4);
-  font-weight: 600;
-}
-
-.field {
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-}
-
-.field label {
-  font-size: var(--text-1);
-  color: var(--fg-muted);
-}
-
-.field input {
-  padding: 0.55rem 0.6rem;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--bg);
-  color: var(--fg);
-  font: inherit;
-  font-size: var(--text-2);
-}
-
-.field input:focus-visible {
-  border-color: var(--accent);
-}
-
-.commit {
-  align-self: flex-start;
-  padding: 0.55rem 1rem;
-  border: 1px solid var(--accent);
-  border-radius: var(--radius);
-  background: transparent;
-  color: var(--accent);
-  font: inherit;
-  font-size: var(--text-2);
-  cursor: pointer;
-  transition:
-    background-color 0.15s ease-out,
-    color 0.15s ease-out;
-}
-
-.commit:hover:enabled {
-  background: var(--accent);
-  color: var(--bg);
-}
-
-.commit:disabled {
-  border-color: var(--border);
-  color: var(--fg-subtle);
-  cursor: default;
-}
-
-/* A state is a word in its own colour. */
-.note {
-  margin: 0;
-  font-size: var(--text-1);
-  color: var(--fg-muted);
-}
-
-.note[data-state='invalid'] {
-  color: var(--state-stopped);
-}
-
-.note[data-state='done'] {
-  color: var(--state-live);
-}
-
 .aside {
   margin-top: 2rem;
   padding-top: 1.25rem;
@@ -145,4 +63,18 @@
 
 .single {
   max-width: 30rem;
+}
+
+/* The claim page says who is asking and what for before it asks for anything.
+ * One sentence, above the panes. */
+.lede {
+  margin: -1rem 0 2rem;
+  max-width: 34rem;
+  font-size: var(--text-2);
+  color: var(--fg-muted);
+}
+
+.lede strong {
+  color: var(--fg);
+  font-weight: 600;
 }
