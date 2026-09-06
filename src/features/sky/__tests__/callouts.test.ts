@@ -2,16 +2,24 @@ import { describe, expect, it } from 'vitest';
 
 import {
   chooseLeader,
+  chromeBoxes,
+  cornerChrome,
+  EDGE_PX,
   keepOutFor,
+  labelWidthFor,
   LABEL_PX,
   leaderBox,
   labelLeft,
   leaderLine,
   leaderOffset,
   leaderPenalty,
+  ndcBox,
   type Placement,
   pushOutOfBand,
+  pushOutOfBoxes,
   RING_RADIUS_PX,
+  topChrome,
+  TOPBAR_PX,
 } from '../annotate';
 import { calloutFrame, calloutSetKey } from '../callouts';
 
@@ -33,7 +41,8 @@ function at(x: number, y: number, forced = false): Placement {
 
 describe('which way a callout is offset from its star', () => {
   it('prefers up-and-right when nothing is in the way', () => {
-    const placement = at(-0.7, -0.55);
+    // Upper left: clear of the hero, of the header and of the corner block.
+    const placement = at(-0.7, 0.55);
     const frame = frameFor(DESKTOP);
     expect(leaderPenalty(placement, 'up-right', LEADER, frame)).toBe(0);
     expect(chooseLeader(placement, LEADER, frame)).toBe('up-right');
@@ -107,7 +116,70 @@ describe('what is a render and what is a frame', () => {
     expect(labelLeft(760, 'up-right', 300, 1440)).toBe(760);
     expect(labelLeft(760, 'up-left', 300, 1440)).toBe(460);
     // And on a frame narrower than the label it keeps its edge placement.
-    expect(labelLeft(360, 'up-left', 366, 390)).toBe(8);
-    expect(labelLeft(20, 'up-right', 366, 390)).toBe(16);
+    expect(labelLeft(360, 'up-left', 400, 390)).toBe(EDGE_PX);
+    expect(labelLeft(20, 'up-right', 400, 390)).toBe(EDGE_PX);
+    // A label the frame can hold keeps a full margin at the right edge too.
+    expect(labelLeft(380, 'up-right', labelWidthFor(390), 390)).toBe(
+      390 - EDGE_PX - labelWidthFor(390),
+    );
+  });
+});
+
+describe("the page's own chrome is a keep-out too", () => {
+  it('turns a label down rather than laying it over the header', () => {
+    // Hard against the top margin on a phone: up-going puts the text over the
+    // "Sign in" row, which is where the owner found a callout drawn.
+    const frame = frameFor(PHONE);
+    const offset = leaderOffset(PHONE.width);
+    const placement = at(-0.2, 0.82);
+    expect(leaderPenalty(placement, 'up-right', offset, frame)).toBeGreaterThan(0);
+    expect(leaderPenalty(placement, 'up-left', offset, frame)).toBeGreaterThan(0);
+    const chosen = chooseLeader(placement, offset, frame);
+    expect(chosen.startsWith('down-')).toBe(true);
+    expect(leaderBox(placement, chosen, offset, frame).top).toBeGreaterThanOrEqual(TOPBAR_PX);
+  });
+
+  it('turns a label away from the globe and the caption', () => {
+    const frame = frameFor(DESKTOP);
+    const offset = leaderOffset(DESKTOP.width);
+    const corner = cornerChrome(DESKTOP.width, DESKTOP.height);
+    // Just above the corner block, over it across: going down lays the text on
+    // the caption, going up clears it.
+    const placement = at(
+      ((corner.left + 40) / DESKTOP.width) * 2 - 1,
+      1 - ((corner.top - 6) / DESKTOP.height) * 2,
+    );
+    expect(leaderPenalty(placement, 'down-right', offset, frame)).toBeGreaterThan(0);
+    expect(chooseLeader(placement, offset, frame).startsWith('up-')).toBe(true);
+  });
+
+  it('measures the chrome where a page can be measured and estimates it where it cannot', () => {
+    // The estimate is what a placement runs on, so it may never be smaller
+    // than the block it stands in for. These are the boxes the shipped page
+    // reports at each viewport.
+    const measured = [
+      [1440, 900, { left: 20, top: 660.2, right: 303, bottom: 882 }],
+      [1024, 768, { left: 20, top: 544.6, right: 290, bottom: 752.6 }],
+      [390, 844, { left: 8, top: 661.3, right: 278, bottom: 827.1 }],
+    ] as const;
+    for (const [width, height, box] of measured) {
+      const corner = cornerChrome(width, height);
+      expect(corner.left).toBeLessThanOrEqual(box.left);
+      expect(corner.right).toBeGreaterThanOrEqual(box.right);
+      expect(corner.top).toBeLessThanOrEqual(box.top);
+      expect(corner.bottom).toBeGreaterThanOrEqual(box.bottom);
+    }
+    expect(chromeBoxes(1440, 900)).toHaveLength(2);
+    expect(topChrome(1440)).toEqual({ left: 0, top: 0, right: 1440, bottom: TOPBAR_PX });
+  });
+
+  it('moves a clamped placement off the corner block', () => {
+    const corner = ndcBox(cornerChrome(PHONE.width, PHONE.height), PHONE.width, PHONE.height);
+    const middle = (corner.x0 + corner.x1) / 2;
+    const on = (corner.y0 + corner.y1) / 2;
+    expect(pushOutOfBoxes(middle, on, [corner])).toBeGreaterThan(corner.y1);
+    // A placement beside the block, or above it, is left where it is.
+    expect(pushOutOfBoxes(0.9, on, [corner])).toBe(on);
+    expect(pushOutOfBoxes(middle, 0.5, [corner])).toBe(0.5);
   });
 });

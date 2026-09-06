@@ -2,14 +2,23 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 import {
+  type Box,
+  chooseLeader,
+  chromeBoxes,
   cssPosition,
+  EDGE_PX,
   HERO_PX,
+  heroBox,
   KEEP_OUT,
   keepOutFor,
   LABEL_PX,
+  labelWidthFor,
+  leaderBox,
+  leaderOffset,
   MAX_LABELS,
   parsePosition,
   place,
+  placementAvoid,
   positionAttribute,
 } from '../annotate';
 import { namedVectors, parseNamed, parseStars } from '../catalog';
@@ -166,6 +175,76 @@ describe('a callout position', () => {
   it('reads nothing from a direction that is not a direction', () => {
     for (const junk of ['', '0,0,0', '1,2', 'NaN,0,1', 'a,b,c', '1,2,3,4']) {
       expect(parsePosition(junk)).toBeNull();
+    }
+  });
+});
+
+/** The label box the shipped page actually draws: the widest the frame allows,
+ * and the height two lines of it measure on the landing. */
+const LABEL_HEIGHT_PX = 42;
+
+function intersects(box: Box, block: Box): boolean {
+  return (
+    Math.min(box.right, block.right) - Math.max(box.left, block.left) > 0.5 &&
+    Math.min(box.bottom, block.bottom) - Math.max(box.top, block.top) > 0.5
+  );
+}
+
+describe('a callout never lands on anything the page has already drawn', () => {
+  it('clears the frame, the hero, the header and the corner block, all orbit long', () => {
+    const stars = vectors();
+    for (const [width, height] of [
+      [1440, 900],
+      [1024, 768],
+      [390, 844],
+    ] as const) {
+      const keepOut = keepOutFor(width, height);
+      const blocks = chromeBoxes(width, height);
+      // The band the placement runs on has headroom in it and a label may tip
+      // a few pixels into it; the card is the box that may never be touched.
+      const hero = heroBox(width, height);
+      const frame = {
+        width,
+        height,
+        label: [labelWidthFor(width), LABEL_HEIGHT_PX] as [number, number],
+        keepOut,
+        blocks,
+      };
+      const offset = leaderOffset(width);
+
+      for (let sample = 0; sample < 240; sample += 1) {
+        const simMs = SIM_EPOCH_MS + (TRACK_PERIOD_MS * sample) / 240;
+        const [lat, lon] = observerAt(simMs);
+        const placed = place(
+          stars,
+          viewMatrix(simMs, lat, lon),
+          width / height,
+          MAX_LABELS,
+          keepOut,
+          placementAvoid(width, height),
+        );
+        expect(placed.length, `nothing named at ${width} sample ${sample}`).toBeGreaterThan(0);
+        for (const placement of placed) {
+          const where = `${width}x${height} sample ${sample}`;
+          const box = leaderBox(
+            placement,
+            chooseLeader(placement, offset, frame),
+            offset,
+            frame,
+          );
+          expect(box.left, `off the left at ${where}`).toBeGreaterThanOrEqual(EDGE_PX - 0.001);
+          expect(box.right, `off the right at ${where}`).toBeLessThanOrEqual(
+            width - EDGE_PX + 0.001,
+          );
+          expect(box.top, `off the top at ${where}`).toBeGreaterThanOrEqual(EDGE_PX - 0.001);
+          expect(box.bottom, `off the bottom at ${where}`).toBeLessThanOrEqual(
+            height - EDGE_PX + 0.001,
+          );
+          expect(intersects(box, hero), `on the hero at ${where}`).toBe(false);
+          expect(intersects(box, blocks[0]!), `on the header at ${where}`).toBe(false);
+          expect(intersects(box, blocks[1]!), `on the corner block at ${where}`).toBe(false);
+        }
+      }
     }
   });
 });

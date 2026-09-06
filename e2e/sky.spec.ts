@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 
-import { keepOutFor, parsePosition } from '../src/features/sky/annotate';
+import { EDGE_PX, keepOutFor, parsePosition } from '../src/features/sky/annotate';
 import { simTimeMs } from '../src/features/sky/clock';
 import { applyView, FOCAL, viewMatrix } from '../src/features/sky/sidereal';
 
@@ -241,4 +241,89 @@ test.describe('on a phone', () => {
       expect(middle > band.bottom || middle < band.top).toBe(true);
     }
   });
+});
+
+/** Every box the page has already drawn, and every callout label over them. */
+async function geometry(page: Page) {
+  return page.evaluate(() => {
+    const box = (element: Element | null) => {
+      if (!element) return null;
+      const rect = element.getBoundingClientRect();
+      return {
+        left: rect.left,
+        top: rect.top,
+        right: rect.right,
+        bottom: rect.bottom,
+      };
+    };
+    return {
+      viewport: [innerWidth, innerHeight] as [number, number],
+      blocks: {
+        hero: box(document.querySelector('.home-card'))!,
+        header: box(document.querySelector('.topbar'))!,
+        corner: box(document.querySelector('.sky-chrome'))!,
+      },
+      labels: [...document.querySelectorAll('.star-callout')].map((node) => ({
+        name: (node as HTMLElement).dataset.name ?? '',
+        box: box(node.querySelector('.callout-label'))!,
+      })),
+    };
+  });
+}
+
+test.describe('a callout is inside the frame and off everything already on it', () => {
+  /* Three viewports, both themes, three instants of a sky that moves at 60x:
+     the placement is a function of where the stars are, so the only way to
+     assert about it is to watch it more than once. */
+  for (const [width, height] of [
+    [1440, 900],
+    [1024, 768],
+    [390, 844],
+  ] as const) {
+    for (const theme of ['dark', 'light'] as const) {
+      test(`${width}x${height}, ${theme}`, async ({ page }) => {
+        await page.setViewportSize({ width, height });
+        // The choice the page reads before first paint, so the run sees the
+        // theme the way a returning visitor does.
+        await page.addInitScript((chosen) => {
+          localStorage.setItem('rn_theme', chosen);
+        }, theme);
+        await settle(page);
+        await expect
+          .poll(() => page.evaluate(() => document.documentElement.dataset.theme))
+          .toBe(theme);
+
+        for (let instant = 0; instant < 3; instant += 1) {
+          // The clock runs 60x, so a second here is a minute of sky and the
+          // labels have moved — and sometimes changed — by the next reading.
+          if (instant > 0) await page.waitForTimeout(1_200);
+          const { blocks, labels } = await geometry(page);
+          expect(labels.length, 'the sky went unlabelled').toBeGreaterThan(0);
+
+          for (const label of labels) {
+            const where = `${label.name} at ${width}x${height} ${theme} #${instant}`;
+            expect(label.box.left, `${where} runs off the left`).toBeGreaterThanOrEqual(
+              EDGE_PX - 1,
+            );
+            expect(label.box.right, `${where} runs off the right`).toBeLessThanOrEqual(
+              width - EDGE_PX + 1,
+            );
+            expect(label.box.top, `${where} runs off the top`).toBeGreaterThanOrEqual(
+              EDGE_PX - 1,
+            );
+            expect(label.box.bottom, `${where} runs off the bottom`).toBeLessThanOrEqual(
+              height - EDGE_PX + 1,
+            );
+            for (const [what, block] of Object.entries(blocks)) {
+              const across =
+                Math.min(label.box.right, block.right) - Math.max(label.box.left, block.left);
+              const down =
+                Math.min(label.box.bottom, block.bottom) - Math.max(label.box.top, block.top);
+              expect(across > 1 && down > 1, `${where} is drawn over the ${what}`).toBe(false);
+            }
+          }
+        }
+      });
+    }
+  }
 });
