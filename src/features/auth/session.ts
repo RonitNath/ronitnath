@@ -128,6 +128,8 @@ async function resolve(): Promise<Principal | null> {
     .where(
       and(
         eq(schema.session.tokenHash, hashToken(token)),
+        /* A person folded into another one is not somebody you can be. */
+        isNull(schema.person.mergedInto),
         isNull(schema.session.revokedAt),
         gt(schema.session.expiresAt, sql`now()`),
       ),
@@ -163,7 +165,10 @@ async function resolve(): Promise<Principal | null> {
     personId: row.personId,
     displayName: row.displayName,
     sessionId: row.sessionId,
-    source: row.source,
+    /* `identity_source` gained `handle` for held people, which is not a door
+     * and so is never a session's source; the column is shared, the type is
+     * not. */
+    source: row.source === 'oidc' ? 'oidc' : 'local',
     isOperator: operator.length > 0,
   };
 }

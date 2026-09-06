@@ -3,9 +3,12 @@
  * src/lib/ids.ts is the only thing that turns one into a string. Feature
  * modules take their slice of this file as they land. */
 
+import { sql } from 'drizzle-orm';
 import {
+  type AnyPgColumn,
   bigserial,
   boolean,
+  check,
   index,
   integer,
   jsonb,
@@ -21,7 +24,11 @@ import {
 const now = () => timestamp('created_at', { withTimezone: true }).notNull().defaultNow();
 
 export const partyKind = pgEnum('party_kind', ['person', 'organization', 'service']);
-export const identitySource = pgEnum('identity_source', ['local', 'oidc']);
+/* `handle` is the third kind of subject and the only one that is not a door:
+ * the thing a member typed when they held someone — an address, a number, or
+ * a bare name — normalised so that a later verified address can be compared
+ * against it. It authenticates nobody. */
+export const identitySource = pgEnum('identity_source', ['local', 'oidc', 'handle']);
 export const factorKind = pgEnum('factor_kind', ['email', 'password', 'oidc']);
 export const linkKind = pgEnum('link_kind', [
   'verify_email',
@@ -33,6 +40,11 @@ export const linkKind = pgEnum('link_kind', [
 ]);
 export const inviteKind = pgEnum('invite_kind', ['personal', 'open']);
 export const rsvpResponse = pgEnum('rsvp_response', ['yes', 'maybe', 'no']);
+/* Why two identities might be one person, and what was decided about it.
+ * A score orders the operator's queue (R6) and never merges anything by
+ * itself — a merge is always somebody's answer. */
+export const matchSignal = pgEnum('match_signal', ['verified_email', 'claimed_link']);
+export const matchStatus = pgEnum('match_status', ['proposed', 'confirmed', 'rejected']);
 
 /* Every addressable subject is a party; person and organization extend it by
  * sharing its id, so a relation can name either without a union column. */
@@ -43,15 +55,25 @@ export const party = pgTable('party', {
   disabledAt: timestamp('disabled_at', { withTimezone: true }),
 });
 
-export const person = pgTable('person', {
-  id: integer('id')
-    .primaryKey()
-    .references(() => party.id, { onDelete: 'cascade' }),
-  displayName: text('display_name').notNull(),
-  /* A held person has no way to sign in yet; a claim link turns that around. */
-  held: boolean('held').notNull().default(false),
-  createdAt: now(),
-});
+export const person = pgTable(
+  'person',
+  {
+    id: integer('id')
+      .primaryKey()
+      .references(() => party.id, { onDelete: 'cascade' }),
+    displayName: text('display_name').notNull(),
+    /* A held person has no way to sign in yet; a claim link turns that around. */
+    held: boolean('held').notNull().default(false),
+    /* Retirement. A merged person keeps every row it had — that record is what
+     * an operator would need to undo it — and stops resolving: whoever asks
+     * for this person is answered with the one it was folded into. */
+    mergedInto: integer('merged_into').references((): AnyPgColumn => person.id, {
+      onDelete: 'set null',
+    }),
+    createdAt: now(),
+  },
+  (t) => [index('person_merged_into_idx').on(t.mergedInto)],
+);
 
 export const organization = pgTable(
   'organization',
@@ -79,7 +101,17 @@ export const identity = pgTable(
     createdAt: now(),
   },
   (t) => [
-    uniqueIndex('identity_source_subject_key').on(t.source, t.subject),
+    /* A door has to be unique deployment-wide or it is not a door. A handle
+     * is not a door: it is one member's note about how to reach somebody, and
+     * two members may well hold the same address. The predicate names the two
+     * sign-in sources rather than excluding `handle`, so that the migration
+     * that adds the enum value can create this index in the same
+     * transaction. */
+    uniqueIndex('identity_source_subject_key')
+      .on(t.source, t.subject)
+      .where(sql`source in ('local', 'oidc')`),
+    /* What ProposeMatch reads: every handle that spells this address. */
+    index('identity_subject_idx').on(t.source, t.subject),
     index('identity_person_idx').on(t.personId),
   ],
 );
@@ -138,12 +170,20 @@ export const link = pgTable(
     targetId: integer('target_id').notNull(),
     createdBy: integer('created_by').references(() => person.id, { onDelete: 'set null' }),
     expiresAt: timestamp('expires_at', { withTimezone: true }),
+    /* A one-shot link is spent once (`used_at`). An invitation is a longer
+     * story that the member who sent it can watch: opened, claimed, or taken
+     * back before either. */
     usedAt: timestamp('used_at', { withTimezone: true }),
+    openedAt: timestamp('opened_at', { withTimezone: true }),
+    claimedAt: timestamp('claimed_at', { withTimezone: true }),
+    claimedBy: integer('claimed_by').references(() => person.id, { onDelete: 'set null' }),
+    revokedAt: timestamp('revoked_at', { withTimezone: true }),
     createdAt: now(),
   },
   (t) => [
     uniqueIndex('link_token_hash_key').on(t.tokenHash),
     index('link_target_idx').on(t.targetKind, t.targetId),
+    index('link_created_by_idx').on(t.createdBy),
   ],
 );
 
@@ -276,6 +316,40 @@ export const rsvp = pgTable(
   (t) => [
     uniqueIndex('rsvp_event_person_key').on(t.eventId, t.personId),
     index('rsvp_event_idx').on(t.eventId),
+  ],
+);
+
+/* Two identities that might be one person. A row is written by whatever
+ * noticed — a verified address that equals somebody's handle, a claimed
+ * invitation — and settled by an answer: the member's, on `/app`, or the
+ * operator's in R6. Nothing merges on a score.
+ *
+ * `identity_a < identity_b` is enforced rather than conventional, so the pair
+ * has one spelling and the unique index means what it says. */
+export const match = pgTable(
+  'match',
+  {
+    id: serial('id').primaryKey(),
+    identityA: integer('identity_a')
+      .notNull()
+      .references(() => identity.id, { onDelete: 'cascade' }),
+    identityB: integer('identity_b')
+      .notNull()
+      .references(() => identity.id, { onDelete: 'cascade' }),
+    signal: matchSignal('signal').notNull(),
+    /* Queue order for the operator's list, in hundredths. Never a threshold. */
+    score: smallint('score').notNull().default(0),
+    status: matchStatus('status').notNull().default('proposed'),
+    evidence: text('evidence'),
+    decidedAt: timestamp('decided_at', { withTimezone: true }),
+    decidedBy: integer('decided_by').references(() => person.id, { onDelete: 'set null' }),
+    createdAt: now(),
+  },
+  (t) => [
+    uniqueIndex('match_pair_signal_key').on(t.identityA, t.identityB, t.signal),
+    index('match_status_idx').on(t.status),
+    index('match_identity_b_idx').on(t.identityB),
+    check('match_ordered_pair', sql`${t.identityA} < ${t.identityB}`),
   ],
 );
 
