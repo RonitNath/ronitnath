@@ -1,0 +1,14 @@
+.git
+.jj
+node_modules
+.next
+drizzle/meta/_journal.json.bak
+docs
+deploy
+e2e
+screenshots
+test-results
+playwright-report
+.env
+.env.local
+README.md

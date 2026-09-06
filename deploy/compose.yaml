@@ -1,0 +1,9 @@
+services:
+  web:
+    image: ghcr.io/ronitnath/ronitnath:${TAG}
+    container_name: ronitnath-web
+    restart: unless-stopped
+    network_mode: host
+    env_file: /data/crypt/ronitnath/web.env
+    environment:
+      PORT: '3140'
