@@ -45,6 +45,10 @@
    * pair can't live in light-dark(), which takes one value per side and a
    * two-part shadow is itself comma-separated, so light sets it below. */
   --hero-shadow: none;
+  /* The tagline is small dark ink, not display gold: it wants the contact
+   * shadow that sharpens its edge and not the 16px halo, which at that size
+   * reads as a smudge behind the letters rather than as depth. */
+  --hero-muted-shadow: none;
 
   /* The light theme is dusk, not white paper: the page *is* the sky. Deep
    * blue overhead where the stars still show, the pale horizon glow given
@@ -102,6 +106,7 @@
   color-scheme: light;
   --hero-shadow:
     0 1px 2px oklch(0.18 0.04 265 / 0.6), 0 0 16px oklch(0.16 0.03 265 / 0.5);
+  --hero-muted-shadow: 0 1px 2px oklch(0.18 0.04 265 / 0.45);
 }
 :root[data-theme='dark'] {
   color-scheme: dark;

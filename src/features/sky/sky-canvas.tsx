@@ -22,10 +22,13 @@ import { altAz, lstRad } from './sidereal';
  * rather than a rim, and the CSS starfield underneath carries the corners.
  */
 
-/** One frame per quarter second. The sky moves 15" of arc in that time — this
- * is not a frame rate the eye can see, it is the cheapest cadence at which the
- * motion stays continuous rather than stepping. */
-const FRAME_INTERVAL_MS = 250;
+/** Four seconds a frame, which is not a frame rate — it is arithmetic. At this
+ * projection scale a degree of sky is about 8px, and the real sidereal rate is
+ * 15 degrees an hour: the field crosses one pixel every thirty seconds. A
+ * frame every four seconds is an eighth of a pixel, already finer than the
+ * antialiasing, and anything faster is main-thread work spent on motion no
+ * screen can show. */
+const FRAME_INTERVAL_MS = 4_000;
 
 /** Fraction of viewport height the zenith sits down from the top. */
 const ZENITH_Y = 0.8;
@@ -168,11 +171,18 @@ export function SkyCanvas() {
       schedule();
     }
 
-    repaint();
-    void coarseObserver().then((where) => {
+    // The first paint of the sky waits for the main thread to be free: it is
+    // background, and it is not worth a millisecond of anyone's interaction
+    // latency. The CSS starfield is already on screen until it lands.
+    const idle = window.requestIdleCallback ?? ((fn: () => void) => window.setTimeout(fn, 200));
+    idle(() => {
       if (!live) return;
-      observer = where;
-      draw();
+      repaint();
+      void coarseObserver().then((where) => {
+        if (!live) return;
+        observer = where;
+        draw();
+      });
     });
 
     // Under reduced motion the sky is a still picture, so a theme flip has to

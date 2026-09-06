@@ -65,7 +65,7 @@
   margin: 0 0 1.75rem;
   font-size: var(--text-3);
   color: var(--fg-muted);
-  text-shadow: var(--hero-shadow);
+  text-shadow: var(--hero-muted-shadow);
 }
 
 /* The other half of the identity pair. */
