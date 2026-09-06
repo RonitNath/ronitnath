@@ -109,6 +109,11 @@ export const session = pgTable(
       .notNull()
       .references(() => person.id, { onDelete: 'cascade' }),
     tokenHash: text('token_hash').notNull(),
+    /* Which door this session came through. An OIDC session ends at the OP as
+     * well as here, and the id_token it was minted with is the hint that
+     * end_session needs; a local session has neither. */
+    source: identitySource('source').notNull().default('local'),
+    oidcIdToken: text('oidc_id_token'),
     userAgent: text('user_agent'),
     ip: text('ip'),
     lastSeenAt: timestamp('last_seen_at', { withTimezone: true }).notNull().defaultNow(),
@@ -272,6 +277,21 @@ export const rsvp = pgTable(
     uniqueIndex('rsvp_event_person_key').on(t.eventId, t.personId),
     index('rsvp_event_idx').on(t.eventId),
   ],
+);
+
+/* Sign-in and reset attempts, counted per (scope, key) in a fixed window.
+ * Postgres is the only store this deployment has, and a counter row that the
+ * command's own transaction touches is one fewer thing to run and to lose. */
+export const authThrottle = pgTable(
+  'auth_throttle',
+  {
+    id: serial('id').primaryKey(),
+    scope: text('scope').notNull(),
+    key: text('key').notNull(),
+    windowStartedAt: timestamp('window_started_at', { withTimezone: true }).notNull().defaultNow(),
+    count: integer('count').notNull().default(0),
+  },
+  (t) => [uniqueIndex('auth_throttle_scope_key').on(t.scope, t.key)],
 );
 
 /* One row per command, written inside the command's own transaction. */
