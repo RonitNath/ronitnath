@@ -53,7 +53,7 @@ function magnitudeAt(u: number): number {
 }
 
 /** Build the sky. Pure in (count, seed): same arguments, same arrays. */
-export function generateCatalog(count = 1600, seed: number = SKY_SEED): StarCatalog {
+export function generateCatalog(count = 2000, seed: number = SKY_SEED): StarCatalog {
   const random = mulberry32(seed);
   const ra = new Float64Array(count);
   const dec = new Float64Array(count);
