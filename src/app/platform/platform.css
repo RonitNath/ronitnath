@@ -1,0 +1,147 @@
+/* R6. The densest surface in the deployment, and the brief's most utilitarian
+ * end: hairline dividers, muted headers, mono for anything the machine chose,
+ * no colour that is not a state's own word. */
+
+.platform-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  padding: 0.6rem 1.25rem;
+  border-bottom: 1px solid var(--border);
+  font-size: var(--text-2);
+  color: var(--fg-muted);
+  background: var(--bg-muted);
+}
+
+/* A state is a word in its own colour — never a capsule (docs/design.md). */
+.party-state[data-state='active'] {
+  color: var(--state-live);
+}
+.party-state[data-state='disabled'] {
+  color: var(--state-stopped);
+}
+.party-state[data-state='merged'] {
+  color: var(--fg-subtle);
+}
+
+.rows.dense {
+  max-width: none;
+  min-width: 44rem;
+}
+
+.rows td.actions .command-row,
+.rows td.actions form {
+  gap: 0.5rem;
+}
+
+/* Every command is a row of controls that ends in its own answer. */
+.command-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: var(--text-2);
+}
+
+.command-row select,
+input.reason {
+  padding: 0.35rem 0.4rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--fg);
+  font: inherit;
+  font-size: var(--text-2);
+}
+
+input.reason {
+  min-width: 14rem;
+}
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+  font-size: var(--text-2);
+}
+
+.filters input,
+.filters select {
+  padding: 0.4rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--fg);
+  font: inherit;
+  font-size: var(--text-2);
+}
+
+/* The payload. It is the one place on an operator page where a value is
+ * allowed to be several lines, because a redacted-by-construction payload is
+ * exactly what this page exists to show. */
+.payload {
+  margin: 0;
+  padding: 0.4rem 0.5rem;
+  max-width: 34rem;
+  max-height: 9rem;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-muted);
+  color: var(--fg-muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-1);
+  white-space: pre;
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: 1rem 2rem;
+  max-width: 60rem;
+  font-size: var(--text-2);
+}
+
+.facts dt {
+  color: var(--fg-subtle);
+  font-size: var(--text-1);
+}
+
+.facts dd {
+  margin: 0.15rem 0 0;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.pair-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-2);
+}
+
+.pair-list li {
+  font-family: var(--font-mono);
+  color: var(--fg-muted);
+}
+
+.pager {
+  margin-top: 1rem;
+  font-size: var(--text-2);
+}
+
+@media (max-width: 34rem) {
+  .platform-nav {
+    row-gap: 0.5rem;
+  }
+
+  input.reason {
+    min-width: 0;
+    width: 100%;
+  }
+}

@@ -301,3 +301,42 @@ time,
 .note[data-state='done'] {
   color: var(--state-live);
 }
+
+
+/* R6. The bar an operator wearing somebody else's name cannot miss: above
+ * everything, on every page, and never drawn for anybody else. It states the
+ * fact and offers the way out — no explanation, no icon. */
+.acting {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  padding: 0.5rem 1rem;
+  border-bottom: 1px solid var(--state-stopped);
+  background: var(--bg-subtle);
+  color: var(--state-stopped);
+  font-size: var(--text-2);
+}
+
+.acting strong {
+  color: var(--fg);
+  font-weight: 600;
+}
+
+.acting button {
+  border: 1px solid var(--state-stopped);
+  border-radius: var(--radius);
+  background: none;
+  padding: 0.15rem 0.6rem;
+  font: inherit;
+  font-size: var(--text-2);
+  color: var(--state-stopped);
+  cursor: pointer;
+}
+
+.acting button:hover {
+  background: var(--surface-glass-hover);
+}

@@ -1,4 +1,7 @@
 import type { Metadata, Viewport } from 'next';
+
+import { ImpersonationBar } from '@/features/platform/components/bar';
+
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -21,7 +24,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <head>
         <script dangerouslySetInnerHTML={{ __html: prePaint }} />
       </head>
-      <body>{children}</body>
+      <body>
+        <ImpersonationBar />
+        {children}
+      </body>
     </html>
   );
 }

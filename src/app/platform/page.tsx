@@ -1,23 +1,72 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 
+import { deploymentReport } from '@/features/platform/deployment';
 import { requireOperator } from '@/lib/tiers';
-
-import '../app/app.css';
 
 export const metadata: Metadata = { title: 'Platform' };
 export const dynamic = 'force-dynamic';
 
-/* R6 fills this in. Until then it exists so that the operator tier is a real
- * boundary rather than a promise: anyone who is not an operator gets a 404,
- * which is what a page that is not theirs looks like. */
+/* The way in. Six surfaces and the five numbers that say how big the thing
+ * behind them is; everything an operator does is one click from here. */
 export default async function PlatformPage() {
   await requireOperator();
+  const report = await deploymentReport();
+
   return (
     <main className="indoors">
       <h1>Platform</h1>
-      <p className="empty">
-        Parties, identities, matches, sessions and the audit feed land here at R6.
-      </p>
+      <p className="note">Everything this deployment holds, and the commands over it.</p>
+
+      <section>
+        <h2>Now</h2>
+        <dl className="facts">
+          <div>
+            <dt>People</dt>
+            <dd>{report.counts.persons}</dd>
+          </div>
+          <div>
+            <dt>Organizations</dt>
+            <dd>{report.counts.organizations}</dd>
+          </div>
+          <div>
+            <dt>Events</dt>
+            <dd>{report.counts.events}</dd>
+          </div>
+          <div>
+            <dt>Live sessions</dt>
+            <dd>{report.counts.sessions}</dd>
+          </div>
+          <div>
+            <dt>Audit rows</dt>
+            <dd>{report.counts.audit}</dd>
+          </div>
+        </dl>
+      </section>
+
+      <section>
+        <h2>Surfaces</h2>
+        <ul className="pair-list">
+          <li>
+            <Link href="/platform/parties">Parties</Link>
+          </li>
+          <li>
+            <Link href="/platform/matches">Matches</Link>
+          </li>
+          <li>
+            <Link href="/platform/sessions">Sessions</Link>
+          </li>
+          <li>
+            <Link href="/platform/audit">Audit</Link>
+          </li>
+          <li>
+            <Link href="/platform/operators">Operators</Link>
+          </li>
+          <li>
+            <Link href="/platform/deployment">Deployment</Link>
+          </li>
+        </ul>
+      </section>
     </main>
   );
 }
