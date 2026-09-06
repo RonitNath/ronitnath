@@ -1,51 +1,58 @@
 /* The four tiers. Every page and every action names the one it needs by
  * calling one of these; there is no per-route guard to forget.
  *
- * R0 ships the visitor path for real and leaves the other three as the shape
- * the later legs fill: no session store exists yet, so member redirects to
- * /auth and the two operator tiers decline uniformly with a 404 — a signed-out
- * visitor must not be able to tell an operator surface from a missing one. */
+ * R2 makes the first three real: the session cookie resolves to a principal
+ * once per request, `operator` is the relation `person → operator → platform:*`,
+ * and an operator surface asked for by anyone else is a 404 — a visitor must
+ * not be able to tell an internal page from a missing one. `requireOrgOperator`
+ * is still the uniform decline; R5 gives it something to say yes to. */
 
 import { notFound, redirect } from 'next/navigation';
+
+import { currentPrincipal, type Principal } from '@/features/auth/session';
 
 export type Tier = 'visitor' | 'member' | 'orgOperator' | 'operator';
 
 export interface VisitorContext {
   tier: 'visitor';
   personId: null;
+  principal: null;
 }
 
 export interface MemberContext {
   tier: Exclude<Tier, 'visitor'>;
   personId: number;
+  principal: Principal;
 }
 
 export type Context = VisitorContext | MemberContext;
 
-/* R2 replaces this with the rn_session cookie lookup. */
 export async function currentPersonId(): Promise<number | null> {
-  return null;
+  return (await currentPrincipal())?.personId ?? null;
 }
 
 export async function requireVisitor(): Promise<VisitorContext> {
-  return { tier: 'visitor', personId: null };
+  return { tier: 'visitor', personId: null, principal: null };
 }
 
-export async function requireMember(): Promise<MemberContext> {
-  const personId = await currentPersonId();
-  if (personId === null) redirect('/auth');
-  return { tier: 'member', personId };
+/** Where to send an anonymous reader so that signing in returns them here. */
+export function signInPath(next?: string): string {
+  return next ? `/auth?next=${encodeURIComponent(next)}` : '/auth';
+}
+
+export async function requireMember(next?: string): Promise<MemberContext> {
+  const principal = await currentPrincipal();
+  if (principal === null) redirect(signInPath(next));
+  return { tier: 'member', personId: principal.personId, principal };
 }
 
 export async function requireOrgOperator(handle: string): Promise<MemberContext> {
   void handle;
-  const personId = await currentPersonId();
-  if (personId === null) notFound();
-  return { tier: 'orgOperator', personId };
+  notFound();
 }
 
 export async function requireOperator(): Promise<MemberContext> {
-  const personId = await currentPersonId();
-  if (personId === null) notFound();
-  return { tier: 'operator', personId };
+  const principal = await currentPrincipal();
+  if (principal === null || !principal.isOperator) notFound();
+  return { tier: 'operator', personId: principal.personId, principal };
 }
