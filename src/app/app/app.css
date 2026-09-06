@@ -248,3 +248,88 @@
     width: 100%;
   }
 }
+
+/* R4. The host's event form asks for a dozen things, three of which are short
+ * enough to share a line; a table cell that holds a guest's note is the one
+ * place a row is allowed to wrap. */
+.indoors .pane.event-form {
+  /* Wider than the one-question panes: three short fields share a line, and
+   * the body is a paragraph, not a name. */
+  max-width: 44rem;
+}
+
+.event-form .pair {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.event-form textarea,
+.event-form select,
+.pane textarea {
+  padding: 0.55rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--fg);
+  font: inherit;
+  font-size: var(--text-2);
+  resize: vertical;
+}
+
+.event-form .field.check {
+  justify-content: flex-end;
+  padding-bottom: 0.55rem;
+}
+
+.event-form .field.check label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: var(--text-2);
+  color: var(--fg);
+}
+
+.event-form .field.check input {
+  accent-color: var(--accent);
+}
+
+.publish {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  align-items: flex-start;
+}
+
+.minted-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-2);
+}
+
+.minted-list .who {
+  display: block;
+  color: var(--fg-muted);
+  font-size: var(--text-1);
+}
+
+.rows td.wrap {
+  white-space: normal;
+  max-width: 18rem;
+  color: var(--fg-muted);
+}
+
+.aside-line {
+  margin-top: 1rem;
+  font-size: var(--text-2);
+}
+
+@media (max-width: 40rem) {
+  .event-form .pair {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
