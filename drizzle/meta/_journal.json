@@ -22,6 +22,13 @@
       "when": 1788660085253,
       "tag": "0002_held_people_and_matches",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1788661920448,
+      "tag": "0003_events",
+      "breakpoints": true
     }
   ]
 }

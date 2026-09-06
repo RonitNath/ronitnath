@@ -270,10 +270,34 @@ export const event = pgTable(
     summary: text('summary'),
     startsAt: timestamp('starts_at', { withTimezone: true }).notNull(),
     endsAt: timestamp('ends_at', { withTimezone: true }),
+    /* The two halves of a place. `location` is the name a guest may read
+     * before answering ("Ronit's apartment"); the address is the thing that
+     * only a yes buys. */
     location: text('location'),
-    /* Held back until a guest says yes. */
     address: text('address'),
+    /* An instant is an instant, but "Sunday afternoon" is a wall clock in a
+     * particular city: the host's zone is what the guest page falls back to
+     * and what the calendar entry is written in. */
+    timezone: text('timezone').notNull().default('America/Los_Angeles'),
+    /* Markdown-lite, as the host typed it. The HTML a guest reads is rendered
+     * from this on the way out and never stored, so there is exactly one
+     * place where markup can be born (src/features/events/markup.ts). */
+    body: text('body').notNull().default(''),
+    /* Null is no limit. A yes past the limit is still a yes — it is `full`,
+     * a word on the page, not an error (src/features/events/capacity.ts). */
+    capacity: integer('capacity'),
+    /* One of the token names in src/features/events/palette.ts, or a poster
+     * the host points at. Neither is required and neither is free-form CSS. */
+    colour: text('colour'),
+    posterUrl: text('poster_url'),
+    /* Whether a guest who has answered yes sees full names or first names. */
+    revealGuests: boolean('reveal_guests').notNull().default(false),
+    /* RFC 5545 SEQUENCE. Bumped by every host edit that a calendar would
+     * want to hear about, so an entry already in somebody's calendar is
+     * replaced rather than duplicated. */
+    sequence: integer('sequence').notNull().default(0),
     publishedAt: timestamp('published_at', { withTimezone: true }),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
     createdAt: now(),
   },
   (t) => [uniqueIndex('event_slug_key').on(t.slug), index('event_host_idx').on(t.hostPersonId)],
@@ -289,6 +313,10 @@ export const eventInvite = pgTable(
     personId: integer('person_id').references(() => person.id, { onDelete: 'cascade' }),
     kind: inviteKind('kind').notNull(),
     plusOneAllowed: boolean('plus_one_allowed').notNull().default(false),
+    /* The personal link minted for this guest at publication. The row keeps
+     * the link's id, never its token: the URL is shown once, at mint time,
+     * and the host mints another one if they lose it. */
+    linkId: integer('link_id').references(() => link.id, { onDelete: 'set null' }),
     createdAt: now(),
   },
   (t) => [
