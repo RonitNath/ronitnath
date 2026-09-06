@@ -13,6 +13,8 @@ export interface FormState {
   email?: string;
   /* A URL a command minted and will never show again (an invitation). */
   minted?: string;
+  /* Several of them at once, named: what publishing an event hands back. */
+  mintedLinks?: { name: string; url: string }[];
 }
 
 /* The uniform decline. Design brief: never a field-level hint, because a hint
