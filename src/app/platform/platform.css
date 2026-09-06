@@ -34,6 +34,19 @@
   gap: 0.5rem;
 }
 
+/* `.commit` aligns itself to the start of a column form; in a row it has a
+ * baseline to meet, and the input beside it is that baseline. */
+.filters .commit,
+.command-row .commit {
+  align-self: auto;
+}
+
+/* Several commands on one line are several things, not one control with four
+ * halves: the gap between them is wider than the gap inside them. */
+.command-row.commands {
+  gap: 1.75rem;
+}
+
 /* Every command is a row of controls that ends in its own answer. */
 .command-row {
   display: flex;
@@ -69,7 +82,7 @@ input.reason {
 
 .filters input,
 .filters select {
-  padding: 0.4rem 0.5rem;
+  padding: 0.55rem 0.6rem;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--bg);

@@ -37,7 +37,15 @@ to `.mail/<timestamp>.eml` (gitignored); `MAIL_DIR` moves that directory, which
 the Playwright run uses because Next's standalone server changes directory.
 
 `pnpm seed:operator --email ronit@isoastra.com` creates the platform operator
-with no factors, ready for ZITADEL to attach itself on first sign-in.
+with no factors, ready for ZITADEL to attach itself on first sign-in. Adding
+`--password <secret>` seeds a *local* operator instead — a confirmed address, a
+password and the `operator` relation — which is how the Playwright run reaches
+`/platform` without an identity provider. The allowlisted address never takes
+that path.
+
+`RN_IMPERSONATION=off` removes SignInAs entirely: the control is not drawn and
+the command declines. The operator commands that destroy or impersonate also
+ask for a password (or a fresh ZITADEL round trip) inside the last ten minutes.
 
 `MAIL_FAIL` names a recipient the transport must refuse — `1` for every
 address, otherwise a substring of one. The Playwright run sets it so a send

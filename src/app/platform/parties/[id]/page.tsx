@@ -38,7 +38,7 @@ export default async function PartyPage({ params }: { params: Promise<{ id: stri
 
       <section>
         <h2>Commands</h2>
-        <div className="command-row">
+        <div className="command-row commands">
           {party.state === 'disabled' ? (
             <Command
               action={enableParty}
