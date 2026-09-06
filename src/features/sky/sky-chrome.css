@@ -1,0 +1,188 @@
+/* The sky's own chrome: the mini-globe, the grounding caption, the two
+ * controls, and the named-star callouts. All of it is background layer — it
+ * sits in the corners and never crosses the hero (the callouts' keep-out band
+ * is what guarantees that, in annotate.ts, not a z-index). */
+
+.sky-chrome {
+  position: fixed;
+  /* Above the callouts: a callout that drifts into the corner must not take
+     the drag that was meant for the globe underneath it. */
+  z-index: 3;
+  left: clamp(0.5rem, 2vw, 1.25rem);
+  bottom: clamp(0.75rem, 2vh, 1.25rem);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.5rem;
+  max-width: calc(100% - 2 * clamp(0.5rem, 2vw, 1.25rem));
+  pointer-events: none;
+}
+
+/* The halo at the limb: the globe is lit, so it spills a little light onto the
+ * page around it rather than ending at a hard edge. */
+.mini-globe-frame {
+  position: relative;
+  display: block;
+  pointer-events: auto;
+}
+
+.mini-globe-frame::before {
+  content: '';
+  position: absolute;
+  inset: -14%;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    color-mix(in oklab, var(--accent) 14%, transparent) 42%,
+    transparent 68%
+  );
+  pointer-events: none;
+}
+
+.mini-globe {
+  position: relative;
+  display: block;
+  width: clamp(96px, 18vmin, 152px);
+  height: clamp(96px, 18vmin, 152px);
+  cursor: grab;
+  touch-action: none;
+}
+
+.mini-globe:active {
+  cursor: grabbing;
+}
+
+.mini-globe:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.grounding {
+  margin: 0;
+  max-width: 100%;
+  min-height: 1.2em;
+  color: var(--fg-subtle);
+  font-size: var(--text-1);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sky-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.sky-control {
+  padding: 0.4rem 0.65rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-glass);
+  color: var(--fg);
+  font: inherit;
+  font-size: var(--text-1);
+  cursor: pointer;
+  pointer-events: auto;
+  transition:
+    border-color 0.15s ease-out,
+    color 0.15s ease-out;
+}
+
+.sky-control:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* The dusk gradient is near-black at the top and near-white at the bottom, so
+ * chrome that lives in the bottom corner re-tints itself for the pale end. */
+:root[data-theme='light'] .grounding {
+  color: oklch(0.34 0.02 250);
+}
+
+:root[data-theme='light'] .sky-control {
+  border-color: oklch(0.34 0.02 250 / 0.4);
+  color: oklch(0.24 0.02 250);
+  background: oklch(0.98 0.005 240 / 0.45);
+}
+
+/* --------------------------------------------------------------- callouts */
+
+.star-annotations {
+  position: fixed;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.star-callout {
+  position: fixed;
+  /* Wide enough for the longest detail line the catalog produces
+     ("Orion · blue supergiant · 863 ly") at this tracking, so a callout states
+     the star rather than trailing off in an ellipsis. */
+  max-width: min(22rem, calc(100vw - 1.5rem));
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--fg);
+  /* The dusk gradient runs from near-black to near-white down the frame, so
+     one ink colour cannot be legible everywhere on it. The halo is the page
+     ground, which makes a callout readable at either end. */
+  text-shadow:
+    0 0 6px var(--bg),
+    0 1px 2px var(--bg);
+  text-align: left;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  pointer-events: auto;
+  transform: translate(var(--callout-x, -50%), -50%);
+  animation: callout-in 0.45s ease both;
+}
+
+.star-callout strong,
+.star-callout span {
+  display: block;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.star-callout strong {
+  font-family: var(--font-display);
+  font-size: var(--text-1);
+  font-weight: 600;
+}
+
+.star-callout span {
+  margin-top: 0.18rem;
+  color: var(--fg-subtle);
+  font-size: var(--text-1);
+  opacity: 0.85;
+}
+
+.star-callout:hover strong,
+.star-callout:focus-visible strong {
+  color: var(--accent);
+}
+
+/* The entrance carries the centring with it: `animation: … both` holds the
+   `to` frame after the animation ends, so every frame states the full
+   transform or the callout ends up hung off its point by its own width. */
+@keyframes callout-in {
+  from {
+    opacity: 0;
+    transform: translate(var(--callout-x, -50%), calc(-50% + 5px));
+  }
+  to {
+    opacity: 1;
+    transform: translate(var(--callout-x, -50%), -50%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .star-callout {
+    animation: none;
+  }
+}
