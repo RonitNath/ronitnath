@@ -11,7 +11,7 @@
 import { and, asc, desc, eq, inArray, isNull, ne, sql } from 'drizzle-orm';
 
 import { database, schema } from '@/db/client';
-import { CONTACT } from '@/features/people/authority';
+import { sharedGroupMembers } from '@/features/groups/queries';
 import { headcount, type Headcount } from './capacity';
 import { linkState, type LinkState } from '@/features/people/invitations';
 import { orderGuests, type Ordered } from './ordering';
@@ -191,10 +191,8 @@ export interface GuestList {
   total: number;
 }
 
-/** Who's coming, in the viewer's order. `sharedWith` is the R5 hook: today
- *  it is answered from `relation` contact edges — people the host wrote down
- *  who the viewer also shares an edge with — and R5 replaces the body of
- *  `sharedCircle` with a groups query without touching this. */
+/** Who's coming, in the viewer's order. The shared-circle question is asked
+ *  of the groups feature and answered there; this stays as R4 wrote it. */
 export async function guestList(eventId: number, viewerId: number | null, limit: number): Promise<GuestList> {
   const db = database();
   const rows = await db
@@ -225,39 +223,15 @@ export async function guestList(eventId: number, viewerId: number | null, limit:
   };
 }
 
-/** The R5 seam. A circle is a group and groups do not exist yet, so the
- *  closest true statement this rung can make is "somebody wrote both of you
- *  down": a `contact` edge from a person who also holds the viewer. */
+/** The seam, filled. A circle is a group, and R5 made groups real: two people
+ *  share one when the viewer's expanded subjects and theirs meet in a group,
+ *  however many groups deep either of them sits. Nothing else counts — being
+ *  written down by the same person is an address book, not a circle. */
 export async function sharedCircle(
   viewerId: number,
   candidates: readonly number[],
 ): Promise<Set<number>> {
-  if (candidates.length === 0) return new Set();
-  const db = database();
-  const holders = db
-    .select({ id: schema.relation.subjectId })
-    .from(schema.relation)
-    .where(
-      and(
-        eq(schema.relation.subjectKind, 'person'),
-        eq(schema.relation.verb, CONTACT),
-        eq(schema.relation.resourceKind, 'person'),
-        eq(schema.relation.resourceId, viewerId),
-      ),
-    );
-  const rows = await db
-    .select({ id: schema.relation.resourceId })
-    .from(schema.relation)
-    .where(
-      and(
-        eq(schema.relation.subjectKind, 'person'),
-        eq(schema.relation.verb, CONTACT),
-        eq(schema.relation.resourceKind, 'person'),
-        inArray(schema.relation.resourceId, [...candidates]),
-        inArray(schema.relation.subjectId, holders),
-      ),
-    );
-  return new Set(rows.map((row) => row.id));
+  return sharedGroupMembers(viewerId, candidates);
 }
 
 export interface ViewerAnswer {
