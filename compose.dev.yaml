@@ -1,0 +1,23 @@
+services:
+  db:
+    image: postgres:17
+    container_name: ronitnath-dev-db
+    restart: unless-stopped
+    ports:
+      # 5433 is the documented default; DEV_DB_PORT moves it when another
+      # project on the machine already holds that port.
+      - '127.0.0.1:${DEV_DB_PORT:-5433}:5432'
+    environment:
+      POSTGRES_USER: ronitnath
+      POSTGRES_PASSWORD: ronitnath
+      POSTGRES_DB: ronitnath
+    volumes:
+      - dev-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ronitnath -d ronitnath']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  dev-db:
