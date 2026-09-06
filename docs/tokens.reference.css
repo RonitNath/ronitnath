@@ -1,0 +1,624 @@
+/* rn-site tokens and chrome — the one stylesheet.
+ *
+ * docs/design.md is the authority for every number here; the values are the
+ * ones the pre-rebuild site shipped, moved rather than re-picked. Every bundle
+ * links this file and the askama pages embed it, so a change lands everywhere
+ * at once and no surface keeps a private copy.
+ *
+ * Dark and light are both authored: the pairs live inside light-dark(), which
+ * resolves against the element's used color-scheme, so nothing is an inversion
+ * of anything and the toggle is one attribute on <html>.
+ *
+ * The display face is declared here rather than in a stylesheet of its own.
+ * Every surface already links this file — the askama pages by URL, each bundle
+ * through its trunk build — so the face and the token that names it arrive
+ * together and no surface can link one without the other. The URL is absolute
+ * because a bundle's copy is served from its own fingerprinted path.
+ */
+
+@font-face {
+  font-family: "Agency Bold";
+  src: url("/static/fonts/agency-bold.ttf") format("truetype");
+  font-weight: 400 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  color-scheme: light dark;
+
+  /* Ground and ink. */
+  --bg: light-dark(oklch(0.97 0.003 240), oklch(0.06 0.005 240));
+  --bg-muted: light-dark(oklch(0.93 0.005 240), oklch(0.1 0.008 240));
+  --bg-subtle: light-dark(oklch(0.89 0.007 240), oklch(0.14 0.01 240));
+  --fg: light-dark(oklch(0.15 0.01 240), oklch(0.96 0.002 80));
+  --fg-muted: light-dark(oklch(0.3 0.012 255), oklch(0.75 0.005 80));
+  --fg-subtle: light-dark(oklch(0.4 0.012 255), oklch(0.55 0.005 80));
+  --border: light-dark(oklch(0.5 0.03 255), oklch(0.22 0.01 240));
+
+  /* Accent: links, focus, the active nav row. Hover moves lightness only. */
+  --accent: light-dark(oklch(0.34 0.14 215), oklch(0.65 0.15 210));
+  --accent-hover: light-dark(oklch(0.24 0.12 215), oklch(0.72 0.15 210));
+
+  /* The identity pair. Public hero only — never on an internal surface. */
+  --hero-red: oklch(0.63 0.235 27);
+  --hero-gold: oklch(0.8 0.135 80);
+
+  --surface-glass: color-mix(in oklab, var(--bg) 33%, transparent);
+  --surface-glass-hover: color-mix(in oklab, var(--bg-subtle) 55%, transparent);
+
+  --font-display: "Agency Bold", system-ui, sans-serif;
+  --font-body: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  /* Five type sizes. There is no sixth. */
+  --text-1: 0.8125rem;
+  --text-2: 0.875rem;
+  --text-3: 1rem;
+  --text-4: 1.25rem;
+  --text-5: 1.6rem;
+
+  /* State ink. A state is a word in its own colour — never a capsule, never a
+   * dot — so these are foreground values and nothing here has a fill. */
+  --state-live: light-dark(oklch(0.42 0.11 155), oklch(0.76 0.13 155));
+  --state-stopped: light-dark(oklch(0.48 0.16 27), oklch(0.72 0.16 27));
+  --state-open: light-dark(oklch(0.48 0.12 70), oklch(0.78 0.13 75));
+  --state-gone: light-dark(oklch(0.42 0.13 300), oklch(0.75 0.13 300));
+
+  --radius: 0.25rem;
+  --rail-width: 15rem;
+  --cell-pad: 0.5rem;
+  --row-height: 2.25rem;
+  --gap-section: 2rem;
+  --content-max: 72rem;
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+}
+
+/* Base. Nothing keeps its user-agent styling: tables, buttons, inputs and
+ * links are all stated explicitly, and the default is borderless. */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-body);
+  font-size: var(--text-3);
+  line-height: 1.5;
+  -webkit-text-size-adjust: 100%;
+}
+
+h1,
+h2,
+h3 {
+  margin: 0;
+  font-weight: 600;
+  line-height: 1.25;
+}
+h1 {
+  font-size: var(--text-4);
+  letter-spacing: -0.01em;
+}
+h2 {
+  font-size: var(--text-3);
+  letter-spacing: 0.01em;
+  color: var(--fg-muted);
+}
+h3 {
+  font-size: var(--text-2);
+  color: var(--fg-muted);
+}
+
+p {
+  margin: 0;
+}
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+}
+a:hover {
+  color: var(--accent-hover);
+  text-decoration: underline;
+}
+
+code,
+.mono {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+}
+
+.num,
+td.num,
+th.num,
+time {
+  font-variant-numeric: tabular-nums;
+}
+
+button,
+input,
+select,
+textarea {
+  accent-color: var(--accent);
+  font: inherit;
+  color: inherit;
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius);
+  margin: 0;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* Shell: a rail wide, a drawer narrow, one main column either way. */
+
+.shell {
+  display: grid;
+  grid-template-columns: var(--rail-width) minmax(0, 1fr);
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+.rail {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--bg-muted);
+  padding: 0.75rem 0;
+}
+
+.rail-identity {
+  padding: 0.25rem 0.9rem 0.75rem;
+  display: grid;
+  gap: 0.1rem;
+}
+.rail-identity .who {
+  font-weight: 600;
+}
+.rail-identity .registration,
+.rail-identity .acting {
+  font-size: var(--text-1);
+  color: var(--fg-subtle);
+}
+
+.rail-scope {
+  display: flex;
+  gap: 0.25rem;
+  padding: 0 0.65rem 0.75rem;
+}
+.rail-scope a {
+  color: var(--fg-muted);
+  font-size: var(--text-1);
+  padding: 0.2rem 0.45rem;
+  border-radius: var(--radius);
+}
+.rail-scope a:hover {
+  background: var(--surface-glass-hover);
+  text-decoration: none;
+}
+.rail-scope a[aria-current="page"] {
+  color: var(--fg);
+  background: var(--bg-subtle);
+}
+
+/* The two controls that live above the nav: who the writes are by, and — where
+ * a tier puts one there — what the pages are about. Same shape, so the rail
+ * reads as one column rather than as a stack of unrelated widgets. */
+.rail-acting,
+.rail-slot {
+  display: grid;
+  gap: 0.15rem;
+  padding: 0 0.65rem 0.75rem;
+}
+.rail-acting label,
+.rail-slot label {
+  font-size: var(--text-1);
+  color: var(--fg-subtle);
+}
+.rail-acting select,
+.rail-slot select {
+  width: 100%;
+  padding: 0.25rem 0.35rem;
+  background: var(--bg-subtle);
+  font-size: var(--text-2);
+}
+.rail-acting .note {
+  font-size: var(--text-1);
+  color: var(--fg-muted);
+}
+.rail-acting .note[data-state="invalid"] {
+  color: var(--state-stopped);
+}
+
+.rail-nav {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  padding: 0 0.65rem;
+}
+.rail-nav a {
+  color: var(--fg-muted);
+  font-size: var(--text-2);
+  padding: 0.35rem 0.5rem;
+  border-radius: var(--radius);
+}
+.rail-nav a:hover {
+  background: var(--surface-glass-hover);
+  color: var(--fg);
+  text-decoration: none;
+}
+.rail-nav a[aria-current="page"] {
+  color: var(--fg);
+  background: var(--bg-subtle);
+}
+
+/* The footer is pinned; the nav scrolls under it. */
+.rail-foot {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 0.9rem;
+  font-size: var(--text-1);
+}
+.rail-foot button {
+  color: var(--fg-muted);
+  cursor: pointer;
+  padding: 0.2rem 0.4rem;
+  border-radius: var(--radius);
+}
+.rail-foot button:hover {
+  background: var(--surface-glass-hover);
+  color: var(--fg);
+}
+.rail-foot form {
+  margin: 0 0 0 auto;
+}
+
+.content {
+  min-width: 0;
+  padding: 1.25rem 1.5rem 3rem;
+}
+.content > * {
+  max-width: var(--content-max);
+}
+.page-head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+/* Narrow: the rail becomes a drawer, and the scope and page stay visible. */
+
+.topbar {
+  display: none;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.5rem 0.75rem;
+  background: var(--bg-muted);
+}
+.topbar button {
+  cursor: pointer;
+  font-size: var(--text-2);
+  padding: 0.25rem 0.5rem;
+  color: var(--fg-muted);
+}
+.topbar .where {
+  font-size: var(--text-2);
+  color: var(--fg-muted);
+}
+.scrim {
+  display: none;
+}
+
+@media (max-width: 52rem) {
+  .shell {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+  .topbar {
+    display: flex;
+  }
+  .rail {
+    position: fixed;
+    inset: 0 auto 0 0;
+    width: min(17rem, 84vw);
+    z-index: 2;
+    transform: translateX(-100%);
+    visibility: hidden;
+  }
+  .shell[data-drawer="open"] .rail {
+    transform: none;
+    visibility: visible;
+  }
+  .shell[data-drawer="open"] .scrim {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 1;
+    background: color-mix(in oklab, var(--bg) 70%, transparent);
+  }
+  .content {
+    padding: 1rem 0.9rem 3rem;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .rail {
+    transition: transform 150ms ease-out;
+  }
+}
+
+/* Table. Hairline dividers, muted headers, mono machine values, and columns
+ * that drop by priority rather than by squeezing. */
+
+.table-tools {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+  font-size: var(--text-2);
+}
+.table-tools input {
+  padding: 0.25rem 0.4rem;
+  background: var(--bg-muted);
+  min-width: 12rem;
+}
+/* No native affordance beside our own: the filter clears by selecting it. */
+.table-tools input::-webkit-search-cancel-button,
+.table-tools input::-webkit-search-decoration {
+  appearance: none;
+  display: none;
+}
+.table-tools .count {
+  color: var(--fg-subtle);
+  font-size: var(--text-1);
+  font-variant-numeric: tabular-nums;
+}
+.table-tools .pager {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--fg-subtle);
+  font-size: var(--text-1);
+}
+.table-tools .pager button {
+  cursor: pointer;
+  padding: 0.15rem 0.4rem;
+  color: var(--fg-muted);
+}
+.table-tools .pager button:disabled {
+  color: var(--fg-subtle);
+  opacity: 0.45;
+  cursor: default;
+}
+
+.tbl {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-2);
+}
+.tbl th,
+.tbl td {
+  text-align: left;
+  padding: var(--cell-pad);
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tbl th {
+  color: var(--fg-subtle);
+  font-weight: 600;
+  font-size: var(--text-1);
+  cursor: pointer;
+  user-select: none;
+}
+.tbl th[aria-sort] {
+  color: var(--fg);
+}
+.tbl tbody tr {
+  height: var(--row-height);
+}
+.tbl tbody tr[tabindex]:hover,
+.tbl tbody tr[tabindex]:focus-visible {
+  background: var(--surface-glass-hover);
+  cursor: pointer;
+}
+.tbl td.mono {
+  font-family: var(--font-mono);
+}
+.tbl .empty {
+  color: var(--fg-subtle);
+  padding: 1rem var(--cell-pad);
+  white-space: normal;
+}
+
+/* The trailing column of verbs. It sizes to its contents, never wraps, and
+ * carries no header: it holds commands, not a value. */
+.tbl .does {
+  width: 1%;
+  white-space: nowrap;
+  text-align: right;
+}
+.tbl td.does .act + .act {
+  margin-left: 0.75rem;
+}
+
+/* A row-level verb is a word, not chrome. Destructive words take the warm ink,
+ * which is the whole of the warning: there is no confirmation dialog for a
+ * command the audit log records and an operator can undo. */
+.act {
+  cursor: pointer;
+  padding: 0;
+  color: var(--accent);
+  font-size: var(--text-2);
+}
+.act:hover {
+  color: var(--accent-hover);
+  text-decoration: underline;
+}
+.act[data-weight="undo"] {
+  color: var(--state-stopped);
+}
+.act:disabled {
+  color: var(--fg-subtle);
+  cursor: default;
+  text-decoration: none;
+}
+
+/* A state is a word in its own colour. Never a capsule, never a dot. */
+.state {
+  font-size: var(--text-1);
+  color: var(--fg-muted);
+}
+.state[data-state="active"],
+.state[data-state="formed"],
+.state[data-state="published"],
+.state[data-state="confirmed"],
+.state[data-state="verified"],
+.state[data-state="proven"] {
+  color: var(--state-live);
+}
+.state[data-state="disabled"],
+.state[data-state="unhealthy"],
+.state[data-state="deleted"],
+.state[data-state="expired"],
+.state[data-state="rejected"] {
+  color: var(--state-stopped);
+}
+.state[data-state="draft"],
+.state[data-state="unformed"],
+.state[data-state="proposed"],
+.state[data-state="unclaimed"],
+.state[data-state="unverified"],
+.state[data-state="unproven"] {
+  color: var(--state-open);
+}
+.state[data-state="merged"],
+.state[data-state="operator"],
+.state[data-state="claimed"],
+.state[data-state="self"],
+.state[data-state="factor"] {
+  color: var(--state-gone);
+}
+
+/* Column priority: 1 always, 2 drops on tablet, 3 drops on phone. */
+@media (max-width: 64rem) {
+  .tbl .p3 {
+    display: none;
+  }
+}
+@media (max-width: 42rem) {
+  .tbl .p2 {
+    display: none;
+  }
+}
+
+/* Fields. They sync themselves; the only button is a commit. */
+
+.field {
+  display: grid;
+  gap: 0.2rem;
+  margin-bottom: 0.75rem;
+  max-width: 26rem;
+}
+.field > label {
+  font-size: var(--text-1);
+  color: var(--fg-subtle);
+}
+.field input,
+.field select,
+.field textarea {
+  padding: 0.3rem 0.45rem;
+  background: var(--bg-muted);
+  width: 100%;
+}
+/* A body of words wants the column it is written in, not a field's width. */
+.field.words {
+  max-width: none;
+}
+.field.words textarea {
+  font-family: var(--font-body);
+  line-height: 1.55;
+  resize: vertical;
+}
+.field.words textarea[readonly] {
+  color: var(--fg-muted);
+}
+/* A phone is not a page of paper. The row count a caller asks for is a
+ * desk-sized height; here it would be most of the screen given to whitespace. */
+@media (max-width: 42rem) {
+  .field.words textarea {
+    height: 14rem;
+  }
+}
+.field .note {
+  font-size: var(--text-1);
+  color: var(--fg-muted);
+  min-height: 1.1em;
+}
+.field .note[data-state="invalid"] {
+  color: var(--hero-red);
+}
+.field.toggle {
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 0.5rem;
+}
+.field.toggle > label {
+  font-size: var(--text-2);
+  color: var(--fg);
+}
+.field.toggle .note {
+  grid-column: 1 / -1;
+}
+
+.commit {
+  cursor: pointer;
+  padding: 0.35rem 0.8rem;
+  background: var(--accent);
+  color: var(--bg);
+  font-size: var(--text-2);
+  font-weight: 600;
+}
+.commit:hover {
+  background: var(--accent-hover);
+}
+.commit:disabled {
+  background: var(--bg-subtle);
+  color: var(--fg-subtle);
+  cursor: default;
+}
+
+.decline {
+  display: grid;
+  gap: 0.5rem;
+  padding-top: 2rem;
+}
+.decline p {
+  color: var(--fg-muted);
+  font-size: var(--text-2);
+}
