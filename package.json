@@ -1,0 +1,54 @@
+{
+  "name": "ronitnath",
+  "version": "0.0.0",
+  "private": true,
+  "packageManager": "pnpm@10.28.1",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "gate": "pnpm typecheck && pnpm lint && pnpm test && pnpm build",
+    "db:up": "docker compose -f compose.dev.yaml up -d",
+    "db:down": "docker compose -f compose.dev.yaml down",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "e2e": "playwright test"
+  },
+  "dependencies": {
+    "drizzle-orm": "0.45.2",
+    "next": "15.5.25",
+    "pg": "8.23.0",
+    "react": "19.2.8",
+    "react-dom": "19.2.8"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.63.0",
+    "@tailwindcss/postcss": "4.3.3",
+    "@types/node": "24.13.3",
+    "@types/pg": "8.23.1",
+    "@types/react": "19.2.18",
+    "@types/react-dom": "19.2.7",
+    "dotenv": "17.2.4",
+    "drizzle-kit": "0.31.10",
+    "eslint": "9.39.5",
+    "eslint-config-next": "15.5.25",
+    "eslint-config-prettier": "10.1.8",
+    "prettier": "3.9.6",
+    "tailwindcss": "4.3.3",
+    "typescript": "5.9.3",
+    "vitest": "3.2.7",
+    "@eslint/eslintrc": "3.3.1"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "unrs-resolver",
+      "sharp",
+      "@tailwindcss/oxide"
+    ]
+  }
+}
