@@ -32,9 +32,34 @@ OIDC_CLIENT_ID=...
 OIDC_CLIENT_SECRET=...
 OIDC_REDIRECT_URI=https://ronitnath.com/auth/oidc/callback
 OIDC_ALLOWLIST=ronit@isoastra.com
-SMTP_URL=...
+SMTP_URL=smtp://<user>:<pass>@<useSend host>:587
+MAIL_FROM=Ronit Nath <no-reply@ronitnath.com>
 APP_VERSION=<tag>
 ```
+
+`SMTP_URL` is not optional in production: with it unset the app falls back to
+the dev transport, which writes verification and reset mail to a directory
+inside the container instead of sending it. `MAIL_FROM` defaults to the value
+above and only needs setting to change the sender.
+
+The ZITADEL app is `ronitnath` in the Isoastra org. Its redirect URI must be
+registered there exactly as `OIDC_REDIRECT_URI` names it, and the callback
+accepts no address but the one on `OIDC_ALLOWLIST`.
+
+## Seed the operator (once, after the first migrate)
+
+```sh
+docker run --rm --network host \
+  --env-file /data/crypt/ronitnath/web.env \
+  ghcr.io/ronitnath/ronitnath:"$TAG"-migrate \
+  pnpm seed:operator --email ronit@isoastra.com
+```
+
+It creates the operator person with no factors and grants it `operator` on
+`platform:*`; the first ZITADEL sign-in attaches the real subject to it.
+Running it twice changes nothing. Skipping it is survivable — the callback
+provisions the same person and grant on first sign-in — but then the display
+name is whatever ZITADEL sent.
 
 ## Release
 

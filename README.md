@@ -32,6 +32,13 @@ pnpm dev                      # http://localhost:3000
 `DEV_DB_PORT=5443 pnpm db:up` moves the database when something else on the
 machine already holds 5433.
 
+With no `SMTP_URL`, verification and reset mail is logged to stdout and written
+to `.mail/<timestamp>.eml` (gitignored); `MAIL_DIR` moves that directory, which
+the Playwright run uses because Next's standalone server changes directory.
+
+`pnpm seed:operator --email ronit@isoastra.com` creates the platform operator
+with no factors, ready for ZITADEL to attach itself on first sign-in.
+
 - `pnpm gate` — typecheck, lint, unit tests, build. Green before any report.
 - `pnpm e2e` — Playwright against the standalone server the image ships.
 - `pnpm db:generate` — a new SQL migration after a `src/db/schema.ts` change.

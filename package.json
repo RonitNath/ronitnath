@@ -16,19 +16,26 @@
     "db:down": "docker compose -f compose.dev.yaml down",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "e2e": "playwright test"
+    "e2e": "playwright test",
+    "seed:operator": "tsx scripts/seed-operator.ts"
   },
   "dependencies": {
+    "@node-rs/argon2": "^2.2.0",
     "drizzle-orm": "0.45.2",
     "next": "15.5.25",
+    "nodemailer": "^10.0.0",
+    "openid-client": "^6.8.8",
     "pg": "8.23.0",
     "react": "19.2.8",
-    "react-dom": "19.2.8"
+    "react-dom": "19.2.8",
+    "zod": "^4.5.4"
   },
   "devDependencies": {
+    "@eslint/eslintrc": "3.3.1",
     "@playwright/test": "1.63.0",
     "@tailwindcss/postcss": "4.3.3",
     "@types/node": "24.13.3",
+    "@types/nodemailer": "^8.0.1",
     "@types/pg": "8.23.1",
     "@types/react": "19.2.18",
     "@types/react-dom": "19.2.7",
@@ -39,9 +46,9 @@
     "eslint-config-prettier": "10.1.8",
     "prettier": "3.9.6",
     "tailwindcss": "4.3.3",
+    "tsx": "^4.23.13",
     "typescript": "5.9.3",
-    "vitest": "3.2.7",
-    "@eslint/eslintrc": "3.3.1"
+    "vitest": "3.2.7"
   },
   "pnpm": {
     "onlyBuiltDependencies": [

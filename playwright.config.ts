@@ -1,4 +1,9 @@
+import { config as loadEnv } from 'dotenv';
 import { defineConfig, devices } from '@playwright/test';
+
+/* The spec files read `.env.local` to decide whether the OIDC door is
+ * configured here; the server under test loads the same files itself. */
+loadEnv({ path: ['.env.local', '.env'], quiet: true });
 
 const port = Number(process.env.E2E_PORT ?? 3141);
 const baseURL = `http://127.0.0.1:${port}`;
@@ -18,7 +23,7 @@ export default defineConfig({
       'rm -rf .next/standalone/.next/static .next/standalone/public',
       'cp -R .next/static .next/standalone/.next/static',
       'cp -R public .next/standalone/public',
-      `PORT=${port} node .next/standalone/server.js`,
+      `MAIL_DIR=${process.cwd()}/.mail PORT=${port} node .next/standalone/server.js`,
     ].join(' && '),
     url: `${baseURL}/healthz`,
     reuseExistingServer: !process.env.CI,

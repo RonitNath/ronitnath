@@ -1,0 +1,189 @@
+import { readdir, readFile } from 'node:fs/promises';
+import { join } from 'node:path';
+import { expect, test, type Page } from '@playwright/test';
+
+/* The golden flows, against the standalone server and the dev database.
+ *
+ * Mail is read off disk: with no `SMTP_URL` the app writes every message to
+ * `.mail/<timestamp>.eml`, which is the only way a test can follow a link it
+ * was never told. Addresses are unique per run so two runs against the same
+ * database do not collide. */
+
+const MAIL_DIR = join(process.cwd(), '.mail');
+const PASSWORD = 'a-long-enough-password';
+
+function address(tag: string): string {
+  return `${tag}-${Date.now()}-${Math.floor(Math.random() * 1e6)}@example.com`;
+}
+
+async function linkFor(to: string, path: string): Promise<string> {
+  const pattern = new RegExp(`${path}/([A-Za-z0-9_-]{43})`);
+  const deadline = Date.now() + 15_000;
+  while (Date.now() < deadline) {
+    let names: string[] = [];
+    try {
+      names = (await readdir(MAIL_DIR)).sort().reverse();
+    } catch {
+      /* the directory appears with the first message */
+    }
+    for (const name of names) {
+      const body = await readFile(join(MAIL_DIR, name), 'utf8');
+      if (!body.includes(`To: ${to}`)) continue;
+      const found = pattern.exec(body);
+      if (found) return `${path}/${found[1]}`;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 200));
+  }
+  throw new Error(`no ${path} link was mailed to ${to}`);
+}
+
+async function registerAndVerify(page: Page, name: string): Promise<string> {
+  const email = address('member');
+  await page.goto('/auth');
+  await page.getByLabel('Name').fill(name);
+  await page.locator('#register-email').fill(email);
+  await page.locator('#register-password').fill(PASSWORD);
+  await page.getByRole('button', { name: 'Register' }).click();
+  await expect(page.getByText('Check your inbox')).toBeVisible();
+
+  await page.goto(await linkFor(email, '/auth/verify'));
+  await page.getByRole('button', { name: 'Confirm' }).click();
+  await expect(page.getByText('Address confirmed')).toBeVisible();
+  return email;
+}
+
+async function signIn(page: Page, email: string, password = PASSWORD) {
+  await page.goto('/auth');
+  await page.locator('#sign-in-email').fill(email);
+  await page.locator('#sign-in-password').fill(password);
+  await page.getByRole('button', { name: 'Sign in' }).click();
+}
+
+test('register, verify, sign in, list sessions, revoke another, sign out', async ({
+  page,
+  browser,
+}) => {
+  const email = await registerAndVerify(page, 'Test Member');
+
+  await signIn(page, email);
+  await expect(page).toHaveURL('/app');
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Test Member');
+  await expect(page.getByText(email)).toBeVisible();
+  /* A member is not an operator: the nav must not offer the surface. */
+  await expect(page.getByRole('link', { name: 'Platform' })).toHaveCount(0);
+
+  /* A second browser gives the sessions list something to revoke. */
+  const other = await browser.newContext();
+  const otherPage = await other.newPage();
+  await signIn(otherPage, email);
+  await expect(otherPage).toHaveURL('/app');
+
+  await page.goto('/app/sessions');
+  await expect(page.getByRole('row')).toHaveCount(3); // header + two sessions
+  await expect(page.getByText('this one')).toHaveCount(1);
+  await page.getByRole('button', { name: 'Revoke' }).click();
+  await expect(page.getByRole('row')).toHaveCount(2);
+
+  /* The revoked session is gone at the wrist, not just on the page. */
+  await otherPage.goto('/app');
+  await expect(otherPage).toHaveURL(/\/auth/);
+  await other.close();
+
+  await page.getByRole('button', { name: 'Sign out' }).click();
+  await expect(page).toHaveURL('/');
+  await expect(page.getByRole('link', { name: 'Sign in' })).toBeVisible();
+});
+
+test('the reset flow sets a new password and ends every open session', async ({ page }) => {
+  const email = await registerAndVerify(page, 'Reset Member');
+  await signIn(page, email);
+  await expect(page).toHaveURL('/app');
+
+  await page.goto('/auth/reset');
+  await page.getByLabel('Email').fill(email);
+  await page.getByRole('button', { name: 'Send the link' }).click();
+  await expect(page.getByText('Check your inbox')).toBeVisible();
+
+  await page.goto(await linkFor(email, '/auth/reset'));
+  await page.getByLabel('New password').fill('an-entirely-new-password');
+  await page.getByRole('button', { name: 'Set the password' }).click();
+  await expect(page.getByText('Password set')).toBeVisible();
+
+  /* The session that asked for the reset is gone with the rest. */
+  await page.goto('/app');
+  await expect(page).toHaveURL(/\/auth/);
+
+  await signIn(page, email, 'an-entirely-new-password');
+  await expect(page).toHaveURL('/app');
+});
+
+test('an unknown address and a wrong password decline identically', async ({ page }) => {
+  const email = await registerAndVerify(page, 'Uniform Member');
+
+  const decline = page.locator('.pane .note[data-state="invalid"]');
+
+  await signIn(page, email, 'not-the-right-password');
+  await expect(decline).toHaveText('Authentication failed.');
+  await expect(page).toHaveURL(/\/auth/);
+
+  await signIn(page, address('nobody'), PASSWORD);
+  await expect(decline).toHaveText('Authentication failed.');
+  await expect(page).toHaveURL(/\/auth/);
+});
+
+test('a reset for an address nobody registered says what a real one says', async ({ page }) => {
+  await page.goto('/auth/reset');
+  await page.getByLabel('Email').fill(address('nobody'));
+  await page.getByRole('button', { name: 'Send the link' }).click();
+  await expect(page.getByText('Check your inbox')).toBeVisible();
+});
+
+test('an anonymous visitor is sent from /app to the door, and back afterwards', async ({
+  page,
+}) => {
+  await page.goto('/app/sessions');
+  await expect(page).toHaveURL('/auth?next=%2Fapp%2Fsessions');
+  await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible();
+});
+
+test('/platform is a 404 for a member, and is not linked at all', async ({ page }) => {
+  const email = await registerAndVerify(page, 'Not An Operator');
+  await signIn(page, email);
+  await expect(page).toHaveURL('/app');
+
+  const response = await page.goto('/platform');
+  expect(response?.status()).toBe(404);
+});
+
+test('/platform is a 404 for an anonymous visitor too', async ({ page }) => {
+  const response = await page.goto('/platform');
+  expect(response?.status()).toBe(404);
+});
+
+test('the Isoastra door redirects to ZITADEL with PKCE, state and nonce', async ({ request }) => {
+  test.skip(!process.env.OIDC_CLIENT_ID, 'OIDC credentials are not configured here');
+
+  const response = await request.get('/auth/oidc/start?next=%2Fapp', { maxRedirects: 0 });
+  expect(response.status()).toBe(302);
+  const location = new URL(response.headers()['location']!);
+  expect(location.origin).toBe('https://auth.isoastra.com');
+  expect(location.pathname).toBe('/oauth/v2/authorize');
+  expect(location.searchParams.get('response_type')).toBe('code');
+  expect(location.searchParams.get('code_challenge_method')).toBe('S256');
+  expect(location.searchParams.get('code_challenge')).toMatch(/^[A-Za-z0-9_-]{43}$/);
+  expect(location.searchParams.get('state')).toBeTruthy();
+  expect(location.searchParams.get('nonce')).toBeTruthy();
+  expect(location.searchParams.get('scope')).toContain('openid');
+  expect(response.headers()['set-cookie']).toContain('rn_oidc=');
+  expect(response.headers()['set-cookie']).toContain('HttpOnly');
+});
+
+test('a callback with no checks cookie declines without touching the database', async ({
+  request,
+}) => {
+  const response = await request.get('/auth/oidc/callback?code=nope&state=nope', {
+    maxRedirects: 0,
+  });
+  expect(response.status()).toBe(302);
+  expect(response.headers()['location']).toContain('/auth?declined=1');
+});
