@@ -159,8 +159,10 @@
   top: 0;
   /* Wide enough for the longest detail line the catalog produces
      ("Orion · blue supergiant · 863 ly") at this tracking, so a callout states
-     the star rather than trailing off in an ellipsis. */
-  max-width: min(22rem, calc(100vw - 1.5rem));
+     the star rather than trailing off in an ellipsis — and never wider than
+     the frame less the margin a label keeps at each end (EDGE_PX), or the
+     narrowest phone has no placement that fits. */
+  max-width: min(22rem, calc(100vw - 2rem));
   padding: 0;
   border: 0;
   background: none;

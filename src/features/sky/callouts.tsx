@@ -1,7 +1,9 @@
 import { type CSSProperties, useEffect, useRef, useState } from 'react';
 
 import {
+  type Box,
   chooseLeader,
+  chromeBoxes,
   keepOutFor,
   LABEL_PX,
   labelLeft,
@@ -69,6 +71,8 @@ export function calloutFrame(
   placement: Placement,
   width: number,
   height: number,
+  label: readonly [number, number] = [labelWidthFor(width), LABEL_PX[1]],
+  blocks?: readonly Box[],
 ): CalloutFrame {
   const offset = leaderOffset(width);
   return {
@@ -77,23 +81,66 @@ export function calloutFrame(
     leader: chooseLeader(placement, offset, {
       width,
       height,
-      label: [labelWidthFor(width), LABEL_PX[1]],
+      label,
       keepOut: keepOutFor(width, height),
+      blocks,
     }),
   };
+}
+
+/** The page's own chrome, off the page itself. The header and the corner block
+ * are laid out by CSS and change size with the viewport and with the controls
+ * in them, so they are measured rather than assumed; where there is nothing to
+ * measure the estimate in `annotate.ts` stands in. */
+export function measureChrome(width: number, height: number): Box[] {
+  const boxes: Box[] = [];
+  for (const selector of ['.topbar', '.sky-chrome']) {
+    const node = document.querySelector(selector);
+    if (!node) continue;
+    const box = node.getBoundingClientRect();
+    if (box.width > 0 && box.height > 0)
+      boxes.push({ left: box.left, top: box.top, right: box.right, bottom: box.bottom });
+  }
+  return boxes.length === 2 ? boxes : chromeBoxes(width, height);
+}
+
+/** A callout's own label box, measured when it mounted. The CSS max-width is
+ * a function of the viewport, so a label measured at one width is re-measured
+ * at another rather than clamped against a box it no longer has. */
+function labelSize(node: HTMLElement, width: number): [number, number] {
+  if (Number(node.dataset.labelVw) !== width) measureLabel(node, width);
+  return [
+    Number(node.dataset.labelWidth) || labelWidthFor(width),
+    Number(node.dataset.labelHeight) || LABEL_PX[1],
+  ];
+}
+
+function measureLabel(node: HTMLElement, width: number): void {
+  const label = node.querySelector('.callout-label');
+  if (!label) return;
+  const box = label.getBoundingClientRect();
+  // Rounded *up*: a label measured half a pixel short is a label placed half a
+  // pixel over the margin it was clamped to.
+  node.dataset.labelWidth = String(Math.ceil(box.width));
+  node.dataset.labelHeight = String(Math.ceil(box.height));
+  node.dataset.labelVw = String(width);
 }
 
 /** Move one callout: one transform, and nothing else in the common frame. The
  * leader's geometry is written only when the direction changes, which is a
  * handful of times over a star's whole crossing of the sky. */
-function writeFrame(node: HTMLElement, frame: CalloutFrame, offset: number): void {
+function writeFrame(
+  node: HTMLElement,
+  frame: CalloutFrame,
+  offset: number,
+  labelWidth: number,
+): void {
   node.style.transform = `translate3d(${frame.x.toFixed(2)}px, ${frame.y.toFixed(2)}px, 0)`;
   // The label's own offset is a function of the direction and of where the
   // frame ends, not of the star's position, so it is written when one of those
   // changes and not once a frame.
   const line = leaderLine(frame.leader, offset);
-  const width = node.dataset.labelWidth ? Number(node.dataset.labelWidth) : LABEL_PX[0];
-  const anchor = labelLeft(frame.x + line.dx, frame.leader, width, innerWidth) - frame.x;
+  const anchor = labelLeft(frame.x + line.dx, frame.leader, labelWidth, innerWidth) - frame.x;
   const state = `${frame.leader}:${anchor.toFixed(0)}`;
   if (node.dataset.leader === state) return;
   node.dataset.leader = state;
@@ -112,6 +159,10 @@ export function Callouts({ stage, named }: { stage: Stage | null; named: NamedSt
   const [rendered, setRendered] = useState<Rendered[]>([]);
   const nodes = useRef(new Map<number, HTMLElement>());
   const latest = useRef<Placement[]>([]);
+  /** The chrome's boxes, measured off the page and kept until something can
+   * have changed them. Reading them once a frame would be a layout read in the
+   * one loop that must not do any. */
+  const chrome = useRef<Box[] | null>(null);
 
   /** A node is positioned the moment it mounts rather than on the next frame,
    * or the first sixteen milliseconds of its entrance play in the corner. */
@@ -121,17 +172,18 @@ export function Callouts({ stage, named }: { stage: Stage | null; named: NamedSt
       return;
     }
     nodes.current.set(star, node);
-    // Measured once, when the callout mounts: the frame loop needs the label's
-    // real width to keep it on screen and must not read layout to get it.
-    const label = node.querySelector('.callout-label');
-    if (label)
-      node.dataset.labelWidth = String(Math.round(label.getBoundingClientRect().width));
+    // Measured when the callout mounts: the frame loop needs the label's real
+    // box to keep it on screen and must not read layout to get it.
+    measureLabel(node, innerWidth);
     const placement = latest.current.find((candidate) => candidate.star === star);
     if (placement) {
+      const label = labelSize(node, innerWidth);
+      chrome.current ??= measureChrome(innerWidth, innerHeight);
       writeFrame(
         node,
-        calloutFrame(placement, innerWidth, innerHeight),
+        calloutFrame(placement, innerWidth, innerHeight, label, chrome.current),
         leaderOffset(innerWidth),
+        label[0],
       );
     }
   };
@@ -140,6 +192,18 @@ export function Callouts({ stage, named }: { stage: Stage | null; named: NamedSt
     if (!stage) return;
     let frame = 0;
     let key = '';
+    // The chrome is re-measured when the viewport changes and when a control
+    // comes or goes — the block grows a row when "Resume orbit" appears — and
+    // never inside the frame loop.
+    const remeasure = (): void => {
+      chrome.current = measureChrome(innerWidth, innerHeight);
+    };
+    remeasure();
+    addEventListener('resize', remeasure);
+    const bar = document.querySelector('.sky-chrome');
+    const watcher =
+      bar && typeof ResizeObserver !== 'undefined' ? new ResizeObserver(remeasure) : null;
+    watcher?.observe(bar!);
     const tick = (): void => {
       frame = requestAnimationFrame(tick);
       const placements = stage.placements();
@@ -158,13 +222,25 @@ export function Callouts({ stage, named }: { stage: Stage | null; named: NamedSt
       }
       const [width, height] = [innerWidth, innerHeight];
       const offset = leaderOffset(width);
+      const blocks = chrome.current ?? undefined;
       for (const placement of placements) {
         const node = nodes.current.get(placement.star);
-        if (node) writeFrame(node, calloutFrame(placement, width, height), offset);
+        if (!node) continue;
+        const label = labelSize(node, width);
+        writeFrame(
+          node,
+          calloutFrame(placement, width, height, label, blocks),
+          offset,
+          label[0],
+        );
       }
     };
     frame = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(frame);
+    return () => {
+      cancelAnimationFrame(frame);
+      removeEventListener('resize', remeasure);
+      watcher?.disconnect();
+    };
   }, [stage]);
 
   return (

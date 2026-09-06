@@ -9,7 +9,7 @@
  * leave the CSS starfield as the picture and the document intact.
  */
 
-import { keepOutFor, place, type Placement } from './annotate';
+import { keepOutFor, place, placementAvoid, type Placement } from './annotate';
 import { BandScene } from './band-gl';
 import { ASSETS, loadCities, loadImageData, loadNamed, loadStars } from './assets';
 import { simTimeMs, syncedSimTimeMs } from './clock';
@@ -134,6 +134,7 @@ export class Stage {
       this.aspect(),
       undefined,
       keepOutFor(innerWidth, innerHeight),
+      placementAvoid(innerWidth, innerHeight),
     );
   }
 
