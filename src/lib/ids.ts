@@ -18,6 +18,9 @@ export const ID_TYPES = {
   session: 's',
   link: 'l',
   event: 'e',
+  /* A match candidate. It is a row in the model like any other and it reaches
+   * a form on /app, so it gets a prefix rather than borrowing one. */
+  match: 'm',
 } as const;
 
 export type IdType = keyof typeof ID_TYPES;
