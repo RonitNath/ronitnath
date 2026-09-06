@@ -6,27 +6,30 @@
  * which a 2D context draws comfortably, and keeping WebGL for the globe alone
  * is what the brief asks for.
  *
+ * Every star is one `drawImage` of a pre-rendered point sprite (`sprites.ts`)
+ * under `lighter`, which is `STAR_FRAG` evaluated once per (colour, size,
+ * falloff) instead of once per fragment.
+ *
  * Behind the stars the Milky Way is painted from `sky/milkyway.webp` — Gaia
  * star counts binned onto an equal-area grid, not procedural noise. That map
  * is fixed on the celestial sphere; what changes with the observer is which
  * part of it clears the horizon and how much atmosphere it shines through.
  * Warping an equirectangular map through the view is a per-pixel operation, so
- * it is done into a small offscreen buffer and scaled up: the band is diffuse,
- * and a soft one is what it should look like.
+ * the shipped path hands it to a fragment shader (`band-gl.ts`) and what is
+ * here is the fallback for a browser with no WebGL2.
  */
 
 import type { StarCatalog } from './catalog';
 import { applyView, FOCAL, type Mat3 } from './sidereal';
+import { falloffFor, type SpriteAtlas } from './sprites';
 import { TUNING, TWILIGHT_MAG_LIMIT } from './tuning';
 
-/** Widest the offscreen Milky Way buffer gets. The band has no detail finer
- * than this at the scale it is drawn. */
-const BAND_MAX_WIDTH = 192;
-
-/** Where the halo gradient is sampled, and the flat alpha that stands in for
- * it on a star only two pixels across. */
-const HALO_STOPS = [0, 0.25, 0.5, 0.75, 1] as const;
-const HALO_MEAN = 0.62;
+/** Widest the offscreen Milky Way buffer gets. This path is the fallback for a
+ * browser with no WebGL2 — the band is drawn by a fragment shader at full
+ * resolution otherwise (`band-gl.ts`) — and at 192 px it read as blobs rather
+ * than as the galaxy, so the fallback samples wide enough and bilinearly
+ * enough to show the dark lanes and the bulge too. */
+const BAND_MAX_WIDTH = 512;
 
 export interface FrameGeometry {
   width: number;
@@ -43,20 +46,25 @@ export interface StarLook {
   radius: Float32Array;
   /** Alpha before atmospheric extinction. */
   alpha: Float32Array;
-  /** `r,g,b` ready for a colour string. */
-  rgb: string[];
+  /** The pre-rendered point sprite each star draws with. Many stars share
+   * one: the sprite depends only on colour, diameter and falloff. */
+  sprite: HTMLCanvasElement[];
   /** How many of the (brightest-first) catalog this look covers. */
   count: number;
   light: boolean;
   dpr: number;
 }
 
-export function buildLook(catalog: StarCatalog, light: boolean, dpr: number): StarLook {
+export function buildLook(
+  catalog: StarCatalog,
+  light: boolean,
+  dpr: number,
+  atlas: SpriteAtlas,
+): StarLook {
   // Twilight needs a different size response than night: a star on a bright
   // sky wins on area rather than on contrast.
   const sizeBase = TUNING.sizeBase * (light ? 4 : 1);
   const sizeExp = TUNING.sizeExp * (light ? 2 : 1);
-  const scale = Math.min(dpr, 1.5);
 
   let count = catalog.count;
   if (light) {
@@ -66,14 +74,17 @@ export function buildLook(catalog: StarCatalog, light: boolean, dpr: number): St
 
   const radius = new Float32Array(count);
   const alpha = new Float32Array(count);
-  const rgb: string[] = new Array<string>(count);
+  const sprite = new Array<HTMLCanvasElement>(count);
   for (let index = 0; index < count; index += 1) {
     const brightness = Math.pow(10, -0.4 * catalog.magnitude[index]!);
+    // `gl_PointSize` is device pixels and the GL canvas was device-sized, so
+    // the shipped star is `size` *CSS* pixels across at any density. The 2D
+    // context is scaled by the ratio, so the same number is the same star.
     const size = Math.min(
       TUNING.sizeMax,
       Math.max(1, sizeBase + TUNING.sizeScale * Math.pow(brightness, sizeExp)),
     );
-    radius[index] = (size / 2) * scale;
+    radius[index] = size / 2;
     alpha[index] = Math.min(
       TUNING.alphaMax,
       Math.max(0, TUNING.alphaBase + TUNING.alphaScale * Math.pow(brightness, TUNING.alphaExp)),
@@ -90,10 +101,9 @@ export function buildLook(catalog: StarCatalog, light: boolean, dpr: number): St
       green += (1 - green) * 0.25;
       blue += (1 - blue) * 0.25;
     }
-    rgb[index] =
-      `${Math.round(red * 255)},${Math.round(green * 255)},${Math.round(blue * 255)}`;
+    sprite[index] = atlas.get(size, red, green, blue, falloffFor(brightness));
   }
-  return { radius, alpha, rgb, count, light, dpr };
+  return { radius, alpha, sprite, count, light, dpr };
 }
 
 /** Atmospheric extinction against the zenith cosine, sampled once per frame
@@ -124,7 +134,56 @@ function smoothstep(edge0: number, edge1: number, x: number): number {
   return t * t * (3 - 2 * t);
 }
 
-/** The Milky Way, sampled through the view into a small RGBA buffer. */
+/** Where a frame pixel lands on the equirectangular map.
+ *
+ * The star pass maps J2000 → view; texturing the sky needs the inverse, and
+ * the view basis is orthonormal, so its transpose is that inverse — which is
+ * why the map is sampled in the catalog's own equatorial frame and no galactic
+ * transform appears anywhere. Returns `[u, v, rayZ]`: `rayZ` is the cosine of
+ * the zenith angle, which the extinction and the twilight gate both need. */
+export function bandUv(
+  matrix: Mat3,
+  ndcX: number,
+  ndcY: number,
+  aspect: number,
+): [number, number, number] {
+  const rx = (ndcX * aspect) / FOCAL;
+  const ry = ndcY / FOCAL;
+  const norm = Math.hypot(rx, ry, 1);
+  const view = [rx / norm, ry / norm, 1 / norm] as const;
+  const jx = matrix[0]! * view[0] + matrix[1]! * view[1] + matrix[2]! * view[2];
+  const jy = matrix[3]! * view[0] + matrix[4]! * view[1] + matrix[5]! * view[2];
+  const jz = matrix[6]! * view[0] + matrix[7]! * view[1] + matrix[8]! * view[2];
+  return [
+    Math.atan2(jy, jx) / (2 * Math.PI) + 0.5,
+    0.5 - Math.asin(Math.min(1, Math.max(-1, jz))) / Math.PI,
+    view[2],
+  ];
+}
+
+/** One channel of the map, sampled bilinearly and wrapping in u. Nearest
+ * sampling is what made the fallback band read as blobs: the map is 1024 px
+ * around the whole sky and one frame pixel spans a fraction of a texel. */
+function sampleBilinear(source: ImageData, u: number, v: number, channel: number): number {
+  const x = u * source.width - 0.5;
+  const y = Math.min(source.height - 1, Math.max(0, v * source.height - 0.5));
+  const x0 = Math.floor(x);
+  const y0 = Math.floor(y);
+  const fx = x - x0;
+  const fy = y - y0;
+  const wrap = (column: number): number =>
+    ((column % source.width) + source.width) % source.width;
+  const columns = [wrap(x0), wrap(x0 + 1)];
+  const rows = [Math.max(0, y0), Math.min(source.height - 1, y0 + 1)];
+  const at = (row: number, column: number): number =>
+    source.data[(row * source.width + column) * 4 + channel]!;
+  const top = at(rows[0]!, columns[0]!) * (1 - fx) + at(rows[0]!, columns[1]!) * fx;
+  const bottom = at(rows[1]!, columns[0]!) * (1 - fx) + at(rows[1]!, columns[1]!) * fx;
+  return top * (1 - fy) + bottom * fy;
+}
+
+/** The Milky Way, sampled through the view into an RGBA buffer. The fallback
+ * for a browser with no WebGL2; `band-gl.ts` is what ships. */
 export function paintBand(
   target: CanvasRenderingContext2D,
   source: ImageData,
@@ -143,33 +202,17 @@ export function paintBand(
       const ndcX = (2 * (px + 0.5)) / width - 1;
       // Undo the star pass's projection to recover this pixel's view ray. The
       // camera looks at the zenith, so ray.z is the cosine of the zenith angle.
-      const rx = (ndcX * aspect) / FOCAL;
-      const ry = ndcY / FOCAL;
-      const norm = Math.hypot(rx, ry, 1);
-      const rayZ = 1 / norm;
+      const [u, v, rayZ] = bandUv(matrix, ndcX, ndcY, aspect);
 
       const airmass = 1 / Math.max(rayZ, 0.05);
       let scale = Math.pow(10, -0.4 * TUNING.extinctionK * (airmass - 1)) * gain;
       if (light) scale *= 1.15 * smoothstep(0.1, 0.75, rayZ);
       if (scale <= 0) continue;
 
-      // The view basis is orthonormal, so its transpose is its inverse: the
-      // map can be sampled in the catalog's own equatorial frame.
-      const view = [rx / norm, ry / norm, rayZ] as const;
-      const jx = matrix[0]! * view[0] + matrix[1]! * view[1] + matrix[2]! * view[2];
-      const jy = matrix[3]! * view[0] + matrix[4]! * view[1] + matrix[5]! * view[2];
-      const jz = matrix[6]! * view[0] + matrix[7]! * view[1] + matrix[8]! * view[2];
-
-      const u = Math.atan2(jy, jx) / (2 * Math.PI) + 0.5;
-      const v = 0.5 - Math.asin(Math.min(1, Math.max(-1, jz))) / Math.PI;
-      const sx = Math.min(source.width - 1, Math.max(0, Math.floor(u * source.width)));
-      const sy = Math.min(source.height - 1, Math.max(0, Math.floor(v * source.height)));
-      const at = (sy * source.width + sx) * 4;
-
       const target4 = (py * width + px) * 4;
       let peak = 0;
       for (let channel = 0; channel < 3; channel += 1) {
-        const value = Math.pow(source.data[at + channel]! / 255, shape) * scale;
+        const value = Math.pow(sampleBilinear(source, u, v, channel) / 255, shape) * scale;
         const byte = Math.min(255, Math.round(value * 255));
         out.data[target4 + channel] = byte;
         if (byte > peak) peak = byte;
@@ -184,7 +227,7 @@ export function paintBand(
 
 /** The offscreen size the band is sampled at for a given viewport. */
 export function bandSize(width: number, height: number): [number, number] {
-  const w = Math.max(32, Math.min(BAND_MAX_WIDTH, Math.round(width / 6)));
+  const w = Math.max(32, Math.min(BAND_MAX_WIDTH, Math.round(width / 3)));
   const h = Math.max(16, Math.round((w * height) / Math.max(width, 1)));
   return [w, h];
 }
@@ -224,41 +267,16 @@ export function paintStars(
     if (light) alpha *= smoothstep(0.2, 0.7, vz);
     if (alpha <= 0.012) continue;
 
-    const rgb = look.rgb[index]!;
+    // The whole of the star: colour and halo are baked into the sprite, and
+    // the per-star alpha is the shader's `v_alpha` scalar, so the drawn
+    // contribution is `colour · exp(-falloff·d²) · alpha` — `STAR_FRAG` term
+    // for term, with `lighter` standing in for additive blending.
     const radius = look.radius[index]!;
-
-    if (radius <= 0.9) {
-      // Under a pixel across there is no halo to draw and no circle to see:
-      // a square of the right area reads identically and costs a fill.
-      ctx.fillStyle = `rgba(${rgb},${alpha.toFixed(3)})`;
-      ctx.fillRect(x - radius, y - radius, radius * 2, radius * 2);
-      drawn += 1;
-      continue;
-    }
-
-    // exp(-glow · d²) is the shader's halo, expressed as gradient stops: the
-    // core saturates and the star's colour stays in the wings, which is what a
-    // genuinely bright star looks like. Only the stars wide enough to show one
-    // pay for it.
-    ctx.beginPath();
-    ctx.arc(x, y, radius, 0, Math.PI * 2);
-    if (radius <= 2.2) {
-      // Two pixels of halo is one flat disc to the eye, and a gradient object
-      // per star is what a 12,191-star loop cannot afford.
-      ctx.fillStyle = `rgba(${rgb},${(alpha * HALO_MEAN).toFixed(3)})`;
-    } else {
-      const glow = ctx.createRadialGradient(x, y, 0, x, y, radius);
-      for (const stop of HALO_STOPS) {
-        glow.addColorStop(
-          stop,
-          `rgba(${rgb},${(alpha * Math.exp(-TUNING.glow * stop * stop)).toFixed(3)})`,
-        );
-      }
-      ctx.fillStyle = glow;
-    }
-    ctx.fill();
+    ctx.globalAlpha = alpha;
+    ctx.drawImage(look.sprite[index]!, x - radius, y - radius, radius * 2, radius * 2);
     drawn += 1;
   }
+  ctx.globalAlpha = 1;
 
   if (highlight && highlight.strength > 0) {
     const [hx, hy, hz] = applyView(matrix, highlight.position);

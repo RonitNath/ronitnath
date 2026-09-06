@@ -117,7 +117,46 @@
 }
 
 .star-callout {
+  /* The group's origin is the star. One transform per frame moves ring, line
+     and label together (callouts.tsx), so they cannot separate; the element
+     itself has no size, which is why the label inside it is absolute. */
   position: fixed;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+  will-change: transform;
+  animation: callout-in 0.45s ease both;
+}
+
+.callout-leader {
+  position: absolute;
+  /* Half its own size back, so its centre — and the viewBox origin — is the
+     star the group is translated to. */
+  left: -64px;
+  top: -64px;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.callout-line {
+  stroke: var(--fg-subtle);
+  stroke-width: 1;
+  opacity: 0.7;
+}
+
+/* The ring is the star's own colour: it says which star as well as where. */
+.callout-ring {
+  fill: none;
+  stroke: var(--ring-color, currentColor);
+  stroke-width: 1;
+  opacity: 0.9;
+}
+
+.callout-label {
+  position: absolute;
+  left: 0;
+  top: 0;
   /* Wide enough for the longest detail line the catalog produces
      ("Orion · blue supergiant · 863 ly") at this tracking, so a callout states
      the star rather than trailing off in an ellipsis. */
@@ -137,47 +176,47 @@
   letter-spacing: 0.08em;
   cursor: pointer;
   pointer-events: auto;
-  transform: translate(var(--callout-x, -50%), -50%);
-  animation: callout-in 0.45s ease both;
+  /* --callout-x is the label's left edge relative to the star, in pixels:
+     outward from the leader's anchor, clamped into the frame. --lead-y is the
+     leader's vertical offset; the label is centred on it. */
+  transform: translate(var(--callout-x, 0px), calc(var(--lead-y, 0px) - 50%));
 }
 
-.star-callout strong,
-.star-callout span {
+.callout-label strong,
+.callout-label span {
   display: block;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
 }
 
-.star-callout strong {
+.callout-label strong {
   font-family: var(--font-display);
   font-size: var(--text-1);
   font-weight: 600;
 }
 
-.star-callout span {
+.callout-label span {
   margin-top: 0.18rem;
   color: var(--fg-subtle);
   font-size: var(--text-1);
   opacity: 0.85;
 }
 
-.star-callout:hover strong,
-.star-callout:focus-visible strong {
+.callout-label:hover strong,
+.callout-label:focus-visible strong {
   color: var(--accent);
 }
 
-/* The entrance carries the centring with it: `animation: … both` holds the
-   `to` frame after the animation ends, so every frame states the full
-   transform or the callout ends up hung off its point by its own width. */
+/* The entrance is the group's, so the line and the ring arrive with the text.
+   It runs on a set change and on nothing else: the frame loop writes the
+   transform, never the opacity. */
 @keyframes callout-in {
   from {
     opacity: 0;
-    transform: translate(var(--callout-x, -50%), calc(-50% + 5px));
   }
   to {
     opacity: 1;
-    transform: translate(var(--callout-x, -50%), -50%);
   }
 }
 

@@ -10,6 +10,7 @@
  */
 
 import { keepOutFor, place, type Placement } from './annotate';
+import { BandScene } from './band-gl';
 import { ASSETS, loadCities, loadImageData, loadNamed, loadStars } from './assets';
 import { simTimeMs, syncedSimTimeMs } from './clock';
 import { type NamedStar, namedVectors, type StarCatalog } from './catalog';
@@ -19,7 +20,8 @@ import { paintFlatGlobe } from './globe-flat';
 import { dragTo, RADIUS, unproject } from './globe-math';
 import { grounding, UPDATE_INTERVAL_MS } from './label';
 import { Observer, TRANSITION_MS, type Point } from './observer';
-import { type Vec3, viewMatrix } from './sidereal';
+import { type Mat3, type Vec3, viewMatrix } from './sidereal';
+import { SpriteAtlas } from './sprites';
 import {
   bandSize,
   buildLook,
@@ -40,21 +42,16 @@ const BAND_INTERVAL_MS = 250;
 
 const HIGHLIGHT_MS = 1_800;
 
+/** What the HTML parts of the island render from. Callout *positions* are not
+ * in here: they move every frame, and pushing them through React state is what
+ * made the labels step across the sky instead of gliding. React is told the
+ * named stars; the positions go to the DOM (see `callouts.tsx`). */
 export interface Readout {
   grounding: string;
-  placements: Placement[];
   named: NamedStar[];
   manual: boolean;
   paused: boolean;
 }
-
-const EMPTY: Readout = {
-  grounding: '',
-  placements: [],
-  named: [],
-  manual: false,
-  paused: false,
-};
 
 export class Stage {
   private readonly mountMs = performance.timeOrigin + performance.now();
@@ -62,8 +59,11 @@ export class Stage {
   private readonly listeners = new Set<(readout: Readout) => void>();
 
   private skyCanvas: HTMLCanvasElement | null = null;
+  private bandCanvas: HTMLCanvasElement | null = null;
+  private bandScene: BandScene | null = null;
   private globeCanvas: HTMLCanvasElement | null = null;
   private globeScene: GlobeScene | null = null;
+  private atlas: SpriteAtlas | null = null;
 
   private stars: StarCatalog | null = null;
   private look: StarLook | null = null;
@@ -80,6 +80,7 @@ export class Stage {
 
   private frame = 0;
   private timer = 0;
+  private catalogDrawn = false;
   private live = true;
   private reduced = false;
   private paused = false;
@@ -113,22 +114,38 @@ export class Stage {
     // first tick and the city joins them when its catalog lands.
     const city = this.cities?.nearest(lat, lon) ?? null;
     const readout: Readout = {
-      ...EMPTY,
       grounding: grounding(lat, lon, city),
       named: this.named,
       manual: this.observer.isManual(),
       paused: this.paused,
-      placements: this.vectors.length
-        ? place(
-            this.vectors,
-            viewMatrix(this.simMs(), lat, lon),
-            this.aspect(),
-            undefined,
-            keepOutFor(innerWidth, innerHeight),
-          )
-        : [],
     };
     for (const listener of this.listeners) listener(readout);
+  }
+
+  /** Where the named stars are *now*, through the same view the canvas last
+   * drew with. The callout loop asks for this every frame; nothing about it
+   * goes through React, and nothing else recomputes it. */
+  placements(): Placement[] {
+    if (!this.vectors.length) return [];
+    const [lat, lon] = this.observerNow();
+    return place(
+      this.vectors,
+      viewMatrix(this.simMs(), lat, lon),
+      this.aspect(),
+      undefined,
+      keepOutFor(innerWidth, innerHeight),
+    );
+  }
+
+  /** The catalog colour of a named star: what the callout's ring is drawn in,
+   * so the ring says which star as well as where. */
+  namedColor(index: number): string | null {
+    const star = this.named[index];
+    if (!star || !this.stars) return null;
+    const at = star.brightIndex * 3;
+    const byte = (offset: number): number =>
+      Math.round((this.stars!.color[at + offset] ?? 1) * 255);
+    return `rgb(${byte(0)},${byte(1)},${byte(2)})`;
   }
 
   private aspect(): number {
@@ -137,6 +154,14 @@ export class Stage {
 
   attachSky(canvas: HTMLCanvasElement | null): void {
     this.skyCanvas = canvas;
+  }
+
+  /** The Milky Way's own canvas, beneath the stars. WebGL2 draws it at full
+   * resolution; without WebGL2 the CPU warp paints into the star canvas as
+   * before. */
+  attachBand(canvas: HTMLCanvasElement | null): void {
+    this.bandCanvas = canvas;
+    this.bandScene = canvas ? BandScene.create(canvas) : null;
   }
 
   attachGlobe(canvas: HTMLCanvasElement | null): void {
@@ -167,6 +192,7 @@ export class Stage {
 
   dispose(): void {
     this.live = false;
+    delete document.documentElement.dataset.sky;
     cancelAnimationFrame(this.frame);
     clearInterval(this.timer);
     this.listeners.clear();
@@ -225,17 +251,20 @@ export class Stage {
   }
 
   private drawSky(simMs: number, lat: number, lon: number): void {
+    const dpr = Math.min(devicePixelRatio || 1, 2);
+    const light = document.documentElement.dataset.theme === 'light';
+    const matrix = viewMatrix(simMs, lat, lon);
+    // The band is its own canvas underneath, so the shader owns the whole
+    // frame and the stars keep a 2D context they can draw sprites into.
+    this.bandScene?.draw(matrix, light, dpr, this.reduced);
+
     const canvas = this.skyCanvas;
     const ctx = canvas?.getContext('2d', { alpha: true });
     if (!canvas || !ctx) return;
 
-    const dpr = Math.min(devicePixelRatio || 1, 2);
     const [width, height] = [innerWidth, innerHeight];
     if (canvas.width !== Math.round(width * dpr)) canvas.width = Math.round(width * dpr);
     if (canvas.height !== Math.round(height * dpr)) canvas.height = Math.round(height * dpr);
-
-    const light = document.documentElement.dataset.theme === 'light';
-    const matrix = viewMatrix(simMs, lat, lon);
 
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, width, height);
@@ -243,10 +272,12 @@ export class Stage {
     // the dusk gradient underneath shows between the stars.
     ctx.globalCompositeOperation = 'lighter';
 
-    if (this.milkyway) this.drawBand(ctx, matrix, width, height, light);
+    // Only when there is no shader to draw it with.
+    if (!this.bandScene && this.milkyway) this.drawBand(ctx, matrix, width, height, light);
     if (this.stars) {
       if (!this.look || this.look.light !== light || this.look.dpr !== dpr) {
-        this.look = buildLook(this.stars, light, dpr);
+        this.atlas ??= new SpriteAtlas();
+        this.look = buildLook(this.stars, light, dpr, this.atlas);
       }
       paintStars(
         ctx,
@@ -256,12 +287,19 @@ export class Stage {
         { width, height, dpr },
         this.currentHighlight(),
       );
+      // The CSS starfield was the picture until this moment. Now that the real
+      // catalog is on screen the two would be one sky over another, so the
+      // designed one is faded out and stays out (`atmosphere.css`).
+      if (!this.catalogDrawn) {
+        this.catalogDrawn = true;
+        document.documentElement.dataset.sky = 'live';
+      }
     }
   }
 
   private drawBand(
     ctx: CanvasRenderingContext2D,
-    matrix: readonly number[],
+    matrix: Mat3,
     width: number,
     height: number,
     light: boolean,
@@ -392,15 +430,26 @@ export class Stage {
           this.cities = cities;
           this.publish();
         }),
-        loadImageData(ASSETS.milkyway, 1_024).then((band) => {
-          if (!this.live) return;
-          this.milkyway = band;
-          this.draw();
-        }),
+        this.loadBand(),
       ]);
       if (!this.live) return;
       await this.loadGlobeTextures();
     })();
+  }
+
+  /** The Milky Way map, to whichever renderer is drawing it. The shader takes
+   * the image straight to a texture; the fallback needs it decoded to pixels
+   * it can sample on the CPU. */
+  private async loadBand(): Promise<void> {
+    if (this.bandScene) {
+      await this.bandScene.loadMap(ASSETS.milkyway);
+      if (this.live) this.draw();
+      return;
+    }
+    const band = await loadImageData(ASSETS.milkyway, 1_024);
+    if (!this.live) return;
+    this.milkyway = band;
+    this.draw();
   }
 
   private async loadGlobeTextures(): Promise<void> {

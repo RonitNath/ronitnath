@@ -62,13 +62,31 @@ describe('placing the callouts', () => {
   it('measures the band against the viewport it is drawn in', () => {
     expect(keepOutFor(1440, 900)[0]).toBeCloseTo(KEEP_OUT[0], 6);
     expect(keepOutFor(1440, 900)[1]).toBeCloseTo(KEEP_OUT[1], 6);
-    // A phone's hero is nearly the whole width, so the band across it widens
-    // until only the vertical rule can place a label — but it stops short of
-    // the margin a forced placement is clamped to, or nothing could clear it.
+    // A phone's hero is nearly the whole width, so the band across it reaches
+    // the whole placeable frame and only the vertical rule places a label. A
+    // sliver of legal width left beside it is what put a callout on the name.
     const [phoneX, phoneY] = keepOutFor(390, 844);
     expect(phoneX).toBeGreaterThan(KEEP_OUT[0]);
-    expect(phoneX).toBeLessThan(0.88);
+    expect(phoneX).toBe(0.88);
     expect(phoneY).toBeGreaterThan(KEEP_OUT[1]);
+  });
+
+  it('never leaves a phone unlabelled, and never labels across the hero', () => {
+    const stars = vectors();
+    const keepOut = keepOutFor(390, 844);
+    for (let sample = 0; sample < 400; sample += 1) {
+      const simMs = SIM_EPOCH_MS + (TRACK_PERIOD_MS * sample) / 400;
+      const [lat, lon] = observerAt(simMs);
+      const placed = place(stars, viewMatrix(simMs, lat, lon), 390 / 844, MAX_LABELS, keepOut);
+      expect(placed.length, `nothing named at sample ${sample}`).toBeGreaterThan(0);
+      for (const placement of placed) {
+        // Across, a phone's band is the whole placeable frame, so what has to
+        // hold everywhere is the vertical rule.
+        expect(Math.abs(placement.y), `on the hero at sample ${sample}`).toBeGreaterThanOrEqual(
+          keepOut[1],
+        );
+      }
+    }
   });
 
   it('never stacks two callouts on top of each other', () => {

@@ -10,7 +10,6 @@ import { type Readout, Stage } from './stage';
 
 const EMPTY: Readout = {
   grounding: '',
-  placements: [],
   named: [],
   manual: false,
   paused: false,
@@ -25,12 +24,14 @@ const EMPTY: Readout = {
  * own clock against that offset from then on. */
 export function SkyStage({ serverEpochMs }: { serverEpochMs: number }) {
   const skyRef = useRef<HTMLCanvasElement>(null);
+  const bandRef = useRef<HTMLCanvasElement>(null);
   const globeRef = useRef<HTMLCanvasElement>(null);
   const [stage, setStage] = useState<Stage | null>(null);
   const [readout, setReadout] = useState<Readout>(EMPTY);
 
   useEffect(() => {
     const created = new Stage(serverEpochMs);
+    created.attachBand(bandRef.current);
     created.attachSky(skyRef.current);
     created.attachGlobe(globeRef.current);
     const unsubscribe = created.subscribe(setReadout);
@@ -61,7 +62,7 @@ export function SkyStage({ serverEpochMs }: { serverEpochMs: number }) {
 
   return (
     <>
-      <SkyCanvas canvasRef={skyRef} />
+      <SkyCanvas bandRef={bandRef} canvasRef={skyRef} />
       <div className="sky-chrome">
         <Globe canvasRef={globeRef} stage={stage} />
         <Grounding text={readout.grounding} />
@@ -85,11 +86,7 @@ export function SkyStage({ serverEpochMs }: { serverEpochMs: number }) {
           ) : null}
         </div>
       </div>
-      <Callouts
-        placements={readout.placements}
-        named={readout.named}
-        onSelect={(placement) => stage?.ringStar(placement.position)}
-      />
+      <Callouts stage={stage} named={readout.named} />
     </>
   );
 }
