@@ -1,6 +1,44 @@
-# ronitnath
+# ronitnath.com
 
-Fresh `main`, started 2026-09-02. This repository is being rebuilt on the Isoastra Template
-head: Leptos islands, Axum, application-owned auth, Hiqlite, Tailwind, no containers.
+Ronit Nath's site and the small application behind it: a public landing page,
+member accounts, events with guest pages, organizations and sharing, and an
+operator surface over the whole model. Self-hosted on the internal cluster.
 
-Previous history is preserved at `legacy/ronitnath-webtemplate/main` and must not be force-pushed.
+`docs/plan.md` is the binding contract — the stack, the model, the four tiers
+and the rung ladder. `docs/design.md` is the design brief; the OKLCH tokens it
+names live in `src/app/globals.css`.
+
+## Stack
+
+Next.js 15 (App Router, React 19, TypeScript strict) · Tailwind 4 over CSS
+variables · PostgreSQL 17 through `pg` + Drizzle ORM · pnpm · Node 24 in a
+`node:24-alpine` standalone image · vitest and Playwright.
+
+Authorisation is four server helpers (`src/lib/tiers.ts`): every page and
+action names the tier it needs, so there is no per-route guard to forget.
+Internal integer ids never leave the server — `src/lib/ids.ts` turns one into a
+type-prefixed, AES-128-encrypted public id.
+
+## Dev loop
+
+```sh
+cp .env.example .env          # set ID_KEY: openssl rand -hex 16
+pnpm install
+pnpm db:up                    # postgres:17 on 127.0.0.1:5433
+pnpm db:migrate               # drizzle-kit; migrations never run at boot
+pnpm dev                      # http://localhost:3000
+```
+
+`DEV_DB_PORT=5443 pnpm db:up` moves the database when something else on the
+machine already holds 5433.
+
+- `pnpm gate` — typecheck, lint, unit tests, build. Green before any report.
+- `pnpm e2e` — Playwright against the standalone server the image ships.
+- `pnpm db:generate` — a new SQL migration after a `src/db/schema.ts` change.
+
+A `justfile` mirrors these for `just gate`, `just db-up`, `just image`.
+
+## Deploy
+
+Manual `docker compose` on the target host, host network, port 3140.
+`deploy/README.md` has the procedure, the config file and the rollback.
