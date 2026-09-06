@@ -1,6 +1,10 @@
-/* Outbound mail. One transport, chosen by whether `SMTP_URL` is set.
+/* Outbound mail. One transport, chosen by the environment.
  *
- * With it, nodemailer over useSend. Without it — every dev machine and the
+ * `USESEND_API_URL` + `USESEND_API_KEY`: the fleet mailer's REST API
+ * (POST /api/v1/emails, verified against usesend's email-schema.ts). This is
+ * the production path — the useSend SMTP proxy on the mesh advertises
+ * STARTTLS without a certificate, so no SMTP client can authenticate to it.
+ * `SMTP_URL`: nodemailer, for any plain SMTP relay. Without either — every dev machine and the
  * Playwright run — the message is logged to stdout *and* written to
  * `.mail/<timestamp>.eml`, because a test that has to click a verification
  * link needs to read one, and scraping a log is worse than opening a file.
@@ -50,7 +54,30 @@ function asEml(message: Message): string {
   ].join('\r\n');
 }
 
+async function sendViaUseSend(base: string, key: string, message: Message): Promise<void> {
+  const res = await fetch(`${base.replace(/\/$/, '')}/api/v1/emails`, {
+    method: 'POST',
+    headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json' },
+    body: JSON.stringify({
+      from: from(),
+      to: message.to,
+      subject: message.subject,
+      text: message.text,
+      html: message.html,
+    }),
+  });
+  if (!res.ok) {
+    throw new Error(`usesend: ${res.status} ${(await res.text()).slice(0, 200)}`);
+  }
+}
+
 export async function sendMail(message: Message): Promise<void> {
+  const apiUrl = process.env.USESEND_API_URL;
+  const apiKey = process.env.USESEND_API_KEY;
+  if (apiUrl && apiKey) {
+    await sendViaUseSend(apiUrl, apiKey, message);
+    return;
+  }
   const url = process.env.SMTP_URL;
   if (url) {
     await transport(url).sendMail({

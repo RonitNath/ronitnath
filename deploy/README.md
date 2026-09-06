@@ -32,12 +32,14 @@ OIDC_CLIENT_ID=...
 OIDC_CLIENT_SECRET=...
 OIDC_REDIRECT_URI=https://ronitnath.com/auth/oidc/callback
 OIDC_ALLOWLIST=ronit@isoastra.com
-SMTP_URL=smtp://<user>:<pass>@<useSend host>:587
+USESEND_API_URL=https://mail.isoastra.com   # preferred: the fleet mailer's REST API
+USESEND_API_KEY=<usesend api key>
+SMTP_URL=                                   # fallback only; the useSend SMTP proxy cannot STARTTLS
 MAIL_FROM=Ronit Nath <no-reply@ronitnath.com>
 APP_VERSION=<tag>
 ```
 
-`SMTP_URL` is not optional in production: with it unset the app falls back to
+Mail is not optional in production: with neither `USESEND_API_*` nor `SMTP_URL` set the app falls back to
 the dev transport, which writes verification and reset mail to a directory
 inside the container instead of sending it. `MAIL_FROM` defaults to the value
 above and only needs setting to change the sender.
