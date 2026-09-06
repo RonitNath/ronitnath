@@ -1,0 +1,7 @@
+/* A published document. One column, the width of a paragraph, and nothing on
+ * the page that is not the document — the reader arrived here for the text. */
+
+.indoors.reading {
+  max-width: 42rem;
+  padding-top: 3rem;
+}

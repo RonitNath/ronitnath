@@ -129,6 +129,13 @@
     padding: 0.5rem 1rem;
   }
 
+  /* Seven destinations do not fit on a phone in one line, and a nav that
+   * scrolls sideways is a nav with a hidden half. */
+  .shell nav {
+    flex-wrap: wrap;
+    row-gap: 0.5rem;
+  }
+
   .shell .who {
     margin-left: 0;
     width: 100%;
@@ -240,6 +247,8 @@
 
 .indoors .pane {
   max-width: 28rem;
+  /* A pane that follows a table is a second thing, not the table's footer. */
+  margin-top: 1.5rem;
 }
 
 @media (max-width: 34rem) {
@@ -332,4 +341,30 @@
   .event-form .pair {
     grid-template-columns: minmax(0, 1fr);
   }
+}
+
+/* R5. A document's body, rendered from markdown-lite: one column of prose,
+ * on `/app/documents/<id>` for a reader and on `/d/<slug>` for anybody. */
+.prose {
+  margin-top: 2rem;
+  font-size: var(--text-3);
+  line-height: 1.65;
+  color: var(--fg-muted);
+}
+
+.prose p,
+.prose ul {
+  margin: 0 0 1.1rem;
+}
+
+.prose ul {
+  padding-left: 1.1rem;
+  /* Tailwind's reset takes the markers off every list; a body list is prose
+   * and wants them back. */
+  list-style: disc;
+}
+
+.prose strong {
+  color: var(--fg);
+  font-weight: 600;
 }

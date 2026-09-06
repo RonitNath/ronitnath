@@ -63,7 +63,7 @@ export function CreateOrganizationForm() {
     <form className="pane" action={action}>
       <h2>Start an organization</h2>
       <div className="field">
-        <label htmlFor="org-name">Name</label>
+        <label htmlFor="org-name">Organization</label>
         <input id="org-name" name="name" type="text" autoComplete="off" required />
       </div>
       <div className="field">
@@ -156,8 +156,10 @@ export function RoleForm({
     <form action={action}>
       <input type="hidden" name="organization" value={organization} />
       <input type="hidden" name="person" value={person} />
-      <select name="role" defaultValue={role} aria-label="Role">
-        {ROLE_OPTIONS.map((option) => (
+      {/* The role they hold is already a word in the row; offering it again
+          in the control would print it twice. */}
+      <select name="role" aria-label="Role">
+        {ROLE_OPTIONS.filter((option) => option !== role).map((option) => (
           <option key={option} value={option}>
             {option}
           </option>

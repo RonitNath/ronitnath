@@ -169,6 +169,12 @@ export function RevokeShareButton({
       <button type="submit" className="linkish" disabled={pending}>
         Revoke
       </button>
+      {state.error ? (
+        <span className="note" data-state="invalid">
+          {' '}
+          {state.error}
+        </span>
+      ) : null}
     </form>
   );
 }

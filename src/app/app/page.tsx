@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 
 import { listIdentities } from '@/features/auth/queries';
 import {
@@ -8,6 +9,8 @@ import {
   RemoveIdentityButton,
 } from '@/features/people/components/identities';
 import { HANDLE_LABEL, normalizeHandle } from '@/features/people/handles';
+import { CreateOrganizationForm } from '@/features/organizations/components/org';
+import { listMemberships } from '@/features/organizations/queries';
 import { listProposals } from '@/features/people/queries';
 import { encodeId } from '@/lib/ids';
 import { requireMember } from '@/lib/tiers';
@@ -22,9 +25,10 @@ const SOURCE_LABEL: Record<string, string> = {
 
 export default async function AppHome() {
   const { principal } = await requireMember('/app');
-  const [identities, proposals] = await Promise.all([
+  const [identities, proposals, memberships] = await Promise.all([
     listIdentities(principal.personId),
     listProposals(principal.personId),
+    listMemberships(principal.personId),
   ]);
   const doors = identities.filter((row) => row.source !== 'handle').length;
 
@@ -48,6 +52,40 @@ export default async function AppHome() {
           ))}
         </section>
       ) : null}
+
+      <section>
+        <h2>Organizations</h2>
+        <div className="scroller">
+          <table className="rows">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Handle</th>
+                <th>You are</th>
+              </tr>
+            </thead>
+            <tbody>
+              {memberships.map((row) => (
+                <tr key={row.id}>
+                  <td>
+                    {row.role === 'member' ? (
+                      row.name
+                    ) : (
+                      <Link href={`/org/${row.handle}`}>{row.name}</Link>
+                    )}
+                  </td>
+                  <td className="mono">/org/{row.handle}</td>
+                  <td>{row.role}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        {memberships.length === 0 ? (
+          <p className="empty">None. An organization is a name, a handle, and whoever you ask in.</p>
+        ) : null}
+        <CreateOrganizationForm />
+      </section>
 
       <section>
         <h2>Name</h2>

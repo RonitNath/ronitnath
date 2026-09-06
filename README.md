@@ -47,6 +47,8 @@ a test should set it.
 - `pnpm gate` — typecheck, lint, unit tests, build. Green before any report.
 - `pnpm e2e` — Playwright against the standalone server the image ships.
 - `pnpm db:generate` — a new SQL migration after a `src/db/schema.ts` change.
+  A change that both drops and adds a column on one table asks, on a terminal,
+  whether the new column is a rename; answer it before committing the file.
 
 A `justfile` mirrors these for `just gate`, `just db-up`, `just image`.
 
