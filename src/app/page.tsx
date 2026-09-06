@@ -1,3 +1,6 @@
+import Link from 'next/link';
+
+import { currentPrincipal } from '@/features/auth/session';
 import { Atmosphere } from '@/features/sky/atmosphere';
 
 import './landing.css';
@@ -5,11 +8,19 @@ import { ThemeToggle } from './theme-toggle';
 
 /** The public landing. Server-rendered whole; the only client code on the page
  * is the sky canvas and the theme toggle. */
-export default function Home() {
+export default async function Home() {
+  /* The chrome says who is here, and nothing more: a name when the visitor is
+   * signed in, the way in when they are not. */
+  const principal = await currentPrincipal();
   return (
     <>
       <Atmosphere />
       <header className="topbar">
+        {principal ? (
+          <Link href="/app">{principal.displayName}</Link>
+        ) : (
+          <Link href="/auth">Sign in</Link>
+        )}
         <ThemeToggle />
       </header>
       <main className="home-hero">

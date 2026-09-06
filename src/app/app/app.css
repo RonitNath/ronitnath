@@ -1,0 +1,136 @@
+/* Indoors. The sky does not follow: this is the utilitarian end of the brief —
+ * hairline dividers, muted headers, mono for anything the machine chose. */
+
+.shell {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  padding: 0 1.25rem;
+  min-height: 3.5rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.shell nav {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  font-size: var(--text-2);
+}
+
+.shell .who {
+  margin-left: auto;
+  font-size: var(--text-2);
+  color: var(--fg-muted);
+}
+
+.shell form {
+  display: contents;
+}
+
+/* A verb, not a button: sign-out is a link-weight control beside the toggle. */
+.linkish {
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  font-size: var(--text-2);
+  color: var(--accent);
+  cursor: pointer;
+}
+
+.linkish:hover {
+  color: var(--accent-hover);
+  text-decoration: underline;
+}
+
+.indoors {
+  max-width: var(--content-max);
+  margin: 0 auto;
+  padding: 2rem 1.25rem 4rem;
+}
+
+.indoors h1 {
+  margin: 0 0 0.25rem;
+  font-family: var(--font-display);
+  font-size: var(--text-5);
+  font-weight: 600;
+  letter-spacing: 0.03em;
+}
+
+.indoors section {
+  margin-top: var(--gap-section);
+}
+
+.indoors h2 {
+  margin: 0 0 0.75rem;
+  font-size: var(--text-3);
+  font-weight: 600;
+  color: var(--fg-muted);
+}
+
+/* Not `.grid`: Tailwind owns that name for `display: grid`, and a utility
+ * that turns a table into a grid box loses every column it had. */
+.rows {
+  width: 100%;
+  /* Six short columns stretched across 72rem is a row of islands: the eye has
+   * to travel further than the values are long. The content max is the page's
+   * bound, not the table's. */
+  max-width: 52rem;
+  /* Below this the columns start breaking words rather than the table
+   * scrolling, which is the one thing `.scroller` is here to prevent. */
+  min-width: 34rem;
+  border-collapse: collapse;
+  font-size: var(--text-2);
+}
+
+.rows th {
+  text-align: left;
+  font-weight: 500;
+  color: var(--fg-subtle);
+  font-size: var(--text-1);
+  padding: var(--cell-pad);
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.rows td {
+  padding: var(--cell-pad);
+  white-space: nowrap;
+  border-bottom: 1px solid var(--border);
+  height: var(--row-height);
+  vertical-align: middle;
+}
+
+.rows td.mono {
+  color: var(--fg-muted);
+}
+
+.rows tr[data-current='true'] td {
+  color: var(--fg);
+}
+
+.current {
+  color: var(--state-live);
+}
+
+.scroller {
+  overflow-x: auto;
+}
+
+.empty {
+  padding: var(--cell-pad) 0;
+  font-size: var(--text-2);
+  color: var(--fg-subtle);
+}
+
+@media (max-width: 34rem) {
+  .shell {
+    flex-wrap: wrap;
+    padding: 0.5rem 1rem;
+  }
+
+  .shell .who {
+    margin-left: 0;
+    width: 100%;
+  }
+}

@@ -5,18 +5,7 @@
  */
 
 :root {
-  --topbar-height: 4.45rem;
   --card-narrow: 31rem;
-}
-
-.topbar {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  min-height: var(--topbar-height);
-  padding: 0 1.25rem;
 }
 
 /* In the light theme the topbar crosses the darkest end of the dusk ramp,
