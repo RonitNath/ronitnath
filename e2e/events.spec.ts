@@ -252,3 +252,43 @@ test('an unpublished event declines its links exactly as a made-up one does', as
   expect(ics.status()).toBe(404);
   await other.close();
 });
+
+test('a shared circle comes first in the list of who is coming', async ({ page, browser }) => {
+  await signedInHost(page, 'Circle Host');
+  await createEvent(page, { title: `Circles ${Date.now()}` });
+  await invite(page, ['Ada Circle', 'Bo Circle', 'Cy Outside']);
+  const links = await publish(page);
+
+  /* R5: a circle is a group. Two of the three guests are in one. */
+  await page.goto('/app/groups');
+  await page.getByLabel('Name').fill('Inner');
+  await page.getByRole('button', { name: 'Create' }).click();
+  await expect(page.getByRole('heading', { name: /^Inner/ })).toBeVisible();
+  for (const name of ['Ada Circle', 'Bo Circle']) {
+    await page.getByLabel('Add').selectOption({ label: name });
+    await page.getByRole('button', { name: 'Add', exact: true }).click();
+    await expect(page.getByRole('row', { name: new RegExp(name) })).toBeVisible();
+  }
+
+  /* Cy answers first, so answered-order alone would put Cy first. */
+  const outside = await browser.newContext();
+  const cy = await outside.newPage();
+  await cy.goto(links.get('Cy Outside')!);
+  await cy.getByRole('radio', { name: 'Yes', exact: true }).check();
+  await cy.locator('.answer button[type="submit"]').click();
+  await outside.close();
+
+  const second = await browser.newContext();
+  const bo = await second.newPage();
+  await bo.goto(links.get('Bo Circle')!);
+  await bo.getByRole('radio', { name: 'Yes', exact: true }).check();
+  await bo.locator('.answer button[type="submit"]').click();
+  await second.close();
+
+  /* Ada shares a group with Bo and not with Cy, so Bo is read first. */
+  const third = await browser.newContext();
+  const ada = await third.newPage();
+  await ada.goto(links.get('Ada Circle')!);
+  await expect(ada.locator('.names .name')).toHaveText(['Bo', 'Cy']);
+  await third.close();
+});
