@@ -1,51 +1,80 @@
-/** Where the visitor is standing, to the nearest tenth of a degree.
+/** Whose sky is on screen: the canonical orbit, or a place the viewer picked.
  *
- * The sky is drawn for a real place, but not at the cost of a permission
- * prompt: a landing page that asks for your location before it will draw a
- * background has got the trade backwards. So this reads the browser's position
- * only when the visitor has *already* granted it to this origin, and otherwise
- * stands in San Francisco. `getCurrentPosition` is never called in any state
- * but `granted`, which is the whole point of the Permissions query.
+ * The default observer is the shared, server-synchronised track — every
+ * browser on the site is looking out from the same point at the same instant.
+ * Dragging the globe overrides that, and the override is deliberately
+ * tab-local: it is a viewer's own detour, not a change to the site.
  *
- * A tenth of a degree is ~11 km, which is four orders of magnitude finer than
- * the sky can show — it is rounded because nothing more precise is wanted,
- * kept, or sent anywhere.
+ * A move is interpolated along the great circle rather than snapped, and
+ * "resume orbit" is the same interpolation with the manual point cleared when
+ * it lands. Under reduced motion the duration is zero, which makes both an
+ * immediate assignment without a second code path.
  */
 
-export interface Observer {
-  latDeg: number;
-  lonDeg: number;
+import { normalizeLonDeg } from './sidereal';
+import { greatCircleLerp, observerAt } from './track';
+
+/** How long a hand-driven move takes, when motion is not reduced. */
+export const TRANSITION_MS = 800;
+
+export type Point = [number, number];
+
+interface Transition {
+  from: Point;
+  startedAtMs: number;
+  durationMs: number;
+  /** Clear the manual observer when this lands: the move is a return to orbit. */
+  clearAtEnd: boolean;
 }
 
-/** Where the sky is drawn from when the browser will not say. */
-export const FALLBACK_OBSERVER: Observer = { latDeg: 37.7749, lonDeg: -122.4194 };
+export class Observer {
+  private manualPoint: Point | null = null;
+  private transition: Transition | null = null;
 
-const COARSE_TIMEOUT_MS = 4_000;
+  /** Where the sky is being viewed from, resolving any move in flight. A
+   * landed transition is retired here: the alternative is a timer whose only
+   * job is to notice that a lerp finished. */
+  resolve(simMs: number, nowMs: number): Point {
+    const target = this.manualPoint ?? observerAt(simMs);
+    const transition = this.transition;
+    if (!transition) return target;
 
-export async function coarseObserver(): Promise<Observer> {
-  if (typeof navigator === 'undefined' || !navigator.geolocation || !navigator.permissions) {
-    return FALLBACK_OBSERVER;
+    const progress =
+      transition.durationMs <= 0
+        ? 1
+        : Math.min(1, Math.max(0, (nowMs - transition.startedAtMs) / transition.durationMs));
+    if (progress >= 1) {
+      this.transition = null;
+      if (transition.clearAtEnd) {
+        this.manualPoint = null;
+        return observerAt(simMs);
+      }
+      return target;
+    }
+    return greatCircleLerp(transition.from, target, progress);
   }
 
-  let granted = false;
-  try {
-    granted = (await navigator.permissions.query({ name: 'geolocation' })).state === 'granted';
-  } catch {
-    // Safari has refused this query for some name values in the past; a
-    // browser that will not answer is treated as one that has not granted.
-    return FALLBACK_OBSERVER;
+  /** The viewer's chosen point, if they have one. `null` means the shared orbit. */
+  manual(): Point | null {
+    return this.manualPoint;
   }
-  if (!granted) return FALLBACK_OBSERVER;
 
-  return new Promise<Observer>((resolve) => {
-    navigator.geolocation.getCurrentPosition(
-      ({ coords }) =>
-        resolve({
-          latDeg: Math.round(coords.latitude * 10) / 10,
-          lonDeg: Math.round(coords.longitude * 10) / 10,
-        }),
-      () => resolve(FALLBACK_OBSERVER),
-      { enableHighAccuracy: false, timeout: COARSE_TIMEOUT_MS, maximumAge: 3_600_000 },
-    );
-  });
+  isManual(): boolean {
+    return this.manualPoint !== null;
+  }
+
+  /** Move to a chosen point, travelling there from wherever the view is now. */
+  set(lat: number, lon: number, simMs: number, nowMs: number, durationMs: number): void {
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
+    const from = this.resolve(simMs, nowMs);
+    this.manualPoint = [Math.min(90, Math.max(-90, lat)), normalizeLonDeg(lon)];
+    this.transition = { from, startedAtMs: nowMs, durationMs, clearAtEnd: false };
+  }
+
+  /** Travel back to the shared orbit and hand control of the view back to it. */
+  resume(simMs: number, nowMs: number, durationMs: number): void {
+    if (this.manualPoint === null) return;
+    const from = this.resolve(simMs, nowMs);
+    this.transition = { from, startedAtMs: nowMs, durationMs, clearAtEnd: true };
+  }
 }
