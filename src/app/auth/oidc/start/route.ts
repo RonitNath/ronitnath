@@ -11,8 +11,9 @@ import { isProduction } from '@/lib/env';
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
-  const next = new URL(request.url).searchParams.get('next') ?? '/app';
-  const { url, checks } = await authorizationRequest(next);
+  const query = new URL(request.url).searchParams;
+  const next = query.get('next') ?? '/app';
+  const { url, checks } = await authorizationRequest(next, query.get('reauth') === '1');
 
   const response = NextResponse.redirect(url.toString(), 302);
   response.cookies.set(OIDC_COOKIE, JSON.stringify(checks), {

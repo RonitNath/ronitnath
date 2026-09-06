@@ -37,12 +37,22 @@ USESEND_API_KEY=<usesend api key>
 SMTP_URL=                                   # fallback only; the useSend SMTP proxy cannot STARTTLS
 MAIL_FROM=Ronit Nath <no-reply@ronitnath.com>
 APP_VERSION=<tag>
+RN_IMPERSONATION=on                         # `off` removes SignInAs entirely
 ```
 
 Mail is not optional in production: with neither `USESEND_API_*` nor `SMTP_URL` set the app falls back to
 the dev transport, which writes verification and reset mail to a directory
 inside the container instead of sending it. `MAIL_FROM` defaults to the value
 above and only needs setting to change the sender.
+
+`RN_IMPERSONATION` is the one switch over the operator's sharpest command.
+Set to `off`, SignInAs is not drawn on a party's page and the action declines
+like anything else that is not allowed; every other operator surface is
+unaffected. Anything but `off` leaves it on, which is the default. The
+commands that destroy or impersonate also require a re-authentication inside
+the last ten minutes — for the OIDC operator that is a fresh round trip
+(`prompt=login`), so the ZITADEL app must not be configured to skip the
+password prompt for it.
 
 The ZITADEL app is `ronitnath` in the Isoastra org. Its redirect URI must be
 registered there exactly as `OIDC_REDIRECT_URI` names it, and the callback

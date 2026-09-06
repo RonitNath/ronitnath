@@ -23,6 +23,10 @@ export interface OidcChecks {
   nonce: string;
   codeVerifier: string;
   next: string;
+  /* A round trip asked for by ReAuthenticate rather than by a sign-in: the
+   * OP is told to prove it again (`prompt=login`, `max_age=0`) and the
+   * session this mints is stamped (src/features/platform/reauth.ts). */
+  reauth?: boolean;
 }
 
 export const OIDC_COOKIE = 'rn_oidc';
@@ -46,6 +50,7 @@ export function redirectUri(): string {
 /** Mint the checks and the URL that carries their public halves. */
 export async function authorizationRequest(
   next: string,
+  reauth = false,
 ): Promise<{ url: URL; checks: OidcChecks }> {
   const config = await configuration();
   const codeVerifier = client.randomPKCECodeVerifier();
@@ -54,6 +59,7 @@ export async function authorizationRequest(
     nonce: client.randomNonce(),
     codeVerifier,
     next,
+    ...(reauth ? { reauth: true } : {}),
   };
   const url = client.buildAuthorizationUrl(config, {
     redirect_uri: redirectUri(),
@@ -62,6 +68,9 @@ export async function authorizationRequest(
     code_challenge_method: 'S256',
     state: checks.state,
     nonce: checks.nonce,
+    /* An existing OP session must not answer this one silently: a
+     * re-authentication that nobody was asked for proves nothing. */
+    ...(reauth ? { prompt: 'login', max_age: '0' } : {}),
   });
   return { url, checks };
 }

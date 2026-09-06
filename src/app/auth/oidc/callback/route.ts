@@ -115,6 +115,10 @@ export async function GET(request: Request) {
       oidcIdToken: accepted.idToken,
       userAgent: where.userAgent,
       ip: where.ip,
+      /* A round trip the operator was sent on by ReAuthenticate: the session
+       * it mints carries the proof, and the platform's sharp commands read
+       * exactly that column (src/features/platform/reauth.ts). */
+      reauthenticatedAt: checks.reauth ? new Date() : null,
     });
     await tx
       .update(schema.factor)

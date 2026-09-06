@@ -16,6 +16,10 @@ export interface OrganizationRow {
   name: string;
 }
 
+/** The organization behind a handle, or null. A disabled organization is
+ *  null: R6's Disable takes the surface away and leaves every row and every
+ *  member's own account exactly where they were, so a handle that is switched
+ *  off answers the way a handle nobody ever registered answers. */
 export async function organizationByHandle(handle: string): Promise<OrganizationRow | null> {
   const rows = await database()
     .select({
@@ -24,7 +28,8 @@ export async function organizationByHandle(handle: string): Promise<Organization
       name: schema.organization.name,
     })
     .from(schema.organization)
-    .where(eq(schema.organization.handle, handle))
+    .innerJoin(schema.party, eq(schema.party.id, schema.organization.id))
+    .where(and(eq(schema.organization.handle, handle), isNull(schema.party.disabledAt)))
     .limit(1);
   return rows[0] ?? null;
 }

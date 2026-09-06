@@ -43,7 +43,7 @@ export const rsvpResponse = pgEnum('rsvp_response', ['yes', 'maybe', 'no']);
 /* Why two identities might be one person, and what was decided about it.
  * A score orders the operator's queue (R6) and never merges anything by
  * itself — a merge is always somebody's answer. */
-export const matchSignal = pgEnum('match_signal', ['verified_email', 'claimed_link']);
+export const matchSignal = pgEnum('match_signal', ['verified_email', 'claimed_link', 'operator']);
 export const matchStatus = pgEnum('match_status', ['proposed', 'confirmed', 'rejected']);
 
 /* Every addressable subject is a party; person and organization extend it by
@@ -148,6 +148,17 @@ export const session = pgTable(
     oidcIdToken: text('oidc_id_token'),
     userAgent: text('user_agent'),
     ip: text('ip'),
+    /* Impersonation (R6). A session whose principal is the target person and
+     * whose actor, in every audit row it writes, is the operator who started
+     * it. Null on every ordinary session, which is what makes the bar and the
+     * double-named audit row impossible to forget. */
+    actingOperatorId: integer('acting_operator_id').references((): AnyPgColumn => person.id, {
+      onDelete: 'set null',
+    }),
+    /* When a password or a fresh OIDC round trip was last presented on this
+     * session. The commands that destroy or impersonate ask for one inside
+     * the last ten minutes (src/features/platform/reauth.ts). */
+    reauthenticatedAt: timestamp('reauthenticated_at', { withTimezone: true }),
     lastSeenAt: timestamp('last_seen_at', { withTimezone: true }).notNull().defaultNow(),
     expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
     revokedAt: timestamp('revoked_at', { withTimezone: true }),
@@ -156,6 +167,7 @@ export const session = pgTable(
   (t) => [
     uniqueIndex('session_token_hash_key').on(t.tokenHash),
     index('session_person_idx').on(t.personId),
+    index('session_acting_operator_idx').on(t.actingOperatorId),
   ],
 );
 
@@ -382,6 +394,9 @@ export const match = pgTable(
     score: smallint('score').notNull().default(0),
     status: matchStatus('status').notNull().default('proposed'),
     evidence: text('evidence'),
+    /* Who asked the question. Null for the ones the model noticed by itself;
+     * the operator's id when they picked two parties by hand. */
+    proposedBy: integer('proposed_by').references(() => person.id, { onDelete: 'set null' }),
     decidedAt: timestamp('decided_at', { withTimezone: true }),
     decidedBy: integer('decided_by').references(() => person.id, { onDelete: 'set null' }),
     createdAt: now(),

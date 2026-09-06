@@ -30,6 +30,15 @@ export interface Principal {
   sessionId: number;
   source: 'local' | 'oidc';
   isOperator: boolean;
+  /* Set only while an operator is signed in as somebody else. The principal
+   * *is* the target person — nothing in `allows` learns a new case — and this
+   * is who is answerable for it: the bar on every page and the second name on
+   * every audit row both read it (src/features/platform). */
+  actingOperatorId: number | null;
+  /* When a password or a fresh round trip was last presented on this session.
+   * The commands that destroy or impersonate ask for one inside the window
+   * (src/features/platform/reauth.ts). */
+  reauthenticatedAt: Date | null;
 }
 
 function ttlMs(): number {
@@ -50,6 +59,8 @@ export async function createSession(
     oidcIdToken?: string | null;
     userAgent?: string | null;
     ip?: string | null;
+    actingOperatorId?: number | null;
+    reauthenticatedAt?: Date | null;
   },
 ): Promise<{ token: string; sessionId: number }> {
   const token = mintToken();
@@ -62,6 +73,8 @@ export async function createSession(
       oidcIdToken: input.oidcIdToken ?? null,
       userAgent: input.userAgent ?? null,
       ip: input.ip ?? null,
+      actingOperatorId: input.actingOperatorId ?? null,
+      reauthenticatedAt: input.reauthenticatedAt ?? null,
       expiresAt: expiryFromNow(),
     })
     .returning({ id: schema.session.id });
@@ -119,6 +132,8 @@ async function resolve(): Promise<Principal | null> {
       personId: schema.session.personId,
       lastSeenAt: schema.session.lastSeenAt,
       source: schema.session.source,
+      actingOperatorId: schema.session.actingOperatorId,
+      reauthenticatedAt: schema.session.reauthenticatedAt,
       displayName: schema.person.displayName,
       disabledAt: schema.party.disabledAt,
     })
@@ -170,6 +185,8 @@ async function resolve(): Promise<Principal | null> {
      * not. */
     source: row.source === 'oidc' ? 'oidc' : 'local',
     isOperator: operator.length > 0,
+    actingOperatorId: row.actingOperatorId,
+    reauthenticatedAt: row.reauthenticatedAt,
   };
 }
 

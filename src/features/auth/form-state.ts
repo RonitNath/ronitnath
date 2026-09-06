@@ -15,6 +15,12 @@ export interface FormState {
   minted?: string;
   /* Several of them at once, named: what publishing an event hands back. */
   mintedLinks?: { name: string; url: string }[];
+  /* The one decline that is allowed to say what it is. An operator inside the
+   * tier being asked to prove they are still at the keyboard learns nothing
+   * they do not already hold (src/features/platform/reauth.ts). */
+  reauth?: boolean;
+  /* A command that will do something irreversible and wants it said twice. */
+  confirm?: string;
 }
 
 /* The uniform decline. Design brief: never a field-level hint, because a hint

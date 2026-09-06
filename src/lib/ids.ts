@@ -24,6 +24,9 @@ export const ID_TYPES = {
   /* A match candidate. It is a row in the model like any other and it reaches
    * a form on /app, so it gets a prefix rather than borrowing one. */
   match: 'm',
+  /* An audit row. The operator's Split names the merge it is undoing, and the
+   * only name a merge has is the row that recorded it (R6). */
+  audit: 'a',
 } as const;
 
 export type IdType = keyof typeof ID_TYPES;
