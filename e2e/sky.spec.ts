@@ -1,15 +1,15 @@
 import { expect, test, type Page } from '@playwright/test';
 
-import { parsePosition } from '../src/features/sky/annotate';
+import { keepOutFor, parsePosition } from '../src/features/sky/annotate';
 import { simTimeMs } from '../src/features/sky/clock';
-import { applyView, viewMatrix } from '../src/features/sky/sidereal';
+import { applyView, FOCAL, viewMatrix } from '../src/features/sky/sidereal';
 
 /** The landing's sky, asserted against the same modules that draw it. */
 
 async function settle(page: Page): Promise<void> {
   await page.goto('/');
   // The assets land after first paint; the callouts appear with the catalog.
-  await expect(page.locator('.star-callout').first()).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator('.callout-label').first()).toBeVisible({ timeout: 15_000 });
   await expect(page.locator('.grounding')).not.toBeEmpty({ timeout: 15_000 });
 }
 
@@ -53,7 +53,9 @@ test('the grounding caption is live', async ({ page }) => {
   await expect(caption).not.toHaveText(first ?? '', { timeout: 2_000 });
 });
 
-test('dragging the globe overrides the shared orbit and Resume gives it back', async ({ page }) => {
+test('dragging the globe overrides the shared orbit and Resume gives it back', async ({
+  page,
+}) => {
   await settle(page);
   await expect(page.getByRole('button', { name: 'Resume orbit' })).toHaveCount(0);
 
@@ -105,5 +107,138 @@ test.describe('reduced motion', () => {
     const first = await lit();
     await page.waitForTimeout(1_500);
     expect(await lit()).toBe(first);
+  });
+});
+
+test('the designed starfield gives way to the real one', async ({ page }) => {
+  await page.goto('/');
+  // Before the catalog lands the CSS starfield is the picture...
+  await expect(page.locator('.starfield')).toBeVisible();
+  // ...and once a frame of the real sky is drawn it is gone, rather than
+  // sitting behind it as a second, static sky.
+  await expect(page.locator('.starfield')).toBeHidden({ timeout: 15_000 });
+  await expect(page.locator('canvas.starscape')).toHaveCount(1);
+  await expect(page.locator('.nebula')).toBeAttached();
+});
+
+test('a callout glides without React re-rendering it', async ({ page }) => {
+  await settle(page);
+  const read = () =>
+    page.evaluate(() => {
+      const nodes = [...document.querySelectorAll('.star-callout')];
+      return {
+        count: document.querySelectorAll('.star-annotations *').length,
+        names: nodes.map((node) => (node as HTMLElement).dataset.name ?? ''),
+        transforms: nodes.map((node) => (node as HTMLElement).style.transform),
+      };
+    });
+  const first = await read();
+  await page.waitForTimeout(100);
+  const second = await read();
+
+  // Same nodes, same stars — nothing was rendered again...
+  expect(second.count).toBe(first.count);
+  expect(second.names).toEqual(first.names);
+  // ...and yet every callout has moved, because the frame loop writes the
+  // transform straight to the DOM.
+  expect(second.transforms).not.toEqual(first.transforms);
+  for (const transform of second.transforms) expect(transform).toContain('translate3d');
+});
+
+test('every callout carries a leader from a ring on its star', async ({ page }) => {
+  await settle(page);
+  const nowMs = Date.now();
+  const caption = (await page.locator('.grounding').textContent()) ?? '';
+  const leaders = await page.evaluate(() =>
+    [...document.querySelectorAll('.star-callout')].map((node) => {
+      const centre = (element: Element) => {
+        const box = element.getBoundingClientRect();
+        return [box.x + box.width / 2, box.y + box.height / 2];
+      };
+      const line = node.querySelector('.callout-line')!;
+      const label = node.querySelector('.callout-label')!.getBoundingClientRect();
+      return {
+        name: (node as HTMLElement).dataset.name ?? '',
+        position: (node as HTMLElement).dataset.position ?? '',
+        ring: centre(node.querySelector('.callout-ring')!),
+        ends: [
+          Number(line.getAttribute('x1')),
+          Number(line.getAttribute('y1')),
+          Number(line.getAttribute('x2')),
+          Number(line.getAttribute('y2')),
+        ],
+        label: [label.x, label.y, label.width, label.height],
+        viewport: [innerWidth, innerHeight],
+      };
+    }),
+  );
+  expect(leaders.length).toBeGreaterThan(0);
+
+  const [lat, lon] = observerFrom(caption);
+  const matrix = viewMatrix(simTimeMs(nowMs), lat, lon);
+  for (const leader of leaders) {
+    const [width, height] = leader.viewport as [number, number];
+    const [vx, vy, vz] = applyView(matrix, parsePosition(leader.position)!);
+    const aspect = width / height;
+    const expected = [
+      (((vx / vz) * FOCAL) / aspect + 1) * 0.5 * width,
+      (1 - (vy / vz) * FOCAL) * 0.5 * height,
+    ];
+
+    // The ring is on the star, unless the placement was clamped to the frame.
+    const clamped = expected.some(
+      (value, axis) => value < 0 || value > (axis === 0 ? width : height),
+    );
+    if (!clamped) {
+      // 60x means a second of skew between reading the clock and reading the
+      // DOM is a few pixels of sky, which is what this tolerance is.
+      expect(
+        Math.hypot(leader.ring[0]! - expected[0]!, leader.ring[1]! - expected[1]!),
+      ).toBeLessThan(60);
+    }
+
+    // The line starts at the ring and ends short of the label it points to.
+    const [x1, y1, x2, y2] = leader.ends as [number, number, number, number];
+    expect(Math.hypot(x1, y1)).toBeLessThan(8);
+    expect(Math.hypot(x2, y2)).toBeGreaterThan(Math.hypot(x1, y1));
+    const end = [leader.ring[0]! + x2, leader.ring[1]! + y2];
+    const [lx, ly, lw, lh] = leader.label as [number, number, number, number];
+    expect(end[0]!).toBeGreaterThan(lx - 40);
+    expect(end[0]!).toBeLessThan(lx + lw + 40);
+    expect(end[1]!).toBeGreaterThan(ly - 40);
+    expect(end[1]!).toBeLessThan(ly + lh + 40);
+  }
+});
+
+test.describe('on a phone', () => {
+  test.use({ viewport: { width: 390, height: 844 } });
+
+  test('no callout is laid across the hero', async ({ page }) => {
+    await settle(page);
+    const hero = (await page.locator('.home-card').boundingBox())!;
+    const [keepOutX, keepOutY] = keepOutFor(390, 844);
+    // Across, a phone's band is the whole placeable frame, so the rule that
+    // can actually be broken is the vertical one.
+    expect(keepOutX).toBeGreaterThan(0.8);
+    const band = {
+      top: 422 - (keepOutY * 844) / 2,
+      bottom: 422 + (keepOutY * 844) / 2,
+    };
+    for (const box of await page
+      .locator('.callout-label')
+      .evaluateAll((nodes) => nodes.map((node) => node.getBoundingClientRect().toJSON()))) {
+      // On screen...
+      expect(box.x).toBeGreaterThanOrEqual(0);
+      expect(box.x + box.width).toBeLessThanOrEqual(390);
+      // ...clear of the hero's own box, which is what the owner saw a callout
+      // sitting on...
+      expect(box.y > hero.y + hero.height || box.y + box.height < hero.y).toBe(true);
+      // ...and anchored outside the keep-out band. The band is the card grown
+      // by a whole label, so a leader may tip the text a few pixels into it and
+      // still be nowhere near the name; what has to hold is that the callout
+      // is placed outside it rather than in it.
+      const middle = box.y + box.height / 2;
+      expect(middle > band.bottom || middle < band.top).toBe(true);
+    }
   });
 });

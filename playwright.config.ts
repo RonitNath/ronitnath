@@ -26,7 +26,10 @@ export default defineConfig({
       /* `MAIL_FAIL` names a substring of a recipient the transport must
        * refuse, so one run can watch a send fail for one visitor and land for
        * everyone else (src/lib/mail.ts). */
-      `MAIL_DIR=${process.cwd()}/.mail MAIL_FAIL=mailfail PORT=${port} node .next/standalone/server.js`,
+      /* The server is told the origin it is actually reachable at, because
+         the door redirects to an absolute `PUBLIC_ORIGIN` URL: with `.env`'s
+         development origin it sends the browser to a port nothing serves. */
+      `MAIL_DIR=${process.cwd()}/.mail MAIL_FAIL=mailfail PUBLIC_ORIGIN=${baseURL} PORT=${port} node .next/standalone/server.js`,
     ].join(' && '),
     url: `${baseURL}/healthz`,
     reuseExistingServer: !process.env.CI,
