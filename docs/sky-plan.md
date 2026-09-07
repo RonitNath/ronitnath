@@ -18,8 +18,7 @@ catalogues), SIMBAD TAP (`ident` → `basic`, `allfluxes`), Gaia DR3
 
 `src/features/sky/` stays the owner. New: `stars-gl.ts` (GL point pass),
 `lod.ts` (tile index + priority queue), `pick.ts` (nearest-star pick),
-`detail.tsx` (panel), `src/app/api/sky/star/[id]/route.ts` (detail lookup +
-cache), `tools/starcat/` (Python builders carried from legacy/universe),
+`detail.tsx` (panel), `src/app/api/sky/star/[id]/route.ts` (detail read), `tools/starcat/` (Python builders carried from legacy/universe),
 `drizzle/0006_sky_star_detail.sql`. Caps: no file over 400 lines; the frame
 loop stays in `stage.ts`.
 
@@ -67,12 +66,20 @@ loop stays in `stage.ts`.
   over STR2 then g9 (g12 not pickable). Hover: ring + tag (name if named, else
   `Gaia DR3 …`/`HIP …`, magnitude, colour). Click pins the star as a callout;
   Escape/click-empty unpins. Coarse pointers: tap = pick.
-- Detail route `GET /api/sky/star/<kind>-<id>`: server queries SIMBAD TAP
-  (`ident`→`basic`+`allfluxes`+`ids`) and Gaia TAP (`gaia_source` +
-  `astrophysical_parameters`), normalises to one JSON, stores in
-  `sky_star_detail(id, payload jsonb, fetched_at)`; served from the table when
-  present, refreshed after 180 days; upstream failures return the catalog-only
-  view (never a 500). Rate-limited per client; 8 s upstream timeout.
+- Datasets are LOCAL (owner 2026-09-07): the browser and the server never
+  contact ESA or CDS at runtime. `tools/starcat/build_detail.py` pulls once,
+  offline, per sky tile: Gaia DR3 G≤12 `gaia_source` + `astrophysical_parameters`
+  (parallax, pmra/pmdec, radial_velocity, ruwe, phot_variable_flag,
+  non_single_star, G/BP/RP, teff/distance/radius/lum/mass), HYG v3 (HIP, HD,
+  Bayer, Flamsteed, proper names, spectral type; CC BY-SA), IAU star names,
+  and one bulk SIMBAD TAP pull for the 12,191 STR2 stars (main_id, otype_txt,
+  sp_type, all ids). Output `data/sky_star_detail.csv.zst` (gitignored,
+  ~100 MB) + `data/sky_star_detail.sha256` (committed). Loader
+  `pnpm db:load-sky` COPYs into `sky_star_detail(id text pk, payload jsonb)`;
+  run once per environment after migrate 0006; the deploy recipe gains that step.
+- Detail route `GET /api/sky/star/<kind>-<id>` reads Postgres only; missing row
+  → catalog-only payload (never a 500). Constellation from IAU boundaries
+  (VizieR VI/42) computed at build and stored in the row.
 - Panel (`detail.tsx`): names (IAU/Bayer/Flamsteed/HD/HIP/Gaia), constellation
   (IAU boundary lookup, VizieR VI/42, packed offline), object type, spectral
   type, temperature, distance (parallax + Gaia distance), luminosity, radius,
