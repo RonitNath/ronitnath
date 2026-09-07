@@ -16,6 +16,7 @@ export default async function Home() {
     <>
       <Atmosphere />
       <header className="topbar">
+        <Link href="/about">About the sky</Link>
         {principal ? (
           <Link href="/app">{principal.displayName}</Link>
         ) : (

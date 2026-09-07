@@ -47,3 +47,20 @@ test('healthz reports a live database', async ({ request }) => {
   expect(res.headers()['cache-control']).toBe('no-store');
   expect(await res.json()).toMatchObject({ ok: true, db: 'ok' });
 });
+
+test('the about page explains the sky and links back to it', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('link', { name: 'About the sky' }).click();
+  await expect(page).toHaveURL(/\/about$/);
+  await expect(page.getByRole('heading', { level: 1 })).toContainText('About the sky');
+  for (const name of ['The stars', 'The Milky Way', 'From catalogue to screen']) {
+    await expect(page.getByRole('heading', { level: 2, name })).toBeVisible();
+  }
+  await expect(page.getByRole('link', { name: 'ESA Gaia Archive' })).toHaveAttribute(
+    'href',
+    'https://gea.esac.esa.int/archive/',
+  );
+  await expect(page.locator('canvas.starscape')).toHaveCount(0);
+  await page.getByRole('link', { name: 'Back to the sky' }).click();
+  await expect(page).toHaveURL(/\/$/);
+});
