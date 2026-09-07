@@ -2,8 +2,23 @@ Star catalog provenance
 =======================
 
 bright.bin
-  Magnitude-sorted naked-eye catalog carried by rn-site. Each record contains
-  a J2000/ICRS direction, apparent magnitude, and display color.
+  Magnitude-sorted naked-eye catalog, 12,191 stars in the STR2 format: a
+  J2000/ICRS direction, apparent magnitude, display color, and the catalog id
+  the star came from (Gaia DR3 source_id, or Hipparcos number).
+
+  Built offline by tools/starcat/build_bright.py from the snapshots committed
+  under tools/starcat/data/ — ESA Gaia DR3 gaia_source (source_id, ra, dec,
+  phot_g_mean_mag, bp_rp, parallax; phot_g_mean_mag < 6.5) and the Hipparcos
+  New Reduction (hip, ra, dec, hp_mag, b_v, plx; hp_mag < 2.5), which supplies
+  the bright end Gaia saturates on. The web application never contacts ESA or
+  CDS at runtime.
+
+  Display color is derived, not drawn: BP-RP (or B-V for the Hipparcos rows)
+  to an effective temperature, then a blackbody spectrum through the CIE 1931
+  observer to sRGB, quantized onto 24 levels. The relations are cited in
+  tools/starcat/colour.py — Mucciarelli & Bellazzini 2020 (RNAAS 4, 52) for
+  BP-RP, Ballesteros 2012 (EPL 97, 34008) for B-V, and Wyman, Sloan & Shirley
+  2013 (JCGT 2(2)) for the color matching functions.
 
 Named-star callouts
   The checked-in 50-entry catalog at public/stars/named.json is

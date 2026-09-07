@@ -11,3 +11,6 @@ playwright-report/
 .playwright/
 screenshots/
 .mail/
+
+# Python bytecode from the offline catalogue builders (tools/starcat).
+__pycache__/

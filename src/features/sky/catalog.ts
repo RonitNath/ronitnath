@@ -1,21 +1,32 @@
 /** The two fetched star assets, and the validation that stands between the
  * network and the canvas.
  *
- * `bright.bin` is the catalog: an 8-byte `STR1` header and then one 20-byte
+ * `bright.bin` is the catalog: an 8-byte `STR2` header and then one 32-byte
  * record per star — three f32 of unit position, one f32 magnitude, four bytes
- * of RGBA colour — sorted brightest first, so a partial read is still the
+ * of RGBA colour, a u64 catalogue id, and the byte that says which catalogue
+ * that id belongs to — sorted brightest first, so a partial read is still the
  * brightest sky rather than a random subset of it.
  *
+ * The id is what makes a star addressable: everything past this leg (streamed
+ * depth, picking, a detail panel that can look a star up) needs to say *which*
+ * star, and an index into a file that is rebuilt whenever the catalogue is
+ * cannot say that. `tools/starcat/build_bright.py` writes the format.
+ *
  * `named.json` is the annotation catalog: a small IAU/SIMBAD-attributed list
- * that points at records in `bright.bin` by index.
+ * that points at records in `bright.bin` by index — and the builder refuses to
+ * publish a catalog whose 50 named stars do not all still match by position.
  */
 
 import type { Vec3 } from './sidereal';
 
 export const HEADER_LEN = 8;
-export const STRIDE = 20;
-const MAGIC = 0x31_52_54_53; // "STR1", little-endian.
+export const STRIDE = 32;
+const MAGIC = 0x32_52_54_53; // "STR2", little-endian.
 const MAX_STARS = 1_000_000;
+
+/** Which catalogue a record's id belongs to. */
+export const KIND_GAIA = 0;
+export const KIND_HIP = 1;
 
 export class CatalogError extends Error {}
 
@@ -26,6 +37,10 @@ export interface StarCatalog {
   magnitude: Float32Array;
   /** RGB in 0..1, three per star. */
   color: Float32Array;
+  /** Gaia DR3 `source_id` or Hipparcos number, one per star. */
+  id: BigUint64Array;
+  /** {@link KIND_GAIA} or {@link KIND_HIP}, one per star. */
+  kind: Uint8Array;
   count: number;
 }
 
@@ -52,6 +67,8 @@ export function parseStars(bytes: Uint8Array): StarCatalog {
   const position = new Float32Array(count * 3);
   const magnitude = new Float32Array(count);
   const color = new Float32Array(count * 3);
+  const id = new BigUint64Array(count);
+  const kind = new Uint8Array(count);
 
   for (let index = 0; index < count; index += 1) {
     const at = HEADER_LEN + index * STRIDE;
@@ -70,8 +87,22 @@ export function parseStars(bytes: Uint8Array): StarCatalog {
     color[index * 3] = view.getUint8(at + 16) / 255;
     color[index * 3 + 1] = view.getUint8(at + 17) / 255;
     color[index * 3 + 2] = view.getUint8(at + 18) / 255;
+    id[index] = view.getBigUint64(at + 20, true);
+    const which = view.getUint8(at + 28);
+    if (which !== KIND_GAIA && which !== KIND_HIP) {
+      throw new CatalogError('invalid star record');
+    }
+    kind[index] = which;
   }
-  return { position, magnitude, color, count };
+  return { position, magnitude, color, id, kind, count };
+}
+
+/** How a star names itself: the form `/api/sky/star/<key>` will read, and the
+ * form a callout or a pick shows when the star has no proper name. */
+export function starKey(catalog: StarCatalog, index: number): string | null {
+  if (!Number.isInteger(index) || index < 0 || index >= catalog.count) return null;
+  const prefix = catalog.kind[index] === KIND_HIP ? 'hip' : 'gaia';
+  return `${prefix}-${catalog.id[index]!}`;
 }
 
 /** The J2000 unit vector of the star at `index`. */
