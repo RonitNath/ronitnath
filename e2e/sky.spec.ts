@@ -3,6 +3,8 @@ import { expect, test, type Page } from '@playwright/test';
 import { EDGE_PX, keepOutFor, parsePosition } from '../src/features/sky/annotate';
 import { simTimeMs } from '../src/features/sky/clock';
 import { applyView, FOCAL, viewMatrix } from '../src/features/sky/sidereal';
+import { observerFrom } from './sky-geometry';
+import { litPixels } from './sky-readback';
 
 /** The landing's sky, asserted against the same modules that draw it. */
 
@@ -11,14 +13,6 @@ async function settle(page: Page): Promise<void> {
   // The assets land after first paint; the callouts appear with the catalog.
   await expect(page.locator('.callout-label').first()).toBeVisible({ timeout: 15_000 });
   await expect(page.locator('.grounding')).not.toBeEmpty({ timeout: 15_000 });
-}
-
-/** The observer, read back off the caption the page renders. */
-function observerFrom(caption: string): [number, number] {
-  const match = /(\d+\.\d+)° ([NS]), (\d+\.\d+)° ([EW])/.exec(caption);
-  expect(match, `no position in ${caption}`).not.toBeNull();
-  const [, lat, ns, lon, ew] = match!;
-  return [Number(lat) * (ns === 'S' ? -1 : 1), Number(lon) * (ew === 'W' ? -1 : 1)];
 }
 
 test('every callout names a star that is really above the horizon', async ({ page }) => {
@@ -92,21 +86,24 @@ test.describe('reduced motion', () => {
   test.use({ reducedMotion: 'reduce' });
 
   test('draws the sky once and then leaves it alone', async ({ page }) => {
-    await page.goto('/');
-    const sky = page.locator('canvas.starscape');
-    const lit = async () =>
-      sky.evaluate((canvas: HTMLCanvasElement) => {
-        const pixels = canvas
-          .getContext('2d')!
-          .getImageData(0, 0, canvas.width, canvas.height).data;
-        let sum = 0;
-        for (let i = 3; i < pixels.length; i += 4) sum += pixels[i]!;
-        return sum;
-      });
-    await expect.poll(lit, { timeout: 15_000 }).toBeGreaterThan(0);
-    const first = await lit();
+    await page.goto('/?skyreadback=1');
+    // The sky arrives in pieces — the catalog, then the Milky Way's map — and
+    // each lands with one frame of its own, so what is asserted is that the
+    // frame stops changing, not that the first one is the last.
+    let settled = 0;
+    await expect
+      .poll(
+        async () => {
+          const lit = await litPixels(page);
+          const same = lit > 0 && lit === settled;
+          settled = lit;
+          return same;
+        },
+        { timeout: 20_000 },
+      )
+      .toBe(true);
     await page.waitForTimeout(1_500);
-    expect(await lit()).toBe(first);
+    expect(await litPixels(page)).toBe(settled);
   });
 });
 

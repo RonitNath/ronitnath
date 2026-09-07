@@ -100,3 +100,38 @@ the IAU full set (~450) since ids now resolve names server-side.
 Plan rules apply (PUBLIC_ORIGIN, audit-free read paths, screenshots viewed
 both themes + phone before any gate). The browser never contacts ESA or CDS
 directly; only `/api/sky/*` does. Assets carry NOTICE updates.
+
+## S1 deviations
+
+Recorded as built, 2026-09-07.
+
+- **The STR2 record is 32 bytes, not 28.** The field list this section gives —
+  20 bytes of STR1, a `u64 id`, a `u8 kind`, 3 pad — sums to 32; 28 was an
+  arithmetic slip. The fields are exactly as specified.
+- **The colour relations are named ones, checked against their papers.**
+  BP−RP → Teff is Mucciarelli & Bellazzini 2020 (RNAAS 4, 52) at solar
+  metallicity, not a Casagrande fit; B−V → Teff for the Hipparcos rows is
+  Ballesteros 2012 (EPL 97, 34008). The 24 levels are spaced evenly in 1/T over
+  2900–17000 K, which is the range the shipped catalogue actually occupies —
+  a wider ramp would spend levels on stars that are not in the file.
+- **The glare wing grows as `b^0.75`, not `b^0.5`.** The square root was built
+  first and made every star from about magnitude 6 up wear the same halo: it
+  compresses a thousand-to-one flux range into thirty-to-one. `b^0.75` puts
+  the drawn radius on `b^0.375`, which is the ten-to-one range of widths the
+  sky shows.
+- **Width is floored below about magnitude 4.5**, where the glare wing is
+  narrower than the core. Those stars are a point of light and nothing else,
+  and a smaller quad would clip the Gaussian.
+- **The highlight ring moved into GL.** There is no 2D canvas on the shipped
+  path to draw it on, so it is a 64-segment `LINE_LOOP` generated from
+  `gl_VertexID` after the tone map.
+- **`preserveDrawingBuffer` is gated on `?skyreadback=1`.** A Playwright
+  `evaluate` runs between frames, so without it `readPixels` sees zeros; the
+  alternative was reading back from the page's own loop, which would put
+  test-only code in the render path.
+- **The end-to-end assertion is about the brightest first-magnitude star in
+  frame, not Sirius by name.** The observer flies a fixed orbit and which of
+  Sirius, Vega, Arcturus and the rest is overhead is not the spec's to choose;
+  it takes the brightest that is, and Sirius when Sirius is it. Its comparison
+  magnitude-5 star is picked at the same altitude, so the atmosphere's share
+  is the same for both and the magnitude difference is what is being measured.

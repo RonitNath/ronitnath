@@ -1,5 +1,7 @@
 import { expect, test } from '@playwright/test';
 
+import { litPixels } from './sky-readback';
+
 test('the landing page renders', async ({ page }) => {
   await page.goto('/');
   await expect(page.getByRole('heading', { level: 1 })).toContainText('Ronit Nath');
@@ -15,22 +17,19 @@ test('the landing page renders', async ({ page }) => {
 });
 
 test('the sky is drawn on the canvas behind the hero', async ({ page }) => {
-  await page.goto('/');
+  // `?skyreadback=1` is what turns `preserveDrawingBuffer` on (gl-util.ts).
+  // Without it the drawing buffer is undefined by the time a Playwright
+  // `evaluate` runs, because that runs between frames; the alternative —
+  // reading back from the page's own loop — would mean shipping test-only
+  // code inside the render path, which is the worse of the two.
+  await page.goto('/?skyreadback=1');
   const sky = page.locator('canvas.starscape');
   await expect(sky).toBeAttached();
-  // Attached is not drawn: ask the canvas whether any star landed on it.
-  await expect
-    .poll(async () =>
-      sky.evaluate((canvas: HTMLCanvasElement) => {
-        const pixels = canvas
-          .getContext('2d')!
-          .getImageData(0, 0, canvas.width, canvas.height).data;
-        let lit = 0;
-        for (let i = 3; i < pixels.length; i += 4) if (pixels[i]! > 0) lit += 1;
-        return lit;
-      }),
-    )
-    .toBeGreaterThan(100);
+  // Attached is not drawn: ask the canvas whether any starlight landed on it.
+  await expect.poll(async () => litPixels(page), { timeout: 20_000 }).toBeGreaterThan(100);
+  // ...and the 2D fallback is not also on screen: two skies is twice the
+  // stars at half the brightness.
+  await expect(page.locator('canvas.starscape-flat')).toBeHidden();
 });
 
 test('the theme toggle switches the document theme both ways', async ({ page }) => {
