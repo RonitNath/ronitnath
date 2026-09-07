@@ -91,6 +91,9 @@ loop stays in `stage.ts`.
 
 ## S4 — polish
 
+Milky Way re-bake at HEALPix level 9 (NSIDE 512, ~0.11°) into a 4096×2048
+map (`tools/starcat/mwcat.py` carried from universe; the 1024×512 map reads
+as blotches when the galactic centre fills the frame at 2× DPR).
 Constellation lines toggle (Stellarium `constellationship.fab`, packed);
 twinkle off by default (reduced-motion respected); named-star list grows to
 the IAU full set (~450) since ids now resolve names server-side.
