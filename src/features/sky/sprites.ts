@@ -1,41 +1,34 @@
-/** The star point-sprite, pre-rendered.
+/** The star point-sprite, pre-rendered — the no-WebGL2 fallback only.
  *
- * The pre-rebuild starscape drew every star as a GL point running
- * `STAR_FRAG`: inside the unit disc the fragment is the star's colour at
- * `exp(-falloff·d²)`, additively blended, so the core saturates toward white
- * and the colour survives only in the wings. A 2D canvas cannot run that per
- * fragment twelve thousand times a frame, but it does not have to: the
- * function depends on nothing but the colour, the diameter and the falloff, so
- * one sprite per (colour bucket × size tier × falloff bucket) reproduces it
- * exactly and the frame becomes a `drawImage` loop.
+ * What ships is `stars-gl.ts`, which evaluates the star profile per fragment
+ * on the GPU. A 2D canvas cannot run that twelve thousand times a frame, so
+ * the fallback approximates it: the profile's *shape* is a radial falloff that
+ * depends on nothing but the diameter, so one sprite per (colour bucket × size
+ * tier × falloff bucket) covers the whole catalogue and the frame becomes a
+ * `drawImage` loop.
  *
  * The sprite carries the halo in its *alpha* and the flat star colour in its
- * RGB. Drawn with `globalAlpha = starAlpha` under `globalCompositeOperation:
- * 'lighter'`, the contribution is `colour · exp(-falloff·d²) · starAlpha`,
- * which is `STAR_FRAG` term for term.
+ * RGB. Drawn with `globalAlpha` set to the star's tone-mapped peak under
+ * `globalCompositeOperation: 'lighter'`, the contribution is
+ * `colour · exp(-falloff·d²) · peak`.
  */
 
-import { TUNING } from './tuning';
-
-/** The shader's halo: `glow = exp(-falloff · d²)`, discarded outside the
- * disc. `d` here is the squared distance from the centre in sprite radii,
- * which is what `dot(c, c)` is in the shader. */
+/** The halo: `exp(-falloff · d²)`, cut off outside the disc. `d` here is the
+ * squared distance from the centre in sprite radii. */
 export function haloAlpha(distanceSquared: number, falloff: number): number {
   if (distanceSquared > 1) return 0;
   return Math.exp(-falloff * distanceSquared);
 }
 
-/** Halo width as a function of brightness rather than of alpha: once the core
- * saturates this is the only channel left that still says "brighter". The
- * shipped `halo` is 0, which reproduces the fixed falloff exactly — the
- * expression is carried over whole so the two constants stay one knob. */
-export function falloffFor(brightness: number): number {
-  return TUNING.glow / (1 + TUNING.halo * Math.pow(brightness, 0.25));
-}
+/** How fast the fallback's halo drops off. One number, not a curve: the GL
+ * pass gets a star's *width* from its glare radius and its *level* from the
+ * tone curve, and the fallback does the same — so the shape between them
+ * never needed to vary. */
+export const FALLOFF = 2.5;
 
-/** Sub-samples per axis inside a sprite pixel. The shader's `discard` is a
- * hard edge at d = 1 and the sprites are a handful of pixels across, so
- * without this the rim of a bright star is a visible staircase. */
+/** Sub-samples per axis inside a sprite pixel. The alpha field is cut off at
+ * d = 1 and the sprites are a handful of pixels across, so without this the
+ * rim of a bright star is a visible staircase. */
 const SUPERSAMPLE = 2;
 
 /** The two resolutions a sprite is rendered at, in device pixels. `drawImage`

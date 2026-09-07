@@ -25,12 +25,16 @@ The landing page is the real sky, from a real place, at a real instant, and
 every part of that is checkable. `src/features/sky/` owns it.
 
 - **Catalog.** `public/stars/bright.bin` is 12,191 stars — J2000 unit vector,
-  magnitude and colour, brightest first — with `named.json` naming 50 of them
-  from the IAU and SIMBAD. `public/sky/milkyway.webp` is Gaia star counts on an
-  equatorial grid, `public/cities/cities.bin` the filtered GeoNames
-  `cities15000`, and `public/textures/earth/` NASA's Blue Marble. All of them
-  are carried unchanged from the pre-rebuild site: designed assets, not
-  regenerated ones. `public/stars/NOTICE` and `public/textures/earth/NOTICE`
+  magnitude, colour and the Gaia DR3 or Hipparcos id the star is known by,
+  brightest first — with `named.json` naming 50 of them from the IAU and
+  SIMBAD. `tools/starcat/build_bright.py` builds it from the ESA Gaia DR3 and
+  Hipparcos snapshots committed beside it; nothing at runtime ever contacts ESA
+  or CDS. Star colour is derived rather than drawn: colour index → effective
+  temperature → a blackbody spectrum through the CIE observer → sRGB, on 24
+  levels. `public/sky/milkyway.webp` is Gaia star counts on an equatorial grid,
+  `public/cities/cities.bin` the filtered GeoNames `cities15000`, and
+  `public/textures/earth/` NASA's Blue Marble, all carried unchanged from the
+  pre-rebuild site. `public/stars/NOTICE` and `public/textures/earth/NOTICE`
   carry their attribution and must stay with them.
 - **Clock.** `clock.ts` runs the sky at 60× wall time from a fixed epoch, with
   the accumulated lead taken modulo one sidereal day so the simulated _date_
@@ -43,12 +47,19 @@ every part of that is checkable. `src/features/sky/` owns it.
   in the view). Dragging or clicking the globe overrides it tab-locally
   (`observer.ts`), travelling 800 ms along the great circle; "Resume orbit"
   travels back. There is no geolocation prompt and no per-visitor sky.
-- **Drawing.** Stars and the Milky Way are a 2D canvas (`star-field.ts`) at
-  ≤30 fps, painting the magnitude response the old WebGL starscape shipped
-  (`tuning.ts`). The mini-globe is the one thing that uses WebGL2
-  (`globe-gl.ts`): a textured sphere lit from the simulated instant's subsolar
-  point, so its terminator is the real one, falling back to a flat day-texture
-  disc where WebGL2 is unavailable.
+- **Drawing.** One WebGL2 canvas at ≤30 fps carries the whole sky: the Milky
+  Way as a fragment shader (`band-gl.ts`), then the catalog as GL points
+  (`stars-gl.ts`). The stars are photometric rather than drawn — linear flux
+  `10^(-0.4(m − m_ref))` through the atmosphere's extinction, an
+  energy-conserving Gaussian core plus a bounded glare wing per fragment,
+  accumulated additively into a float buffer and tone mapped once with
+  `1 − exp(−x·exposure)`, so bright cores saturate to white while their wings
+  keep the blackbody colour. `tuning.ts` holds those numbers and why.
+  `star-field.ts` paints the same picture on a 2D canvas where there is no
+  WebGL2, and only one of the two is ever on screen. The mini-globe
+  (`globe-gl.ts`) is a textured sphere lit from the simulated instant's
+  subsolar point, so its terminator is the real one, falling back to a flat
+  day-texture disc without WebGL2.
 - **Annotations.** `annotate.ts` projects the named stars through the same view
   and keeps at most three that clear a keep-out band around the hero; on a
   phone, where nothing clears it, the best above-horizon star is forced to the

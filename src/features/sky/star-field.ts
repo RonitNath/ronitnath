@@ -1,14 +1,15 @@
-/** The star field, painted on a 2D canvas.
+/** The star field, painted on a 2D canvas — the no-WebGL2 fallback.
  *
- * The projection, the magnitude response and the atmospheric extinction are
- * the ones the pre-rebuild WebGL starscape shipped (`render.rs` /
- * `shaders.rs`), evaluated on the CPU: the sky is 12,191 points at ≤30 fps,
- * which a 2D context draws comfortably, and keeping WebGL for the globe alone
- * is what the brief asks for.
+ * What ships is `stars-gl.ts`: the catalogue as GL points, accumulated in
+ * linear flux into a float buffer and tone mapped once. A 2D context cannot do
+ * that, so this approximates it with the same numbers (`tuning.ts`): each star
+ * gets the width its glare wing earns it and an alpha that is its profile's
+ * peak run through the same tone curve, drawn as one `drawImage` of a
+ * pre-rendered sprite under `lighter`.
  *
- * Every star is one `drawImage` of a pre-rendered point sprite (`sprites.ts`)
- * under `lighter`, which is `STAR_FRAG` evaluated once per (colour, size,
- * falloff) instead of once per fragment.
+ * The two paths are never both on screen — `stage.ts` attaches one canvas or
+ * the other (`sky-canvas.tsx`), and which one it is depends on nothing but
+ * whether a WebGL2 context could be had.
  *
  * Behind the stars the Milky Way is painted from `sky/milkyway.webp` — Gaia
  * star counts binned onto an equal-area grid, not procedural noise. That map
@@ -21,8 +22,16 @@
 
 import type { StarCatalog } from './catalog';
 import { applyView, FOCAL, type Mat3 } from './sidereal';
-import { falloffFor, type SpriteAtlas } from './sprites';
-import { TUNING, TWILIGHT_MAG_LIMIT } from './tuning';
+import { FALLOFF, type SpriteAtlas } from './sprites';
+import {
+  GLARE_EPS_PX,
+  NIGHT,
+  starDiameterPx,
+  toneMap,
+  TUNING,
+  TWILIGHT,
+  TWILIGHT_MAG_LIMIT,
+} from './tuning';
 
 /** Widest the offscreen Milky Way buffer gets. This path is the fallback for a
  * browser with no WebGL2 — the band is drawn by a fragment shader at full
@@ -61,10 +70,7 @@ export function buildLook(
   dpr: number,
   atlas: SpriteAtlas,
 ): StarLook {
-  // Twilight needs a different size response than night: a star on a bright
-  // sky wins on area rather than on contrast.
-  const sizeBase = TUNING.sizeBase * (light ? 4 : 1);
-  const sizeExp = TUNING.sizeExp * (light ? 2 : 1);
+  const response = light ? TWILIGHT : NIGHT;
 
   let count = catalog.count;
   if (light) {
@@ -75,33 +81,31 @@ export function buildLook(
   const radius = new Float32Array(count);
   const alpha = new Float32Array(count);
   const sprite = new Array<HTMLCanvasElement>(count);
+  const sigma = response.coreSigmaPx;
   for (let index = 0; index < count; index += 1) {
-    const brightness = Math.pow(10, -0.4 * catalog.magnitude[index]!);
-    // `gl_PointSize` is device pixels and the GL canvas was device-sized, so
-    // the shipped star is `size` *CSS* pixels across at any density. The 2D
-    // context is scaled by the ratio, so the same number is the same star.
-    const size = Math.min(
-      TUNING.sizeMax,
-      Math.max(1, sizeBase + TUNING.sizeScale * Math.pow(brightness, sizeExp)),
-    );
+    // Linear flux at the zenith; the atmosphere's share of it is a function of
+    // where the star is in the frame and so is applied per frame below.
+    const flux = Math.pow(10, -0.4 * (catalog.magnitude[index]! - response.magRef));
+    const size = starDiameterPx(flux, response);
     radius[index] = size / 2;
-    alpha[index] = Math.min(
-      TUNING.alphaMax,
-      Math.max(0, TUNING.alphaBase + TUNING.alphaScale * Math.pow(brightness, TUNING.alphaExp)),
-    );
+    // The star profile at its own centre, through the tone curve: the peak of
+    // an energy-conserving Gaussian core plus the glare wing's finite middle.
+    const peak =
+      flux / (2 * Math.PI * sigma * sigma) +
+      (Math.pow(flux, response.glareExp) * response.glareK) / (GLARE_EPS_PX * GLARE_EPS_PX);
+    alpha[index] = toneMap(peak, response.exposure);
 
     let [red, green, blue] = [
       catalog.color[index * 3]!,
       catalog.color[index * 3 + 1]!,
       catalog.color[index * 3 + 2]!,
     ];
-    if (light) {
-      // Colour does not survive a bright sky; push toward white.
-      red += (1 - red) * 0.25;
-      green += (1 - green) * 0.25;
-      blue += (1 - blue) * 0.25;
+    if (response.whiten > 0) {
+      red += (1 - red) * response.whiten;
+      green += (1 - green) * response.whiten;
+      blue += (1 - blue) * response.whiten;
     }
-    sprite[index] = atlas.get(size, red, green, blue, falloffFor(brightness));
+    sprite[index] = atlas.get(size, red, green, blue, FALLOFF);
   }
   return { radius, alpha, sprite, count, light, dpr };
 }

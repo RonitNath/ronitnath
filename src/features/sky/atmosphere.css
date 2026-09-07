@@ -284,14 +284,13 @@
   background: var(--dusk);
 }
 
-/* The Milky Way, drawn by a fragment shader (band-gl.ts) over the nebula and
-   under the stars. Its alpha covers the colour it carries, so the dusk
-   gradient composites into one picture rather than being painted over. */
-.milkyway,
-/* The real sky, drawn by the island above the CSS one. Additive: it leaves
-   its own alpha at zero, so in light mode the dusk gradient underneath shows
+/* The real sky, drawn by the island above the CSS one — the Milky Way's
+   shader and the star points on one WebGL2 canvas (.starscape), or the 2D
+   fallback (.starscape-flat) where there is no WebGL2. Its alpha covers only
+   the light it carries, so in light mode the dusk gradient underneath shows
    through the gaps between the stars rather than being covered by black. */
-.starscape {
+.starscape,
+.starscape-flat {
   position: fixed;
   inset: 0;
   width: 100%;

@@ -24,15 +24,14 @@ const EMPTY: Readout = {
  * own clock against that offset from then on. */
 export function SkyStage({ serverEpochMs }: { serverEpochMs: number }) {
   const skyRef = useRef<HTMLCanvasElement>(null);
-  const bandRef = useRef<HTMLCanvasElement>(null);
+  const flatRef = useRef<HTMLCanvasElement>(null);
   const globeRef = useRef<HTMLCanvasElement>(null);
   const [stage, setStage] = useState<Stage | null>(null);
   const [readout, setReadout] = useState<Readout>(EMPTY);
 
   useEffect(() => {
     const created = new Stage(serverEpochMs);
-    created.attachBand(bandRef.current);
-    created.attachSky(skyRef.current);
+    created.attachSky(skyRef.current, flatRef.current);
     created.attachGlobe(globeRef.current);
     const unsubscribe = created.subscribe(setReadout);
     created.start();
@@ -62,7 +61,7 @@ export function SkyStage({ serverEpochMs }: { serverEpochMs: number }) {
 
   return (
     <>
-      <SkyCanvas bandRef={bandRef} canvasRef={skyRef} />
+      <SkyCanvas canvasRef={skyRef} flatRef={flatRef} />
       <div className="sky-chrome">
         <Globe canvasRef={globeRef} stage={stage} />
         <Grounding text={readout.grounding} />

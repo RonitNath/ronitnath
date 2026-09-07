@@ -3,20 +3,20 @@ import { describe, expect, it } from 'vitest';
 import {
   bucketRgb,
   colorBucket,
-  falloffFor,
+  FALLOFF,
   haloAlpha,
   sizeTier,
   spriteAlphaField,
   tierSide,
 } from '../sprites';
-import { TUNING } from '../tuning';
 
-/** The sprite is the pre-rebuild point-sprite shader, evaluated once instead
- * of once per fragment. What has to hold is that it is the same function. */
+/** The fallback sprite is the star profile's shape, evaluated once per
+ * (colour, size, falloff) instead of once per fragment. What has to hold is
+ * that it is the same function everywhere in the sprite. */
 describe('the point sprite', () => {
-  it('carries the shader halo at the centre, mid-radius and the rim', () => {
+  it('carries the halo at the centre, mid-radius and the rim', () => {
     const side = 96;
-    const falloff = falloffFor(1);
+    const falloff = FALLOFF;
     const field = spriteAlphaField(side, falloff);
     // Row through the middle of the sprite; column offsets are radii.
     const row = side / 2;
@@ -34,22 +34,13 @@ describe('the point sprite', () => {
     }
   });
 
-  it('discards outside the disc, exactly as the fragment shader does', () => {
+  it('is cut off outside the disc, and continuous up to it', () => {
     expect(haloAlpha(1.0001, 2.5)).toBe(0);
     expect(haloAlpha(1, 2.5)).toBeCloseTo(Math.exp(-2.5), 12);
     const side = 32;
     const field = spriteAlphaField(side, 2.5);
     expect(field[0]).toBe(0);
     expect(field[side - 1]).toBe(0);
-  });
-
-  it('widens the halo with brightness only as far as the shipped halo says', () => {
-    // The shipped `halo` is 0, so the falloff is `glow` for every star; the
-    // expression is still the shader's, so a non-zero halo would widen it.
-    expect(falloffFor(1)).toBeCloseTo(TUNING.glow, 12);
-    expect(falloffFor(1e-4)).toBeCloseTo(TUNING.glow, 12);
-    const widened = TUNING.glow / (1 + 0.5 * Math.pow(100, 0.25));
-    expect(widened).toBeLessThan(TUNING.glow);
   });
 
   it('buckets a size and a colour to within what the eye separates', () => {

@@ -1,4 +1,4 @@
-/** One owner for the clock, the observer and the two canvases.
+/** One owner for the clock, the observer and the canvases.
  *
  * Everything the island draws is a function of (server time, the observer).
  * Holding both here is what keeps the sky, the globe's marker and the
@@ -10,7 +10,6 @@
  */
 
 import { keepOutFor, place, placementAvoid, type Placement } from './annotate';
-import { BandScene } from './band-gl';
 import { ASSETS, loadCities, loadImageData, loadNamed, loadStars } from './assets';
 import { simTimeMs, syncedSimTimeMs } from './clock';
 import { type NamedStar, namedVectors, type StarCatalog } from './catalog';
@@ -20,25 +19,14 @@ import { paintFlatGlobe } from './globe-flat';
 import { dragTo, RADIUS, unproject } from './globe-math';
 import { grounding, UPDATE_INTERVAL_MS } from './label';
 import { Observer, TRANSITION_MS, type Point } from './observer';
-import { type Mat3, type Vec3, viewMatrix } from './sidereal';
-import { SpriteAtlas } from './sprites';
-import {
-  bandSize,
-  buildLook,
-  type Highlight,
-  paintBand,
-  paintStars,
-  type StarLook,
-} from './star-field';
+import { type Vec3, viewMatrix } from './sidereal';
+import { SkyRenderer } from './sky-render';
+import type { Highlight } from './star-field';
 
 /** ≤30 fps. At 60× the sky moves 15 arcminutes a second, which is a pixel and
  * a half per frame at this scale — smooth, and half the main-thread cost of a
  * 60 fps loop that would show the same motion. */
 const FRAME_INTERVAL_MS = 33;
-
-/** The Milky Way is diffuse and its warp is per-pixel, so it is re-sampled on
- * its own slower cadence and scaled up between times. */
-const BAND_INTERVAL_MS = 250;
 
 const HIGHLIGHT_MS = 1_800;
 
@@ -58,23 +46,16 @@ export class Stage {
   private readonly observer = new Observer();
   private readonly listeners = new Set<(readout: Readout) => void>();
 
-  private skyCanvas: HTMLCanvasElement | null = null;
-  private bandCanvas: HTMLCanvasElement | null = null;
-  private bandScene: BandScene | null = null;
+  private readonly sky = new SkyRenderer();
   private globeCanvas: HTMLCanvasElement | null = null;
   private globeScene: GlobeScene | null = null;
-  private atlas: SpriteAtlas | null = null;
 
   private stars: StarCatalog | null = null;
-  private look: StarLook | null = null;
   private named: NamedStar[] = [];
   private vectors: Vec3[] = [];
   private cities: CityCatalog | null = null;
-  private milkyway: ImageData | null = null;
   private earth: ImageData | null = null;
 
-  private band: HTMLCanvasElement | null = null;
-  private bandDrawnAt = 0;
   private lastFrameAt = 0;
   private highlight: (Highlight & { until: number }) | null = null;
 
@@ -153,16 +134,10 @@ export class Stage {
     return innerHeight > 0 ? innerWidth / innerHeight : 1.6;
   }
 
-  attachSky(canvas: HTMLCanvasElement | null): void {
-    this.skyCanvas = canvas;
-  }
-
-  /** The Milky Way's own canvas, beneath the stars. WebGL2 draws it at full
-   * resolution; without WebGL2 the CPU warp paints into the star canvas as
-   * before. */
-  attachBand(canvas: HTMLCanvasElement | null): void {
-    this.bandCanvas = canvas;
-    this.bandScene = canvas ? BandScene.create(canvas) : null;
+  /** The sky's canvases: the WebGL2 one that ships and the 2D one that stands
+   * in for it (`sky-render.ts` picks between them). */
+  attachSky(canvas: HTMLCanvasElement | null, flat: HTMLCanvasElement | null): void {
+    this.sky.attach(canvas, flat);
   }
 
   attachGlobe(canvas: HTMLCanvasElement | null): void {
@@ -238,8 +213,7 @@ export class Stage {
   /** One frame, drawn on demand — a theme flip under reduced motion has to ask
    * for the frame the loop would otherwise have supplied. */
   redraw(): void {
-    this.band = null;
-    this.look = null;
+    this.sky.reset();
     this.draw();
     this.publish();
   }
@@ -252,75 +226,23 @@ export class Stage {
   }
 
   private drawSky(simMs: number, lat: number, lon: number): void {
-    const dpr = Math.min(devicePixelRatio || 1, 2);
-    const light = document.documentElement.dataset.theme === 'light';
-    const matrix = viewMatrix(simMs, lat, lon);
-    // The band is its own canvas underneath, so the shader owns the whole
-    // frame and the stars keep a 2D context they can draw sprites into.
-    this.bandScene?.draw(matrix, light, dpr, this.reduced);
-
-    const canvas = this.skyCanvas;
-    const ctx = canvas?.getContext('2d', { alpha: true });
-    if (!canvas || !ctx) return;
-
-    const [width, height] = [innerWidth, innerHeight];
-    if (canvas.width !== Math.round(width * dpr)) canvas.width = Math.round(width * dpr);
-    if (canvas.height !== Math.round(height * dpr)) canvas.height = Math.round(height * dpr);
-
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.clearRect(0, 0, width, height);
-    // Additive: the canvas leaves its own alpha at zero, so in the light theme
-    // the dusk gradient underneath shows between the stars.
-    ctx.globalCompositeOperation = 'lighter';
-
-    // Only when there is no shader to draw it with.
-    if (!this.bandScene && this.milkyway) this.drawBand(ctx, matrix, width, height, light);
-    if (this.stars) {
-      if (!this.look || this.look.light !== light || this.look.dpr !== dpr) {
-        this.atlas ??= new SpriteAtlas();
-        this.look = buildLook(this.stars, light, dpr, this.atlas);
-      }
-      paintStars(
-        ctx,
-        this.stars,
-        this.look,
-        matrix,
-        { width, height, dpr },
-        this.currentHighlight(),
-      );
-      // The CSS starfield was the picture until this moment. Now that the real
-      // catalog is on screen the two would be one sky over another, so the
-      // designed one is faded out and stays out (`atmosphere.css`).
-      if (!this.catalogDrawn) {
-        this.catalogDrawn = true;
-        document.documentElement.dataset.sky = 'live';
-      }
+    const drawn = this.sky.draw(
+      this.stars,
+      viewMatrix(simMs, lat, lon),
+      document.documentElement.dataset.theme === 'light',
+      Math.min(devicePixelRatio || 1, 2),
+      // Under reduced motion the sky is one still frame, and the band's
+      // reveal is an animation.
+      this.reduced,
+      this.currentHighlight(),
+    );
+    // The CSS starfield was the picture until the first real frame. Now that
+    // the catalog is on screen the two would be one sky over another, so the
+    // designed one is faded out and stays out (`atmosphere.css`).
+    if (drawn && !this.catalogDrawn) {
+      this.catalogDrawn = true;
+      document.documentElement.dataset.sky = 'live';
     }
-  }
-
-  private drawBand(
-    ctx: CanvasRenderingContext2D,
-    matrix: Mat3,
-    width: number,
-    height: number,
-    light: boolean,
-  ): void {
-    const [bw, bh] = bandSize(width, height);
-    if (!this.band || this.band.width !== bw || this.band.height !== bh) {
-      this.band = document.createElement('canvas');
-      this.band.width = bw;
-      this.band.height = bh;
-      this.bandDrawnAt = 0;
-    }
-    const now = performance.now();
-    if (now - this.bandDrawnAt >= BAND_INTERVAL_MS) {
-      this.bandDrawnAt = now;
-      const bandCtx = this.band.getContext('2d');
-      if (bandCtx && this.milkyway) paintBand(bandCtx, this.milkyway, matrix, light);
-    }
-    ctx.imageSmoothingEnabled = true;
-    ctx.imageSmoothingQuality = 'high';
-    ctx.drawImage(this.band, 0, 0, width, height);
   }
 
   private currentHighlight(): Highlight | null {
@@ -438,19 +360,9 @@ export class Stage {
     })();
   }
 
-  /** The Milky Way map, to whichever renderer is drawing it. The shader takes
-   * the image straight to a texture; the fallback needs it decoded to pixels
-   * it can sample on the CPU. */
   private async loadBand(): Promise<void> {
-    if (this.bandScene) {
-      await this.bandScene.loadMap(ASSETS.milkyway);
-      if (this.live) this.draw();
-      return;
-    }
-    const band = await loadImageData(ASSETS.milkyway, 1_024);
-    if (!this.live) return;
-    this.milkyway = band;
-    this.draw();
+    await this.sky.loadBand();
+    if (this.live) this.draw();
   }
 
   private async loadGlobeTextures(): Promise<void> {

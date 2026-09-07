@@ -10,11 +10,14 @@
  * `SKY_FRAG`), ported whole: inverse-view sampling, `pow(rgb, shape) · gain`
  * tone mapping, secant-airmass extinction, the twilight gate, an alpha that
  * covers the colour it carries, and the reveal that fades it in when the map
- * lands. It draws onto its own canvas beneath the star canvas, so the stars
- * stay 2D — twelve thousand `drawImage` calls of a pre-rendered sprite are
- * cheaper than the buffer churn of moving them into this context too.
+ * lands.
+ *
+ * It is the first pass on the sky canvas and the stars (`stars-gl.ts`) are the
+ * second, sharing one context: the caller sizes the canvas, clears it, and
+ * runs the two in that order.
  */
 
+import { fullscreenTriangle, link, uniforms } from './gl-util';
 import type { Mat3 } from './sidereal';
 import { FOCAL } from './sidereal';
 import { TUNING } from './tuning';
@@ -85,17 +88,6 @@ void main() {
 }
 `;
 
-function compile(gl: WebGL2RenderingContext, type: number, source: string): WebGLShader {
-  const shader = gl.createShader(type);
-  if (!shader) throw new Error('createShader');
-  gl.shaderSource(shader, source);
-  gl.compileShader(shader);
-  if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-    throw new Error(gl.getShaderInfoLog(shader) ?? 'shader compile failed');
-  }
-  return shader;
-}
-
 const UNIFORMS = [
   'u_view',
   'u_f',
@@ -110,34 +102,16 @@ const UNIFORMS = [
 
 export class BandScene {
   private readonly program: WebGLProgram;
-  private readonly uniform: Record<string, WebGLUniformLocation | null> = {};
+  private readonly uniform: Record<string, WebGLUniformLocation | null>;
+  private readonly quad: WebGLVertexArrayObject;
   private readonly texture: WebGLTexture;
   private mapLoadedAt = 0;
   private hasMap = false;
 
-  private constructor(
-    private readonly canvas: HTMLCanvasElement,
-    private readonly gl: WebGL2RenderingContext,
-  ) {
-    const program = gl.createProgram();
-    if (!program) throw new Error('createProgram');
-    gl.attachShader(program, compile(gl, gl.VERTEX_SHADER, VERT));
-    gl.attachShader(program, compile(gl, gl.FRAGMENT_SHADER, FRAG));
-    gl.linkProgram(program);
-    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-      throw new Error(gl.getProgramInfoLog(program) ?? 'program link failed');
-    }
-    this.program = program;
-    gl.useProgram(program);
-    for (const name of UNIFORMS) this.uniform[name] = gl.getUniformLocation(program, name);
-
-    // One triangle large enough to cover the viewport — cheaper than a quad
-    // and free of the diagonal seam two triangles produce.
-    const buffer = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
-    gl.enableVertexAttribArray(0);
-    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+  private constructor(private readonly gl: WebGL2RenderingContext) {
+    this.program = link(gl, VERT, FRAG);
+    this.uniform = uniforms(gl, this.program, UNIFORMS);
+    this.quad = fullscreenTriangle(gl);
 
     this.texture = gl.createTexture()!;
     gl.bindTexture(gl.TEXTURE_2D, this.texture);
@@ -160,16 +134,9 @@ export class BandScene {
   }
 
   /** Best-effort: a browser with no WebGL2 gets the CPU warp instead. */
-  static create(canvas: HTMLCanvasElement): BandScene | null {
-    const gl = canvas.getContext('webgl2', {
-      alpha: true,
-      antialias: false,
-      premultipliedAlpha: true,
-      powerPreference: 'low-power',
-    });
-    if (!gl) return null;
+  static create(gl: WebGL2RenderingContext): BandScene | null {
     try {
-      return new BandScene(canvas, gl);
+      return new BandScene(gl);
     } catch {
       return null;
     }
@@ -195,17 +162,12 @@ export class BandScene {
   }
 
   /** `instant` skips the reveal: under reduced motion the sky is one still
-   * frame, and a fade is an animation. */
-  draw(matrix: Mat3, light: boolean, dpr: number, instant = false): void {
-    const { gl, canvas } = this;
-    const width = Math.round(innerWidth * dpr);
-    const height = Math.round(innerHeight * dpr);
-    if (canvas.width !== width) canvas.width = width;
-    if (canvas.height !== height) canvas.height = height;
-    gl.viewport(0, 0, width, height);
-    gl.clearColor(0, 0, 0, 0);
-    gl.clear(gl.COLOR_BUFFER_BIT);
+   * frame, and a fade is an animation. The canvas is sized and cleared by the
+   * caller, which owns both passes. */
+  draw(matrix: Mat3, light: boolean, width: number, height: number, instant = false): void {
+    const { gl } = this;
     if (!this.hasMap) return;
+    gl.viewport(0, 0, width, height);
 
     const reveal = instant
       ? 1
@@ -223,7 +185,9 @@ export class BandScene {
     gl.uniform1f(this.uniform.u_extinction_k!, TUNING.extinctionK);
     gl.uniform1f(this.uniform.u_band_gain!, TUNING.bandGain);
     gl.uniform1f(this.uniform.u_band_shape!, TUNING.bandShape);
+    gl.bindVertexArray(this.quad);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
+    gl.bindVertexArray(null);
   }
 
   /** Whether the reveal is still running, and the band therefore still
