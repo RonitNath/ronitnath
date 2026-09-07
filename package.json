@@ -16,6 +16,7 @@
     "db:down": "docker compose -f compose.dev.yaml down",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
+    "db:load-sky": "zstd -dc data/sky_star_detail.csv.zst | psql \"$DATABASE_URL\" -v ON_ERROR_STOP=1 -f tools/starcat/load_detail.sql",
     "e2e": "playwright test",
     "seed:operator": "tsx scripts/seed-operator.ts"
   },

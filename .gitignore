@@ -14,6 +14,9 @@ screenshots/
 
 # Python bytecode from the offline catalogue builders (tools/starcat).
 __pycache__/
-# Bulk built datasets (the sky detail file, TAP caches); scripts are committed, artifacts are not.
-data/
 
+# Bulk sky build artifacts: the TAP caches and the detail dataset. Its
+# checksum and stats are the record of the build, so they stay.
+data/*
+!data/sky_star_detail.sha256
+!data/sky_star_detail.stats.json

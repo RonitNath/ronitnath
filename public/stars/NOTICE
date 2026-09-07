@@ -31,8 +31,26 @@ Named-star callouts
 Gaia LOD
   public/stars/lod is generated from ESA Gaia DR3 gaia_source fields source_id,
   ra, dec, phot_g_mean_mag, and bp_rp with phot_g_mean_mag <= 12. It is produced
-  offline by tools/build_star_lod.py. The web application never contacts ESA or
-  CDS at runtime.
+  offline by tools/starcat/build_star_lod.py into 768 per-tile files plus
+  g9.bin and a manifest. The web application never contacts ESA or CDS at
+  runtime.
+
+Star detail (sky_star_detail)
+  Built offline by tools/starcat/build_detail.py and loaded into Postgres. It
+  merges, per star, Gaia DR3 gaia_source and astrophysical_parameters, the HYG
+  v3 database, the IAU Catalog of Star Names, the IAU constellation boundaries,
+  and a SIMBAD lookup limited to the bright catalog. Each row records the
+  catalogues it drew on.
+
+  HYG v3 database (c) Astronomy Nexus / David Nash, licensed CC BY-SA 4.0
+    https://github.com/astronexus/HYG-Database
+    https://creativecommons.org/licenses/by-sa/4.0/
+  IAU Catalog of Star Names (IAU Division C WG on Star Names), (c) IAU,
+    licensed CC BY 4.0 — https://www.iau.org/public/themes/naming_stars/
+  Constellation boundaries: VizieR VI/42, "Identification of a Constellation
+    From Position" (Roman 1987, PASP 99, 695), after Delporte (1930); CDS.
+  SIMBAD astronomical database, CDS Strasbourg. Cite Wenger et al. 2000,
+    A&AS 143, 9 — https://simbad.cds.unistra.fr/simbad/
 
 Sources
   ESA Gaia Archive: https://gea.esac.esa.int/archive/
@@ -40,3 +58,6 @@ Sources
   IAU Catalog of Star Names: https://www.iau.org/public/themes/naming_stars/
   SIMBAD: https://simbad.cds.unistra.fr/simbad/
   Hipparcos New Reduction: https://cdsarc.cds.unistra.fr/viz-bin/cat/I/311
+  HYG Database: https://github.com/astronexus/HYG-Database
+  VizieR VI/42: https://cdsarc.cds.unistra.fr/viz-bin/cat/VI/42
+  SIMBAD TAP: https://simbad.cds.unistra.fr/simbad/sim-tap
