@@ -1,0 +1,23 @@
+{
+  "builtAt": "2026-09-07T23:17:32Z",
+  "rows": 3087894,
+  "gaiaRows": 3087828,
+  "hipRows": 66,
+  "withAstrophysical": 1812700,
+  "withHyg": 119699,
+  "withIau": 405,
+  "withSimbad": 12104,
+  "withConstellation": 3087894,
+  "hygRowsByHip": 117951,
+  "hygPositions": 111411,
+  "iauNames": 817,
+  "simbadRows": 12127,
+  "file": "sky_star_detail.csv.zst",
+  "fileBytes": 257560579,
+  "sha256": "f2b031174827d50c507204137c9bce47c836b3892ffe971493c71ae43db0673e",
+  "withAstrophysicalRate": 0.587,
+  "withHygRate": 0.0388,
+  "withIauRate": 0.0001,
+  "withSimbadRate": 0.0039,
+  "withConstellationRate": 1.0
+}
