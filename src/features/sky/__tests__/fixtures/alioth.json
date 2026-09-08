@@ -1,0 +1,73 @@
+{
+    "ra": 193.508178,
+    "dec": 55.959785,
+    "hip": "62956",
+    "hyg": {
+        "hd": "112185",
+        "hr": "4905",
+        "ra": 193.50708,
+        "dec": 55.959821,
+        "hip": "62956",
+        "magV": 1.76,
+        "bayer": "Eps",
+        "proper": "Alioth",
+        "absMagV": -0.256,
+        "flamsteed": "77",
+        "colorIndex": -0.022,
+        "luminosity": 110.255433,
+        "spectralType": "A0p",
+        "constellation": "UMa",
+        "bayerFlamsteed": "77Eps UMa",
+        "distanceParsecs": 25.31
+    },
+    "iau": {
+        "hd": "112185",
+        "ra": 193.50729,
+        "dec": 55.959823,
+        "hip": "62956",
+        "magV": 1.76,
+        "bayer": "eps",
+        "iauName": "Alioth",
+        "designation": "HR 4905",
+        "constellation": "UMa",
+        "iauNameDiacritics": "Alioth"
+    },
+    "gaia": {
+        "bpRp": 0.338367,
+        "magG": 1.731607,
+        "magBp": 2.46912,
+        "magRp": 2.130753,
+        "variableFlag": "VARIABLE",
+        "nonSingleStar": 0.0
+    },
+    "kind": "gaia",
+    "name": "Alioth",
+    "bright": true,
+    "simbad": {
+        "ids": [
+            "TIC 150387644",
+            "Gaia DR3 1576683529448755328",
+            "HIP 62956",
+            "CNS5 3183",
+            "PLX 2964",
+            "* eps UMa",
+            "WEB 11163"
+        ],
+        "pmra": "111.91",
+        "pmdec": "-8.24",
+        "main_id": "* eps UMa",
+        "sp_type": "A1III-IVpkB9",
+        "otype_txt": "a2*",
+        "plx_value": "39.51",
+        "rvz_radvel": "-12.7"
+    },
+    "sources": [
+        "Gaia DR3 gaia_source",
+        "HYG v3",
+        "IAU WGSN Catalog of Star Names",
+        "SIMBAD (CDS)"
+    ],
+    "sourceId": "1576683529448755328",
+    "constellation": "UMa",
+    "constellationName": "Ursa Major"
+}

@@ -1,0 +1,25 @@
+{
+    "ra": 5.819251,
+    "dec": -86.687383,
+    "gaia": {
+        "bpRp": 1.941882,
+        "magG": 10.661315,
+        "pmra": 17.117565,
+        "ruwe": 1.16226,
+        "magBp": 11.635365,
+        "magRp": 9.693482,
+        "pmdec": -0.227917,
+        "parallax": 0.209857,
+        "variableFlag": "NOT_AVAILABLE",
+        "nonSingleStar": 0.0,
+        "parallaxError": 0.012294,
+        "radialVelocity": 45.159977
+    },
+    "kind": "gaia",
+    "sources": [
+        "Gaia DR3 gaia_source"
+    ],
+    "sourceId": "4616204397039146496",
+    "constellation": "Oct",
+    "constellationName": "Octans"
+}

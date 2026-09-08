@@ -444,3 +444,21 @@ export const audit = pgTable(
     index('audit_target_idx').on(t.targetKind, t.targetId),
   ],
 );
+
+/* The sky's star detail, one row per star the panel can be opened on.
+ *
+ * This is not part of the kernel model: it is a read-only catalogue, built
+ * offline by `tools/starcat/build_detail.py` and loaded whole by
+ * `pnpm db:load-sky`. It has no foreign keys, no audit and no commands — a
+ * detail lookup is a read, and reads write nothing (docs/plan.md).
+ *
+ * `id` is the *dataset's* form, `g<gaia source_id>` or `h<hip>`, which is what
+ * the CSV carries and what a three-million-row COPY must not have to rewrite.
+ * The URL a browser asks with is `gaia-<id>` / `hip-<n>` (`catalog.ts`
+ * `starKey()`); the route translates between the two and nothing else does.
+ * The payload is the builder's JSON verbatim, normalised on the way out. */
+export const skyStarDetail = pgTable('sky_star_detail', {
+  id: text('id').primaryKey(),
+  payload: jsonb('payload').notNull(),
+  builtAt: timestamp('built_at', { withTimezone: true }).notNull().defaultNow(),
+});

@@ -43,6 +43,13 @@
       "when": 1788665237690,
       "tag": "0005_platform_operator",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1788830461294,
+      "tag": "0006_sky_star_detail",
+      "breakpoints": true
     }
   ]
 }
