@@ -41,6 +41,7 @@ import {
   TWILIGHT_MAG_LIMIT,
   GLARE_FLOOR,
 } from './tuning';
+import type { DeepLayer } from './deep-gl';
 import type { Highlight } from './star-field';
 import {
   POINT_FRAG,
@@ -55,9 +56,45 @@ import {
 /** Bytes per star in the GPU buffer: three f32 of direction, one of magnitude,
  * and four bytes of colour. The id and kind the catalogue carries are for
  * looking a star up, not for drawing it, and stay on the CPU. */
-const VERTEX_STRIDE = 20;
+export const VERTEX_STRIDE = 20;
 
-export class StarScene {
+/** Fainter than any star in any of the three catalogues: the vertex shader's
+ * magnitude cut, switched off. */
+export const NO_MAG_LIMIT = 99;
+
+/** The texture unit the streaming coverage field is bound to. The tone map
+ * has unit 0; nothing else in this pass samples anything. */
+export const COVERAGE_UNIT = 1;
+
+/** What one call of the star program is allowed to differ in. Everything else
+ * — the view, the reference magnitude, the extinction, the core width, the
+ * tone curve — is the same law for every buffer drawn through it, which is the
+ * point of routing the deep passes through here at all. */
+export interface PointOptions {
+  /** Glare weight. Zero draws the core alone, which is how the G 9-12 tiles
+   * read as grain rather than as three million dots. */
+  glareK: number;
+  /** Widest the point may be, in CSS pixels. */
+  maxPx: number;
+  /** The faintest magnitude to draw. */
+  magLimit: number;
+  /** Whether this buffer is streamed, and so has to ask the coverage field
+   * whether the sky around each star has arrived. */
+  deep?: boolean;
+}
+
+/** The star program, offered to the deep layer as a service: it owns the
+ * shaders and the float target, `deep-gl.ts` owns the vertices. */
+export interface PointPass {
+  points(
+    vao: WebGLVertexArrayObject,
+    first: number,
+    count: number,
+    options: PointOptions,
+  ): void;
+}
+
+export class StarScene implements PointPass {
   private readonly pointProgram: WebGLProgram;
   private readonly toneProgram: WebGLProgram;
   private readonly ringProgram: WebGLProgram;
@@ -78,6 +115,11 @@ export class StarScene {
 
   private count = 0;
   private twilightCount = 0;
+  private deep: DeepLayer | null = null;
+  /** How many points the last frame drew, over all three buffers, and how
+   * long the draw took. Read by the debug readout only. */
+  lastPoints = 0;
+  lastDrawMs = 0;
 
   private constructor(private readonly gl: WebGL2RenderingContext) {
     this.pointProgram = link(gl, POINT_VERT, POINT_FRAG);
@@ -141,6 +183,13 @@ export class StarScene {
     this.twilightCount = cut;
   }
 
+  /** The streamed catalogue, drawn into the same float buffer between the
+   * bright stars and the tone map. Attaching it here rather than beside the
+   * band is what keeps every star on one exposure. */
+  attachDeep(deep: DeepLayer | null): void {
+    this.deep = deep;
+  }
+
   get ready(): boolean {
     return this.count > 0;
   }
@@ -172,8 +221,7 @@ export class StarScene {
       this.targetTexture,
       0,
     );
-    const complete =
-      gl.checkFramebufferStatus(gl.FRAMEBUFFER) === gl.FRAMEBUFFER_COMPLETE;
+    const complete = gl.checkFramebufferStatus(gl.FRAMEBUFFER) === gl.FRAMEBUFFER_COMPLETE;
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     if (!complete) {
       gl.deleteFramebuffer(this.target);
@@ -207,7 +255,13 @@ export class StarScene {
       gl.clear(gl.COLOR_BUFFER_BIT);
     }
 
+    const startedAt = performance.now();
     this.drawPoints(matrix, light, dpr, width, height, response, hdr);
+    this.lastPoints = light ? this.twilightCount : this.count;
+    if (this.deep) {
+      this.lastPoints += this.deep.draw(this, response, light, dpr, startedAt);
+    }
+    this.lastDrawMs = performance.now() - startedAt;
 
     if (hdr) {
       gl.bindFramebuffer(gl.FRAMEBUFFER, null);
@@ -246,21 +300,41 @@ export class StarScene {
     set('u_dpr', dpr);
     set('u_mag_ref', response.magRef);
     set('u_extinction_k', TUNING.extinctionK);
-    set('u_glare_k', response.glareK);
     set('u_glare_exp', response.glareExp);
     set('u_sigma', response.coreSigmaPx);
     set('u_floor', GLARE_FLOOR);
-    set('u_max_px', MAX_STAR_PX);
     set('u_whiten', response.whiten);
     set('u_twilight', light ? 1 : 0);
     set('u_eps', GLARE_EPS_PX);
+    gl.uniform1i(this.pointUniform.u_coverage!, COVERAGE_UNIT);
     // With no float target the tone curve has nowhere to run but here, so
     // each star arrives already curved and the additive blend piles up
     // slightly-too-bright overlaps. It is the fallback, not the picture.
     set('u_fold', hdr ? 0 : 1);
     set('u_exposure', response.exposure);
-    gl.bindVertexArray(this.starVao);
-    gl.drawArrays(gl.POINTS, 0, light ? this.twilightCount : this.count);
+    this.points(this.starVao, 0, light ? this.twilightCount : this.count, {
+      glareK: response.glareK,
+      maxPx: MAX_STAR_PX,
+      magLimit: NO_MAG_LIMIT,
+    });
+  }
+
+  /** One draw of one buffer, with the four things a pass may vary. The program
+   * and every other uniform are already set by {@link drawPoints}, which is
+   * why this is only ever called from inside a frame. */
+  points(
+    vao: WebGLVertexArrayObject,
+    first: number,
+    count: number,
+    options: PointOptions,
+  ): void {
+    const { gl } = this;
+    gl.uniform1f(this.pointUniform.u_glare_k!, options.glareK);
+    gl.uniform1f(this.pointUniform.u_max_px!, options.maxPx);
+    gl.uniform1f(this.pointUniform.u_mag_limit!, options.magLimit);
+    gl.uniform1f(this.pointUniform.u_deep!, options.deep ? 1 : 0);
+    gl.bindVertexArray(vao);
+    gl.drawArrays(gl.POINTS, first, count);
   }
 
   private drawRing(
@@ -279,10 +353,7 @@ export class StarScene {
     gl.useProgram(this.ringProgram);
     gl.uniform2f(this.ringUniform.u_centre_px!, x, y);
     gl.uniform2f(this.ringUniform.u_viewport!, width, height);
-    gl.uniform1f(
-      this.ringUniform.u_radius_px!,
-      (14 + 6 * (1 - highlight.strength)) * dpr,
-    );
+    gl.uniform1f(this.ringUniform.u_radius_px!, (14 + 6 * (1 - highlight.strength)) * dpr);
     const ink = 0.85 * highlight.strength;
     gl.uniform4f(this.ringUniform.u_ink!, 0.745 * ink, 0.882 * ink, ink, ink);
     gl.bindVertexArray(this.ringVao);

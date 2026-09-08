@@ -12,6 +12,7 @@
 import { keepOutFor, place, placementAvoid, type Placement } from './annotate';
 import { ASSETS, loadCities, loadImageData, loadNamed, loadStars } from './assets';
 import { simTimeMs, syncedSimTimeMs } from './clock';
+import { DeepStreaming } from './deep-stage';
 import { type NamedStar, namedVectors, type StarCatalog } from './catalog';
 import type { CityCatalog } from './cities';
 import { GlobeScene } from './globe-gl';
@@ -19,6 +20,7 @@ import { paintFlatGlobe } from './globe-flat';
 import { dragTo, RADIUS, unproject } from './globe-math';
 import { grounding, UPDATE_INTERVAL_MS } from './label';
 import { Observer, TRANSITION_MS, type Point } from './observer';
+import type { StreamView } from './lod-stream';
 import { type Vec3, viewMatrix } from './sidereal';
 import { SkyRenderer } from './sky-render';
 import type { Highlight } from './star-field';
@@ -47,6 +49,7 @@ export class Stage {
   private readonly listeners = new Set<(readout: Readout) => void>();
 
   private readonly sky = new SkyRenderer();
+  private readonly deep: DeepStreaming;
   private globeCanvas: HTMLCanvasElement | null = null;
   private globeScene: GlobeScene | null = null;
 
@@ -68,7 +71,10 @@ export class Stage {
   private frozenSimMs: number | null = null;
 
   constructor(private readonly serverEpochMs: number) {
+    const view = (): StreamView => this.streamView();
+    this.deep = new DeepStreaming(this.sky, view, () => this.draw());
     this.reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    this.deep.setStill(this.reduced);
     if (this.reduced) this.frozenSimMs = simTimeMs(serverEpochMs);
   }
 
@@ -119,8 +125,8 @@ export class Stage {
     );
   }
 
-  /** The catalog colour of a named star: what the callout's ring is drawn in,
-   * so the ring says which star as well as where. */
+  /** The catalog colour of a named star: the callout's ring is drawn in it, so
+   * the ring says which star as well as where. */
   namedColor(index: number): string | null {
     const star = this.named[index];
     if (!star || !this.stars) return null;
@@ -128,6 +134,13 @@ export class Stage {
     const byte = (offset: number): number =>
       Math.round((this.stars!.color[at + offset] ?? 1) * 255);
     return `rgb(${byte(0)},${byte(1)},${byte(2)})`;
+  }
+
+  /** What the tile queue scores against (`lod-tiles.ts`). */
+  private streamView(): StreamView {
+    const [lat, lon] = this.observerNow();
+    const simMs = this.simMs();
+    return { matrix: viewMatrix(simMs, lat, lon), aspect: this.aspect(), simMs };
   }
 
   private aspect(): number {
@@ -168,6 +181,7 @@ export class Stage {
 
   dispose(): void {
     this.live = false;
+    this.deep.dispose();
     delete document.documentElement.dataset.sky;
     cancelAnimationFrame(this.frame);
     clearInterval(this.timer);
@@ -191,6 +205,7 @@ export class Stage {
 
   setReducedMotion(reduced: boolean): void {
     this.reduced = reduced;
+    this.deep.setStill(reduced);
     this.frozenSimMs = reduced ? this.simMs() : null;
     if (reduced) {
       cancelAnimationFrame(this.frame);
@@ -321,6 +336,7 @@ export class Stage {
   }
 
   private redrawSoon(): void {
+    this.deep.invalidate(); // in flight for a sky that just left the screen
     if (this.reduced || this.paused) this.draw();
     this.publish();
   }
@@ -353,16 +369,16 @@ export class Stage {
           this.cities = cities;
           this.publish();
         }),
-        this.loadBand(),
+        this.sky.loadBand().then(() => {
+          if (this.live) this.draw();
+        }),
       ]);
       if (!this.live) return;
       await this.loadGlobeTextures();
+      if (!this.live) return;
+      // Last and largest, competing with nothing (`deep-stage.ts`).
+      await this.deep.start();
     })();
-  }
-
-  private async loadBand(): Promise<void> {
-    await this.sky.loadBand();
-    if (this.live) this.draw();
   }
 
   private async loadGlobeTextures(): Promise<void> {

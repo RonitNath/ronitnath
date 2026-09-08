@@ -27,6 +27,19 @@ uniform float u_floor;
 uniform float u_max_px;
 uniform float u_whiten;
 uniform float u_twilight;
+/** 1 for the streamed tile pass, which is the only one that has to ask
+ * whether the sky it is drawing has arrived yet. */
+uniform float u_deep;
+/** How much of each tile of the 32x24 grid is resident, 0 to 1, sampled
+ * *bilinearly*: between two cells the value is the average of them, so a
+ * region whose neighbours are all resident reads 1 and the field falls off
+ * across the outermost tile of whatever has landed. Eroded below by
+ * 2(c - 0.5), which puts the zero exactly on the boundary of the loaded
+ * region — that is what makes a half-streamed sky have no edge in it. */
+uniform sampler2D u_coverage;
+/** The faintest star this pass draws. A magnitude cut in the vertex shader
+ * rather than a count, because the whole tile buffer is one draw. */
+uniform float u_mag_limit;
 
 out vec3 v_color;
 out float v_flux;
@@ -34,7 +47,7 @@ out float v_size_css;
 
 void main() {
     vec3 view = u_view * a_pos;
-    if (view.z <= 0.08) {
+    if (view.z <= 0.08 || a_mag > u_mag_limit) {
         // Below the horizon: park it outside the clip volume rather than
         // spend a fragment on it.
         gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
@@ -49,6 +62,15 @@ void main() {
     // Twilight keeps its stars high in the sky; near the bottom of the frame
     // the page is nearly white and a star there is a grey speck.
     flux *= mix(1.0, smoothstep(0.20, 0.70, view.z), u_twilight);
+
+    if (u_deep > 0.5) {
+        // Where this star is on the streaming grid. The RA axis wraps, so the
+        // texture does too and the 0/360 seam interpolates like any other.
+        float ra = degrees(atan(a_pos.y, a_pos.x));
+        float dec = degrees(asin(clamp(a_pos.z, -1.0, 1.0)));
+        vec2 cell = vec2(fract(ra / 360.0), (dec + 90.0) / 180.0);
+        flux *= clamp(2.0 * (texture(u_coverage, cell).r - 0.5), 0.0, 1.0);
+    }
 
     // The point is sized by where its glare wing falls below what the screen
     // can show, which is the only reason a bright star is a wide one.
@@ -166,6 +188,9 @@ export const POINT_UNIFORMS = [
   'u_whiten',
   'u_twilight',
   'u_eps',
+  'u_deep',
+  'u_coverage',
+  'u_mag_limit',
   'u_fold',
   'u_exposure',
 ] as const;

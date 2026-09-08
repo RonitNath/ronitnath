@@ -16,8 +16,10 @@
  */
 
 import { ASSETS, loadImageData } from './assets';
+import { SKY_DEBUG } from './deep-stage';
 import { BandScene } from './band-gl';
 import type { StarCatalog } from './catalog';
+import { DeepLayer } from './deep-gl';
 import { skyContext } from './gl-util';
 import type { Mat3 } from './sidereal';
 import { SpriteAtlas } from './sprites';
@@ -41,6 +43,7 @@ export class SkyRenderer {
   private gl: WebGL2RenderingContext | null = null;
   private bandScene: BandScene | null = null;
   private starScene: StarScene | null = null;
+  private deep: DeepLayer | null = null;
   private uploaded = false;
 
   private atlas: SpriteAtlas | null = null;
@@ -48,6 +51,9 @@ export class SkyRenderer {
   private milkyway: ImageData | null = null;
   private band: HTMLCanvasElement | null = null;
   private bandDrawnAt = 0;
+  /** Frame times, kept only under `?skydebug=1`: about twenty seconds of them
+   * at 30 fps, which is long enough for a median to mean something. */
+  private readonly frames: number[] = [];
 
   /** Attach the two canvases and decide which of them is the sky. */
   attach(canvas: HTMLCanvasElement | null, flat: HTMLCanvasElement | null): void {
@@ -58,6 +64,24 @@ export class SkyRenderer {
     this.starScene = this.gl ? StarScene.create(this.gl) : null;
     if (canvas) canvas.hidden = this.gl === null;
     if (flat) flat.hidden = this.gl !== null;
+  }
+
+  /** The streamed catalogue's buffers, created on demand — nothing allocates
+   * 12 MB of vertex memory until the streamer has decided this device is
+   * getting tiles at all. `null` where there is no WebGL2 to put them on: the
+   * 2D fallback draws the bright catalogue and nothing deeper. */
+  deepLayer(): DeepLayer | null {
+    if (!this.gl || !this.starScene) return null;
+    if (!this.deep) {
+      this.deep = new DeepLayer(this.gl);
+      this.starScene.attachDeep(this.deep);
+    }
+    return this.deep;
+  }
+
+  /** Points drawn in the last frame, over all three buffers. */
+  get points(): number {
+    return this.starScene?.lastPoints ?? 0;
   }
 
   /** Whether the shipped path is the one drawing. */
@@ -93,9 +117,31 @@ export class SkyRenderer {
     instant: boolean,
     highlight: Highlight | null,
   ): boolean {
-    return this.gl
+    if (!SKY_DEBUG) {
+      return this.gl
+        ? this.drawGl(stars, matrix, light, dpr, instant, highlight)
+        : this.drawFlat(stars, matrix, light, dpr, highlight);
+    }
+    // The measured path blocks on the GPU. That is the only honest way to
+    // time a frame from here, and exactly what production must not do.
+    const startedAt = performance.now();
+    const drawn = this.gl
       ? this.drawGl(stars, matrix, light, dpr, instant, highlight)
       : this.drawFlat(stars, matrix, light, dpr, highlight);
+    this.gl?.finish();
+    this.frames.push(performance.now() - startedAt);
+    if (this.frames.length > 600) this.frames.shift();
+    return drawn;
+  }
+
+  /** Milliseconds a frame took, GPU included: last, median, worst. */
+  frameStats(): { last: number; median: number; max: number } {
+    const sorted = [...this.frames].sort((a, b) => a - b);
+    return {
+      last: this.frames.at(-1) ?? 0,
+      median: sorted[sorted.length >> 1] ?? 0,
+      max: sorted.at(-1) ?? 0,
+    };
   }
 
   private drawGl(
