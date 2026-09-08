@@ -347,6 +347,25 @@ Recorded as built, 2026-09-08.
   brightness against distance that is enough for a magnitude-5 neighbour of
   Arcturus to win. Paused, the frame the positions came from is the frame the
   pointer lands in.
+- **A star that already has a callout gets no hover tag.** The tag and the
+  callout say the same star's name a few pixels apart, so hovering Arcturus
+  printed "ARCTURUS / mag 0.11 · orange" across the callout's second line and
+  neither could be read. The callout goes into a hover state instead — the ring
+  brightens, the detail line comes up to full ink — which is the same answer
+  said once. For every *other* star the tag is now placed the way a callout's
+  leader is: four corners of its star in preference order (right-below first,
+  because the leaders prefer up-and-out), and the first that lands on no callout
+  label, no hero card and no chrome. `tag.ts` is the geometry, judged against
+  the boxes the callouts already measured into `dataset.labelWidth/Height`, so
+  nothing in the frame loop reads layout.
+- **A tag's trespass is counted as area, where a callout's is counted as
+  distance.** `leaderPenalty` scores a block by the shorter of its two overlaps,
+  because a callout it turns away can be moved and what it wants to know is how
+  far. A tag has four corners and no other move, so what it wants to know is
+  which corner hides the least text: the area lost over the tag's own height,
+  which is the width of text under it. Clipping the tail of a callout's detail
+  line by two pixels of height is nearly no distance at all and is the whole end
+  of the line, and the shorter-overlap rule chose exactly that.
 - **The first-minute byte budget moved from 5.2 MB to 5.4 MB.** The band is
   126 KB more on the run's own viewport, once, for a band that no longer reads
   as blobs at the galactic centre.

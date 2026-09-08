@@ -490,7 +490,8 @@ export function leaderBox(
   };
 }
 
-function overlap(low: number, high: number, otherLow: number, otherHigh: number): number {
+/** How much two intervals share. Zero where they only touch. */
+export function overlap(low: number, high: number, otherLow: number, otherHigh: number): number {
   return Math.max(0, Math.min(high, otherHigh) - Math.max(low, otherLow));
 }
 

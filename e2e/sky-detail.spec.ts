@@ -20,9 +20,16 @@ interface DebugStar {
 
 const GATE_STAR = 'Alioth';
 
+/** The names the page has already labelled, in the order they are drawn. */
+async function calloutNames(page: Page): Promise<string[]> {
+  return page.$$eval('.star-callout', (nodes) =>
+    nodes.map((node) => (node as HTMLElement).dataset.name ?? ''),
+  );
+}
+
 /** The boxes a pointer must stay out of: a pick over the hero, the header or
  * the corner block is a click on the page, not on the sky (`star-pick.tsx`). */
-async function usable(page: Page): Promise<DebugStar[]> {
+async function onScreen(page: Page): Promise<DebugStar[]> {
   return page.evaluate(() => {
     const stars =
       (globalThis as { __sky?: () => { named?: DebugStar[] } }).__sky?.().named ?? [];
@@ -40,6 +47,13 @@ async function usable(page: Page): Promise<DebugStar[]> {
         ),
     );
   });
+}
+
+/** A star with no callout on it: the ones that get a hover tag. A star the
+ * page has already named gets none, on purpose (`star-pick.tsx`). */
+async function usable(page: Page): Promise<DebugStar[]> {
+  const [stars, named] = await Promise.all([onScreen(page), calloutNames(page)]);
+  return stars.filter((star) => !named.includes(star.name));
 }
 
 async function starOnScreen(page: Page): Promise<DebugStar> {
@@ -137,6 +151,47 @@ test('a named callout opens the same panel', async ({ page }) => {
   await callout.dispatchEvent('click');
   await expect(page.locator('.star-detail')).toBeVisible();
   await expect(page.locator('.star-detail h2')).not.toBeEmpty();
+});
+
+test('a star the page has already named gets no tag, and its callout lights up', async ({
+  page,
+}) => {
+  await page.goto('/?skydebug=1');
+  // The group itself has no size — the label inside it is what is drawn.
+  await expect(page.locator('.callout-label').first()).toBeVisible({ timeout: 30_000 });
+  await page.locator('button.sky-control', { hasText: 'Pause sky' }).click();
+  await page.waitForTimeout(200);
+
+  // A callout whose *star* a pointer can reach: a forced one is clamped to the
+  // edge and the star it names may be under the card, and a bright neighbour
+  // can take the pick at the pixel the star is on. Each candidate is tried
+  // until one of them is actually hovered.
+  const named = await calloutNames(page);
+  const reachable = (await onScreen(page)).filter((star) => named.includes(star.name));
+  expect(reachable.length, 'a callout star clear of the page chrome').toBeGreaterThan(0);
+
+  let hovered: string | null = null;
+  for (const candidate of reachable) {
+    await page.mouse.move(candidate.x, candidate.y);
+    await page.waitForTimeout(150);
+    const state = await page
+      .locator(`.star-callout[data-name="${candidate.name}"]`)
+      .getAttribute('data-hover');
+    if (state === 'true') {
+      hovered = candidate.name;
+      break;
+    }
+  }
+  expect(hovered, 'a callout star the pick agrees is under the pointer').toBeTruthy();
+
+  const callout = page.locator(`.star-callout[data-name="${hovered}"]`);
+  await expect(callout).toHaveAttribute('data-hover', 'true');
+  // The callout already says the name; the tag would say it again, on top.
+  await expect(page.locator('.star-tag')).toBeHidden();
+
+  // And it is given back when the pointer moves off the star.
+  await page.mouse.move(20, 500);
+  await expect(callout).not.toHaveAttribute('data-hover', 'true');
 });
 
 test('a tap picks on a coarse pointer', async ({ browser }) => {

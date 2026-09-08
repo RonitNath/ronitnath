@@ -230,6 +230,24 @@
   color: var(--accent);
 }
 
+/* The pointer is on the star this callout names. It already says everything
+   the hover tag would, so the tag is not drawn (`star-pick.tsx`) and the
+   callout answers instead: the ring brightens and the detail line comes up to
+   full ink, which is the same "this one" the tag was there to say. */
+.star-callout[data-hover] .callout-ring {
+  stroke-width: 1.6;
+  opacity: 1;
+}
+
+.star-callout[data-hover] .callout-line {
+  opacity: 1;
+}
+
+.star-callout[data-hover] .callout-label span {
+  color: var(--fg);
+  opacity: 1;
+}
+
 /* The entrance is the group's, so the line and the ring arrive with the text.
    It runs on a set change and on nothing else: the frame loop writes the
    transform, never the opacity. */

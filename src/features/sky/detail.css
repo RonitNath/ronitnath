@@ -13,9 +13,10 @@
   left: 0;
   top: 0;
   z-index: 3;
-  /* Vertically centred on the star, and to the left of it when the frame ends
-     before the tag would (star-pick.tsx writes the side). */
-  translate: 0 -50%;
+  /* The transform is the tag's top-left corner, in viewport pixels: which
+     corner of the star it hangs off is chosen against the callouts, the card
+     and the chrome (tag.ts), so the box is placed there outright rather than
+     nudged off the star by a translate here. */
   max-width: 15rem;
   padding: 0.25rem 0.45rem;
   border: 1px solid var(--border);
@@ -25,10 +26,6 @@
   color: var(--fg);
   pointer-events: none;
   will-change: transform;
-}
-
-.star-tag[data-side='left'] {
-  translate: -100% -50%;
 }
 
 .star-tag strong,

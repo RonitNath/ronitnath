@@ -2,9 +2,11 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import type { Box } from './annotate';
 import { StarDetailPanel } from './detail';
 import type { PickHit } from './pick';
 import type { Stage } from './stage';
+import { calloutBoxes, chooseTagSide, pageBoxes, TAG_PX, tagBox } from './tag';
 
 /** Hover, click, and the panel they open — the interaction half of S3.
  *
@@ -18,12 +20,14 @@ import type { Stage } from './stage';
  * React sees a hover only when the star under the pointer changes. The tag's
  * position is written straight to the DOM by the same loop that picks, the way
  * the callouts are moved (`callouts.tsx`).
+ *
+ * A star the page has already labelled gets no tag. The callout beside it
+ * carries the star's name in a bigger hand a few pixels away, and a tag drawn
+ * there printed the two over each other; the callout goes into a hover state
+ * instead, which is the same answer said once (docs/sky-plan.md S3). Where a
+ * tag *is* drawn, `tag.ts` chooses which corner of the star it hangs off, so
+ * it lands on no callout, no card and no chrome.
  */
-
-/** How far the tag sits from the star, in CSS pixels, and how wide it can be
- * before the flip to the other side is needed to keep it on screen. */
-const TAG_OFFSET_PX = 18;
-const TAG_WIDTH_PX = 240;
 
 /** Chrome a pointer may be over without it being a pick: everything that is
  * already a control, plus the panel itself. */
@@ -49,6 +53,13 @@ export function StarPick({
   const hovered = useRef<PickHit | null>(null);
   const pointer = useRef<{ x: number; y: number } | null>(null);
   const dirty = useRef(false);
+  /** The callout currently in the hover state, so it can be given back. */
+  const marked = useRef<HTMLElement | null>(null);
+  /** The tag's measured box, and the star it was measured for. */
+  const measured = useRef<{ key: string; size: [number, number] } | null>(null);
+  /** The page's own boxes. Re-measured when the hover or the panel changes and
+   * never inside the frame loop, which must read no layout. */
+  const page = useRef<Box[] | null>(null);
 
   const pin = onPin;
   const unpin = useCallback(() => onPin(null), [onPin]);
@@ -57,7 +68,29 @@ export function StarPick({
     if (!stage) return;
     let frame = 0;
 
+    /** The callout that names this star, where one is on screen. Compared by
+     * name because that is what a callout carries: `data-name` is the entry in
+     * `named.json` the pick's own `name` came out of. */
+    const calloutFor = (hit: PickHit): HTMLElement | null => {
+      if (!hit.name) return null;
+      for (const node of document.querySelectorAll<HTMLElement>('.star-callout')) {
+        if (node.dataset.name === hit.name) return node;
+      }
+      return null;
+    };
+
+    /** At most one callout is in the hover state, and it is this one. Written
+     * straight to the DOM: the callouts re-render on a set change, which is
+     * once every half-minute, and a hover is not a set change. */
+    const markCallout = (node: HTMLElement | null): void => {
+      if (marked.current === node) return;
+      if (marked.current) delete marked.current.dataset.hover;
+      marked.current = node;
+      if (node) node.dataset.hover = 'true';
+    };
+
     const clearHover = (): void => {
+      markCallout(null);
       if (!hovered.current) return;
       hovered.current = null;
       stage.setHover(null);
@@ -109,19 +142,47 @@ export function StarPick({
       }
       const node = tag.current;
       const current = hovered.current;
-      if (!node || !current) return;
+      if (!current) {
+        // The pointer left the star. The pick clears itself where it is set,
+        // but the callout it lit up is given back here, where every other
+        // ending is handled too.
+        markCallout(null);
+        if (node) node.hidden = true;
+        return;
+      }
+      if (!node) return;
       const at = stage.screenPosition(current.position);
       if (!at) {
+        node.hidden = true;
+        markCallout(null);
+        return;
+      }
+      // The star already has a name on screen: light that up rather than
+      // saying it twice, on top of itself.
+      const callout = calloutFor(current);
+      markCallout(callout);
+      if (callout) {
         node.hidden = true;
         return;
       }
       node.hidden = false;
-      // Right of the star by default, left of it when the frame ends first —
-      // either way beside it, never on it.
-      const flip = at[0] + TAG_OFFSET_PX + TAG_WIDTH_PX > innerWidth;
-      const x = flip ? at[0] - TAG_OFFSET_PX : at[0] + TAG_OFFSET_PX;
-      node.dataset.side = flip ? 'left' : 'right';
-      node.style.transform = `translate3d(${x.toFixed(1)}px, ${at[1].toFixed(1)}px, 0)`;
+      // Measured once the tag is showing this star's own text: a box judged on
+      // the previous star's width flips at the wrong distance from the edge.
+      if (node.dataset.key === current.key && measured.current?.key !== current.key) {
+        const box = node.getBoundingClientRect();
+        if (box.width > 0) measured.current = { key: current.key, size: [box.width, box.height] };
+      }
+      const size = measured.current?.key === current.key ? measured.current.size : TAG_PX;
+      const where = {
+        width: innerWidth,
+        height: innerHeight,
+        size,
+        blocks: [...(page.current ?? []), ...calloutBoxes()] as Box[],
+      };
+      const side = chooseTagSide(at[0], at[1], where);
+      const box = tagBox(at[0], at[1], side, where);
+      node.dataset.side = side;
+      node.style.transform = `translate3d(${box.left.toFixed(1)}px, ${box.top.toFixed(1)}px, 0)`;
     };
 
     addEventListener('pointermove', onMove, { passive: true });
@@ -135,13 +196,26 @@ export function StarPick({
       removeEventListener('pointerdown', onClick);
       removeEventListener('pointerleave', onLeave);
       removeEventListener('keydown', onKey);
+      markCallout(null);
       stage.setHover(null);
     };
   }, [stage, pin, unpin]);
 
+  /* The panel is not laid out by the time it opens, and a callout that has
+   * just appeared is not either, so the page's boxes are taken after the
+   * commit rather than during it. */
+  useEffect(() => {
+    page.current = pageBoxes();
+    const remeasure = (): void => {
+      page.current = pageBoxes();
+    };
+    addEventListener('resize', remeasure);
+    return () => removeEventListener('resize', remeasure);
+  }, [hover, pinned]);
+
   return (
     <>
-      <div className="star-tag" ref={tag} hidden aria-hidden="true">
+      <div className="star-tag" ref={tag} hidden aria-hidden="true" data-key={hover?.key}>
         {hover ? (
           <>
             <strong>{hover.name ?? tagName(hover)}</strong>
