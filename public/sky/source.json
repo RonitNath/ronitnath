@@ -1,0 +1,31 @@
+{
+  "catalog": "Gaia DR3 (ESA/Gaia/DPAC, CC BY-SA 3.0 IGO)",
+  "tap": "https://gea.esac.esa.int/tap-server/tap/sync",
+  "query": "SELECT t.hpx9, COUNT(*) AS n, SUM(t.f * t.c) / SUM(t.f) AS bp_rp_w\nFROM (SELECT source_id/2199023255552 AS hpx9,\n             phot_g_mean_flux AS f, bp_rp AS c\n      FROM gaiadr3.gaia_source\n      WHERE phot_g_mean_mag < 15 AND bp_rp IS NOT NULL\n        AND source_id >= {lo} AND source_id < {hi}) AS t\nGROUP BY t.hpx9",
+  "chunks": 192,
+  "healpix_order": 9,
+  "healpix_divisor": 2199023255552,
+  "rows": 3065685,
+  "projection": "equirectangular, equatorial J2000",
+  "built": "2026-09-07",
+  "maps": [
+    {
+      "file": "milkyway-81ee6f522371.webp",
+      "size": [
+        4096,
+        2048
+      ],
+      "bytes": 322816,
+      "sha256": "81ee6f52237122e1d8a00c90726b02360b698917c96a8802542f32ccc90ba07f"
+    },
+    {
+      "file": "milkyway-2k-81ee6f522371.webp",
+      "size": [
+        2048,
+        1024
+      ],
+      "bytes": 145678,
+      "sha256": "cb776eaccca46d8fef399c423e544f4613fae3bed507657e247dc8658d873feb"
+    }
+  ]
+}

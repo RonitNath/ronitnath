@@ -208,7 +208,7 @@ def rederive_named(stars: list[dict]) -> tuple[dict, int]:
     """named.json with every brightIndex matched by position into `stars`."""
     named = json.loads(NAMED.read_text())
     before = previous_directions()
-    # A flat scan per named star is 50 x 12,191 dot products, which is nothing
+    # A flat scan per named star is 333 x 12,191 dot products, which is nothing
     # once a year; a spatial index here would be more code than it saves.
     moved = 0
     for entry in named["stars"]:
@@ -271,7 +271,7 @@ def main() -> None:
         f"dupes dropped) -> {OUT} ({OUT.stat().st_size / 1024:.0f} KiB)"
     )
     print(f"colour levels used: {len(levels)} of {len(RAMP)} ({levels[0]}..{levels[-1]})")
-    print(f"named indices re-derived: 50 matched, {moved} moved")
+    print(f"named indices re-derived: {len(named['stars'])} matched, {moved} moved")
 
 
 if __name__ == "__main__":

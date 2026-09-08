@@ -1,0 +1,18 @@
+{
+  "source": "https://raw.githubusercontent.com/Stellarium/stellarium/v23.4/skycultures/modern/constellationship.fab",
+  "licence": "CC BY-SA 4.0 + Free Art License (Stellarium modern skyculture)",
+  "resolvedVia": "HYG v3 HIP positions, matched into bright.bin within 60 arcsec",
+  "constellations": 88,
+  "pairs": 665,
+  "duplicatePairs": 0,
+  "droppedPairs": 11,
+  "unresolvedHip": [
+    8903,
+    14135,
+    28380,
+    33165,
+    59803,
+    107315
+  ],
+  "bytes": 2668
+}

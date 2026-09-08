@@ -21,12 +21,38 @@ bright.bin
   2013 (JCGT 2(2)) for the color matching functions.
 
 Named-star callouts
-  The checked-in 50-entry catalog at public/stars/named.json is
-  position-matched to bright.bin. Proper names follow the IAU Catalog of Star
-  Names. Constellations, spectral classifications, and parallaxes were checked
-  against SIMBAD and the Hipparcos New Reduction (CDS VizieR I/311). Distances
-  are rounded for legibility; values for luminous supergiants whose parallax is
-  poorly constrained are approximate rather than false-precision reciprocals.
+  public/stars/named.json holds 333 stars, position-matched to bright.bin and
+  built by tools/starcat/build_names.py: every name in the IAU Catalog of Star
+  Names whose star is in the catalogue. 339 of the 451 approved names are
+  brighter than the G <= 6.5 cut and six of those are stars Gaia saturates on,
+  which is what the difference is. Constellation comes from the IAU row's own
+  three-letter code; classification is HYG v3's spectral type read as a phrase;
+  distance is HYG's parallax distance in light years, rounded for legibility
+  (a tenth under 100 ly, ten under 1,000, a hundred beyond).
+
+  The fifty entries the site opened with keep their own text. They were checked
+  one at a time against SIMBAD and the Hipparcos New Reduction (CDS VizieR
+  I/311); where the generated phrase differs it differs in wording, and a build
+  should not overwrite a person's reading. They live at
+  tools/starcat/data/named_hand.json, which is the build's input and not its
+  output. Distances for luminous supergiants whose parallax is poorly
+  constrained are approximate rather than false-precision reciprocals.
+
+Constellation figures
+  public/sky/lines.bin is 665 segments over the 88 constellations, packed by
+  tools/starcat/build_lines.py as pairs of bright.bin record indices. The
+  figures are Stellarium's modern sky culture (v23.4
+  skycultures/modern/constellationship.fab), which that file's info.ini
+  licenses CC BY-SA 4.0 International Public License + Free Art License; the
+  Hipparcos numbers it draws to are resolved into catalogue records through
+  HYG v3 positions. Eleven of Stellarium's 676 segments are absent: six of
+  their stars are not in bright.bin, and a segment that does not resolve at
+  both ends is refused rather than guessed. public/sky/lines.json records the
+  counts and the unresolved HIP numbers.
+
+  Stellarium (c) Stellarium contributors — https://stellarium.org/
+    https://creativecommons.org/licenses/by-sa/4.0/
+    https://artlibre.org/licence/lal/en/
 
 Gaia LOD
   public/stars/lod is generated from ESA Gaia DR3 gaia_source fields source_id,

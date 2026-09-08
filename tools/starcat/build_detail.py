@@ -27,7 +27,6 @@ import json
 import math
 import os
 import random
-import re
 import shutil
 import struct
 import subprocess
@@ -39,6 +38,8 @@ import urllib.parse
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+
+import iau_csn
 
 ROOT = Path(__file__).resolve().parents[2]
 HERE = Path(__file__).resolve().parent
@@ -428,12 +429,6 @@ def read_hyg(path: Path) -> tuple[dict[str, dict], HygIndex]:
     return by_hip, HygIndex(positions)
 
 
-IAU_ROW = re.compile(
-    r"^(\S+)\s+(\S+)\s+(.+?)\s+(\S+)\s+(\S+)\s+(\S{1,3})\s+(\S+)\s+(\S+)"
-    r"\s+([-+]?[\d.]+|_)\s+(\S+)\s+(\S+)\s+(\S+)\s+([\d.]+)\s+([-+]?[\d.]+)"
-    r"\s+(\d{4}-\d{2}-\d{2})")
-
-
 class HygIndex:
     """Match a Gaia DR3 star to a HYG v3 row by sky position and magnitude.
 
@@ -478,29 +473,28 @@ class HygIndex:
 
 
 def read_iau(path: Path) -> tuple[dict[str, dict], dict[str, dict]]:
-    """IAU-CSN fixed-column text -> name records keyed by HIP and by HD."""
+    """IAU-CSN name records keyed by HIP and by HD.
+
+    The parsing moved to `iau_csn.py` in S4. This read the file with a regular
+    expression over whitespace, and the file is fixed-column with spaces inside
+    two of its columns: twenty-four of the 451 names are two words, so "Rigil
+    Kentaurus" arrived as the name "Rigil" with "Kentaurus" in the diacritics
+    column, and Mebsuta's blank component column shifted every field after it.
+    """
     by_hip: dict[str, dict] = {}
     by_hd: dict[str, dict] = {}
-    for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
-        if not line.strip() or line[0] in "#$":
-            continue
-        match = IAU_ROW.match(line)
-        if not match:
-            continue
-        (name, diacritics, designation, greek_id, _greek, con, _comp, _wds,
-         mag, _band, hip, hd, ra, dec, _date) = match.groups()
-        blank = {"_", "-", ""}
+    for row in iau_csn.parse(path):
         record = prune({
-            "iauName": name,
-            "iauNameDiacritics": diacritics if diacritics not in blank else None,
-            "designation": designation if designation not in blank else None,
-            "bayer": greek_id if greek_id not in blank else None,
-            "constellation": con if con not in blank else None,
-            "magV": number(mag),
-            "hip": hip if hip not in blank else None,
-            "hd": hd if hd not in blank else None,
-            "ra": number(ra),
-            "dec": number(dec),
+            "iauName": row.name,
+            "iauNameDiacritics": row.diacritics if row.diacritics != row.name else None,
+            "designation": row.designation,
+            "bayer": row.bayer,
+            "constellation": row.constellation,
+            "magV": row.magnitude,
+            "hip": row.hip,
+            "hd": row.hd,
+            "ra": row.ra_deg,
+            "dec": row.dec_deg,
         })
         if record.get("hip"):
             by_hip.setdefault(record["hip"], record)
