@@ -1,4 +1,3 @@
-import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -26,11 +25,13 @@ import { namedVectors, parseNamed, parseStars } from '../catalog';
 import { SIM_EPOCH_MS } from '../clock';
 import { FOCAL, type Vec3, viewMatrix } from '../sidereal';
 import { observerAt, TRACK_PERIOD_MS } from '../track';
+import { SKY_ASSETS } from '../asset-names';
+import { shipped, shippedText } from './fixtures/shipped';
 
 const vectors = (): Vec3[] =>
   namedVectors(
-    parseStars(new Uint8Array(readFileSync('public/stars/bright.bin'))),
-    parseNamed(readFileSync('public/stars/named.json', 'utf8')),
+    parseStars(new Uint8Array(shipped(SKY_ASSETS.bright))),
+    parseNamed(shippedText(SKY_ASSETS.named)),
   );
 
 describe('placing the callouts', () => {

@@ -10,12 +10,23 @@ committed.
 
 | Script | Builds | Committed output |
 | --- | --- | --- |
+| `build_bright.py` | the naked-eye catalogue | `public/stars/bright-<hash>.bin`, `data/hip_filled.json` |
 | `mwcat.py` | S4 Milky Way band | `public/sky/milkyway*.webp`, `source.json` |
-| `build_lines.py` | S4 constellation figures | `public/sky/lines.bin`, `lines.json` |
-| `build_names.py` | S4 named stars | `public/stars/named.json` |
-| `build_star_lod.py` | S2 streamed depth | `public/stars/lod/*.bin`, `manifest.json` |
+| `build_lines.py` | S4 constellation figures | `public/sky/lines-<hash>.bin`, `lines.json` |
+| `build_names.py` | S4 named stars | `public/stars/named-<hash>.json` |
+| `build_star_lod.py` | S2 streamed depth | `public/stars/lod/<id>-<hash>.bin`, `manifest.json` |
+| `name_assets.py` | the content hashes | renames, `src/features/sky/asset-names.ts` |
 | `build_detail.py` | S3 star detail | `data/sky_star_detail.sha256`, `.stats.json` |
+| `build_delta.py` | detail for a catalogue fill | `data/sky_star_detail.delta.csv` |
 | `load_detail.py` | the psql loader | `load_detail.sql` |
+
+Every asset the browser fetches is named `<stem>-<sha256[:12]><suffix>`, so it
+can be served `immutable` for a year and a rebuild never has to be purged.
+`build_star_lod.py` names the tiles from the sha256 its manifest already
+records; `name_assets.py` stamps the rest and writes the map the client reads.
+**Run it last**, after every builder that writes into `public/`. Builders read
+through `name_assets.current()` rather than a literal path, because the file
+they wrote last time is not where they wrote it.
 
 `pnpm db:load-sky` runs `scripts/load-sky.mjs`, not `load_detail.py`: the
 deployment's image is `node:24-alpine` with the application's own dependencies
@@ -71,18 +82,19 @@ number is wrong for it.
 python3 tools/starcat/build_lines.py --report
 ```
 
-665 of Stellarium's 676 segments survive. Six HIP numbers do not resolve —
-Sheratan, Menkar, Mahasim, Gienah and Enif are V 2.5 to 2.7, which Gaia
-saturates on and `hip_2.5.csv` cuts just above, and HIP 33165 is V 6.65 — and a
-segment that does not resolve at both ends is refused rather than guessed.
-`public/sky/lines.json` records the counts and the unresolved numbers.
+674 of Stellarium's 676 segments survive. One HIP number does not resolve —
+HIP 33165 is V 6.65, past the catalogue's own limit — and a segment that does
+not resolve at both ends is refused rather than guessed, which costs Canis
+Major two of its seventeen. `public/sky/lines.json` records the counts, the
+unresolved numbers and the content hash of the catalogue the indices address.
 
 Licence: CC BY-SA 4.0 + Free Art License (`skycultures/modern/info.ini`).
 
 ## build_names.py — the named stars
 
-Every name in the IAU Catalog of Star Names whose star is in `bright.bin`: 333
-of the 451, the difference being the 112 fainter than G 6.5 and the six above.
+Every name in the IAU Catalog of Star Names whose star is in `bright.bin`: 337
+of the 451, the difference being the ~110 fainter than magnitude 6.5, plus
+Regor and R Doradus, which the IAU list does not carry.
 Position-matched within two arcminutes, with brightness breaking a tie —
 Alpha Centauri's two components are five arcseconds apart and the pair moves
 3.7 arcseconds a year, so both records are within half an arcminute of the IAU
@@ -96,7 +108,15 @@ distance in light years.
 
 The fifty entries S1 wrote by hand live at `data/named_hand.json` and keep
 their text; that file is the build's *input*, never its output, or a second run
-would read a generated phrase as a person's reading.
+would read a generated phrase as a person's reading. The four the IAU list does
+not carry resolve through their own `hip` and HYG's position — never through a
+`brightIndex`, which is written against the catalogue of the day and means a
+different star after any rebuild.
+
+`named.json` records the content hash of the catalogue it resolved against, as
+`lines.json` does. Every record `build_bright.py` adds moves the indices after
+it, so a stale name list labels the wrong stars plausibly; the hashes are what
+let a test refuse the pair.
 
 ```sh
 python3 tools/starcat/build_names.py --dry-run
@@ -217,7 +237,9 @@ Licence: CDS/VizieR, free with attribution.
 `https://simbad.cds.unistra.fr/simbad/sim-tap/sync`, batches of ≤ 500
 identifiers, cached under `data/tap/simbad/`. Queried for the ~12.2k ids in
 `tools/starcat/data/gaia_g6.5.csv` (`'Gaia DR3 <source_id>'`) and
-`hip_2.5.csv` (`'HIP <n>'`) — the stars the panel can actually pick.
+the Hipparcos numbers the catalogue actually carries (`'HIP <n>'`): the
+saturated bright end of `hip_6.5.csv` plus everything in `hip_filled.json`.
+Those are the stars the panel can be asked about under an `h<hip>` key.
 
 ```sql
 SELECT i.id AS query_id, b.main_id, b.otype_txt, b.sp_type, b.plx_value,
@@ -246,16 +268,59 @@ Floats are rounded to six decimals: 3.6 mas on a position, and past the
 uncertainty on everything else here. Carrying full float64 repr instead costs
 another 80 MB for no information.
 
+## build_bright.py — the naked-eye catalogue
+
+`gaia_g6.5.csv` (Gaia DR3, G < 6.5) and `hip_6.5.csv` (Hipparcos New Reduction,
+Hp < 6.5, with `pm_ra`/`pm_de`), merged in three tiers. Every Hipparcos row is
+first carried forward 24.75 years by its own proper motion, from that
+catalogue's epoch of 1991.25 to Gaia's of 2016.0; without that ε Cygni lands
+twelve arcseconds from its own Gaia record and is added a second time.
+
+- **Hp < 2.5** — Gaia is saturated and unusable, so Hipparcos is authoritative
+  and the Gaia row within 3 arcsec and 1.5 mag of it is dropped. 89 stars.
+- **Below that** — Gaia is authoritative, and a Hipparcos row is *added* only
+  where no Gaia row is within 3 arcsec and 1.5 mag. 198 stars, five of them
+  second magnitude (Sheratan, Menkar, Mahasim, Gienah, Enif) that the old
+  Hp < 2.5 cut passed just above and Gaia records only as saturated pixels.
+- Where a star is added, every Gaia record within 3 arcsec of it goes too,
+  magnitude or no magnitude: 47 of the 198 have such a ghost, and left alone it
+  draws the star twice at two magnitudes.
+
+12,335 records. The added stars are written to `data/hip_filled.json`, which is
+what `build_star_lod.py` clears a radius around and `build_delta.py` builds
+detail rows for.
+
+```sh
+python3 tools/starcat/build_bright.py
+```
+
+## build_delta.py — detail rows for a fill
+
+`sky_star_detail` is 3.09M rows and 257 MB compressed; rebuilding it to answer
+for two hundred new stars is a day of TAP for a change of 0.006%. This asks
+`build_detail.py`'s own routines about exactly the numbers in
+`hip_filled.json` — HYG, the IAU list, the boundary walk, one small SIMBAD
+batch cached under `data/tap/simbad-delta/` — and writes
+`data/sky_star_detail.delta.csv`. Load it with
+`node scripts/load-sky.mjs --delta <file>`, which upserts instead of replacing.
+
 ## Refresh
 
 ```sh
-python3 tools/starcat/build_star_lod.py                # tiles (no network)
-python3 tools/starcat/mwcat.py                         # ~10 min, resumable
-python3 tools/starcat/build_lines.py                   # seconds
+python3 tools/starcat/build_bright.py                  # seconds
 python3 tools/starcat/build_names.py                   # seconds
+python3 tools/starcat/build_lines.py                   # seconds
+python3 tools/starcat/build_star_lod.py --resort       # tiles (no network)
+python3 tools/starcat/mwcat.py                         # ~10 min, resumable
+python3 tools/starcat/name_assets.py                   # last: the hashes
+python3 tools/starcat/build_delta.py                   # if the catalogue grew
 python3 tools/starcat/build_detail.py                  # ~40 min, resumable
 pnpm db:load-sky                                       # into $DATABASE_URL
 ```
+
+The order matters: `build_names.py` and `build_lines.py` resolve indices into
+whatever `build_bright.py` last wrote, and `name_assets.py` cannot stamp a file
+that has not been rebuilt yet.
 
 Delete the matching directory under `data/tap/` to force a stage to re-pull.
 

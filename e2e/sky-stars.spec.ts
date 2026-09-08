@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 
 import { expect, test } from '@playwright/test';
 
+import { SKY_ASSETS } from '../src/features/sky/asset-names';
 import { parseStars, starPosition } from '../src/features/sky/catalog';
 import { simTimeMs } from '../src/features/sky/clock';
 import { applyView, viewMatrix } from '../src/features/sky/sidereal';
@@ -20,7 +21,7 @@ import { starProfile } from './sky-readback';
 test('the brightest star in frame is drawn brighter and wider than a magnitude-5 star', async ({
   page,
 }) => {
-  const catalog = parseStars(new Uint8Array(readFileSync('public/stars/bright.bin')));
+  const catalog = parseStars(new Uint8Array(readFileSync(`public${SKY_ASSETS.bright}`)));
   // The catalog is sorted brightest first, so its opening run is the
   // first-magnitude sky: Sirius, Canopus, Vega, Arcturus and the rest. The
   // observer flies a fixed orbit, so which of them is overhead is not this

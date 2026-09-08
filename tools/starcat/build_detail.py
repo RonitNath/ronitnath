@@ -302,13 +302,21 @@ def constellation_for(ra_deg: float, dec_deg: float,
 # -------------------------------------------------------------- stage: simbad
 
 def bright_ids() -> tuple[list[str], list[str]]:
+    """The catalogue keys `bright.bin` actually carries.
+
+    The Hipparcos half is the saturated bright end (Hp < 2.5, where Gaia is
+    unusable) plus every star the fill added, which `build_bright.py` writes
+    to `hip_filled.json`. Reading the whole Hp < 6.5 pull instead would ask
+    SIMBAD about eight thousand stars the catalogue files under Gaia ids.
+    """
     base = Path(os.environ.get("RN_BRIGHT_DIR", HERE / "data"))
-    gaia_csv, hip_csv = base / "gaia_g6.5.csv", base / "hip_2.5.csv"
-    with gaia_csv.open(newline="", encoding="utf-8") as handle:
+    with (base / "gaia_g6.5.csv").open(newline="", encoding="utf-8") as handle:
         gaia = [row["source_id"] for row in csv.DictReader(handle)]
-    with hip_csv.open(newline="", encoding="utf-8") as handle:
-        hip = [row["hip"] for row in csv.DictReader(handle)]
-    return gaia, hip
+    with (base / "hip_6.5.csv").open(newline="", encoding="utf-8") as handle:
+        hip = [row["hip"] for row in csv.DictReader(handle)
+               if float(row["hp_mag"]) < 2.5]
+    filled = json.loads((base / "hip_filled.json").read_text())["stars"]
+    return gaia, hip + [str(star["hip"]) for star in filled]
 
 
 def simbad_batch(index: int, idents: list[str]) -> Path:
@@ -514,6 +522,47 @@ def open_writer(target: Path):
     return handle, None, final
 
 
+def hip_payload(hip, hyg_by_hip, iau_by_hip, iau_by_hd, simbad, bounds, stats) -> dict:
+    """One `h<hip>` row: a star the bright catalogue carries and Gaia does not.
+
+    Shared with `build_delta.py`, which builds exactly these rows for the
+    stars a catalogue fill added rather than re-deriving three million.
+    """
+    hyg = hyg_by_hip.get(hip)
+    simbad_row = simbad.get(f"HIP {hip}")
+    iau = iau_by_hip.get(hip) or (iau_by_hd.get(str(hyg.get("hd")))
+                                  if hyg and hyg.get("hd") else None)
+    payload = {"kind": "hip", "hip": hip, "bright": True,
+               "sources": ["Hipparcos (bright catalog)"]}
+    if hyg:
+        payload["hyg"] = hyg
+        payload["sources"].append("HYG v3")
+        stats["withHyg"] += 1
+    if iau:
+        payload["iau"] = iau
+        payload["name"] = iau["iauName"]
+        payload["sources"].append("IAU WGSN Catalog of Star Names")
+        stats["withIau"] += 1
+    elif hyg and hyg.get("proper"):
+        payload["name"] = hyg["proper"]
+    if simbad_row:
+        payload["simbad"] = prune(simbad_row)
+        payload["sources"].append("SIMBAD (CDS)")
+        stats["withSimbad"] += 1
+    ra = hyg.get("ra") if hyg else None
+    dec = hyg.get("dec") if hyg else None
+    if ra is None and iau:
+        ra, dec = iau.get("ra"), iau.get("dec")
+    if ra is not None and dec is not None:
+        payload["ra"], payload["dec"] = ra, dec
+        abbr = constellation_for(ra, dec, bounds)
+        if abbr:
+            payload["constellation"] = abbr
+            payload["constellationName"] = CONSTELLATION_NAMES.get(abbr, abbr)
+            stats["withConstellation"] += 1
+    return payload
+
+
 def stage_merge() -> None:
     bounds = load_boundaries(TAP_CACHE / "constellation_boundaries.csv")
     hyg_by_hip, hyg_index = read_hyg(TAP_CACHE / "hyg_v3.csv")
@@ -625,38 +674,7 @@ def stage_merge() -> None:
     for hip in hip_bright:
         if hip in hip_seen:
             continue
-        hyg = hyg_by_hip.get(hip)
-        simbad_row = simbad.get(f"HIP {hip}")
-        iau = iau_by_hip.get(hip) or (iau_by_hd.get(str(hyg.get("hd")))
-                                      if hyg and hyg.get("hd") else None)
-        payload = {"kind": "hip", "hip": hip, "bright": True,
-                   "sources": ["Hipparcos (bright catalog)"]}
-        if hyg:
-            payload["hyg"] = hyg
-            payload["sources"].append("HYG v3")
-            stats["withHyg"] += 1
-        if iau:
-            payload["iau"] = iau
-            payload["name"] = iau["iauName"]
-            payload["sources"].append("IAU WGSN Catalog of Star Names")
-            stats["withIau"] += 1
-        elif hyg and hyg.get("proper"):
-            payload["name"] = hyg["proper"]
-        if simbad_row:
-            payload["simbad"] = prune(simbad_row)
-            payload["sources"].append("SIMBAD (CDS)")
-            stats["withSimbad"] += 1
-        ra = hyg.get("ra") if hyg else None
-        dec = hyg.get("dec") if hyg else None
-        if ra is None and iau:
-            ra, dec = iau.get("ra"), iau.get("dec")
-        if ra is not None and dec is not None:
-            payload["ra"], payload["dec"] = ra, dec
-            abbr = constellation_for(ra, dec, bounds)
-            if abbr:
-                payload["constellation"] = abbr
-                payload["constellationName"] = CONSTELLATION_NAMES.get(abbr, abbr)
-                stats["withConstellation"] += 1
+        payload = hip_payload(hip, hyg_by_hip, iau_by_hip, iau_by_hd, simbad, bounds, stats)
         writer.writerow([f"h{hip}", json.dumps(prune(payload), separators=(",", ":"))])
         stats["rows"] += 1
         stats["hipRows"] += 1

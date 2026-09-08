@@ -1,5 +1,12 @@
 import { expect, test, type Page } from '@playwright/test';
 
+import { SKY_ASSETS } from '../src/features/sky/asset-names';
+
+/** Every asset is `<stem>-<content hash>`, so a URL is matched on its shape
+ * rather than on a name that changes with the bytes. */
+const TILE = /\/stars\/lod\/\d+-[0-9a-f]{12}\.bin$/;
+const G9 = /\/stars\/lod\/g9-[0-9a-f]{12}\.bin$/;
+
 /** S2: the streamed Gaia catalogue — that it arrives in the right order, that
  * it arrives nearest the view first, and that it costs what it is budgeted.
  *
@@ -42,9 +49,9 @@ test('the deep sky lands after the catalogue, nearest the view first', async ({ 
 
   // The bright catalogue is the picture; g9 is depth added to it, and the
   // tiles are depth added to that. Nothing overtakes what it is drawn over.
-  expect(at(/\/stars\/bright\.bin$/)).toBeLessThan(at(/\/stars\/lod\/g9\.bin$/));
-  expect(at(/\/stars\/lod\/g9\.bin$/)).toBeLessThan(at(/\/stars\/lod\/\d+\.bin$/));
-  expect(at(/\/stars\/lod\/manifest\.json$/)).toBeLessThan(at(/\/stars\/lod\/g9\.bin$/));
+  expect(at(new RegExp(`${SKY_ASSETS.bright}$`))).toBeLessThan(at(G9));
+  expect(at(G9)).toBeLessThan(at(TILE));
+  expect(at(new RegExp(`${SKY_ASSETS.lodManifest}$`))).toBeLessThan(at(G9));
 
   // The first tile fetched is one of the handful the view is under. The queue
   // is re-scored twice a second and the sky turns, so the assertion is
@@ -54,8 +61,8 @@ test('the deep sky lands after the catalogue, nearest the view first', async ({ 
 
   // Every tile file that was fetched is one the queue asked for.
   const fetchedFiles = seen
-    .filter((entry) => /\/stars\/lod\/\d+\.bin$/.test(entry.url))
-    .map((entry) => Number(entry.url.split('/').at(-1)!.replace('.bin', '')));
+    .filter((entry) => TILE.test(entry.url))
+    .map((entry) => Number(entry.url.split('/').at(-1)!.split('-')[0]));
   expect(new Set(fetchedFiles)).toEqual(new Set(state.stream!.fetched));
   expect(state.residentTiles).toBeGreaterThan(0);
   expect(state.points).toBeGreaterThan(150_000);
@@ -86,7 +93,7 @@ test('the first minute of sky fits the budget', async ({ page }) => {
 
   const seen = (await resources(page)).filter((entry) => entry.startMs < 60_000);
   const total = seen.reduce((sum, entry) => sum + entry.bytes, 0);
-  const tiles = seen.filter((entry) => /\/stars\/lod\/\d+\.bin$/.test(entry.url));
+  const tiles = seen.filter((entry) => TILE.test(entry.url));
   const tileBytes = tiles.reduce((sum, entry) => sum + entry.bytes, 0);
 
   expect(tiles.length).toBeGreaterThan(4);

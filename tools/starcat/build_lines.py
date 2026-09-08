@@ -36,10 +36,11 @@ import struct
 import urllib.request
 from pathlib import Path
 
+from name_assets import current, digest_of
+
 ROOT = Path(__file__).resolve().parent.parent.parent
 FAB = ROOT / "data" / "lines" / "constellationship.fab"
 HYG = ROOT / "data" / "tap" / "hyg_v3.csv"
-BRIGHT = ROOT / "public" / "stars" / "bright.bin"
 OUT = ROOT / "public" / "sky" / "lines.bin"
 MANIFEST = ROOT / "public" / "sky" / "lines.json"
 
@@ -79,12 +80,12 @@ def unit(ra_deg: float, dec_deg: float) -> tuple[float, float, float]:
 
 def read_bright() -> tuple[list[tuple[float, float, float]], list[float]]:
     """The bright catalogue's directions and magnitudes, by record index."""
-    blob = BRIGHT.read_bytes()
+    blob = current("/stars/bright.bin").read_bytes()
     if blob[:4] != MAGIC:
-        raise SystemExit(f"{BRIGHT} is not an STR2 catalogue")
+        raise SystemExit("the published catalogue is not STR2")
     count = struct.unpack_from("<I", blob, 4)[0]
     if len(blob) != HEADER_LEN + count * STRIDE:
-        raise SystemExit(f"{BRIGHT} is truncated")
+        raise SystemExit("the published catalogue is truncated")
     if count > 0xFFFF:
         raise SystemExit("the packed format addresses records with a u16")
     directions, magnitudes = [], []
@@ -242,6 +243,7 @@ def build() -> dict:
 
     return {
         "source": FAB_URL,
+        "catalogue": digest_of("/stars/bright.bin"),
         "licence": "CC BY-SA 4.0 + Free Art License (Stellarium modern skyculture)",
         "resolvedVia": "HYG v3 HIP positions, matched into bright.bin within 60 arcsec",
         "constellations": len(read_figures(FAB)),

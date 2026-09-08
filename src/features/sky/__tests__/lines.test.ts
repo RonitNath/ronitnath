@@ -3,14 +3,16 @@ import { describe, expect, it } from 'vitest';
 
 import { CatalogError, parseStars } from '../catalog';
 import { LINE_VERTEX_FLOATS, lineVertices, pairCount, parseLines, vertexCount } from '../lines';
+import { SKY_ASSETS } from '../asset-names';
+import { shipped } from './fixtures/shipped';
 
-const BLOB = new Uint8Array(readFileSync('public/sky/lines.bin'));
+const BLOB = new Uint8Array(shipped(SKY_ASSETS.lines));
 const MANIFEST = JSON.parse(readFileSync('public/sky/lines.json', 'utf8')) as {
   pairs: number;
   constellations: number;
   droppedPairs: number;
 };
-const STARS = parseStars(new Uint8Array(readFileSync('public/stars/bright.bin')));
+const STARS = parseStars(new Uint8Array(shipped(SKY_ASSETS.bright)));
 
 function packed(pairs: readonly [number, number][]): Uint8Array {
   const bytes = new Uint8Array(8 + pairs.length * 4);

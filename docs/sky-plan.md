@@ -369,3 +369,146 @@ Recorded as built, 2026-09-08.
 - **The first-minute byte budget moved from 5.2 MB to 5.4 MB.** The band is
   126 KB more on the run's own viewport, once, for a band that no longer reads
   as blobs at the galactic centre.
+
+## Catalogue fill + content addressing
+
+Owner 2026-09-08: fill the hole in the catalogue, and content-address every
+asset the sky fetches so a deploy never invalidates a byte.
+
+### The hole, and why neither half claimed it
+
+S4 recorded five naked-eye stars drawn nowhere at all — Sheratan, Menkar,
+Mahasim, Gienah and Enif, all V 2.4 to 2.7 — and eleven constellation segments
+dropped for want of them. The cause is the merge S1 shipped. Gaia DR3's
+`gaia_source_lite` at G < 6.5 was the catalogue; `hip_2.5.csv`, cut at Hp < 2.5,
+was the supplement for the bright end Gaia saturates on. Gaia is unusable above
+G ≈ 1.7 and unreliable to about G 6, so the band between the two cuts belonged
+to neither: Gaia records those stars as saturated pixels — Mahasim reads G 7.28
+for a V 2.62 star, seventy-five times too faint — and Hipparcos was not asked.
+
+The fill pulls the whole naked-eye Hipparcos catalogue (`hip_6.5.csv`,
+Hp < 6.5, 7,982 rows, 578 KB) and merges in **three tiers** rather than two.
+Brighter than Hp 2.5 Hipparcos is authoritative and the matching Gaia row is
+dropped, exactly as before — that tier is unchanged, and it is why Sirius, Vega
+and Alioth still carry Hipparcos magnitudes. Below it Gaia is authoritative and
+a Hipparcos row is only *added* where no Gaia row lies within 3 arcsec and 1.5
+magnitudes. 198 stars arrive on those terms, nine of them brighter than fourth
+magnitude: Enif, Gienah, Lesath, Mahasim, Menkar, Sheratan and Rasalgethi by
+name, plus HIP 26551 and HIP 92862. Every star Gaia does measure keeps Gaia's
+own BP−RP colour; nothing regresses onto the B−V ramp.
+
+12,191 stars become 12,335. `named.json` grows from 333 to 339 and
+`lines.bin` from 665 segments to 674 of Stellarium's 676.
+
+### Deviations
+
+- **The cross-match had to become epoch-aware before it could be inverted.**
+  Run as the brief describes it — Hipparcos positions as published, matched
+  against Gaia at 3 arcsec — the fill adds 1,330 stars, and most of them are
+  wrong. Hipparcos is epoch 1991.25 and Gaia DR3 is 2016.0: ε Cygni moves 480
+  mas/yr and lands twelve arcseconds from its own Gaia record, four times the
+  match radius, so it is "missing" and gets added a second time. Carrying every
+  Hipparcos row forward 24.75 years by its own proper motion first — the pull
+  gains `pm_ra`, `pm_de` for it — cuts the fill from 1,330 to 198, which is the
+  number of stars that were actually absent. The propagated position is also
+  what is *stored*, so the Hipparcos records now sit in Gaia's frame rather than
+  a quarter-century behind it.
+- **A star that is added takes its Gaia ghost with it, magnitude or no
+  magnitude.** Forty-seven of the 198 *do* have a Gaia record within three
+  arcseconds — a saturated one, which is exactly why the magnitude test refused
+  it and the star was filled. Left alone it draws the star twice at two
+  magnitudes: HIP 92862 at 3.93 with a ghost at 2.36 two arcseconds away. So
+  once the build has decided Gaia has no usable row for a star, every Gaia
+  record within the match radius of it goes. The same rule reaches the deep
+  layers, where the ghost carries a different source id at the same place and a
+  dedupe by id cannot see it: `build_star_lod.py` drops records within 20
+  arcseconds of a filled star — 3 arcsec widened to swallow the tiles'
+  octahedral quantisation, which is about 15 — and 330 went.
+- **`named.json` has one builder now.** `build_bright.py` used to re-derive the
+  named indices against the previous catalogue and refuse to publish if one
+  failed to match by position. That guard cannot survive this change: R Doradus
+  was a saturated Gaia record at magnitude 1.96 and is now its Hipparcos record
+  at 4.66, which is neither the same position nor the same brightness, and
+  every Hipparcos record moved by up to two arcminutes when the epochs were
+  fixed. What replaces it is stronger and cheaper: `build_names.py` and
+  `build_lines.py` each write the **content hash of the catalogue they resolved
+  against** into their own manifest, the catalogue's filename carries the same
+  hash, and a test refuses a set whose three hashes disagree. A rebuilt
+  catalogue beside a stale name list now fails the gate instead of labelling
+  the wrong stars plausibly.
+- **The hand-written entries needed a HIP number.** The fifty S1 wrote are
+  keyed by name where the IAU list also carries the star, which is
+  index-independent and safe. The four the IAU list does *not* carry — Alpha
+  Centauri, Delta Velorum, R Doradus, Regor — were resolved by a `brightIndex`
+  written against the catalogue of the day, so after a rebuild "Regor" would
+  name whatever star had slid into slot 32. They carry a `hip` now and resolve
+  positionally through HYG, the same way an IAU row does.
+- **Two segments stay dropped, both in Canis Major.** They run through HIP
+  33165, V 6.65, which is fainter than the catalogue's own magnitude 6.5 limit.
+  Raising the limit for one segment would add thousands of records to every
+  visitor's first fetch, so the gap is stated instead — in NOTICE, in the
+  README and on /about.
+- **`build_bright.py` gave up `crossmatch.py` to stay under 400 lines.** Where
+  a catalogue row points, how far apart two directions are, and whether some
+  indexed star is the star in hand: geometry, which is not merge policy.
+
+### Content addressing
+
+Measured through the edge before the change: `/stars/lod/*` was `immutable` and
+served HIT, and *everything else* carried `public, max-age=0` and came back
+`cf-cache-status: REVALIDATED` — nine conditional GETs to the origin on every
+page load. The band already had a hash in its filename and still got
+`max-age=0`. `docs/sky-cdn.md`, written alongside this, measures what that
+actually cost: Next answers each with a 304 of a couple of hundred bytes, so
+the saving is nine round trips of latency rather than 1.7 MB of egress.
+
+Every fetched asset is now named `<stem>-<sha256[:12]><suffix>`, generated by
+the builders: `build_star_lod.py` names the 768 tiles and `g9` from the per-tile
+sha256 its manifest already carried (tile id first, so the directory still reads
+as a grid), and `tools/starcat/name_assets.py` stamps the catalogue, the names,
+the figures, the band's two bakes, the cities, the three earth textures and the
+manifest itself, writing the map to `src/features/sky/asset-names.ts`.
+`assets.ts` reads that module, Next content-hashes the bundle that imports it,
+and `next.config.ts` serves `/stars/*`, `/sky/*`, `/cities/*` and `/textures/*`
+`public, max-age=31536000, immutable`. The HTML is the only mutable thing left
+in the graph, and no cache ever has to be purged.
+
+A client holding an old bundle asks for a filename this deploy does not have.
+That is a 404, and `lod-stream.ts` has always treated a refused tile as a tile
+of grain the sky does without; `lod-stream.test.ts` now says so out loud, and
+checks the streamer asks for more on the next tick rather than wedging.
+
+Every builder reads through `name_assets.current()` rather than a literal path,
+because the file it wrote last time is not where it wrote it any more.
+
+### The detail delta
+
+`sky_star_detail` is 3,087,894 rows and 257 MB compressed. Rebuilding it to
+answer for 198 new stars would be a day of Gaia TAP and an hour of loading for
+a change of 0.006%, and the rows it would rewrite are byte-identical to the
+ones already there. `tools/starcat/build_delta.py` asks `build_detail.py`'s own
+routines — HYG, the IAU list, the boundary walk, one 198-id SIMBAD batch — for
+exactly the Hipparcos numbers `hip_filled.json` names, and writes
+`data/sky_star_detail.delta.csv` (198 rows, 237 KB). `node scripts/load-sky.mjs
+--delta` upserts it with `on conflict do update`: under a second, and idempotent.
+
+### The gate, on a server with no GPU
+
+nexus (12 cores, no GPU) runs the suite at 12 workers in 1m52s. Headless
+Chromium there has no WebGL2 at all unless it is asked for ANGLE's software
+rasteriser, so `playwright.config.ts` gains an opt-in `E2E_SOFTWARE_GL=1` that
+passes `--use-gl=angle --use-angle=swiftshader`; without it every sky spec waits
+twenty seconds for a pixel that is never lit.
+
+Three specs are then sensitive to how fast that rasteriser is rather than to
+what the code does. At 12 workers `sky-lines`, `sky-stars` and the
+reduced-motion case fail; at 3 workers the first two pass and at 1 the third
+does, which is the contention the Mac's five-worker flake also was. All three
+are measuring a *settled* frame — that the figures changed eight thousand
+pixels, that Sirius's core reached white, that the sky stopped changing inside
+twenty seconds — and a dozen software rasterisers sharing twelve cores do not
+settle a frame in the time those assertions allow. (The float target is not the
+reason: SwiftShader offers both `EXT_color_buffer_half_float` and
+`EXT_color_buffer_float`, so the accumulation buffer is the real one.) A
+workstation with a GPU runs the whole suite green; a headless server is where
+the worker count has to come down.

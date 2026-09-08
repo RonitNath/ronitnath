@@ -23,6 +23,20 @@ Records whose source_id is already in the bright catalog
 (`tools/starcat/data/gaia_g6.5.csv`, shipped as STR2) are dropped here; the
 count lands in the manifest as `droppedBright`.
 
+A second drop covers what a source-id list cannot see. `build_bright.py` fills
+the catalogue with the Hipparcos stars Gaia has no usable row for, and "no
+usable row" is not "no row": Mahasim is a V 2.62 star that DR3 records at G
+7.28 three arcseconds away. That record is the same star, saturated, and left
+in place it would draw a magnitude-7 point on top of a magnitude-2.6 one. So
+records within 20 arcsec of a filled star
+(`tools/starcat/data/hip_filled.json`) go too, as `droppedNearFilled`.
+
+File names carry a content hash — `<id>-<12 hex>.bin` — taken from the sha256
+the manifest already records. The tile id stays first so the directory reads
+as a grid to a person, and the hash is what lets every one of these be served
+`immutable` for a year with no purge on a rebuild: a rebuilt tile is a new URL
+and the manifest is what says so.
+
 Two sources, in order of preference:
   --from-legacy DIR  slice the already-built legacy blobs (g12.bin + its
                      manifest); no network, byte-identical to the pinned pull.
@@ -52,6 +66,8 @@ import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
+from name_assets import current
+
 ROOT = Path(__file__).resolve().parents[2]
 HERE = Path(__file__).resolve().parent
 OUT = ROOT / "public" / "stars" / "lod"
@@ -66,6 +82,16 @@ RECORD = struct.Struct("<Qhhhh")
 HEADER = struct.Struct("<I")
 RA_BINS, DEC_BINS = 32, 24
 G_LIMIT, G9_LIMIT = 12, 9
+HASH_CHARS = 12
+
+# How near a filled Hipparcos star a Gaia record has to be to be the same star.
+# `build_bright.py` matches at 3 arcsec, and this is that widened to swallow
+# the octahedral quantisation: two i16 over the octahedron is about 15 arcsec
+# of position error, so a 3 arcsec test against a decoded direction would miss
+# the record it is there to catch. At this radius a coincidental G <= 12
+# neighbour is expected about once per 150 filled stars, which is a handful of
+# faint points across the whole sky against 1,330 saturated duplicates.
+DEDUPE_RADIUS_DEG = 20.0 / 3_600.0
 
 
 def oct_encode(ra_deg: float, dec_deg: float) -> tuple[int, int]:
@@ -95,6 +121,50 @@ def bright_source_ids() -> set[int]:
 
 def sha256_of(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
+
+
+def oct_decode(ox: int, oy: int) -> tuple[float, float, float]:
+    """The inverse of `oct_encode`, so a published file can be re-read.
+
+    `lod.ts` does the same thing for the browser; this is here because the
+    dedupe below has to ask where a record already on disk is pointing.
+    """
+    x, y = ox / 32767.0, oy / 32767.0
+    z = 1.0 - abs(x) - abs(y)
+    if z < 0:
+        x, y = (1 - abs(y)) * (1 if x >= 0 else -1), (1 - abs(x)) * (1 if y >= 0 else -1)
+    norm = math.sqrt(x * x + y * y + z * z) or 1.0
+    return x / norm, y / norm, z / norm
+
+
+class FilledIndex:
+    """The stars `build_bright.py` added, banded by z for a nearness test.
+
+    Empty when there is no `hip_filled.json` — a build from a catalogue that
+    was never filled drops nothing here, which is what it should do.
+    """
+
+    BAND = 0.01
+
+    def __init__(self) -> None:
+        path = Path(os.environ.get("RN_BRIGHT_DIR", HERE / "data")) / "hip_filled.json"
+        self.bands: dict[int, list[tuple[float, float, float]]] = {}
+        self.count = 0
+        if not path.exists():
+            return
+        for star in json.loads(path.read_text())["stars"]:
+            vec = tuple(star["vec"])
+            self.bands.setdefault(int(vec[2] / self.BAND), []).append(vec)
+            self.count += 1
+
+    def covers(self, vec: tuple[float, float, float]) -> bool:
+        band = int(vec[2] / self.BAND)
+        limit = math.cos(math.radians(DEDUPE_RADIUS_DEG))
+        for offset in (-1, 0, 1):
+            for other in self.bands.get(band + offset, ()):
+                if sum(a * b for a, b in zip(vec, other)) > limit:
+                    return True
+        return False
 
 
 # --------------------------------------------------------------- legacy slice
@@ -175,9 +245,11 @@ def buckets_from_tap(cache: Path) -> tuple[list[bytearray], dict]:
 
 # ------------------------------------------------------------------- writing
 
-def build(buckets: list[bytearray], release: str, dropped_before: int = 0) -> dict:
+def build(buckets: list[bytearray], release: str, before: dict | None = None) -> dict:
     bright = bright_source_ids()
-    print(f"bright catalog: {len(bright):,} source ids to drop")
+    filled = FilledIndex()
+    print(f"bright catalog: {len(bright):,} source ids to drop, "
+          f"{filled.count:,} filled stars to clear a radius around")
     OUT.mkdir(parents=True, exist_ok=True)
     for stale in OUT.glob("*.bin"):
         stale.unlink()
@@ -197,14 +269,17 @@ def build(buckets: list[bytearray], release: str, dropped_before: int = 0) -> di
         "tiles": [],
     }
     mid = bytearray()
-    kept = dropped = 0
+    kept = dropped = near_filled = 0
     for tile, data in enumerate(buckets):
         rows = []
         for offset in range(0, len(data), RECORD.size):
             record = data[offset:offset + RECORD.size]
-            source_id, _ox, _oy, milli_mag, _colour = RECORD.unpack(record)
+            source_id, ox, oy, milli_mag, _colour = RECORD.unpack(record)
             if source_id in bright:
                 dropped += 1
+                continue
+            if filled.count and filled.covers(oct_decode(ox, oy)):
+                near_filled += 1
                 continue
             rows.append((milli_mag, bytes(record)))
             kept += 1
@@ -216,13 +291,15 @@ def build(buckets: list[bytearray], release: str, dropped_before: int = 0) -> di
             if milli_mag <= G9_LIMIT * 1000:
                 mid.extend(record)
         blob = MAGIC + HEADER.pack(len(body) // RECORD.size) + bytes(body)
-        (OUT / f"{tile}.bin").write_bytes(blob)
+        digest = sha256_of(blob)
+        name = f"{tile}-{digest[:HASH_CHARS]}.bin"
+        (OUT / name).write_bytes(blob)
         manifest["tiles"].append({
             "id": tile,
-            "file": f"{tile}.bin",
+            "file": name,
             "count": len(body) // RECORD.size,
             "bytes": len(blob),
-            "sha256": sha256_of(blob),
+            "sha256": digest,
         })
 
     # g9 is one file the client always takes whole, but it is drawn under the
@@ -233,19 +310,23 @@ def build(buckets: list[bytearray], release: str, dropped_before: int = 0) -> di
     )
     mid = bytearray(b"".join(bytes(row) for row in mid_rows))
     g9 = MAGIC + HEADER.pack(len(mid) // RECORD.size) + bytes(mid)
-    (OUT / "g9.bin").write_bytes(g9)
-    manifest["g9"] = {"file": "g9.bin", "count": len(mid) // RECORD.size,
-                      "bytes": len(g9), "sha256": sha256_of(g9)}
+    g9_digest = sha256_of(g9)
+    g9_name = f"g9-{g9_digest[:HASH_CHARS]}.bin"
+    (OUT / g9_name).write_bytes(g9)
+    manifest["g9"] = {"file": g9_name, "count": len(mid) // RECORD.size,
+                      "bytes": len(g9), "sha256": g9_digest}
     manifest["count"] = kept
     # A re-sort re-reads files the drop already ran on, so it carries the
     # count forward rather than reporting the zero it just measured: that
     # number is the build's record that nothing is drawn twice.
-    manifest["droppedBright"] = dropped or dropped_before
+    manifest["droppedBright"] = dropped or (before or {}).get("droppedBright", 0)
+    manifest["droppedNearFilled"] = near_filled or (before or {}).get("droppedNearFilled", 0)
     manifest["totalBytes"] = sum(t["bytes"] for t in manifest["tiles"]) + len(g9)
     (OUT / "manifest.json").write_text(json.dumps(manifest, separators=(",", ":")) + "\n")
     print(f"wrote {kept:,} G<={G_LIMIT} records in {len(buckets)} tiles "
-          f"({manifest['totalBytes']:,} bytes), {manifest['g9']['count']:,} in g9.bin, "
-          f"dropped {dropped:,} already in the bright catalog")
+          f"({manifest['totalBytes']:,} bytes), {manifest['g9']['count']:,} in "
+          f"{g9_name}, dropped {dropped:,} already in the bright catalog and "
+          f"{near_filled:,} sitting on a filled Hipparcos star")
     return manifest
 
 
@@ -255,7 +336,7 @@ def buckets_from_published() -> tuple[list[bytearray], dict]:
     Used by --resort. The bright-catalog drop has already happened for these,
     so `build` will find nothing left to drop and the counts come out the same.
     """
-    manifest = json.loads((OUT / "manifest.json").read_text())
+    manifest = json.loads(current("/stars/lod/manifest.json").read_text())
     buckets = []
     for tile in manifest["tiles"]:
         blob = (OUT / tile["file"]).read_bytes()
@@ -267,7 +348,7 @@ def buckets_from_published() -> tuple[list[bytearray], dict]:
 
 
 def verify() -> None:
-    manifest = json.loads((OUT / "manifest.json").read_text())
+    manifest = json.loads(current("/stars/lod/manifest.json").read_text())
     for tile in manifest["tiles"] + [manifest["g9"]]:
         blob = (OUT / tile["file"]).read_bytes()
         assert blob[:8] == MAGIC, tile["file"]
@@ -299,7 +380,7 @@ def main() -> None:
         buckets, source = buckets_from_tap(ROOT / "data" / "tap" / "lod")
     else:
         buckets, source = buckets_from_legacy(args.from_legacy)
-    build(buckets, source.get("release", "Gaia DR3"), source.get("droppedBright", 0))
+    build(buckets, source.get("release", "Gaia DR3"), source)
     verify()
 
 

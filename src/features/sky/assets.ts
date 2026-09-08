@@ -5,29 +5,23 @@
  * starfield as the picture and the rest of the document intact.
  */
 
+import { SKY_ASSETS } from './asset-names';
 import { type NamedCatalog, parseNamed, parseStars, type StarCatalog } from './catalog';
 import { CityCatalog } from './cities';
 import { type LinePairs, parseLines } from './lines';
 
-/** The band's two bakes, named by the content hash `tools/starcat/mwcat.py`
- * writes into them.
+/** Every asset the sky fetches, named by the content hash
+ * `tools/starcat/name_assets.py` stamps into it.
  *
- * The hash is in the filename on purpose: the map is served with a long
- * immutable cache and sits behind a CDN, so a re-bake at the same path would
- * be invisible to everyone who already has one until the cache expired. A new
- * bake is a new URL, and nothing has to be purged anywhere.
+ * The hash is in the filename on purpose, and now on all of them rather than
+ * just the band: these files sit behind a CDN and are served `immutable` for a
+ * year, so a rebuild at the same path would be invisible to everyone already
+ * holding one until the cache expired. A rebuild is a new URL instead, and
+ * nothing has to be purged anywhere. Measured before this was true: nine of
+ * these revalidated against the origin on every single page load
+ * (`docs/sky-cdn.md`).
  */
-export const ASSETS = {
-  bright: '/stars/bright.bin',
-  named: '/stars/named.json',
-  lines: '/sky/lines.bin',
-  milkyway: '/sky/milkyway-81ee6f522371.webp',
-  milkyway2k: '/sky/milkyway-2k-81ee6f522371.webp',
-  cities: '/cities/cities.bin',
-  earthDay: '/textures/earth/day.jpg',
-  earthNormal: '/textures/earth/normal.jpg',
-  earthSpecular: '/textures/earth/specular.jpg',
-} as const;
+export const ASSETS = SKY_ASSETS;
 
 /** Above this many device pixels across, the frame can show the 4096-wide
  * bake; below it the 2048 one carries every texel the screen has. A 390 px

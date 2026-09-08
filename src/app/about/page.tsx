@@ -79,7 +79,7 @@ export default function AboutPage() {
         <section>
           <h2>The stars</h2>
           <p>
-            The catalogue holds 12,191 stars, every star brighter than magnitude 6.5. That is
+            The catalogue holds 12,335 stars, every star brighter than magnitude 6.5. That is
             the naked-eye limit from a dark site, so the screen shows what an unaided eye
             could see if the atmosphere and the city were not in the way. Each record is a
             direction on the sky, an apparent magnitude and a display colour.
@@ -90,10 +90,15 @@ export default function AboutPage() {
             nearly two billion stars from a spacecraft at the second Lagrange point. Gaia
             saturates on the very brightest stars, so the bright end is taken from the
             Hipparcos catalogue instead, the earlier ESA astrometry mission of 1989 to 1993
-            in its 2007 re-reduction. A Gaia entry is dropped in favour of a Hipparcos entry
-            only when the two lie within three arcseconds and within 1.5 magnitudes of each
-            other. Three arcseconds covers the proper motion a fast star accumulates between
-            the two catalogues’ epochs of 1991.25 and 2016.0.
+            in its 2007 re-reduction: brighter than second magnitude the Hipparcos entry
+            wins outright, and the Gaia entry within three arcseconds of it is dropped.
+            Below that Gaia is the measurement, and a Hipparcos entry is only added where
+            Gaia has nothing within three arcseconds and 1.5 magnitudes. Just under two
+            hundred stars are here on those terms, five of them second-magnitude ones the
+            older cut passed just above — Sheratan in Aries, Menkar in Cetus, Mahasim in
+            Auriga, Gienah in Corvus and Enif in Pegasus. Every Hipparcos position is
+            carried forward by the star’s own motion from that catalogue’s epoch of 1991.25
+            to Gaia’s of 2016.0 first, or the same star arrives twice.
           </p>
           <p>
             Colour is derived from each star’s BP−RP index, the difference between Gaia’s
@@ -102,7 +107,7 @@ export default function AboutPage() {
             not a spectrum and does not claim to be.
           </p>
           <p>
-            Three hundred and thirty-three stars are named: every name approved by the
+            Three hundred and thirty-nine stars are named: every name approved by the
             International Astronomical Union whose star is bright enough to be in the
             catalogue. Constellations, classifications and distances come from the HYG
             catalogue and the Hipparcos parallaxes, with distances rounded for legibility;
@@ -110,9 +115,12 @@ export default function AboutPage() {
             SIMBAD with. At most three are called out at once, chosen for what is in frame.
           </p>
           <p>
-            The Lines control draws the constellation figures — 665 segments over 88
+            The Lines control draws the constellation figures — 674 segments over 88
             constellations, from Stellarium’s modern sky culture, with each figure’s
             Hipparcos numbers resolved into catalogue records when the file was packed.
+            Two of the 676 are missing, both in Canis Major and both drawn to a star
+            fainter than the catalogue’s own limit; a segment that cannot be resolved at
+            both ends is left out rather than guessed at.
             They are off unless you ask for them, they carry no labels, and they dim with
             the same extinction the stars do.
           </p>

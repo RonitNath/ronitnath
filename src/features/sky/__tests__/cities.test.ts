@@ -1,9 +1,10 @@
-import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 import { CityCatalog, distanceBetweenKm, EARTH_MEAN_RADIUS_KM } from '../cities';
+import { SKY_ASSETS } from '../asset-names';
+import { shipped } from './fixtures/shipped';
 
-const BYTES = new Uint8Array(readFileSync('public/cities/cities.bin'));
+const BYTES = new Uint8Array(shipped(SKY_ASSETS.cities));
 const catalog = (): CityCatalog => CityCatalog.parse(BYTES)!;
 
 describe('the shipped city catalog', () => {

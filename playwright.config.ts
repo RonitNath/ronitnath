@@ -13,7 +13,21 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   reporter: [['list']],
-  use: { baseURL, trace: 'off' },
+  use: {
+    baseURL,
+    trace: 'off',
+    /* The sky is a WebGL2 canvas, and headless Chromium on a machine with no
+     * GPU has no WebGL2 at all: every sky spec then waits twenty seconds for a
+     * pixel that is never lit. `E2E_SOFTWARE_GL=1` swaps in ANGLE's software
+     * rasteriser, which is how the suite runs at full parallelism on a
+     * server. A workstation with a GPU wants the real driver, so it is opt-in.
+     */
+    launchOptions: {
+      args: process.env.E2E_SOFTWARE_GL
+        ? ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader']
+        : [],
+    },
+  },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
   webServer: {
     /* The smoke runs the artifact the image ships: the standalone server,

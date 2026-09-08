@@ -127,7 +127,26 @@ docker run --rm --network host \
 ```
 
 About 80 seconds, one transaction, a full replacement: a failure leaves the old
-rows in place. The table is about 2.5 GB with its indexes, so it is loaded on
+rows in place.
+
+When a release only *fills* the catalogue — a couple of hundred Hipparcos stars
+Gaia has no usable row for — the whole file does not move. `build_delta.py`
+writes `data/sky_star_detail.delta.csv` beside the release, and it is loaded
+the same way with `--delta`, which upserts rather than truncating:
+
+```sh
+scp data/sky_star_detail.delta.csv alien:/tmp/
+sudo mv /tmp/sky_star_detail.delta.csv /data/crypt/ronitnath/
+docker run --rm --network host \
+  --env-file /data/crypt/ronitnath/web.env \
+  -v /data/crypt/ronitnath/sky_star_detail.delta.csv:/app/data/delta.csv:ro \
+  ghcr.io/ronitnath/ronitnath:"$TAG"-migrate \
+  node scripts/load-sky.mjs --delta /app/data/delta.csv
+```
+
+Under a second, idempotent, and on alien only — the table reaches delenda
+through Patroni. Do it before the restart: the new bundle asks about stars the
+old table has no rows for. The table is about 2.5 GB with its indexes, so it is loaded on
 one node and reaches the others through Patroni replication — the second host
 runs the image, not the load.
 

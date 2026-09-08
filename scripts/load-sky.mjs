@@ -1,6 +1,7 @@
 /** Load the built star detail into Postgres, with nothing but Node and `pg`.
  *
  *   node scripts/load-sky.mjs [path-to-sky_star_detail.csv.zst]
+ *   node scripts/load-sky.mjs --delta [path-to-sky_star_detail.delta.csv]
  *
  * The catalogue is 3,087,894 rows and 257 MB compressed, and the obvious way
  * to move it is `COPY ... FROM STDIN`. That needs either `psql` or
@@ -16,6 +17,12 @@
  * `tools/starcat/load_detail.sql` has: the build is the whole catalogue, so
  * TRUNCATE + INSERT beats an upsert plus an anti-join delete over three
  * million rows, and a failure anywhere leaves the old rows in place.
+ *
+ * `--delta` is the other shape, for a catalogue fill: a few hundred rows of
+ * plain CSV upserted with `on conflict do update`, no truncate and no
+ * checksum sidecar. Rebuilding three million rows to add two hundred stars is
+ * a day of TAP and an hour of loading for a change of 0.006%, and the rows it
+ * would rewrite are byte-identical to the ones already there.
  *
  * The table is created by the drizzle migration, never here. Loading into a
  * table that does not exist would be a silent success against nothing.
@@ -35,7 +42,10 @@ import pg from 'pg';
 const BATCH = 1_000;
 const PROGRESS_EVERY = 250_000;
 
-const path = process.argv[2] ?? 'data/sky_star_detail.csv.zst';
+const delta = process.argv.includes('--delta');
+const path =
+  process.argv.slice(2).find((argument) => !argument.startsWith('--')) ??
+  (delta ? 'data/sky_star_detail.delta.csv' : 'data/sky_star_detail.csv.zst');
 const url = process.env.DATABASE_URL;
 if (!url) fail('DATABASE_URL is not set');
 await access(path).catch(() => fail(`${path} is not there — build it first (tools/starcat)`));
@@ -87,7 +97,9 @@ async function checksum() {
   return `sha256 ${actual}, as built`;
 }
 
-console.log(await checksum());
+// A delta is small, plain and built beside the release it ships with; the
+// sidecar checksum belongs to the 257 MB file that travels by scp.
+console.log(delta ? `delta load from ${path}` : await checksum());
 
 const client = new pg.Client({ connectionString: url });
 await client.connect();
@@ -115,8 +127,9 @@ try {
      on commit drop`,
   );
 
+  const source = createReadStream(path);
   const lines = createInterface({
-    input: createReadStream(path).pipe(createZstdDecompress()),
+    input: delta ? source : source.pipe(createZstdDecompress()),
     crlfDelay: Infinity,
   });
   for await (const line of lines) {
@@ -132,11 +145,14 @@ try {
   }
   await flush();
 
-  // The replacement itself, inside the same transaction that read the file.
-  await client.query('truncate sky_star_detail');
+  // The replacement itself, inside the same transaction that read the file —
+  // or, for a delta, an upsert of just the rows the file carries.
+  if (!delta) await client.query('truncate sky_star_detail');
   await client.query(
     `insert into sky_star_detail (id, payload, built_at)
-     select id, payload, now() from sky_star_detail_incoming`,
+     select id, payload, now() from sky_star_detail_incoming
+     on conflict (id) do update
+       set payload = excluded.payload, built_at = excluded.built_at`,
   );
   await client.query('commit');
 } catch (error) {
@@ -147,7 +163,10 @@ try {
 
 const count = await client.query('select count(*)::bigint as rows from sky_star_detail');
 await client.end();
-console.log(`loaded ${Number(count.rows[0].rows).toLocaleString('en-US')} rows in ${seconds()}s`);
+console.log(
+  `${delta ? 'upserted' : 'loaded'} ${rows.toLocaleString('en-US')} rows; ` +
+    `${Number(count.rows[0].rows).toLocaleString('en-US')} in the table, ${seconds()}s`,
+);
 
 function seconds() {
   return ((Date.now() - startedAt) / 1_000).toFixed(0);

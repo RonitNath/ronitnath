@@ -36,11 +36,11 @@ import struct
 from pathlib import Path
 
 import iau_csn
+from name_assets import current, digest_of
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 IAU = ROOT / "data" / "tap" / "iau_csn.txt"
 HYG = ROOT / "data" / "tap" / "hyg_v3.csv"
-BRIGHT = ROOT / "public" / "stars" / "bright.bin"
 NAMED = ROOT / "public" / "stars" / "named.json"
 # The fifty S1 wrote by hand, kept as their own input: if the build read them
 # back out of its own output it would treat last night's generated phrase as a
@@ -93,9 +93,9 @@ def unit(ra_deg: float, dec_deg: float) -> tuple[float, float, float]:
 
 
 def read_bright() -> tuple[list[tuple[float, float, float]], list[float]]:
-    blob = BRIGHT.read_bytes()
+    blob = current("/stars/bright.bin").read_bytes()
     if blob[:4] != b"STR2":
-        raise SystemExit(f"{BRIGHT} is not an STR2 catalogue")
+        raise SystemExit("the published catalogue is not STR2")
     count = struct.unpack_from("<I", blob, 4)[0]
     records = [
         struct.unpack_from("<ffff", blob, HEADER_LEN + index * STRIDE)
@@ -206,7 +206,7 @@ def build() -> tuple[dict, dict[str, int]]:
 
     stars, taken = [], {}
     tally = {"names": 0, "unmatched": 0, "noDistance": 0, "duplicate": 0,
-             "handKept": 0, "handOnly": 0}
+             "handKept": 0, "handOnly": 0, "handUnresolved": 0}
     for row in iau_csn.parse(IAU):
         if row.ra_deg is None or row.dec_deg is None:
             tally["unmatched"] += 1
@@ -247,16 +247,45 @@ def build() -> tuple[dict, dict[str, int]]:
     # A hand-written entry the IAU list does not carry — "Alpha Centauri",
     # "Delta Velorum", "R Doradus", "Regor" — stays, unless its record has
     # already been claimed by the IAU name for the same star.
+    #
+    # It is resolved through its own HIP number and HYG's position, the same
+    # way an IAU row is, and never through the `brightIndex` in the file: that
+    # number was written against the catalogue of the day it was written, and
+    # every record the catalogue gains moves the ones after it. Resolved by
+    # index, "Regor" would name whichever star had slid into slot 32.
     for name, entry in kept.items():
-        if name in taken.values() or entry["brightIndex"] in taken:
+        if name in taken.values():
             continue
-        taken[entry["brightIndex"]] = name
+        row = hyg.get(str(entry.get("hip", "")))
+        if not row:
+            tally["handUnresolved"] += 1
+            continue
+        index, separation = nearest(
+            directions, magnitudes,
+            unit(float(row["ra"]) * 15.0, float(row["dec"])),
+            float(row["mag"]) if row.get("mag") else None,
+        )
+        if separation > MATCH_DEG or index in taken:
+            tally["handUnresolved"] += 1
+            continue
+        taken[index] = name
         tally["handOnly"] += 1
-        stars.append(dict(entry))
+        stars.append({
+            "brightIndex": index,
+            "name": name,
+            "constellation": entry["constellation"],
+            "classification": entry["classification"],
+            "distanceLy": entry["distanceLy"],
+        })
 
     stars.sort(key=lambda star: star["brightIndex"])
     tally["names"] = len(stars)
-    return {"version": 2, "sources": SOURCES, "stars": stars}, tally
+    return {
+        "version": 2,
+        "catalogue": digest_of("/stars/bright.bin"),
+        "sources": SOURCES,
+        "stars": stars,
+    }, tally
 
 
 def render(named: dict) -> str:
@@ -274,8 +303,14 @@ def main() -> None:
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
     named, tally = build()
+    # The list this build replaces, where there is one: a first build after a
+    # catalogue rebuild may have had its named.json deleted with the rest.
+    try:
+        previous = json.loads(current("/stars/named.json").read_text())["stars"]
+    except SystemExit:
+        previous = []
     superseded = [
-        star["name"] for star in json.loads(NAMED.read_text())["stars"]
+        star["name"] for star in previous
         if star["name"] not in {entry["name"] for entry in named["stars"]}
     ]
     if not args.dry_run:
@@ -284,7 +319,8 @@ def main() -> None:
         f"{tally['names']} names ({tally['handKept']} hand-written kept), "
         f"{tally['unmatched']} not in bright.bin, {tally['duplicate']} same record, "
         f"{tally['noDistance']} without a distance or classification; "
-        f"{tally['handOnly']} hand-only kept"
+        f"{tally['handOnly']} hand-only kept, "
+        f"{tally['handUnresolved']} hand-only unresolved"
     )
     if superseded:
         print(f"superseded by their IAU name: {superseded}")

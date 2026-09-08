@@ -1,17 +1,35 @@
 Star catalog provenance
 =======================
 
-bright.bin
-  Magnitude-sorted naked-eye catalog, 12,191 stars in the STR2 format: a
+bright-<hash>.bin
+  Magnitude-sorted naked-eye catalog, 12,335 stars in the STR2 format: a
   J2000/ICRS direction, apparent magnitude, display color, and the catalog id
-  the star came from (Gaia DR3 source_id, or Hipparcos number).
+  the star came from (Gaia DR3 source_id, or Hipparcos number). The filename
+  carries the sha256 of its own bytes, as every fetched sky asset does.
 
   Built offline by tools/starcat/build_bright.py from the snapshots committed
   under tools/starcat/data/ — ESA Gaia DR3 gaia_source (source_id, ra, dec,
   phot_g_mean_mag, bp_rp, parallax; phot_g_mean_mag < 6.5) and the Hipparcos
-  New Reduction (hip, ra, dec, hp_mag, b_v, plx; hp_mag < 2.5), which supplies
-  the bright end Gaia saturates on. The web application never contacts ESA or
-  CDS at runtime.
+  New Reduction (hip, ra, dec, hp_mag, b_v, plx, pm_ra, pm_de; hp_mag < 6.5).
+  The web application never contacts ESA or CDS at runtime.
+
+  The two are merged in three tiers. Gaia measures the catalog. Brighter than
+  Hp 2.5 it cannot — DR3 saturates above G 1.7 and its photometry is unreliable
+  past that — so the Hipparcos row is authoritative and the Gaia row is dropped.
+  Fainter than that the Hipparcos row is only *added*, where no Gaia row lies
+  within 3 arcseconds and 1.5 magnitudes of it. 198 stars are there on those
+  terms, including five of the second magnitude — Sheratan, Menkar, Mahasim,
+  Gienah and Enif — which the earlier Hp < 2.5 supplement cut just above and
+  Gaia records only as saturated pixels. Where such a star is added, any Gaia
+  record within 3 arcseconds of it is dropped whatever its magnitude says: that
+  record is the same star measured badly, and the disagreement is why the star
+  was added at all.
+
+  Hipparcos positions are epoch 1991.25 and Gaia DR3's are 2016.0, so every
+  Hipparcos row is carried forward 24.75 years by its own proper motion before
+  it is matched or stored. Epsilon Cygni moves 480 mas/yr: uncorrected it lands
+  twelve arcseconds from its Gaia record, four times the match radius, and
+  would be added a second time and drawn twice.
 
   Display color is derived, not drawn: BP-RP (or B-V for the Hipparcos rows)
   to an effective temperature, then a blackbody spectrum through the CIE 1931
@@ -21,11 +39,11 @@ bright.bin
   2013 (JCGT 2(2)) for the color matching functions.
 
 Named-star callouts
-  public/stars/named.json holds 333 stars, position-matched to bright.bin and
+  named-<hash>.json holds 339 stars, position-matched to bright.bin and
   built by tools/starcat/build_names.py: every name in the IAU Catalog of Star
-  Names whose star is in the catalogue. 339 of the 451 approved names are
-  brighter than the G <= 6.5 cut and six of those are stars Gaia saturates on,
-  which is what the difference is. Constellation comes from the IAU row's own
+  Names whose star is in the catalogue, plus Regor and R Doradus, which the IAU
+  list does not carry. The ~110 that do not resolve are fainter than the
+  catalogue's magnitude 6.5 limit. Constellation comes from the IAU row's own
   three-letter code; classification is HYG v3's spectral type read as a phrase;
   distance is HYG's parallax distance in light years, rounded for legibility
   (a tenth under 100 ly, ten under 1,000, a hundred beyond).
@@ -39,16 +57,19 @@ Named-star callouts
   constrained are approximate rather than false-precision reciprocals.
 
 Constellation figures
-  public/sky/lines.bin is 665 segments over the 88 constellations, packed by
+  sky/lines-<hash>.bin is 674 segments over the 88 constellations, packed by
   tools/starcat/build_lines.py as pairs of bright.bin record indices. The
   figures are Stellarium's modern sky culture (v23.4
   skycultures/modern/constellationship.fab), which that file's info.ini
   licenses CC BY-SA 4.0 International Public License + Free Art License; the
   Hipparcos numbers it draws to are resolved into catalogue records through
-  HYG v3 positions. Eleven of Stellarium's 676 segments are absent: six of
-  their stars are not in bright.bin, and a segment that does not resolve at
-  both ends is refused rather than guessed. public/sky/lines.json records the
-  counts and the unresolved HIP numbers.
+  HYG v3 positions. Two of Stellarium's 676 segments are absent, both of them
+  in Canis Major and both through HIP 33165, a V 6.65 star past the catalogue's
+  own magnitude 6.5 limit; a segment that does not resolve at both ends is
+  refused rather than guessed. The other nine that used to be missing are now
+  drawn — their stars are what the catalogue fill added. public/sky/lines.json
+  records the counts, the unresolved HIP numbers, and the content hash of the
+  catalogue whose record indices the file addresses.
 
   Stellarium (c) Stellarium contributors — https://stellarium.org/
     https://creativecommons.org/licenses/by-sa/4.0/
@@ -58,8 +79,11 @@ Gaia LOD
   public/stars/lod is generated from ESA Gaia DR3 gaia_source fields source_id,
   ra, dec, phot_g_mean_mag, and bp_rp with phot_g_mean_mag <= 12. It is produced
   offline by tools/starcat/build_star_lod.py into 768 per-tile files plus
-  g9.bin and a manifest. The web application never contacts ESA or CDS at
-  runtime.
+  g9 and a manifest, each named <id>-<hash>.bin from the sha256 the manifest
+  records. Records already in bright.bin are dropped, by source id and — for
+  the stars the fill added, whose saturated Gaia rows carry a different id at
+  the same place — within 20 arcseconds of one of them. The web application
+  never contacts ESA or CDS at runtime.
 
 Star detail (sky_star_detail)
   Built offline by tools/starcat/build_detail.py and loaded into Postgres. It

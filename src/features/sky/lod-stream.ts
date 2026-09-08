@@ -21,6 +21,7 @@
  * in flight: those tiles were chosen for a sky that is no longer on screen.
  */
 
+import { SKY_ASSETS } from './asset-names';
 import {
   type DeepStars,
   LOD_HEADER_LEN,
@@ -122,12 +123,15 @@ export class TileStreamer {
   constructor(
     private readonly sink: DeepSink,
     private readonly path = '/stars/lod',
+    /* The manifest is content-addressed like everything else it names, so its
+     * URL is generated rather than assembled from `path`. */
+    private readonly manifestUrl: string = SKY_ASSETS.lodManifest,
   ) {}
 
   /** The manifest and `g9.bin`, in that order, after the page has painted.
    * Resolves once g9 is on the GPU; tiles start on the next tick. */
   async start(): Promise<void> {
-    const response = await fetch(`${this.path}/manifest.json`, { cache: 'force-cache' });
+    const response = await fetch(this.manifestUrl, { cache: 'force-cache' });
     if (!response.ok) throw new Error(`manifest: ${response.status}`);
     this.manifest = parseManifest(await response.json());
     this.tiles = tilesAllowed();

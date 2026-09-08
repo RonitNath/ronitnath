@@ -3,9 +3,11 @@ import { describe, expect, it } from 'vitest';
 
 import { parseNamed, parseStars } from '../catalog';
 import { CONSTELLATIONS } from '../constellations';
+import { SKY_ASSETS } from '../asset-names';
+import { shipped, shippedText } from './fixtures/shipped';
 
-const NAMED = parseNamed(readFileSync('public/stars/named.json', 'utf8'));
-const STARS = parseStars(new Uint8Array(readFileSync('public/stars/bright.bin')));
+const NAMED = parseNamed(shippedText(SKY_ASSETS.named));
+const STARS = parseStars(new Uint8Array(shipped(SKY_ASSETS.bright)));
 const HAND = JSON.parse(
   readFileSync('tools/starcat/data/named_hand.json', 'utf8'),
 ) as { stars: { name: string; classification: string; distanceLy: number }[] };
@@ -13,9 +15,10 @@ const HAND = JSON.parse(
 describe('the grown name list', () => {
   it('is the whole IAU set that resolves, not the fifty S1 wrote', () => {
     expect(NAMED.stars.length).toBeGreaterThan(300);
-    // 339 of the 451 approved names are brighter than the catalogue's G <= 6.5
-    // cut, and six of those are stars Gaia saturates on; the rest resolve.
-    expect(NAMED.stars.length).toBeLessThanOrEqual(339);
+    // 337 of the 451 approved names resolve into the filled catalogue, plus
+    // the two hand-written entries the IAU list does not carry — Regor and R
+    // Doradus. The rest are fainter than the catalogue's magnitude 6.5 limit.
+    expect(NAMED.stars.length).toBe(339);
   });
 
   it('carries a two-word name whole', () => {

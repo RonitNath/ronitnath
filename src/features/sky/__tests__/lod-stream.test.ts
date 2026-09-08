@@ -1,4 +1,3 @@
-import { readFileSync } from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { type DeepStars, LOD_HEADER_LEN, LOD_RECORD_BYTES } from '../lod';
@@ -11,6 +10,8 @@ import {
   TileStreamer,
 } from '../lod-stream';
 import { viewMatrix } from '../sidereal';
+import { SKY_ASSETS } from '../asset-names';
+import { shippedText } from './fixtures/shipped';
 
 /** A `GDR3LOD1` file of `count` identical faint stars — the streamer cares
  * about lengths and order, not about where the stars are. */
@@ -21,7 +22,13 @@ function blob(count: number): Uint8Array {
   return bytes;
 }
 
-const manifest = JSON.parse(readFileSync('public/stars/lod/manifest.json', 'utf8'));
+const manifest = JSON.parse(shippedText(SKY_ASSETS.lodManifest));
+
+/** Which tile a URL asks for. Tile files are `<id>-<content hash>.bin`, so the
+ * id is the head of the name and nothing else in the URL is a number. */
+function tileIdOf(url: string): number {
+  return Number(url.split('/').at(-1)!.split('-')[0]);
+}
 
 class Sink implements DeepSink {
   capacity = 4;
@@ -60,15 +67,16 @@ function server(options: { hold?: boolean } = {}): {
   vi.stubGlobal('fetch', (url: string, init?: RequestInit) => {
     calls.push(url);
     const range = (init?.headers as Record<string, string> | undefined)?.Range ?? null;
-    if (!url.endsWith('manifest.json')) ranges.push(range);
+    if (url !== SKY_ASSETS.lodManifest) ranges.push(range);
     if (init?.signal) signals.push(init.signal);
-    const body = url.endsWith('manifest.json')
+    const body =
+      url === SKY_ASSETS.lodManifest
       ? { ok: true, json: async () => manifest }
       : {
           ok: true,
           arrayBuffer: async () => {
-            const name = url.split('/').at(-1)!;
-            const id = Number(name.replace('.bin', ''));
+            // Every file is `<id>-<hash>.bin`, and `g9-<hash>.bin` alongside.
+            const id = tileIdOf(url);
             const count = Number.isNaN(id) ? manifest.g9.count : manifest.tiles[id].count;
             const bytes = blob(count);
             // A ranged request gets the front of the file, header and all,
@@ -77,7 +85,7 @@ function server(options: { hold?: boolean } = {}): {
             return (end ? bytes.slice(0, Number(end[1]) + 1) : bytes).buffer;
           },
         };
-    if (!options.hold || url.endsWith('manifest.json') || url.endsWith('g9.bin')) {
+    if (!options.hold || url === SKY_ASSETS.lodManifest || url.includes('/g9-')) {
       return Promise.resolve(body);
     }
     return new Promise((resolve, reject) => {
@@ -114,7 +122,7 @@ describe('the streamer', () => {
     const streamer = new TileStreamer(sink);
     await streamer.start();
     expect(sink.g9?.count).toBe(manifest.g9.count);
-    expect(calls).toEqual(['/stars/lod/manifest.json', '/stars/lod/g9.bin']);
+    expect(calls).toEqual([SKY_ASSETS.lodManifest, `/stars/lod/${manifest.g9.file}`]);
 
     const view = viewAt(Date.UTC(2026, 2, 3, 4, 5));
     streamer.step(view, 1_000);
@@ -123,7 +131,7 @@ describe('the streamer', () => {
     const wanted = rankTiles(zenithOf(view.matrix), frameRadiusRad(16 / 9)).map((n) => n.id);
     const first = calls
       .slice(2)
-      .map((url) => Number(url.split('/').at(-1)!.replace('.bin', '')));
+      .map(tileIdOf);
     // Two in flight at a time, and both of them from the head of the queue.
     expect(first).toHaveLength(2);
     expect(wanted.slice(0, 4)).toContain(first[0]);
@@ -170,7 +178,7 @@ describe('the streamer', () => {
       await flush();
     }
     const asked = calls.slice(2).map((url, index) => ({
-      count: manifest.tiles[Number(url.split('/').at(-1)!.replace('.bin', ''))].count,
+      count: manifest.tiles[tileIdOf(url)].count,
       range: ranges[index + 1] ?? null,
     }));
     expect(asked.length).toBeGreaterThan(4);
@@ -195,7 +203,7 @@ describe('the streamer', () => {
     }
     const spent = calls
       .slice(2)
-      .map((url) => manifest.tiles[Number(url.split('/').at(-1)!.replace('.bin', ''))].bytes)
+      .map((url) => manifest.tiles[tileIdOf(url)].bytes)
       .map((bytes: number) => Math.min(bytes, 12 + 4_096 * 16))
       .reduce((total: number, bytes: number) => total + bytes, 0);
     // The burst plus twenty seconds of trickle, and not the 51 MB on disk.
@@ -219,6 +227,39 @@ describe('the streamer', () => {
     expect(sink.tiles.size).toBe(0);
   });
 
+  it('skips a tile that is no longer there and keeps streaming', async () => {
+    /* Every tile name carries a content hash, so a visitor still holding a
+     * bundle from the release before last asks for a filename this deploy no
+     * longer has. That is a 404, and a 404 is a tile of grain the sky does
+     * without: the streamer must not stall, retry forever, or fail the page.
+     */
+    const calls: string[] = [];
+    vi.stubGlobal('fetch', (url: string) => {
+      calls.push(url);
+      if (url === SKY_ASSETS.lodManifest) return Promise.resolve({ ok: true, json: async () => manifest });
+      if (url.includes('/g9-')) {
+        return Promise.resolve({ ok: true, arrayBuffer: async () => blob(manifest.g9.count).buffer });
+      }
+      return Promise.resolve({ ok: false, status: 404 });
+    });
+    const sink = new Sink();
+    const streamer = new TileStreamer(sink);
+    await streamer.start();
+    expect(sink.g9?.count).toBe(manifest.g9.count);
+
+    streamer.step(viewAt(Date.UTC(2026, 2, 3, 4, 5)), 1_000);
+    await flush();
+    expect(sink.tiles.size).toBe(0);
+
+    // And the next tick asks for more, rather than being wedged on the ones
+    // that were not there.
+    const before = calls.length;
+    streamer.step(viewAt(Date.UTC(2026, 2, 3, 4, 6)), 2_000);
+    await flush();
+    expect(calls.length).toBeGreaterThan(before);
+    expect(streamer.enabled).toBe(true);
+  });
+
   it('leaves a phone on a data plan with g9 alone', async () => {
     vi.stubGlobal('matchMedia', () => ({ matches: true }));
     vi.stubGlobal('innerWidth', 390);
@@ -229,6 +270,6 @@ describe('the streamer', () => {
     streamer.step(viewAt(Date.UTC(2026, 2, 3, 4, 5)), 1_000);
     await flush();
     expect(streamer.enabled).toBe(false);
-    expect(calls).toEqual(['/stars/lod/manifest.json', '/stars/lod/g9.bin']);
+    expect(calls).toEqual([SKY_ASSETS.lodManifest, `/stars/lod/${manifest.g9.file}`]);
   });
 });

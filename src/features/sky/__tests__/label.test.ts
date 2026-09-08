@@ -1,4 +1,3 @@
-import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 import { parseNamed } from '../catalog';
@@ -13,6 +12,8 @@ import {
   UPDATE_INTERVAL_MS,
 } from '../label';
 import { observerAt } from '../track';
+import { SKY_ASSETS } from '../asset-names';
+import { shipped, shippedText } from './fixtures/shipped';
 
 const city = (distanceKm: number): City => ({ name: 'Testville', country: 'TS', distanceKm });
 
@@ -44,7 +45,7 @@ describe('the grounding caption', () => {
     // sample time would still render a plausible caption, and only this catches
     // it.
     const catalog = CityCatalog.parse(
-      new Uint8Array(readFileSync('public/cities/cities.bin')),
+      new Uint8Array(shipped(SKY_ASSETS.cities)),
     )!;
     const text = (simMs: number): string => {
       const [lat, lon] = observerAt(simMs);
@@ -56,7 +57,7 @@ describe('the grounding caption', () => {
 
 describe('a callout detail line', () => {
   it('states the catalog and nothing more', () => {
-    const star = parseNamed(readFileSync('public/stars/named.json', 'utf8')).stars[0]!;
+    const star = parseNamed(shippedText(SKY_ASSETS.named)).stars[0]!;
     const detail = starDetail(star);
     expect(detail).toContain(star.constellation);
     expect(detail.endsWith(' ly')).toBe(true);

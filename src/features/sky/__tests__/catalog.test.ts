@@ -1,4 +1,3 @@
-import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -14,9 +13,11 @@ import {
   starPosition,
   STRIDE,
 } from '../catalog';
+import { SKY_ASSETS } from '../asset-names';
+import { shipped, shippedText } from './fixtures/shipped';
 
-const BRIGHT = new Uint8Array(readFileSync('public/stars/bright.bin'));
-const NAMED = readFileSync('public/stars/named.json', 'utf8');
+const BRIGHT = new Uint8Array(shipped(SKY_ASSETS.bright));
+const NAMED = shippedText(SKY_ASSETS.named);
 
 /** One STR2 record, with everything but the arguments left valid. */
 function oneRecord(x: number, y: number, z: number, kind = KIND_GAIA): Uint8Array {
@@ -34,7 +35,9 @@ const STR2_MAGIC = [0x53, 0x54, 0x52, 0x32];
 
 describe('the shipped star catalog', () => {
   it('validates and has its published count', () => {
-    expect(parseStars(BRIGHT).count).toBe(12_191);
+    // 12,048 Gaia rows, the 89 Hipparcos bright-end stars Gaia saturates on,
+    // and the 198 the fill added between the two (`build_bright.py`).
+    expect(parseStars(BRIGHT).count).toBe(12_335);
   });
 
   it('is sorted brightest first, so a partial read is still the sky', () => {
@@ -58,7 +61,7 @@ describe('the shipped star catalog', () => {
     for (let index = 0; index < catalog.count; index += 1) {
       if (catalog.kind[index] === KIND_GAIA) gaia += 1;
     }
-    expect(gaia).toBe(12_102);
+    expect(gaia).toBe(12_048);
     const last = catalog.count - 1;
     expect(catalog.id[last]).toBeGreaterThan(BigInt(Number.MAX_SAFE_INTEGER));
     expect(starKey(catalog, last)).toBe(`gaia-${catalog.id[last]}`);
@@ -77,7 +80,7 @@ describe('the shipped star catalog', () => {
     const catalog = parseStars(BRIGHT);
     const vector = starPosition(catalog, 0)!;
     expect(Math.abs(Math.hypot(...vector) - 1)).toBeLessThan(0.01);
-    expect(starPosition(catalog, 12_191)).toBeNull();
+    expect(starPosition(catalog, catalog.count)).toBeNull();
     expect(starPosition(catalog, -1)).toBeNull();
   });
 });

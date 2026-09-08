@@ -1,4 +1,3 @@
-import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -15,6 +14,8 @@ import {
 } from '../lod';
 import { tileFor } from '../lod-tiles';
 import { unitVector } from '../sidereal';
+import { SKY_ASSETS } from '../asset-names';
+import { shippedLod, shippedText } from './fixtures/shipped';
 
 /** The builder's `oct_encode`, transcribed from `tools/starcat/build_star_lod.py`.
  * The decoder is asserted against *this* rather than against a round trip
@@ -133,7 +134,7 @@ describe('parseDeep', () => {
 
 describe('the shipped assets', () => {
   const manifest = parseManifest(
-    JSON.parse(readFileSync('public/stars/lod/manifest.json', 'utf8')),
+    JSON.parse(shippedText(SKY_ASSETS.lodManifest)),
   );
 
   it('says the bright catalogue was deduplicated at build', () => {
@@ -146,7 +147,7 @@ describe('the shipped assets', () => {
 
   it('decodes a real tile into its own patch of sky', () => {
     const tile = manifest.tiles[300]!;
-    const stars = parseDeep(readFileSync(`public/stars/lod/${tile.file}`));
+    const stars = parseDeep(shippedLod(tile.file));
     expect(stars.count).toBe(tile.count);
     for (let index = 0; index < stars.count; index += 97) {
       const at = index * 3;
@@ -162,7 +163,7 @@ describe('the shipped assets', () => {
   it('is sorted brightest first, which is what a Range prefix relies on', () => {
     const tile = manifest.tiles[280]!;
     expect(manifest.sortedByMagnitude).toBe(true);
-    const whole = readFileSync(`public/stars/lod/${tile.file}`);
+    const whole = shippedLod(tile.file);
     const stars = parseDeep(whole);
     expect(stars.count).toBeGreaterThan(4_096);
     // The first 4,096 records of the file are the 4,096 brightest stars in
