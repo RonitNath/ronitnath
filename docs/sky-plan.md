@@ -251,3 +251,102 @@ Recorded as built, 2026-09-07.
 - **The panel says a temperature from BP−RP where Gaia has no astrophysical
   row**, labelled as that rather than as `teff_gspphot`. Alioth has no
   astrophysical row and a colour temperature is worth more than a blank.
+
+## S4 deviations
+
+Recorded as built, 2026-09-08.
+
+- **The whole-sky query is asked 192 times, not once.** The archive will *run*
+  a level-9 aggregation over `gaia_source` — it is one indexed pass — but it
+  will not deliver it: the async job's result stream for three million rows is
+  reset by the front end after a megabyte or two, and there is no `Range`
+  support to resume from. Splitting the query along the HEALPix index gives 192
+  contiguous `source_id` ranges the server answers without a scan, each about
+  16k rows and half a megabyte, and each arrives whole. `public/sky/source.json`
+  carries the query with its range placeholders and the chunk count. The pull
+  is 3,065,685 rows over 3,145,728 pixels — the 80,043 empty ones are Poisson,
+  not a gap: at level 9 a high-latitude pixel holds a handful of stars.
+- **The band map is 4096x2048 at 315 KB**, under the 600 KB the brief allowed,
+  with a 2048x1024 downscale at 142 KB for anything under 1,600 device pixels
+  across. The angular blur is 0.16° rather than the legacy 0.45°: at level 7
+  the blur was hiding a 0.46° lattice, and at level 9 the same blur would hide
+  the dust instead. `flux` is dropped from the SELECT — the baker never read it,
+  and it was a third of the bytes.
+- **The map's filename carries its content hash.** `milkyway-<12 hex>.webp`,
+  written by the baker and named in `assets.ts`. A re-bake at a fixed path is
+  invisible behind a CDN and to everyone holding the old one, and the
+  alternative was a Cloudflare purge on every bake. Nothing has to be purged.
+- **Mipmaps needed `textureGrad`, and finding out why was the visual gate's
+  work.** Turning on `LINEAR_MIPMAP_LINEAR` drew a dashed dark curve across the
+  band. The map wraps in u, and the hardware picks a level from the screen-space
+  derivative of the coordinate it is handed: across the seam at RA 180 that
+  derivative jumps by a whole turn for the one 2x2 quad straddling it, which
+  selects the coarsest mip for that quad. Wrapping `dFdx`/`dFdy` back into
+  [-0.5, 0.5] and sampling with them explicitly is the fix.
+- **The figures are CC BY-SA 4.0 + Free Art License, not GPL.** Stellarium's
+  `skycultures/modern/info.ini` says so; the file moved out of `master` after
+  v23.4, so the pinned source is that tag. The astronexus alternative the brief
+  offered does not exist — HYG publishes no line set — so no substitution was
+  needed. HYG *is* used, for the HIP positions the join runs through.
+- **665 segments of Stellarium's 676, and six Hipparcos numbers unresolved.**
+  Sheratan, Menkar, Mahasim, Gienah and Enif are all V 2.5 to 2.7 — Gaia
+  saturates on them and `hip_2.5.csv` cuts just above them, so they are not in
+  `bright.bin` at all; HIP 33165 is V 6.65, past the catalogue. Eleven segments
+  are dropped rather than guessed, which leaves a gap in Aries, Cetus, Auriga,
+  Corvus and Pegasus. Closing it means rebuilding `bright.bin` from a deeper
+  Hipparcos cut, which moves every record index in the catalogue and is not
+  S4's to do.
+- **The pass draws quads, not `LINES`.** `lineWidth` is 1 device pixel and
+  nothing else on every driver that matters, which at 2x DPR is half a CSS
+  pixel of unfeathered diagonal — a dotted line over a star field. Each segment
+  is two triangles carrying both endpoints, so the vertex shader works out the
+  screen direction and offsets its own corner; the fragment feathers the last
+  device pixel. One CSS pixel, antialiased, on a canvas with no MSAA.
+- **333 names, not the ~450 the plan guessed.** Only 339 of the IAU's 451
+  approved names are brighter than the catalogue's G ≤ 6.5 cut, and seven of
+  those are the saturated stars above. The two-word column bug is fixed in a
+  shared `iau_csn.py` that reads the file's own fixed columns — and reading
+  *those* found a second bug the regex shared: Mebsuta leaves the component
+  column blank, so a whitespace split loses a field and shifts every column
+  after it. `build_detail.py` now reads through the same module.
+- **Alpha Centauri needed a magnitude tiebreak.** Its two components are five
+  arcseconds apart and the pair moves 3.7 arcseconds a year, so at the epoch
+  difference between the IAU file and the catalogue both records sit within half
+  an arcminute of the position and the *nearer* one is the fainter component.
+  Candidates are bucketed by separation to two arcminutes and brightness decides
+  inside the bucket, which puts Rigil Kentaurus on A and Toliman on B.
+- **The fifty hand-written entries moved to `tools/starcat/data/named_hand.json`.**
+  They were the build's input and its output at the same file, so a second run
+  would have read last night's generated phrase as a person's reading and the
+  distinction would have been gone. Two of the fifty are superseded by their
+  star's IAU name (Alpha Centauri by Rigil Kentaurus, Delta Velorum by
+  Alsephina); the rest keep their text.
+- **Growing the list to 333 exposed a missing factor of two in the callout
+  separation.** A label hangs off its anchor by a label width plus the leader
+  offset, so two anchors whose leaders turn toward each other need *twice* that
+  between them; `separationFor` measured one. With fifty candidates two landing
+  near each other was rare, and with 333 it is the common case — the visual gate
+  found Polaris and Deneb printed over each other 403 px apart on a 1440 px
+  frame. Both axes now come from `reach`, which already said exactly this.
+- **Twinkle is `?twinkle=1` and not a button.** Three controls fit the corner on
+  a desktop and wrap to two rows on a 390 px phone, which puts a second row of
+  chrome under the grounding caption. Two controls and a query parameter is the
+  quieter answer; the scintillation itself is in the star vertex shader, tied to
+  airmass rather than to brightness, magnitude 3.2 and brighter, and never under
+  reduced motion.
+- **The light theme's hover and pressed states were unreachable.** The dusk
+  re-tint `:root[data-theme='light'] .sky-control` is a whole selector more
+  specific than `.sky-control:hover`, so in the light theme the button had been
+  the same ink whatever it was doing since R1. Said again at that specificity.
+- **`stage.ts` gave up `stage-view.ts` to stay under 400 lines.** Where the
+  named stars are on screen, what colour a callout's ring is, and which ring
+  this frame draws: three questions answered from a view matrix and a catalogue,
+  which is not what a stage is for.
+- **The S3 detail end-to-end now pauses before it picks.** It drove the pointer
+  at coordinates read a few frames earlier, and at 60x with the pick weighing
+  brightness against distance that is enough for a magnitude-5 neighbour of
+  Arcturus to win. Paused, the frame the positions came from is the frame the
+  pointer lands in.
+- **The first-minute byte budget moved from 5.2 MB to 5.4 MB.** The band is
+  126 KB more on the run's own viewport, once, for a band that no longer reads
+  as blobs at the galactic centre.

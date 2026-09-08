@@ -26,12 +26,17 @@ every part of that is checkable. `src/features/sky/` owns it.
 
 - **Catalog.** `public/stars/bright.bin` is 12,191 stars — J2000 unit vector,
   magnitude, colour and the Gaia DR3 or Hipparcos id the star is known by,
-  brightest first — with `named.json` naming 50 of them from the IAU and
-  SIMBAD. `tools/starcat/build_bright.py` builds it from the ESA Gaia DR3 and
+  brightest first — with `named.json` naming 333 of them: every IAU-approved
+  name whose star is in the catalogue, built by `build_names.py`. `tools/starcat/build_bright.py` builds it from the ESA Gaia DR3 and
   Hipparcos snapshots committed beside it; nothing at runtime ever contacts ESA
   or CDS. Star colour is derived rather than drawn: colour index → effective
   temperature → a blackbody spectrum through the CIE observer → sRGB, on 24
-  levels. `public/sky/milkyway.webp` is Gaia star counts on an equatorial grid,
+  levels. `public/sky/milkyway-<hash>.webp` is 36.8 million Gaia stars counted
+  into 3.1 million equal-area HEALPix cells and baked into a 4096x2048
+  equatorial map (a 2048x1024 downscale goes to narrow screens); the hash is
+  the content's, so a re-bake is a new URL and no cache is ever stale.
+  `public/sky/lines.bin` is Stellarium's 88 constellation figures as 665 pairs
+  of catalogue record indices.
   `public/cities/cities.bin` the filtered GeoNames `cities15000`, and
   `public/textures/earth/` NASA's Blue Marble, all carried unchanged from the
   pre-rebuild site. `public/stars/NOTICE` and `public/textures/earth/NOTICE`
@@ -48,7 +53,9 @@ every part of that is checkable. `src/features/sky/` owns it.
   (`observer.ts`), travelling 800 ms along the great circle; "Resume orbit"
   travels back. There is no geolocation prompt and no per-visitor sky.
 - **Drawing.** One WebGL2 canvas at ≤30 fps carries the whole sky: the Milky
-  Way as a fragment shader (`band-gl.ts`), then the catalog as GL points
+  Way as a fragment shader (`band-gl.ts`), the constellation figures as
+  antialiased quads when the Lines control is on (`lines-gl.ts`, off by default
+  and remembered in `localStorage`), then the catalog as GL points
   (`stars-gl.ts`). The stars are photometric rather than drawn — linear flux
   `10^(-0.4(m − m_ref))` through the atmosphere's extinction, an
   energy-conserving Gaussian core plus a bounded glare wing per fragment,
@@ -82,6 +89,10 @@ every part of that is checkable. `src/features/sky/` owns it.
   no audit row, no transaction, and nothing at runtime contacts ESA or CDS. A
   key with no row answers 200 with what the key itself says. Empty fields are
   dropped, so the panel is as tall as what is known about the star.
+- **Twinkle** is `?twinkle=1` and nothing else: a per-star scintillation in the
+  star vertex shader whose amplitude follows airmass rather than brightness,
+  applied to magnitude 3.2 and brighter, never under reduced motion. It is a
+  query parameter because a third button crowds the corner on a phone.
 - **Reduced motion** draws one frame and stops repainting; "Pause sky" freezes
   the clock. Nothing is fetched, decoded or painted until the main thread is
   idle, and every asset is validated before it is drawn: Lighthouse on the

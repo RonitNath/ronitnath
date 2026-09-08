@@ -102,10 +102,19 @@ export default function AboutPage() {
             not a spectrum and does not claim to be.
           </p>
           <p>
-            Fifty stars are named. Their names are the proper names adopted by the
-            International Astronomical Union. Their constellations, classifications and
-            distances were checked against SIMBAD and the Hipparcos parallaxes, with
-            distances rounded for legibility.
+            Three hundred and thirty-three stars are named: every name approved by the
+            International Astronomical Union whose star is bright enough to be in the
+            catalogue. Constellations, classifications and distances come from the HYG
+            catalogue and the Hipparcos parallaxes, with distances rounded for legibility;
+            the fifty the site opened with keep the wording they were checked against
+            SIMBAD with. At most three are called out at once, chosen for what is in frame.
+          </p>
+          <p>
+            The Lines control draws the constellation figures — 665 segments over 88
+            constellations, from Stellarium’s modern sky culture, with each figure’s
+            Hipparcos numbers resolved into catalogue records when the file was packed.
+            They are off unless you ask for them, they carry no labels, and they dim with
+            the same extinction the stars do.
           </p>
         </section>
 
@@ -114,8 +123,8 @@ export default function AboutPage() {
           <p>
             The band behind the stars is not an image of the Milky Way. It is a count. Every
             Gaia source brighter than magnitude 15, some 36.8 million stars, was binned into
-            196,608 equal-area cells of the sky about half a degree across, and each cell’s
-            total flux became its surface brightness. Where the galactic disc is edge-on
+            3,145,728 equal-area cells of the sky 0.115° across, and each cell’s star count
+            became its surface brightness. Where the galactic disc is edge-on
             there are more stars per cell and the band appears on its own. Where
             interstellar dust hides the stars behind it the counts collapse, which is why the
             dark lane through Cygnus and Aquila, the Great Rift, is there without anyone
@@ -123,8 +132,37 @@ export default function AboutPage() {
             redder in the plane than at the galactic poles, which is interstellar reddening.
           </p>
           <p>
-            The counts are baked once into a 1024 by 512 pixel map in equatorial
-            coordinates. The browser never contacts the Gaia archive.
+            The counts are baked once into a 4096 by 2048 pixel map in equatorial
+            coordinates — a 2048 by 1024 version is sent to narrow screens, which have no
+            pixels to show the difference on. The first bake used cells half a degree
+            across, and at that size the dust lanes toward the galactic centre were blobs of
+            the grid rather than shapes of the dust; the cells are now a fifth of that.
+            The browser never contacts the Gaia archive.
+          </p>
+        </section>
+
+        <section>
+          <h2>Deeper than the eye</h2>
+          <p>
+            The naked-eye catalogue is what arrives first, and it is not where the sky
+            stops. Once the page has painted, a second file of every Gaia star brighter
+            than magnitude 9 — 165,393 of them — is fetched whole, and after that the sky
+            is streamed: 768 tiles of every star brighter than magnitude 12, three million
+            in all, requested nearest the middle of the view first and then along the path
+            the viewpoint will take over the next few simulated minutes, so the sky ahead
+            has arrived by the time you are under it. The faint tiles are drawn as flux
+            below the size of a pixel rather than as points, which is what makes them read
+            as the texture of the sky instead of as three million dots. Nothing is fetched
+            on a metered connection or a device that says it is saving data.
+          </p>
+          <p>
+            Clicking a star opens what is known about it. That comes from this server and
+            no other: a 3.09 million row table built offline from Gaia DR3’s source and
+            astrophysical parameters, the HYG catalogue for proper names, Bayer and
+            Flamsteed designations and spectral types, the IAU name list, the IAU
+            constellation boundaries, and one bulk SIMBAD query for the twelve thousand
+            stars the pointer can reach. The browser never asks ESA or CDS anything, and
+            neither does the page behind it.
           </p>
         </section>
 
