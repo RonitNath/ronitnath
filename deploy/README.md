@@ -104,6 +104,33 @@ docker run --rm --network host \
   ghcr.io/ronitnath/ronitnath:"$TAG"-migrate
 ```
 
+### The star catalogue, once per environment
+
+`sky_star_detail` is 3,087,894 rows built offline (`tools/starcat/README.md`).
+It is not in the image — 257 MB compressed — and it is not in a migration: it
+is data, loaded once after the migration that creates the table, and again only
+when the build is refreshed. Skipping it is survivable; the detail panel then
+answers with what a star's catalogue key says and nothing more.
+
+Copy the build to the host, then load it from the same one-off container the
+migration runs in (the loader is Node and `pg`, so the image needs nothing
+added to it; it checks the file against `data/sky_star_detail.sha256` before it
+loads a byte):
+
+```sh
+scp data/sky_star_detail.csv.zst alien:/data/crypt/ronitnath/
+docker run --rm --network host \
+  --env-file /data/crypt/ronitnath/web.env \
+  -v /data/crypt/ronitnath/sky_star_detail.csv.zst:/data/sky_star_detail.csv.zst:ro \
+  ghcr.io/ronitnath/ronitnath:"$TAG"-migrate \
+  node scripts/load-sky.mjs /data/sky_star_detail.csv.zst
+```
+
+About 80 seconds, one transaction, a full replacement: a failure leaves the old
+rows in place. The table is about 2.5 GB with its indexes, so it is loaded on
+one node and reaches the others through Patroni replication — the second host
+runs the image, not the load.
+
 Then start the service:
 
 ```sh
@@ -129,3 +156,9 @@ back only to a tag whose schema the current database still satisfies.
 TAG=<previous> docker compose -f compose.yaml up -d
 curl -sS http://127.0.0.1:3140/healthz
 ```
+
+Take a `pg_dump -Fc` into `/data/crypt/ronitnath/backups/` before a migration
+that is not purely additive. `sky_star_detail` is excluded from those dumps
+(`--exclude-table sky_star_detail`): it is 2.5 GB of data that is rebuilt from
+a file that is checksummed and kept, and a backup of it is a copy of something
+that is not lost.

@@ -42,6 +42,12 @@ Star detail (sky_star_detail)
   and a SIMBAD lookup limited to the bright catalog. Each row records the
   catalogues it drew on.
 
+  Where a star's constellation is given by both HYG and the boundary walk, the
+  panel shows HYG's: the two disagree on 13% of the stars HYG names, and on
+  every one checked (Rigil Kentaurus, Mimosa, Fomalhaut, Deneb Algedi) HYG is
+  the one that agrees with the IAU boundaries. The computed value stands where
+  HYG has no row, which is every star fainter than the HYG catalogue reaches.
+
   HYG v3 database (c) Astronomy Nexus / David Nash, licensed CC BY-SA 4.0
     https://github.com/astronexus/HYG-Database
     https://creativecommons.org/licenses/by-sa/4.0/

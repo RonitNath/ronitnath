@@ -192,3 +192,62 @@ Recorded as built, 2026-09-07.
 - **`?skyfill=1` lifts the byte budget**, alongside `?skydebug=1`, so the
   performance gate can fill every slot in a minute rather than a quarter of an
   hour. Neither flag is reachable without typing it.
+
+## S3 deviations
+
+Recorded as built, 2026-09-07.
+
+- **The dataset's ids and the URL's ids are different spellings, and the route
+  is where they meet.** `sky_star_detail.id` stays as the CSV carries it,
+  `g<source_id>` / `h<hip>`; the browser asks with `starKey()`'s `gaia-<n>` /
+  `hip-<n>`. Rewriting three million keys through a COPY to match a URL is work
+  done three million times to save one line.
+- **A `hip-` key is looked up twice, and migration 0007 is why.** The bright
+  catalogue calls a first-magnitude star by its Hipparcos number and the detail
+  build filed it under its *Gaia* source id wherever the positional match
+  landed: Alioth is `hip-62956` to the sky and `g1576683529448755328` to the
+  table, with `hip: "62956"` in the payload. Only the 66 Hipparcos stars Gaia
+  has no row for are keyed `h<n>`. Without the second lookup — the primary key,
+  then `payload->>'hip'` over the index 0007 adds — every bright named star a
+  visitor clicks answers "no further record" about the best-known stars in the
+  sky. The visual gate found this; every test passed while it was true.
+- **HYG's constellation beats the boundary walk, and HYG's `proper` beats the
+  IAU name fields.** The build derives a constellation by precessing to B1875
+  and walking the VI/42 arcs; it puts Rigil Kentaurus in Circinus, Mimosa in
+  Centaurus and Fomalhaut in Sculptor. HYG names one per star, curated, and is
+  right in every case checked; the two disagree on 13% of the stars HYG knows.
+  Separately, the IAU name list is parsed out of fixed columns, so a two-word
+  name lands split — HIP 71683 arrives as `iauName` "Rigil" and
+  `iauNameDiacritics` "Kentaurus", and neither half is the star's name.
+  `constellations.ts` carries the 88 abbreviation/name pairs the panel needs,
+  and the lookup itself is what rejects HYG's two malformed codes.
+- **Fourteen pixels is the reach for every star; brightness decides who wins
+  inside it.** The plan says "nearest within 14 px weighted by brightness". A
+  star's own drawn half-width (`tuning.ts` `starDiameterPx`) comes off the
+  distance, so a pointer inside Sirius's disc cannot be stolen by a
+  magnitude-8 neighbour three pixels nearer — but brightness never *extends*
+  the reach, or a first-magnitude star would swallow twenty pixels of sky.
+- **`g9.bin` keeps its source ids after all.** S2 dropped them because nothing
+  could then ask which star; picking is what asks. 165,393 ids is 1.3 MB. The
+  768 streamed tiles still drop theirs — they are not pickable, and three
+  million ids nobody reads would be 25 MB of nothing.
+- **Three modules came out of `stage.ts`, which was at its 400-line cap.**
+  `globe-stage.ts` (the mini-globe), `stage-assets.ts` (the order the assets
+  arrive in) and `pick-stage.ts` (which star is hovered, which is pinned, where
+  either is on screen a frame later). The interaction is a fourth file,
+  `star-pick.tsx`, beside the panel's `detail.tsx`: the pointer wiring and the
+  hover tag are not the panel.
+- **The label separation is measured against the label now.** 328 px of a
+  1440 px frame is 0.46 in normalised coordinates and the constant was 0.55; on
+  a 390 px phone the same label is 1.68 across, so two callouts a third of the
+  width apart passed the test and were printed on top of each other. The panel
+  made it visible by taking the bottom 62% of a phone, but the defect was
+  S1's and is fixed there. Desktop is unchanged.
+- **`window.__sky` grew a `named` array**, so the end-to-end can drive the
+  pointer at whichever star is actually up rather than at a star the orbit may
+  have set. It is still `?skydebug=1` only, and the install moved from
+  `deep-stage.ts` to `stage.ts` because the stage is what knows what is on
+  screen.
+- **The panel says a temperature from BP−RP where Gaia has no astrophysical
+  row**, labelled as that rather than as `teff_gspphot`. Alioth has no
+  astrophysical row and a colour temperature is worth more than a blank.

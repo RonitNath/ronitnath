@@ -65,6 +65,23 @@ every part of that is checkable. `src/features/sky/` owns it.
   phone, where nothing clears it, the best above-horizon star is forced to the
   edge and says so. `label.ts` writes the grounding caption — position first,
   then the nearest city, "over" it within 50 km.
+- **Picking.** Hovering a star rings it and tags it; clicking pins it and opens
+  the detail panel. `pick.ts` projects the two pickable catalogues — the bright
+  12,191 and `g9.bin`'s 165,393 — on the CPU through the same view matrix the
+  shader is handed, at most once a frame and only when a pointer asks, and
+  buckets them on screen so a query reads a neighbourhood rather than the whole
+  sky. Nothing is read back from the GPU. The reach is 14 px for every star;
+  inside it a star's own drawn half-width decides which one wins, so a pointer
+  inside Sirius's disc is on Sirius. The streamed G 9-12 tiles are not
+  pickable.
+- **Detail.** `GET /api/sky/star/<gaia-|hip->id` reads one row of
+  `sky_star_detail` — 3,087,894 stars merged offline from Gaia DR3 and its
+  astrophysical parameters, HYG v3, the IAU name list, the IAU constellation
+  boundaries and, for the stars a pointer can reach, SIMBAD — and normalises
+  five catalogues' spellings into one shape (`star-detail.ts`). It is a read:
+  no audit row, no transaction, and nothing at runtime contacts ESA or CDS. A
+  key with no row answers 200 with what the key itself says. Empty fields are
+  dropped, so the panel is as tall as what is known about the star.
 - **Reduced motion** draws one frame and stops repainting; "Pause sky" freezes
   the clock. Nothing is fetched, decoded or painted until the main thread is
   idle, and every asset is validated before it is drawn: Lighthouse on the
@@ -81,6 +98,15 @@ pnpm db:up                    # postgres:17 on 127.0.0.1:5433
 pnpm db:migrate               # drizzle-kit; migrations never run at boot
 pnpm dev                      # http://localhost:3000
 ```
+
+The star detail the panel reads is a separate, one-off load. Put the built
+`sky_star_detail.csv.zst` in `data/` (gitignored; `data/sky_star_detail.sha256`
+is the checksum of the build that is deployed) and run `pnpm db:load-sky` once
+per environment after `pnpm db:migrate`. It needs nothing on PATH — the loader
+is Node and `pg` — checks the file against that checksum before it loads a
+byte, takes about 80 seconds, and replaces the table whole inside one
+transaction. Without it the panel still opens and says what the star's key
+says. `tools/starcat/README.md` is how the file is built.
 
 `DEV_DB_PORT=5443 pnpm db:up` moves the database when something else on the
 machine already holds 5433.
