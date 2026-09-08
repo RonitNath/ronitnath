@@ -11,6 +11,15 @@
  * name a star that has no row; the answer is then what the key itself says,
  * with a 200 and the same cache lifetime, because it is just as true a day
  * from now.
+ *
+ * A `hip-` key is looked up twice. The bright catalogue calls a first-magnitude
+ * star by its Hipparcos number, but the detail build filed it under its Gaia
+ * source id wherever the positional match succeeded: Alioth is `hip-62956` to
+ * the sky and `g1576683529448755328` to the table, with `hip: "62956"` in the
+ * payload. Only the 66 Hipparcos stars Gaia has no row for are keyed `h<n>`.
+ * So the primary key first, and the payload's own HIP number second, over the
+ * index migration 0007 adds — otherwise every bright named star a visitor
+ * clicks answers "no further record" about the best-known stars in the sky.
  */
 
 import { sql } from 'drizzle-orm';
@@ -44,9 +53,15 @@ export async function GET(
     return Response.json({ error: 'too many requests' }, { status: 429, headers: NO_STORE });
   }
   try {
-    const found = await database().execute<{ payload: unknown }>(
+    const db = database();
+    let found = await db.execute<{ payload: unknown }>(
       sql`select payload from sky_star_detail where id = ${key.rowId} limit 1`,
     );
+    if (found.rows.length === 0 && key.kind === 'hip') {
+      found = await db.execute<{ payload: unknown }>(
+        sql`select payload from sky_star_detail where payload->>'hip' = ${key.number} limit 1`,
+      );
+    }
     const row = found.rows[0];
     const detail = row ? normaliseStarDetail(key, row.payload) : catalogOnly(key);
     return Response.json(detail, { status: 200, headers: CACHE });

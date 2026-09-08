@@ -265,6 +265,19 @@ export function pushOutOfBoxes(x: number, y: number, boxes: readonly NdcBox[]): 
  * coordinates are one unreadable block of text, not two labels. */
 const MIN_SEPARATION: readonly [number, number] = [0.55, 0.14];
 
+/** How far apart two labels have to be, for a frame of this width.
+ *
+ * The constant above is a desktop measurement: a label is 328 px of a 1440 px
+ * frame, which is 0.46 in normalised coordinates, and 0.55 is that with a
+ * little room. On a phone the same label is nearly the *whole* frame — 328 of
+ * 390 px, which is 1.68 — so two callouts a third of the width apart pass the
+ * desktop test and are printed straight over each other. Measuring the
+ * separation against the label instead of against a number is what keeps three
+ * names on a phone from being one unreadable pile. */
+export function separationFor(width: number): [number, number] {
+  return [Math.max(MIN_SEPARATION[0], (labelWidthFor(width) * 2) / width), MIN_SEPARATION[1]];
+}
+
 /** How many labels the frame carries at once. Three is what fits down one side
  * of a phone without the sky becoming a list. */
 export const MAX_LABELS = 3;
@@ -286,6 +299,7 @@ export function place(
   limit: number = MAX_LABELS,
   keepOut: readonly [number, number] = KEEP_OUT,
   avoid: readonly NdcBox[] = [],
+  separation: readonly [number, number] = MIN_SEPARATION,
 ): Placement[] {
   const inside: Placement[] = [];
   let bestForced: Placement | null = null;
@@ -303,8 +317,8 @@ export function place(
     if (!onHero && !onChrome && Math.abs(x) <= MARGIN_X && Math.abs(y) <= MARGIN_Y) {
       const collides = inside.some(
         (other) =>
-          Math.abs(other.x - x) < MIN_SEPARATION[0] &&
-          Math.abs(other.y - y) < MIN_SEPARATION[1],
+          Math.abs(other.x - x) < separation[0] &&
+          Math.abs(other.y - y) < separation[1],
       );
       if (collides) continue;
       inside.push({ star, position: vector, x, y, forced: false });

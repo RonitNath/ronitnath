@@ -456,9 +456,21 @@ export const audit = pgTable(
  * the CSV carries and what a three-million-row COPY must not have to rewrite.
  * The URL a browser asks with is `gaia-<id>` / `hip-<n>` (`catalog.ts`
  * `starKey()`); the route translates between the two and nothing else does.
- * The payload is the builder's JSON verbatim, normalised on the way out. */
-export const skyStarDetail = pgTable('sky_star_detail', {
-  id: text('id').primaryKey(),
-  payload: jsonb('payload').notNull(),
-  builtAt: timestamp('built_at', { withTimezone: true }).notNull().defaultNow(),
-});
+ * The payload is the builder's JSON verbatim, normalised on the way out.
+ *
+ * The index is on the Hipparcos number *inside* the payload, because a star
+ * has two names here and only one of them is the key. The bright catalogue
+ * calls a first-magnitude star by its HIP number, but the detail build wrote
+ * it under its Gaia source id wherever the two matched — Alioth is
+ * `g1576683529448755328` with `hip: "62956"` in the payload, and only the 66
+ * Hipparcos stars Gaia has no row for are keyed `h<n>`. Without this index the
+ * fallback lookup is a sequential scan of three million rows. */
+export const skyStarDetail = pgTable(
+  'sky_star_detail',
+  {
+    id: text('id').primaryKey(),
+    payload: jsonb('payload').notNull(),
+    builtAt: timestamp('built_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  () => [index('sky_star_detail_hip_idx').on(sql`((payload ->> 'hip'))`)],
+);

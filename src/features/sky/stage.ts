@@ -9,7 +9,13 @@
  * leave the CSS starfield as the picture and the document intact.
  */
 
-import { keepOutFor, place, placementAvoid, type Placement } from './annotate';
+import {
+  keepOutFor,
+  place,
+  placementAvoid,
+  type Placement,
+  separationFor,
+} from './annotate';
 
 import { simTimeMs, syncedSimTimeMs } from './clock';
 import { type DeepReadout, DeepStreaming, SKY_DEBUG } from './deep-stage';
@@ -129,6 +135,7 @@ export class Stage {
       undefined,
       keepOutFor(innerWidth, innerHeight),
       placementAvoid(innerWidth, innerHeight),
+      separationFor(innerWidth),
     );
   }
 

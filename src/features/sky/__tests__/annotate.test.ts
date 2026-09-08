@@ -18,6 +18,7 @@ import {
   MAX_LABELS,
   parsePosition,
   place,
+  separationFor,
   placementAvoid,
   positionAttribute,
 } from '../annotate';
@@ -246,5 +247,18 @@ describe('a callout never lands on anything the page has already drawn', () => {
         }
       }
     }
+  });
+});
+
+describe('separationFor', () => {
+  it('is the desktop constant where a label is a third of the frame', () => {
+    // 328 px of 1440 is 0.46 in normalised coordinates; the constant is 0.55.
+    expect(separationFor(1_440)[0]).toBeCloseTo(0.55, 2);
+  });
+
+  it('grows to the label where the label is the frame', () => {
+    // On a 390 px phone the same label is 328 px — 1.68 across — so two
+    // callouts that pass the desktop test are printed over each other.
+    expect(separationFor(390)[0]).toBeGreaterThan(1.6);
   });
 });

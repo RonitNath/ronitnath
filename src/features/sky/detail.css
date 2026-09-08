@@ -80,9 +80,12 @@
     left: auto;
     top: calc(var(--topbar-height) + 0.5rem);
     right: clamp(0.5rem, 2vw, 1.25rem);
-    bottom: clamp(0.75rem, 2vh, 1.25rem);
+    /* As tall as what is known about the star, and no taller: a pane stretched
+       to the bottom of the frame is mostly empty for a Gaia-only row, and the
+       sky behind it is the picture. */
+    bottom: auto;
     width: 22rem;
-    max-height: none;
+    max-height: calc(100dvh - var(--topbar-height) - 1.5rem);
     border: 1px solid var(--border);
     border-radius: var(--radius);
   }

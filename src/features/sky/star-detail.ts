@@ -16,6 +16,8 @@
  * shows twenty rather than both showing twenty with fifteen dashes.
  */
 
+import { CONSTELLATIONS } from './constellations';
+
 /** Which catalogue a URL key names, and the row id that catalogue maps to.
  *
  * Two spellings exist and both are load-bearing. The browser says
@@ -223,7 +225,11 @@ export function normaliseStarDetail(key: StarKey, payload: unknown): StarDetail 
   const simbad = block(row, 'simbad');
 
   const names: StarNames = {
-    proper: str(iau.iauNameDiacritics) ?? str(iau.iauName) ?? str(row.name) ?? str(hyg.proper),
+    // HYG's proper name first: the IAU list is parsed out of fixed columns and
+    // a two-word name lands split across two fields — HIP 71683 arrives as
+    // `iauName` "Rigil" and `iauNameDiacritics` "Kentaurus", and neither half
+    // is the star's name.
+    proper: str(hyg.proper) ?? str(row.name) ?? str(iau.iauName),
     bayerFlamsteed: str(hyg.bayerFlamsteed),
     hd: str(hyg.hd) ?? str(iau.hd),
     hr: str(hyg.hr),
@@ -245,10 +251,19 @@ export function normaliseStarDetail(key: StarKey, payload: unknown): StarDetail 
     sources: Array.isArray(row.sources) ? row.sources.filter((s): s is string => typeof s === 'string') : [],
   };
 
-  const abbreviation = str(row.constellation) ?? str(hyg.constellation);
-  const constellationName = str(row.constellationName);
+  // HYG's per-star constellation where it has a usable one, and the boundary
+  // walk the build did otherwise — see `constellations.ts` for why that way
+  // round.
+  const hygConstellation = str(hyg.constellation);
+  const abbreviation =
+    hygConstellation && CONSTELLATIONS[hygConstellation]
+      ? hygConstellation
+      : str(row.constellation);
   if (abbreviation) {
-    detail.constellation = { abbreviation, name: constellationName ?? abbreviation };
+    detail.constellation = {
+      abbreviation,
+      name: CONSTELLATIONS[abbreviation] ?? str(row.constellationName) ?? abbreviation,
+    };
   }
 
   const otype = str(simbad.otype_txt);

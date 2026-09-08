@@ -1,0 +1,61 @@
+{
+    "ra": 219.911475,
+    "dec": -60.833976,
+    "hip": "71683",
+    "hyg": {
+        "hd": "128620",
+        "hr": "5459",
+        "ra": 219.911475,
+        "dec": -60.833976,
+        "hip": "71683",
+        "magV": -0.01,
+        "bayer": "Alp-1",
+        "gliese": "Gl 559A",
+        "proper": "Rigil Kentaurus",
+        "absMagV": 4.379,
+        "colorIndex": 0.71,
+        "luminosity": 1.543121,
+        "spectralType": "G2V",
+        "constellation": "Cen",
+        "bayerFlamsteed": "Alp1Cen",
+        "distanceParsecs": 1.3248
+    },
+    "iau": {
+        "hd": "128620",
+        "ra": 219.902066,
+        "dec": -60.833975,
+        "hip": "71683",
+        "magV": -0.01,
+        "bayer": "alf",
+        "iauName": "Rigil",
+        "designation": "Rigil Kentaurus   HR 5459",
+        "constellation": "Cen",
+        "iauNameDiacritics": "Kentaurus"
+    },
+    "kind": "hip",
+    "name": "Rigil",
+    "bright": true,
+    "simbad": {
+        "ids": [
+            "GALAH 140708001701306",
+            "2MASS J14393592-6050069",
+            "TIC 471011145",
+            "GJ 559 A"
+        ],
+        "pmra": "-3679.25",
+        "pmdec": "473.67",
+        "main_id": "* alf Cen A",
+        "sp_type": "G2V",
+        "otype_txt": "PM*",
+        "plx_value": "742.12",
+        "rvz_radvel": "-15.252"
+    },
+    "sources": [
+        "Hipparcos (bright catalog)",
+        "HYG v3",
+        "IAU WGSN Catalog of Star Names",
+        "SIMBAD (CDS)"
+    ],
+    "constellation": "Cir",
+    "constellationName": "Circinus"
+}

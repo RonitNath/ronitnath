@@ -129,6 +129,17 @@ describe('normaliseStarDetail', () => {
     expect(detail.temperature).toBeUndefined();
   });
 
+  it('takes the name and the constellation from the curated catalogue', () => {
+    const detail = normaliseStarDetail(key('hip-71683'), fixture('rigil'));
+    // The IAU list is parsed out of fixed columns, so "Rigil Kentaurus" lands
+    // in the row as `iauName` "Rigil" and `iauNameDiacritics` "Kentaurus", and
+    // neither half is the star's name. HYG's `proper` is.
+    expect(detail.title).toBe('Rigil Kentaurus');
+    // And the build's boundary walk puts the nearest star system to the Sun in
+    // Circinus, which it is not. HYG says Centaurus, and HYG is right.
+    expect(detail.constellation).toEqual({ abbreviation: 'Cen', name: 'Centaurus' });
+  });
+
   it('answers with the key alone when there is no row', () => {
     const detail = catalogOnly(key('gaia-4611686018427387904'));
     expect(detail.source).toBe('catalog');

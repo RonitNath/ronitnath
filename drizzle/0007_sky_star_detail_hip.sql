@@ -1,0 +1,1 @@
+CREATE INDEX "sky_star_detail_hip_idx" ON "sky_star_detail" USING btree (((payload ->> 'hip')));

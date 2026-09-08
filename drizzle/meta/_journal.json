@@ -50,6 +50,13 @@
       "when": 1788830461294,
       "tag": "0006_sky_star_detail",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1788833402335,
+      "tag": "0007_sky_star_detail_hip",
+      "breakpoints": true
     }
   ]
 }

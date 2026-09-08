@@ -96,11 +96,11 @@ export function detailRows(detail: StarDetail): Row[] {
   push('Radius', detail.radiusSuns !== undefined ? `${fmt(detail.radiusSuns)} R⊙` : undefined);
   push('Mass', detail.massSuns !== undefined ? `${fmt(detail.massSuns)} M⊙` : undefined);
   push('Age', detail.ageGyr !== undefined ? `${fmt(detail.ageGyr)} ${UNITS.gigayear}` : undefined);
+  // The total, not the two components: a pair of grouped decimals separated by
+  // a comma reads as one number with a thousands separator in it, and how fast
+  // a star is moving across the sky is the number the row is for.
   if (detail.properMotion) {
-    push(
-      'Proper motion',
-      `${fmt(detail.properMotion.ra, 2)}, ${fmt(detail.properMotion.dec, 2)} ${UNITS.masPerYear}`,
-    );
+    push('Proper motion', `${fmt(detail.properMotion.total, 2)} ${UNITS.masPerYear}`);
   }
   push(
     'Radial velocity',
