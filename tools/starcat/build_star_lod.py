@@ -7,7 +7,17 @@ needs, view-first, with immutable cache headers and no server logic. `g9.bin`
 carries every G <= 9 record in one file for the after-first-paint fetch.
 
 Record: "<Qhhhh" = source_id, octahedral x, octahedral y, mag*1000, (BP-RP)*1000.
-File:   b"GDR3LOD1" + u32 record count + records.
+File:   b"GDR3LOD1" + u32 record count + records, *brightest first*.
+
+The ordering is a contract, not a convenience: the client draws at most a few
+thousand stars from any one tile, and a tile on the galactic plane holds
+twenty thousand. Sorted by magnitude, the first N records of a file are the N
+brightest stars of that patch of sky, which is a magnitude cut and therefore
+spatially even — so the browser asks for `Range: bytes=0-...` and pays for
+what it draws. Unsorted, the same prefix is whatever order the archive
+returned, which for Gaia source ids is a HEALPix walk: a corner of the tile,
+and a visible edge in the middle of the sky. `sortedByMagnitude` in the
+manifest is what says the files hold up their end.
 
 Records whose source_id is already in the bright catalog
 (`tools/starcat/data/gaia_g6.5.csv`, shipped as STR2) are dropped here; the
@@ -18,6 +28,10 @@ Two sources, in order of preference:
                      manifest); no network, byte-identical to the pinned pull.
   --from-tap         re-query the Gaia archive per tile (slow; only when the
                      pinned release is refreshed).
+  --resort           re-read the tiles already in public/stars/lod and write
+                     them back sorted, for a build made before the ordering
+                     was a contract. A permutation: same records, same counts,
+                     same file sizes.
 
 Python 3 standard library only. Production never contacts ESA.
 """
@@ -161,7 +175,7 @@ def buckets_from_tap(cache: Path) -> tuple[list[bytearray], dict]:
 
 # ------------------------------------------------------------------- writing
 
-def build(buckets: list[bytearray], release: str) -> dict:
+def build(buckets: list[bytearray], release: str, dropped_before: int = 0) -> dict:
     bright = bright_source_ids()
     print(f"bright catalog: {len(bright):,} source ids to drop")
     OUT.mkdir(parents=True, exist_ok=True)
@@ -169,7 +183,8 @@ def build(buckets: list[bytearray], release: str) -> dict:
         stale.unlink()
 
     manifest = {
-        "version": 2,
+        "version": 3,
+        "sortedByMagnitude": True,
         "release": release,
         "generatedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "magic": MAGIC.decode(),
@@ -184,17 +199,22 @@ def build(buckets: list[bytearray], release: str) -> dict:
     mid = bytearray()
     kept = dropped = 0
     for tile, data in enumerate(buckets):
-        body = bytearray()
+        rows = []
         for offset in range(0, len(data), RECORD.size):
             record = data[offset:offset + RECORD.size]
             source_id, _ox, _oy, milli_mag, _colour = RECORD.unpack(record)
             if source_id in bright:
                 dropped += 1
                 continue
+            rows.append((milli_mag, bytes(record)))
+            kept += 1
+        # Brightest first, so a prefix of the file is a magnitude cut.
+        rows.sort(key=lambda row: row[0])
+        body = bytearray()
+        for milli_mag, record in rows:
             body.extend(record)
             if milli_mag <= G9_LIMIT * 1000:
                 mid.extend(record)
-            kept += 1
         blob = MAGIC + HEADER.pack(len(body) // RECORD.size) + bytes(body)
         (OUT / f"{tile}.bin").write_bytes(blob)
         manifest["tiles"].append({
@@ -205,18 +225,45 @@ def build(buckets: list[bytearray], release: str) -> dict:
             "sha256": sha256_of(blob),
         })
 
+    # g9 is one file the client always takes whole, but it is drawn under the
+    # same magnitude limit, so it is sorted too.
+    mid_rows = sorted(
+        (mid[at:at + RECORD.size] for at in range(0, len(mid), RECORD.size)),
+        key=lambda record: RECORD.unpack(record)[3],
+    )
+    mid = bytearray(b"".join(bytes(row) for row in mid_rows))
     g9 = MAGIC + HEADER.pack(len(mid) // RECORD.size) + bytes(mid)
     (OUT / "g9.bin").write_bytes(g9)
     manifest["g9"] = {"file": "g9.bin", "count": len(mid) // RECORD.size,
                       "bytes": len(g9), "sha256": sha256_of(g9)}
     manifest["count"] = kept
-    manifest["droppedBright"] = dropped
+    # A re-sort re-reads files the drop already ran on, so it carries the
+    # count forward rather than reporting the zero it just measured: that
+    # number is the build's record that nothing is drawn twice.
+    manifest["droppedBright"] = dropped or dropped_before
     manifest["totalBytes"] = sum(t["bytes"] for t in manifest["tiles"]) + len(g9)
     (OUT / "manifest.json").write_text(json.dumps(manifest, separators=(",", ":")) + "\n")
     print(f"wrote {kept:,} G<={G_LIMIT} records in {len(buckets)} tiles "
           f"({manifest['totalBytes']:,} bytes), {manifest['g9']['count']:,} in g9.bin, "
           f"dropped {dropped:,} already in the bright catalog")
     return manifest
+
+
+def buckets_from_published() -> tuple[list[bytearray], dict]:
+    """Re-read the tiles already in `public/stars/lod` as record buffers.
+
+    Used by --resort. The bright-catalog drop has already happened for these,
+    so `build` will find nothing left to drop and the counts come out the same.
+    """
+    manifest = json.loads((OUT / "manifest.json").read_text())
+    buckets = []
+    for tile in manifest["tiles"]:
+        blob = (OUT / tile["file"]).read_bytes()
+        if blob[:8] != MAGIC or HEADER.unpack_from(blob, 8)[0] != tile["count"]:
+            raise SystemExit(f"{tile['file']} is not the file the manifest describes")
+        buckets.append(bytearray(blob[len(MAGIC) + HEADER.size:]))
+    print(f"published: {sum(t['count'] for t in manifest['tiles']):,} records to re-sort")
+    return buckets, manifest
 
 
 def verify() -> None:
@@ -227,6 +274,11 @@ def verify() -> None:
         assert HEADER.unpack_from(blob, 8)[0] == tile["count"], tile["file"]
         assert len(blob) == tile["bytes"], tile["file"]
         assert sha256_of(blob) == tile["sha256"], tile["file"]
+        # The client Range-fetches a prefix of a tile and expects the brightest
+        # stars in it, so the ordering is verified rather than assumed.
+        mags = [RECORD.unpack_from(blob, len(MAGIC) + HEADER.size + at * RECORD.size)[3]
+                for at in range(tile["count"])]
+        assert mags == sorted(mags), f"{tile['file']} is not sorted by magnitude"
     print(f"verified {len(manifest['tiles'])} tiles + g9.bin against the manifest")
 
 
@@ -235,16 +287,19 @@ def main() -> None:
     parser.add_argument("--from-legacy", type=Path,
                         default=Path(os.environ.get("RN_LEGACY_LOD", ROOT / "data" / "legacy")))
     parser.add_argument("--from-tap", action="store_true")
+    parser.add_argument("--resort", action="store_true")
     parser.add_argument("--verify-only", action="store_true")
     args = parser.parse_args()
     if args.verify_only:
         verify()
         return
-    if args.from_tap:
+    if args.resort:
+        buckets, source = buckets_from_published()
+    elif args.from_tap:
         buckets, source = buckets_from_tap(ROOT / "data" / "tap" / "lod")
     else:
         buckets, source = buckets_from_legacy(args.from_legacy)
-    build(buckets, source.get("release", "Gaia DR3"))
+    build(buckets, source.get("release", "Gaia DR3"), source.get("droppedBright", 0))
     verify()
 
 
