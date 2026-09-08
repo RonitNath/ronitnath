@@ -9,14 +9,7 @@
  * leave the CSS starfield as the picture and the document intact.
  */
 
-import {
-  keepOutFor,
-  place,
-  placementAvoid,
-  type Placement,
-  separationFor,
-} from './annotate';
-
+import type { Placement } from './annotate';
 import { simTimeMs, syncedSimTimeMs } from './clock';
 import { type DeepReadout, DeepStreaming, SKY_DEBUG } from './deep-stage';
 import type { NamedStar, StarCatalog } from './catalog';
@@ -27,10 +20,18 @@ import { grounding, UPDATE_INTERVAL_MS } from './label';
 import { COLOUR_RAMP } from './lod';
 import { Observer, TRANSITION_MS, type Point } from './observer';
 import type { StreamView } from './lod-stream';
+import type { LinePairs } from './lines';
 import type { PickHit } from './pick';
 import { type DebugStar, StagePicking } from './pick-stage';
 import { type Vec3, viewMatrix } from './sidereal';
 import { SkyRenderer } from './sky-render';
+import {
+  catalogColor,
+  HIGHLIGHT_MS,
+  highlightNow,
+  placementsFor,
+  type TimedHighlight,
+} from './stage-view';
 import { loadSkyAssets } from './stage-assets';
 import type { Highlight } from './star-field';
 
@@ -39,17 +40,15 @@ import type { Highlight } from './star-field';
  * 60 fps loop that would show the same motion. */
 const FRAME_INTERVAL_MS = 33;
 
-const HIGHLIGHT_MS = 1_800;
-
-/** What the HTML parts of the island render from. Callout *positions* are not
- * in here: they move every frame, and pushing them through React state is what
- * made the labels step across the sky instead of gliding. React is told the
- * named stars; the positions go to the DOM (see `callouts.tsx`). */
+/** What the HTML parts of the island render from. Callout *positions* are not:
+ * they move every frame, and through React state the labels stepped across the
+ * sky instead of gliding. Positions go to the DOM (`callouts.tsx`). */
 export interface Readout {
   grounding: string;
   named: NamedStar[];
   manual: boolean;
   paused: boolean;
+  lines: boolean;
 }
 
 export class Stage {
@@ -73,7 +72,7 @@ export class Stage {
   private cities: CityCatalog | null = null;
 
   private lastFrameAt = 0;
-  private highlight: (Highlight & { until: number }) | null = null;
+  private highlight: TimedHighlight | null = null;
 
   private frame = 0;
   private timer = 0;
@@ -81,6 +80,12 @@ export class Stage {
   private live = true;
   private reduced = false;
   private paused = false;
+  private lines = false;
+  private linePairs: LinePairs | null = null;
+  /** Scintillation, `?twinkle=1` only — see `sky-stage.tsx` for why it is not
+   * a button. Never under reduced motion: it is motion and nothing else. */
+  private readonly twinkle =
+    typeof location !== 'undefined' && location.search.includes('twinkle=1');
   private frozenSimMs: number | null = null;
 
   constructor(private readonly serverEpochMs: number) {
@@ -118,36 +123,21 @@ export class Stage {
       named: this.named,
       manual: this.observer.isManual(),
       paused: this.paused,
+      lines: this.lines,
     };
     for (const listener of this.listeners) listener(readout);
   }
 
-  /** Where the named stars are *now*, through the same view the canvas last
-   * drew with. The callout loop asks for this every frame; nothing about it
-   * goes through React, and nothing else recomputes it. */
+  /** Where the named stars are now, and what colour a callout's ring is: both
+   * are `stage-view.ts`, given the one view matrix this frame drew with. */
   placements(): Placement[] {
-    if (!this.vectors.length) return [];
     const [lat, lon] = this.observerNow();
-    return place(
-      this.vectors,
-      viewMatrix(this.simMs(), lat, lon),
-      this.aspect(),
-      undefined,
-      keepOutFor(innerWidth, innerHeight),
-      placementAvoid(innerWidth, innerHeight),
-      separationFor(innerWidth),
-    );
+    const matrix = viewMatrix(this.simMs(), lat, lon);
+    return placementsFor(this.vectors, matrix, this.aspect(), innerWidth, innerHeight);
   }
 
-  /** The catalog colour of a named star: the callout's ring is drawn in it, so
-   * the ring says which star as well as where. */
   namedColor(index: number): string | null {
-    const star = this.named[index];
-    if (!star || !this.stars) return null;
-    const at = star.brightIndex * 3;
-    const byte = (offset: number): number =>
-      Math.round((this.stars!.color[at + offset] ?? 1) * 255);
-    return `rgb(${byte(0)},${byte(1)},${byte(2)})`;
+    return catalogColor(this.stars, this.named, index);
   }
 
   /** What the tile queue scores against (`lod-tiles.ts`). */
@@ -161,14 +151,15 @@ export class Stage {
     return innerHeight > 0 ? innerWidth / innerHeight : 1.6;
   }
 
-  /** The sky's canvases: the WebGL2 one that ships and the 2D one that stands
-   * in for it (`sky-render.ts` picks between them). */
-  attachSky(canvas: HTMLCanvasElement | null, flat: HTMLCanvasElement | null): void {
-    this.sky.attach(canvas, flat);
-  }
-
-  attachGlobe(canvas: HTMLCanvasElement | null): void {
-    this.globe.attach(canvas);
+  /** The three canvases: the WebGL2 sky that ships, the 2D one that stands in
+   * for it (`sky-render.ts` picks between them), and the mini-globe. */
+  attach(
+    sky: HTMLCanvasElement | null,
+    flat: HTMLCanvasElement | null,
+    globe: HTMLCanvasElement | null,
+  ): void {
+    this.sky.attach(sky, flat);
+    this.globe.attach(globe);
   }
 
   /** Whether the globe is drawing through WebGL rather than the flat disc. */
@@ -182,7 +173,7 @@ export class Stage {
     // Opt-in, and unreachable without typing `?skydebug=1`.
     if (SKY_DEBUG) {
       (window as unknown as { __sky: () => DeepReadout & { named: DebugStar[] } }).__sky =
-        () => ({ ...this.deep.readout(), named: this.debugNamed() });
+        () => ({ ...this.deep.readout(), named: this.picking.debugNamed(this.named) });
     }
     // The sky is background: nothing is fetched, decoded or painted until the
     // main thread is free, and the CSS starfield holds the frame until then.
@@ -236,6 +227,15 @@ export class Stage {
     }
   }
 
+  /** The constellation figures on or off. The stage keeps the flag; the button
+   * remembers it (`sky-stage.tsx`), because what a visitor chose is theirs and
+   * not this frame's. */
+  setLines(lines: boolean): void {
+    this.lines = lines;
+    this.draw();
+    this.publish();
+  }
+
   setPaused(paused: boolean): void {
     this.paused = paused;
     this.frozenSimMs = paused ? this.simMs() : null;
@@ -257,7 +257,7 @@ export class Stage {
     const simMs = this.simMs();
     const [lat, lon] = this.observerNow();
     this.drawSky(simMs, lat, lon);
-    this.drawGlobe(simMs, lat, lon);
+    this.globe.draw(lat, lon, simMs, document.documentElement.dataset.theme === 'light');
   }
 
   private drawSky(simMs: number, lat: number, lon: number): void {
@@ -270,6 +270,7 @@ export class Stage {
       // reveal is an animation.
       this.reduced,
       this.currentHighlight(),
+      { lines: this.lines, twinkle: this.twinkle && !this.reduced },
     );
     // The CSS starfield was the picture until the first real frame. Now that
     // the catalog is on screen the two would be one sky over another, so the
@@ -281,23 +282,15 @@ export class Stage {
   }
 
   private currentHighlight(): Highlight | null {
-    const ringed = this.picking.ringed;
-    if (ringed) return { position: ringed.position, strength: 1 };
-    const highlight = this.highlight;
-    if (!highlight) return null;
-    const left = highlight.until - performance.now();
-    if (left <= 0) {
-      this.highlight = null;
-      return null;
-    }
-    return { position: highlight.position, strength: left / HIGHLIGHT_MS };
+    const { highlight, expired } = highlightNow(
+      this.picking.ringed,
+      this.highlight,
+      performance.now(),
+    );
+    if (expired) this.highlight = null;
+    return highlight;
   }
 
-  private drawGlobe(simMs: number, lat: number, lon: number): void {
-    this.globe.draw(lat, lon, simMs, document.documentElement.dataset.theme === 'light');
-  }
-
-  // --- picking -------------------------------------------------------------
 
   /** The pick's own state is in `pick-stage.ts`; the stage supplies it the one
    * view matrix everything else is drawn through, so the pick, the ring and
@@ -323,12 +316,6 @@ export class Stage {
     return this.picking.screenPosition(position);
   }
 
-  /** Every named star on screen, for `?skydebug=1` and nothing else. */
-  debugNamed(): DebugStar[] {
-    return this.picking.debugNamed(this.named);
-  }
-
-  // --- the controls, all of which write the one observer -------------------
 
   setObserver(lat: number, lon: number, travel: boolean): void {
     const duration = travel && !this.reduced ? TRANSITION_MS : 0;
@@ -366,8 +353,6 @@ export class Stage {
     this.publish();
   }
 
-  // --- assets --------------------------------------------------------------
-
   /** The fetch order lives in `stage-assets.ts`; what each arrival *means* is
    * here, because it is the stage's own state that changes. */
   private loadAssets(): void {
@@ -376,6 +361,7 @@ export class Stage {
       stars: (catalog) => {
         this.stars = catalog;
         this.picking.picker.setCatalog(catalog, COLOUR_RAMP);
+        this.sky.setLines(catalog, this.linePairs);
         this.draw();
       },
       named: (named, vectors) => {
@@ -389,6 +375,11 @@ export class Stage {
       cities: (cities) => {
         this.cities = cities;
         this.publish();
+      },
+      lines: (pairs) => {
+        this.linePairs = pairs;
+        this.sky.setLines(this.stars, pairs);
+        if (this.lines) this.draw();
       },
       band: () =>
         this.sky.loadBand().then(() => {

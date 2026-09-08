@@ -15,7 +15,31 @@ const EMPTY: Readout = {
   named: [],
   manual: false,
   paused: false,
+  lines: false,
 };
+
+/** Where the constellation toggle is remembered. Off is the default and the
+ * absent value, so a visitor who has never pressed it gets the sky. */
+const LINES_KEY = 'rn.sky.lines';
+
+/** Storage is a permission in some browsers and absent in others; a sky that
+ * throws on load because it could not read a preference is a worse sky than
+ * one that forgets. */
+function storedLines(): boolean {
+  try {
+    return localStorage.getItem(LINES_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function rememberLines(on: boolean): void {
+  try {
+    localStorage.setItem(LINES_KEY, on ? '1' : '0');
+  } catch {
+    // Nothing to do: the toggle still works for this visit.
+  }
+}
 
 /** The one client island on the landing page.
  *
@@ -45,8 +69,8 @@ export function SkyStage({ serverEpochMs }: { serverEpochMs: number }) {
 
   useEffect(() => {
     const created = new Stage(serverEpochMs);
-    created.attachSky(skyRef.current, flatRef.current);
-    created.attachGlobe(globeRef.current);
+    created.attach(skyRef.current, flatRef.current, globeRef.current);
+    created.setLines(storedLines());
     const unsubscribe = created.subscribe(setReadout);
     created.start();
     setStage(created);
@@ -86,6 +110,19 @@ export function SkyStage({ serverEpochMs }: { serverEpochMs: number }) {
             onClick={() => stage?.setPaused(!readout.paused)}
           >
             {readout.paused ? 'Resume sky' : 'Pause sky'}
+          </button>
+          <button
+            type="button"
+            className="sky-control"
+            id="toggle-lines"
+            aria-pressed={readout.lines}
+            onClick={() => {
+              const next = !readout.lines;
+              rememberLines(next);
+              stage?.setLines(next);
+            }}
+          >
+            Lines
           </button>
           {readout.manual ? (
             <button

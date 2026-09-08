@@ -15,12 +15,14 @@
  * is twice the stars at half the brightness.
  */
 
-import { ASSETS, loadImageData } from './assets';
+import { ASSETS, bandUrl, loadImageData } from './assets';
 import { SKY_DEBUG } from './deep-stage';
 import { BandScene } from './band-gl';
 import type { StarCatalog } from './catalog';
 import { DeepLayer } from './deep-gl';
 import { skyContext } from './gl-util';
+import { LineScene } from './lines-gl';
+import { type LinePairs, lineVertices } from './lines';
 import type { Mat3 } from './sidereal';
 import { SpriteAtlas } from './sprites';
 import {
@@ -37,12 +39,20 @@ import { StarScene } from './stars-gl';
  * re-samples it on its own slower cadence and scales it up between times. */
 const BAND_INTERVAL_MS = 250;
 
+/** The two things a frame may be asked to add, both off by default and both
+ * only available on the WebGL path. */
+export interface SkyOptions {
+  lines?: boolean;
+  twinkle?: boolean;
+}
+
 export class SkyRenderer {
   private canvas: HTMLCanvasElement | null = null;
   private flat: HTMLCanvasElement | null = null;
   private gl: WebGL2RenderingContext | null = null;
   private bandScene: BandScene | null = null;
   private starScene: StarScene | null = null;
+  private lineScene: LineScene | null = null;
   private deep: DeepLayer | null = null;
   private uploaded = false;
 
@@ -62,6 +72,7 @@ export class SkyRenderer {
     this.gl = canvas ? skyContext(canvas) : null;
     this.bandScene = this.gl ? BandScene.create(this.gl) : null;
     this.starScene = this.gl ? StarScene.create(this.gl) : null;
+    this.lineScene = this.gl ? LineScene.create(this.gl) : null;
     if (canvas) canvas.hidden = this.gl === null;
     if (flat) flat.hidden = this.gl !== null;
   }
@@ -101,10 +112,20 @@ export class SkyRenderer {
    * pixels it can sample on the CPU. */
   async loadBand(): Promise<void> {
     if (this.bandScene) {
-      await this.bandScene.loadMap(ASSETS.milkyway);
+      await this.bandScene.loadMap(bandUrl(innerWidth, Math.min(devicePixelRatio || 1, 2)));
       return;
     }
-    this.milkyway = await loadImageData(ASSETS.milkyway, 1_024);
+    // The CPU path samples the map at 1,024 across whatever it is handed, so
+    // the wide bake would be three times the bytes for the same pixels.
+    this.milkyway = await loadImageData(ASSETS.milkyway2k, 1_024);
+  }
+
+  /** The constellation figures, expanded against the catalogue that is already
+   * on the GPU. Both have to have landed, and either may land first. */
+  setLines(catalog: StarCatalog | null, pairs: LinePairs | null): void {
+    if (!this.lineScene || !catalog || !pairs) return;
+    const vertices = lineVertices(catalog, pairs);
+    if (vertices) this.lineScene.upload(vertices);
   }
 
   /** One frame. Returns whether the star catalogue actually landed on it,
@@ -116,17 +137,18 @@ export class SkyRenderer {
     dpr: number,
     instant: boolean,
     highlight: Highlight | null,
+    options: SkyOptions = {},
   ): boolean {
     if (!SKY_DEBUG) {
       return this.gl
-        ? this.drawGl(stars, matrix, light, dpr, instant, highlight)
+        ? this.drawGl(stars, matrix, light, dpr, instant, highlight, options)
         : this.drawFlat(stars, matrix, light, dpr, highlight);
     }
     // The measured path blocks on the GPU. That is the only honest way to
     // time a frame from here, and exactly what production must not do.
     const startedAt = performance.now();
     const drawn = this.gl
-      ? this.drawGl(stars, matrix, light, dpr, instant, highlight)
+      ? this.drawGl(stars, matrix, light, dpr, instant, highlight, options)
       : this.drawFlat(stars, matrix, light, dpr, highlight);
     this.gl?.finish();
     this.frames.push(performance.now() - startedAt);
@@ -151,6 +173,7 @@ export class SkyRenderer {
     dpr: number,
     instant: boolean,
     highlight: Highlight | null,
+    options: SkyOptions,
   ): boolean {
     const gl = this.gl!;
     const canvas = this.canvas!;
@@ -164,13 +187,15 @@ export class SkyRenderer {
     gl.clearColor(0, 0, 0, 0);
     gl.clear(gl.COLOR_BUFFER_BIT);
     this.bandScene?.draw(matrix, light, width, height, instant);
+    // Between the band and the stars: a figure is behind the sky it names.
+    if (options.lines) this.lineScene?.draw(matrix, light, dpr, width, height);
 
     if (!stars || !this.starScene) return false;
     if (!this.uploaded) {
       this.starScene.upload(stars);
       this.uploaded = true;
     }
-    this.starScene.draw(matrix, light, dpr, width, height, highlight);
+    this.starScene.draw(matrix, light, dpr, width, height, highlight, options.twinkle);
     return true;
   }
 

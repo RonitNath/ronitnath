@@ -35,6 +35,65 @@ export async function litPixels(page: Page): Promise<number> {
   })()`) as Promise<number>;
 }
 
+/** The total light on the sky canvas: the sum of each pixel's brightest
+ * channel.
+ *
+ * Counting *lit* pixels cannot see the constellation figures. The band writes
+ * an alpha wherever it writes any colour at all, so nine tenths of the canvas
+ * is already non-zero before a line is drawn and a hairline lands almost
+ * entirely on pixels that were counted anyway. How much light is there does
+ * see them: 665 segments at a fifth of an alpha is a percentage of the frame,
+ * not a rounding error. */
+export async function skyLuminance(page: Page): Promise<number> {
+  return page.evaluate(`(() => {
+    ${READ_BACK}
+    const pixels = new Uint8Array(width * height * 4);
+    gl.readPixels(0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+    let sum = 0;
+    for (let i = 0; i < pixels.length; i += 4) {
+      sum += Math.max(pixels[i], pixels[i + 1], pixels[i + 2]);
+    }
+    return sum;
+  })()`) as Promise<number>;
+}
+
+/** Keep this frame in the page, so the next one can be compared against it
+ * pixel by pixel. Nothing crosses the wire: a 1440x900 buffer is five
+ * megabytes and the answer wanted is one number. */
+export async function holdFrame(page: Page): Promise<void> {
+  await page.evaluate(`(() => {
+    ${READ_BACK}
+    const pixels = new Uint8Array(width * height * 4);
+    gl.readPixels(0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+    globalThis.__heldFrame = pixels;
+  })()`);
+}
+
+/** How many pixels differ from the held frame by more than `threshold`.
+ *
+ * This is what can see the constellation figures. Total light cannot: the band
+ * across a frame is most of the light on it, and 665 hairlines at a fifth of
+ * an alpha are a few per cent of that — a margin the streamer's own arrivals
+ * eat into. A pixel that changed is unambiguous. */
+export async function changedPixels(page: Page, threshold = 6): Promise<number> {
+  return page.evaluate(`(() => {
+    ${READ_BACK}
+    const before = globalThis.__heldFrame;
+    const pixels = new Uint8Array(width * height * 4);
+    gl.readPixels(0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+    let changed = 0;
+    for (let i = 0; i < pixels.length; i += 4) {
+      const delta = Math.max(
+        Math.abs(pixels[i] - before[i]),
+        Math.abs(pixels[i + 1] - before[i + 1]),
+        Math.abs(pixels[i + 2] - before[i + 2]),
+      );
+      if (delta > ${threshold}) changed += 1;
+    }
+    return changed;
+  })()`) as Promise<number>;
+}
+
 export interface StarProfile {
   /** The brightest channel found anywhere in the window, 0..255. */
   peak: number;

@@ -15,9 +15,10 @@
  * this owns the order.
  */
 
-import { loadCities, loadNamed, loadStars } from './assets';
+import { loadCities, loadLines, loadNamed, loadStars } from './assets';
 import { namedVectors, type NamedCatalog, type StarCatalog } from './catalog';
 import type { CityCatalog } from './cities';
+import type { LinePairs } from './lines';
 import type { Vec3 } from './sidereal';
 
 /** What the loader hands back, in the order it gets it. Each call is made only
@@ -27,6 +28,7 @@ export interface AssetSink {
   stars(catalog: StarCatalog): void;
   named(named: NamedCatalog, vectors: Vec3[]): void;
   cities(cities: CityCatalog): void;
+  lines(pairs: LinePairs): void;
   band(): Promise<void>;
   globe(): Promise<void>;
   deep(): Promise<void>;
@@ -46,6 +48,12 @@ export async function loadSkyAssets(sink: AssetSink): Promise<void> {
   await Promise.allSettled([
     loadCities().then((cities) => {
       if (sink.live()) sink.cities(cities);
+    }),
+    // 2.7 KB of segment indices, fetched whether or not the toggle is on: a
+    // control that has to wait for a download after it is pressed is a control
+    // that does not work.
+    loadLines().then((pairs) => {
+      if (sink.live()) sink.lines(pairs);
     }),
     sink.band(),
   ]);

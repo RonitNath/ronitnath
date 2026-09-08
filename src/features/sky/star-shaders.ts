@@ -30,6 +30,14 @@ uniform float u_twilight;
 /** 1 for the streamed tile pass, which is the only one that has to ask
  * whether the sky it is drawing has arrived yet. */
 uniform float u_deep;
+/** Scintillation, off at zero: the fractional flux swing at one airmass past
+ * the zenith. Amplitude, magnitude cut and period range are TWINKLE in
+ * tuning.ts, where twinkleFactor is this same arithmetic on the CPU and is
+ * what the unit test bounds. */
+uniform float u_twinkle;
+uniform float u_twinkle_mag;
+uniform vec2 u_twinkle_period;
+uniform float u_time_ms;
 /** How much of each tile of the 32x24 grid is resident, 0 to 1, sampled
  * *bilinearly*: between two cells the value is the average of them, so a
  * region whose neighbours are all resident reads 1 and the field falls off
@@ -62,6 +70,18 @@ void main() {
     // Twilight keeps its stars high in the sky; near the bottom of the frame
     // the page is nearly white and a star there is a grey speck.
     flux *= mix(1.0, smoothstep(0.20, 0.70, view.z), u_twilight);
+
+    // Turbulence, not brightness: the column of air that dims a low star is
+    // what makes it flicker, so the swing follows airmass and a star at the
+    // zenith barely moves. The seed is the star's own index, which is what
+    // keeps the field from breathing in unison.
+    if (u_twinkle > 0.0 && a_mag <= u_twinkle_mag) {
+        float swing = min(0.45, u_twinkle * (airmass - 1.0));
+        float seed = float(gl_VertexID);
+        float spread = (sin(seed * 12.9898) + 1.0) * 0.5;
+        float period = mix(u_twinkle_period.x, u_twinkle_period.y, spread);
+        flux *= 1.0 + swing * sin(6.28318530718 * (u_time_ms / period + seed * 0.618034));
+    }
 
     if (u_deep > 0.5) {
         // Where this star is on the streaming grid. The RA axis wraps, so the
@@ -191,6 +211,10 @@ export const POINT_UNIFORMS = [
   'u_deep',
   'u_coverage',
   'u_mag_limit',
+  'u_twinkle',
+  'u_twinkle_mag',
+  'u_twinkle_period',
+  'u_time_ms',
   'u_fold',
   'u_exposure',
 ] as const;

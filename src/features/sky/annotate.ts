@@ -265,17 +265,27 @@ export function pushOutOfBoxes(x: number, y: number, boxes: readonly NdcBox[]): 
  * coordinates are one unreadable block of text, not two labels. */
 const MIN_SEPARATION: readonly [number, number] = [0.55, 0.14];
 
-/** How far apart two labels have to be, for a frame of this width.
+/** How far apart two anchors have to be for their labels not to overlap.
  *
- * The constant above is a desktop measurement: a label is 328 px of a 1440 px
- * frame, which is 0.46 in normalised coordinates, and 0.55 is that with a
- * little room. On a phone the same label is nearly the *whole* frame — 328 of
- * 390 px, which is 1.68 — so two callouts a third of the width apart pass the
- * desktop test and are printed straight over each other. Measuring the
- * separation against the label instead of against a number is what keeps three
- * names on a phone from being one unreadable pile. */
+ * The constant above is a desktop measurement of one label, and one label is
+ * the wrong unit: a label hangs off its anchor by {@link reach} in whichever
+ * direction the leader turned, so two anchors whose leaders turn *toward each
+ * other* need twice that between them. Measuring one label instead is what put
+ * Polaris and Deneb over each other at 403 px apart on a 1440 px frame — both
+ * passed a 328 px test and both labels ran 364 px inward.
+ *
+ * S3 measured against the label rather than a fixed number, which is what
+ * fixed the phone; S4 grew the name list from 50 stars to 333, which made two
+ * of them landing near each other the common case rather than the rare one,
+ * and that is when the missing factor of two showed. The test is an AND over
+ * both axes, so this rejects a pair only where the boxes really would meet. */
 export function separationFor(width: number): [number, number] {
-  return [Math.max(MIN_SEPARATION[0], (labelWidthFor(width) * 2) / width), MIN_SEPARATION[1]];
+  const [outX, outY] = reach(width);
+  const perPx = 2 / width;
+  return [
+    Math.max(MIN_SEPARATION[0], 2 * outX * perPx),
+    Math.max(MIN_SEPARATION[1], 2 * outY * perPx),
+  ];
 }
 
 /** How many labels the frame carries at once. Three is what fits down one side

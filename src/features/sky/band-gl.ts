@@ -1,7 +1,8 @@
 /** The Milky Way, drawn by a fragment shader.
  *
- * `sky/milkyway.webp` is Gaia star counts binned onto an equal-area grid and
- * baked in equatorial coordinates. Getting it on screen is a per-pixel
+ * `sky/milkyway-<hash>.webp` is Gaia star counts binned onto an equal-area
+ * grid — HEALPix level 9, 0.115 degrees, 3.07 million pixels — and baked in
+ * equatorial coordinates. Getting it on screen is a per-pixel
  * operation — the inverse of the star pass's projection, then an
  * equirectangular lookup — and the CPU warp this replaces could only afford it
  * into a 192 px buffer, which scaled up to blobs rather than to the galaxy.
@@ -74,7 +75,18 @@ void main() {
     // reads as the galaxy on black reads as smog.
     float shape = mix(u_band_shape, 2.7, u_light);
     float gain = mix(u_band_gain, 0.46, u_light);
-    vec3 band = pow(texture(u_map, uv).rgb, vec3(shape)) * gain * extinction;
+    // The map wraps in u, and the hardware picks a mipmap level from the
+    // screen-space derivatives of the coordinate it is handed. Across the
+    // seam at RA 180 those derivatives jump by a whole turn for the one 2x2
+    // quad that straddles it, which selects the coarsest level there and draws
+    // a dashed dark curve across the band. Wrapping the derivatives back into
+    // [-0.5, 0.5] and sampling with them explicitly is the fix; nothing else
+    // about the sample changes.
+    vec2 ddx = dFdx(uv);
+    vec2 ddy = dFdy(uv);
+    ddx.x -= round(ddx.x);
+    ddy.x -= round(ddy.x);
+    vec3 band = pow(textureGrad(u_map, uv, ddx, ddy).rgb, vec3(shape)) * gain * extinction;
 
     // Twilight keeps the band only high in the sky; near the bottom of the
     // frame the page is nearly white and any band there is a smudge.
@@ -105,6 +117,7 @@ export class BandScene {
   private readonly uniform: Record<string, WebGLUniformLocation | null>;
   private readonly quad: WebGLVertexArrayObject;
   private readonly texture: WebGLTexture;
+  private readonly anisotropy: EXT_texture_filter_anisotropic | null = null;
   private mapLoadedAt = 0;
   private hasMap = false;
 
@@ -131,6 +144,7 @@ export class BandScene {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    this.anisotropy = gl.getExtension('EXT_texture_filter_anisotropic');
   }
 
   /** Best-effort: a browser with no WebGL2 gets the CPU warp instead. */
@@ -153,6 +167,22 @@ export class BandScene {
     gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, 0);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, bitmap);
     bitmap.close();
+    // At 4096 across, most of the frame samples the map minified: a texel is
+    // 0.088 degrees and a screen pixel near the frame edge covers several of
+    // them. Without mipmaps that is point sampling a texel out of every group
+    // the pixel covers, which crawls as the sky turns. Trilinear plus whatever
+    // anisotropy the driver has keeps the band still and the lanes sharp
+    // toward the horizon, where the sample footprint is most stretched.
+    gl.generateMipmap(gl.TEXTURE_2D);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+    if (this.anisotropy) {
+      const max = gl.getParameter(this.anisotropy.MAX_TEXTURE_MAX_ANISOTROPY_EXT);
+      gl.texParameterf(
+        gl.TEXTURE_2D,
+        this.anisotropy.TEXTURE_MAX_ANISOTROPY_EXT,
+        Math.min(8, typeof max === 'number' ? max : 1),
+      );
+    }
     this.hasMap = true;
     this.mapLoadedAt = performance.now();
   }

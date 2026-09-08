@@ -176,10 +176,12 @@ describe('a refused star asset', () => {
 describe('the named catalog', () => {
   it('is structured, attributed, and points inside the star catalog', () => {
     const catalog = parseNamed(NAMED);
-    expect(catalog.version).toBe(1);
-    expect(catalog.stars.length).toBeGreaterThanOrEqual(50);
+    // Version 2 is S4's build: the whole IAU list that resolves into
+    // bright.bin rather than the fifty S1 wrote out by hand.
+    expect(catalog.version).toBe(2);
+    expect(catalog.stars.length).toBeGreaterThanOrEqual(300);
     expect(catalog.sources.some((source) => source.includes('IAU'))).toBe(true);
-    expect(catalog.sources.some((source) => source.includes('SIMBAD'))).toBe(true);
+    expect(catalog.sources.some((source) => source.includes('HYG'))).toBe(true);
     const vectors = namedVectors(parseStars(BRIGHT), catalog);
     expect(vectors).toHaveLength(catalog.stars.length);
     for (const vector of vectors)

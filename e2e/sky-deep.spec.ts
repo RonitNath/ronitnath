@@ -63,15 +63,20 @@ test('the deep sky lands after the catalogue, nearest the view first', async ({ 
 
 /** What the first minute is allowed to cost, and where the number comes from.
  *
- * The page's own assets are 1.47 MB — document, JS, the bright catalogue, the
- * Milky Way map, the city list and the globe's three textures — and `g9.bin`
- * is 2.65 MB more, so 4.12 MB is spent before a single tile is asked for. The
- * streamer's first minute is its 640 KB burst plus 60 s at 5 KB/s, which is
- * 0.94 MB: 5.06 MB in total, and 5.2 leaves room for the page itself to grow
- * a little without this becoming a test of the JS bundle. The budget that
- * actually shapes the streamer is the plan's 6 MB in five minutes, which the
- * rate below it is set by. */
-const FIRST_MINUTE_BYTES = 5.2e6;
+ * The page's own assets are 1.60 MB — document, JS, the bright catalogue, the
+ * Milky Way map, the constellation figures, the city list and the globe's
+ * three textures — and `g9.bin` is 2.65 MB more, so 4.25 MB is spent before a
+ * single tile is asked for. The streamer's first minute is its 640 KB burst
+ * plus 60 s at 5 KB/s, which is 0.94 MB: 5.19 MB in total, and 5.4 leaves room
+ * for the page itself to grow a little without this becoming a test of the JS
+ * bundle. The budget that actually shapes the streamer is the plan's 6 MB in
+ * five minutes, which the rate below it is set by.
+ *
+ * S4's re-bake is what moved this: the band was a 1024x512 map at 19.5 KB and
+ * is now 4096x2048 at 315 KB, of which this viewport fetches the 2048x1024
+ * downscale at 145 KB. 126 KB once, for a band that no longer reads as blobs
+ * when the galactic centre fills the frame. */
+const FIRST_MINUTE_BYTES = 5.4e6;
 const FIRST_MINUTE_TILE_BYTES = 1.0e6;
 
 test('the first minute of sky fits the budget', async ({ page }) => {
@@ -87,8 +92,8 @@ test('the first minute of sky fits the budget', async ({ page }) => {
   expect(tiles.length).toBeGreaterThan(4);
   expect(tileBytes).toBeLessThan(FIRST_MINUTE_TILE_BYTES);
   expect(total).toBeLessThan(FIRST_MINUTE_BYTES);
-  // And the 51 MB on disk is nowhere near being spent.
-  expect(total).toBeLessThan(0.1 * 51.9e6);
+  // And the 51 MB on disk is nowhere near being spent: a ninth of it.
+  expect(total).toBeLessThan(0.11 * 51.9e6);
 });
 
 test('the light theme keeps the sky it had', async ({ page }) => {

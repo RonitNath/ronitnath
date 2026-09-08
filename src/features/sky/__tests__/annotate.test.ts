@@ -35,9 +35,19 @@ const vectors = (): Vec3[] =>
 
 describe('placing the callouts', () => {
   it('labels the sky at every point of the orbit, on a desktop and on a phone', () => {
-    const stars = vectors();
+    // Two catalogues: the shipped one, and its four brightest stars alone.
+    // S4 grew the name list from 50 stars to 333, and with that many
+    // candidates some star is placeable in every frame — so the fallback that
+    // pushes an unplaceable label off the hero is only reachable with a sparse
+    // catalogue, which is what the second list is.
+    const full = vectors();
+    const sparse = full.slice(0, 4);
     let forcedSeen = false;
-    for (let sample = 0; sample < 400; sample += 1) {
+    for (const [stars, always] of [
+      [full, true],
+      [sparse, false],
+    ] as const)
+      for (let sample = 0; sample < 400; sample += 1) {
       const simMs = SIM_EPOCH_MS + (TRACK_PERIOD_MS * sample) / 400;
       const [lat, lon] = observerAt(simMs);
       const matrix = viewMatrix(simMs, lat, lon);
@@ -47,7 +57,8 @@ describe('placing the callouts', () => {
       ] as const) {
         const keepOut = keepOutFor(width, height);
         const placed = place(stars, matrix, width / height, MAX_LABELS, keepOut);
-        expect(placed.length).toBeGreaterThan(0);
+        // Four stars are not always above the horizon; 333 are.
+        if (always) expect(placed.length).toBeGreaterThan(0);
         expect(placed.length).toBeLessThanOrEqual(MAX_LABELS);
         for (const placement of placed) {
           expect(
@@ -251,14 +262,22 @@ describe('a callout never lands on anything the page has already drawn', () => {
 });
 
 describe('separationFor', () => {
-  it('is the desktop constant where a label is a third of the frame', () => {
-    // 328 px of 1440 is 0.46 in normalised coordinates; the constant is 0.55.
-    expect(separationFor(1_440)[0]).toBeCloseTo(0.55, 2);
+  it('is twice a label\'s reach, because two leaders may turn toward each other', () => {
+    // A label hangs off its anchor by the label plus the leader offset; two
+    // anchors whose leaders turn inward need twice that between them. On a
+    // 1440 px frame that is 2 x (328 + 36) = 728 px, or 1.011 normalised.
+    const reachPx = labelWidthFor(1_440) + leaderOffset(1_440);
+    expect(separationFor(1_440)[0]).toBeCloseTo((2 * reachPx * 2) / 1_440, 6);
+    expect(separationFor(1_440)[0]).toBeGreaterThan(1);
   });
 
   it('grows to the label where the label is the frame', () => {
     // On a 390 px phone the same label is 328 px — 1.68 across — so two
     // callouts that pass the desktop test are printed over each other.
     expect(separationFor(390)[0]).toBeGreaterThan(1.6);
+  });
+
+  it('separates vertically by the label\'s own reach too', () => {
+    expect(separationFor(1_440)[1]).toBeGreaterThan(0.14);
   });
 });

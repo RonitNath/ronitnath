@@ -45,6 +45,14 @@ async function usable(page: Page): Promise<DebugStar[]> {
 async function starOnScreen(page: Page): Promise<DebugStar> {
   await page.goto('/?skydebug=1');
   await expect.poll(async () => (await usable(page)).length, { timeout: 30_000 }).toBeGreaterThan(0);
+  // Pause before reading the positions the pointer will be driven to. The sky
+  // turns 15 arcminutes a second, and the pick weighs a neighbour's brightness
+  // against its distance — so a couple of frames between the reading and the
+  // click is enough for a magnitude-5 star beside Arcturus to be the nearer of
+  // the two. Paused, the frame the positions came from is the frame the
+  // pointer lands in.
+  await page.locator('button.sky-control', { hasText: 'Pause sky' }).click();
+  await page.waitForTimeout(200);
   const stars = await usable(page);
   return stars.find((star) => star.name === GATE_STAR) ?? stars[0]!;
 }

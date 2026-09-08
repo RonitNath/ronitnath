@@ -7,16 +7,38 @@
 
 import { type NamedCatalog, parseNamed, parseStars, type StarCatalog } from './catalog';
 import { CityCatalog } from './cities';
+import { type LinePairs, parseLines } from './lines';
 
+/** The band's two bakes, named by the content hash `tools/starcat/mwcat.py`
+ * writes into them.
+ *
+ * The hash is in the filename on purpose: the map is served with a long
+ * immutable cache and sits behind a CDN, so a re-bake at the same path would
+ * be invisible to everyone who already has one until the cache expired. A new
+ * bake is a new URL, and nothing has to be purged anywhere.
+ */
 export const ASSETS = {
   bright: '/stars/bright.bin',
   named: '/stars/named.json',
-  milkyway: '/sky/milkyway.webp',
+  lines: '/sky/lines.bin',
+  milkyway: '/sky/milkyway-81ee6f522371.webp',
+  milkyway2k: '/sky/milkyway-2k-81ee6f522371.webp',
   cities: '/cities/cities.bin',
   earthDay: '/textures/earth/day.jpg',
   earthNormal: '/textures/earth/normal.jpg',
   earthSpecular: '/textures/earth/specular.jpg',
 } as const;
+
+/** Above this many device pixels across, the frame can show the 4096-wide
+ * bake; below it the 2048 one carries every texel the screen has. A 390 px
+ * phone at 3x is 1,170 device pixels, and the half-sized map is 145 KB rather
+ * than 315 KB for a picture indistinguishable on it. */
+const WIDE_DEVICE_PX = 1_600;
+
+/** Which bake this device should fetch. */
+export function bandUrl(widthCss: number, dpr: number): string {
+  return widthCss * dpr >= WIDE_DEVICE_PX ? ASSETS.milkyway : ASSETS.milkyway2k;
+}
 
 async function bytes(url: string): Promise<Uint8Array> {
   const response = await fetch(url);
@@ -32,6 +54,10 @@ export async function loadNamed(): Promise<NamedCatalog> {
   const response = await fetch(ASSETS.named);
   if (!response.ok) throw new Error(`${ASSETS.named}: ${response.status}`);
   return parseNamed(await response.text());
+}
+
+export async function loadLines(): Promise<LinePairs> {
+  return parseLines(await bytes(ASSETS.lines));
 }
 
 export async function loadCities(): Promise<CityCatalog> {

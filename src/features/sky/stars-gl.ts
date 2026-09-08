@@ -40,6 +40,7 @@ import {
   TWILIGHT,
   TWILIGHT_MAG_LIMIT,
   GLARE_FLOOR,
+  TWINKLE,
 } from './tuning';
 import type { DeepLayer } from './deep-gl';
 import type { Highlight } from './star-field';
@@ -241,6 +242,7 @@ export class StarScene implements PointPass {
     width: number,
     height: number,
     highlight: Highlight | null,
+    twinkle = false,
   ): void {
     if (!this.count) return;
     const { gl } = this;
@@ -256,7 +258,7 @@ export class StarScene implements PointPass {
     }
 
     const startedAt = performance.now();
-    this.drawPoints(matrix, light, dpr, width, height, response, hdr);
+    this.drawPoints(matrix, light, dpr, width, height, response, hdr, twinkle);
     this.lastPoints = light ? this.twilightCount : this.count;
     if (this.deep) {
       this.lastPoints += this.deep.draw(this, response, light, dpr, startedAt);
@@ -288,6 +290,7 @@ export class StarScene implements PointPass {
     height: number,
     response: StarResponse,
     hdr: boolean,
+    twinkle: boolean,
   ): void {
     const { gl } = this;
     gl.viewport(0, 0, width, height);
@@ -310,6 +313,17 @@ export class StarScene implements PointPass {
     // With no float target the tone curve has nowhere to run but here, so
     // each star arrives already curved and the additive blend piles up
     // slightly-too-bright overlaps. It is the fallback, not the picture.
+    set('u_twinkle', twinkle ? TWINKLE.amplitude : 0);
+    set('u_twinkle_mag', TWINKLE.magLimit);
+    gl.uniform2f(
+      this.pointUniform.u_twinkle_period!,
+      TWINKLE.periodMinMs,
+      TWINKLE.periodMaxMs,
+    );
+    // Wrapped before it reaches a float32: `performance.now()` past a few
+    // hours has fewer bits left than a period has milliseconds, and the
+    // scintillation would quantise into steps.
+    set('u_time_ms', performance.now() % 100_000);
     set('u_fold', hdr ? 0 : 1);
     set('u_exposure', response.exposure);
     this.points(this.starVao, 0, light ? this.twilightCount : this.count, {

@@ -81,8 +81,7 @@ test('the brightest star in frame is drawn brighter and wider than a magnitude-5
   // atmosphere takes a share that depends on nothing else: two stars a
   // magnitude apart low in the frame are a fairer test of the response than
   // one at the zenith against one on the horizon.
-  let faintAt: [number, number] | null = null;
-  let closest = Infinity;
+  const candidates: { at: [number, number]; apart: number }[] = [];
   for (const index of faint) {
     const candidate = screen(index);
     if (!candidate) continue;
@@ -90,18 +89,31 @@ test('the brightest star in frame is drawn brighter and wider than a magnitude-5
     if (Math.hypot(candidate.at[0] - bright!.at[0], candidate.at[1] - bright!.at[1]) < 80) {
       continue;
     }
-    const apart = Math.abs(candidate.zenithCos - bright!.zenithCos);
-    if (apart < closest) {
-      closest = apart;
-      faintAt = candidate.at;
-    }
+    candidates.push({
+      at: candidate.at,
+      apart: Math.abs(candidate.zenithCos - bright!.zenithCos),
+    });
   }
-  expect(faintAt, 'no magnitude-5 star was in frame to compare against').not.toBeNull();
-  expect(closest, 'no magnitude-5 star was at a comparable altitude').toBeLessThan(0.12);
+  candidates.sort((a, b) => a.apart - b.apart);
+  expect(candidates[0], 'no magnitude-5 star was in frame to compare against').toBeTruthy();
+  expect(candidates[0]!.apart, 'no magnitude-5 star was at a comparable altitude').toBeLessThan(
+    0.12,
+  );
 
   const where = `magnitude ${catalog.magnitude[brightIndex]!.toFixed(2)}`;
   const measured = await starProfile(page, ...bright!.at);
-  const dim = await starProfile(page, ...faintAt!);
+  // The comparison has to be of a star against *sky*. S4's re-baked band
+  // resolves the galactic core at five times the detail, and its brightest
+  // parts now reach white on their own — a magnitude-5 star standing on one of
+  // them is at 255 because of what is behind it, which measures the band and
+  // not the response under test. So the nearest candidate in altitude that is
+  // also on dark sky is the one taken.
+  let dim = await starProfile(page, ...candidates[0]!.at);
+  for (const candidate of candidates.slice(0, 6)) {
+    if (dim.background <= 60) break;
+    dim = await starProfile(page, ...candidate.at);
+  }
+  expect(dim.background, 'every magnitude-5 star in frame stands on the band').toBeLessThan(80);
   expect(measured.peak, `${where} did not saturate`).toBeGreaterThan(240);
   expect(dim.peak, 'a magnitude-5 star should not be at white').toBeLessThan(measured.peak);
   expect(measured.widthPx, `${where} was no wider than a magnitude-5 star`).toBeGreaterThan(

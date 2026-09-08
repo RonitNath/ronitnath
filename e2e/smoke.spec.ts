@@ -52,7 +52,12 @@ test('the about page explains the sky and links back to it', async ({ page }) =>
   await page.getByRole('link', { name: 'About the sky' }).click();
   await expect(page).toHaveURL(/\/about$/);
   await expect(page.getByRole('heading', { level: 1 })).toContainText('About the sky');
-  for (const name of ['The stars', 'The Milky Way', 'From catalogue to screen']) {
+  for (const name of [
+    'The stars',
+    'The Milky Way',
+    'Deeper than the eye',
+    'From catalogue to screen',
+  ]) {
     await expect(page.getByRole('heading', { level: 2, name })).toBeVisible();
   }
   await expect(page.getByRole('link', { name: 'ESA Gaia Archive' })).toHaveAttribute(

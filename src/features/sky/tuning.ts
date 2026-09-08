@@ -82,6 +82,28 @@ export const TWILIGHT: StarResponse = {
   whiten: 0.3,
 };
 
+/** How a constellation figure is drawn, per theme (`lines-gl.ts`).
+ *
+ * Dark is `--fg` itself at a fifth of an alpha: the same ink the page writes
+ * in, far enough back that a magnitude-4 star is brighter than the line
+ * through it. Light is neither `--fg` nor the sky — the dusk gradient runs
+ * from near-black at the top of the frame to near-white at the bottom, so a
+ * near-black line is invisible at the top and a pale one at the bottom. A
+ * mid-lightness slate reads against both ends, which is the only value that
+ * does, and it can carry more alpha because it never approaches either ground.
+ */
+export interface LineLook {
+  /** sRGB in 0..1, premultiplied by the pass. */
+  color: readonly [number, number, number];
+  alpha: number;
+}
+
+/** `--fg` in the dark theme: oklch(0.96 0.002 80). */
+export const LINE_DARK: LineLook = { color: [0.95, 0.947, 0.942], alpha: 0.22 };
+
+/** oklch(0.55 0.03 250) — a slate that survives both ends of the dusk ramp. */
+export const LINE_LIGHT: LineLook = { color: [0.395, 0.452, 0.513], alpha: 0.3 };
+
 /** The widest a star may be drawn, in CSS pixels. Celestia bounds its glare at
  * roughly a degree of apparent field; at this focal length and viewport that
  * is about 24 px, and it is Sirius that reaches it. Without the bound the
@@ -154,4 +176,49 @@ export function starDiameterPx(flux: number, response: StarResponse): number {
  * it. That is the whole reason the pass accumulates in a float buffer first. */
 export function toneMap(value: number, exposure: number): number {
   return 1 - Math.exp(-Math.max(0, value) * exposure);
+}
+
+/** Scintillation: how much a star's flux wanders, and how fast.
+ *
+ * Off by default. Twinkling is atmospheric turbulence — the same column of air
+ * that dims a low star also makes it flicker, and a star at the zenith barely
+ * moves — so the amplitude is tied to airmass and not to brightness. It is
+ * applied only to stars the eye can actually see twinkle: below about
+ * magnitude 3 there is enough light for the variation to register, and above
+ * it a 20% wander on a star already at the edge of visibility reads as noise
+ * in the render rather than as air.
+ *
+ * The period is per star, spread over 0.3 to 1.2 s from the star's own index,
+ * so nothing pulses in unison; the phase is spread the same way.
+ */
+export const TWINKLE = {
+  /** Faintest star that scintillates. */
+  magLimit: 3.2,
+  /** Fractional flux swing at one airmass past the zenith, before the airmass
+   * scaling; a low star reaches about a third of its flux either way. */
+  amplitude: 0.18,
+  periodMinMs: 300,
+  periodMaxMs: 1200,
+} as const;
+
+/** The flux multiplier for one star at one instant.
+ *
+ * Bounded in `[1 - a, 1 + a]` with `a` under 0.5 for any airmass, so a star
+ * never goes out and never doubles: this is air, not a strobe. `seed` is the
+ * star's own index, which is what keeps the field from breathing together.
+ */
+export function twinkleFactor(
+  mag: number,
+  zenithCos: number,
+  seed: number,
+  timeMs: number,
+): number {
+  if (mag > TWINKLE.magLimit) return 1;
+  const airmass = 1 / Math.max(zenithCos, 0.05);
+  const amplitude = Math.min(0.45, TWINKLE.amplitude * (airmass - 1));
+  if (amplitude <= 0) return 1;
+  const spread = (Math.sin(seed * 12.9898) + 1) / 2;
+  const period = TWINKLE.periodMinMs + spread * (TWINKLE.periodMaxMs - TWINKLE.periodMinMs);
+  const phase = seed * 0.618_034;
+  return 1 + amplitude * Math.sin(2 * Math.PI * (timeMs / period + phase));
 }
