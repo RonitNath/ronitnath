@@ -138,3 +138,57 @@ Recorded as built, 2026-09-07.
   it takes the brightest that is, and Sirius when Sirius is it. Its comparison
   magnitude-5 star is picked at the same altitude, so the atmosphere's share
   is the same for both and the magnitude difference is what is being measured.
+
+## S2 deviations
+
+Recorded as built, 2026-09-07.
+
+- **Four modules, not one.** `lod.ts` is the file format, the colour ramp and
+  the magnitude cut; `lod-tiles.ts` the grid and the priority queue;
+  `lod-stream.ts` the fetching, the budget and the LRU; `deep-gl.ts` the two
+  GPU buffers; `deep-stage.ts` the half-second tick and the debug readout. One
+  file would have been eight hundred lines, and the queue is the piece worth
+  reading on its own.
+- **Tiles are scored from their near edge, not their centre.** On a 32x24
+  equal-angle grid a polar cell is a sliver and an equatorial one is seven
+  degrees across, so centre distance ranks a tile that adds nothing to the
+  drawable region above one that completes it. `distance` in the queue is
+  `angle(zenith, centre) - tileRadius`; the frame bonus and the orbit-ahead
+  tail are exactly as specified.
+- **The visible region is a coverage _field_, not a cone.** The plan's tile
+  fade plus a magnitude ramp inside a tile's edge cannot avoid seams: a taper
+  that reaches zero at the boundary makes a dark line between two loaded
+  tiles, and one that reaches a half makes a step at the edge of a lone tile.
+  What ships is a 32x24 texture holding how much of each tile is resident,
+  sampled bilinearly in the vertex shader and eroded by `2(c - 0.5)`. That is
+  1 wherever a tile's neighbours have landed, 0 on the boundary of the loaded
+  region, and smooth across the outermost tile between them — so there is no
+  edge to see whatever has streamed. It subsumes the per-tile 600 ms fade
+  (the field eases per frame, on arrival _and_ on eviction) and lets the whole
+  tile buffer draw in one call.
+- **`Range` requests are used after all, and the tile files were re-sorted to
+  make them honest.** A tile on the galactic plane holds 20,278 stars in
+  324 KB and the GPU keeps 4,096 of them; paying five times over for the
+  discard spent the entire byte budget on six tiles. The files are now written
+  brightest-first (`build_star_lod.py`, `--resort` for a build made before the
+  ordering was a contract, `sortedByMagnitude` in the manifest), so the front
+  of a file is a magnitude cut — spatially even, which a prefix of the old
+  source-id order was not — and the client asks for at most
+  `12 + 4096 x 16` bytes of any tile. Same records, same counts, same file
+  sizes; only the order inside each file changed.
+- **The first minute costs 5.0 MB, not the 4 the brief asked for.** The page's
+  own assets are 1.47 MB and `g9.bin` is 2.65 MB, so 4.1 MB is spent before a
+  tile is asked for: the 4 MB figure was unreachable without cutting g9 or the
+  globe's textures. The streamer's own budget — a 640 KB burst then 5 KB/s —
+  is set by the plan's "6 MB in five minutes", which it meets: 2.1 MB of tiles
+  by five minutes, 6.2 MB in total.
+- **Frame timing is reported as the main thread's cost and the frame
+  interval.** `gl.finish()` does not stall on this driver, so a
+  wall-clock bracket around the draw measures issuing it, not drawing it. The
+  readout carries both that and the interval between painted frames, which is
+  what a visitor actually sees.
+- **The S2 end-to-end lives in `e2e/sky-deep.spec.ts`.** `sky.spec.ts` was
+  already 326 lines and the cap is 400.
+- **`?skyfill=1` lifts the byte budget**, alongside `?skydebug=1`, so the
+  performance gate can fill every slot in a minute rather than a quarter of an
+  hour. Neither flag is reachable without typing it.
