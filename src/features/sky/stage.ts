@@ -10,19 +10,22 @@
  */
 
 import { keepOutFor, place, placementAvoid, type Placement } from './annotate';
-import { ASSETS, loadCities, loadImageData, loadNamed, loadStars } from './assets';
+
 import { simTimeMs, syncedSimTimeMs } from './clock';
-import { DeepStreaming } from './deep-stage';
-import { type NamedStar, namedVectors, type StarCatalog } from './catalog';
+import { type DeepReadout, DeepStreaming, SKY_DEBUG } from './deep-stage';
+import type { NamedStar, StarCatalog } from './catalog';
 import type { CityCatalog } from './cities';
-import { GlobeScene } from './globe-gl';
-import { paintFlatGlobe } from './globe-flat';
-import { dragTo, RADIUS, unproject } from './globe-math';
+import { GlobeView } from './globe-stage';
+import { dragTo } from './globe-math';
 import { grounding, UPDATE_INTERVAL_MS } from './label';
+import { COLOUR_RAMP } from './lod';
 import { Observer, TRANSITION_MS, type Point } from './observer';
 import type { StreamView } from './lod-stream';
+import type { PickHit } from './pick';
+import { type DebugStar, StagePicking } from './pick-stage';
 import { type Vec3, viewMatrix } from './sidereal';
 import { SkyRenderer } from './sky-render';
+import { loadSkyAssets } from './stage-assets';
 import type { Highlight } from './star-field';
 
 /** ≤30 fps. At 60× the sky moves 15 arcminutes a second, which is a pixel and
@@ -50,14 +53,18 @@ export class Stage {
 
   private readonly sky = new SkyRenderer();
   private readonly deep: DeepStreaming;
-  private globeCanvas: HTMLCanvasElement | null = null;
-  private globeScene: GlobeScene | null = null;
+  private readonly globe = new GlobeView();
+  private readonly picking = new StagePicking(
+    () => viewMatrix(this.simMs(), ...this.observerNow()),
+    () => {
+      if (this.reduced || this.paused) this.draw();
+    },
+  );
 
   private stars: StarCatalog | null = null;
   private named: NamedStar[] = [];
   private vectors: Vec3[] = [];
   private cities: CityCatalog | null = null;
-  private earth: ImageData | null = null;
 
   private lastFrameAt = 0;
   private highlight: (Highlight & { until: number }) | null = null;
@@ -154,16 +161,22 @@ export class Stage {
   }
 
   attachGlobe(canvas: HTMLCanvasElement | null): void {
-    this.globeCanvas = canvas;
-    this.globeScene = canvas ? GlobeScene.create(canvas) : null;
+    this.globe.attach(canvas);
   }
 
   /** Whether the globe is drawing through WebGL rather than the flat disc. */
   get hasWebgl(): boolean {
-    return this.globeScene !== null;
+    return this.globe.accelerated;
   }
 
   start(): void {
+    // The readout is a function rather than a snapshot: whoever asks gets the
+    // frame times, the queue and what is on screen as they are when they ask.
+    // Opt-in, and unreachable without typing `?skydebug=1`.
+    if (SKY_DEBUG) {
+      (window as unknown as { __sky: () => DeepReadout & { named: DebugStar[] } }).__sky =
+        () => ({ ...this.deep.readout(), named: this.debugNamed() });
+    }
     // The sky is background: nothing is fetched, decoded or painted until the
     // main thread is free, and the CSS starfield holds the frame until then.
     const idle = window.requestIdleCallback ?? ((fn: () => void) => setTimeout(fn, 200));
@@ -261,6 +274,8 @@ export class Stage {
   }
 
   private currentHighlight(): Highlight | null {
+    const ringed = this.picking.ringed;
+    if (ringed) return { position: ringed.position, strength: 1 };
     const highlight = this.highlight;
     if (!highlight) return null;
     const left = highlight.until - performance.now();
@@ -272,29 +287,38 @@ export class Stage {
   }
 
   private drawGlobe(simMs: number, lat: number, lon: number): void {
-    const canvas = this.globeCanvas;
-    if (!canvas) return;
-    const light = document.documentElement.dataset.theme === 'light';
-    const ink = light ? [1, 0.93, 0.72] : [1, 0.42, 0.33];
-    if (this.globeScene) {
-      this.globeScene.draw(lat, lon, simMs, ink);
-      return;
-    }
-    const ctx = canvas.getContext('2d');
-    if (!ctx || !this.earth) return;
-    const size = Math.round(
-      Math.max(1, canvas.clientWidth) * Math.min(devicePixelRatio || 1, 2),
-    );
-    if (canvas.width !== size) {
-      canvas.width = size;
-      canvas.height = size;
-    }
-    ctx.clearRect(0, 0, size, size);
-    paintFlatGlobe(ctx, this.earth, lat, lon);
-    ctx.fillStyle = light ? 'rgb(255,237,184)' : 'rgb(255,107,84)';
-    ctx.beginPath();
-    ctx.arc(size / 2, size / 2, Math.max(2.5, (size * RADIUS) / 44), 0, Math.PI * 2);
-    ctx.fill();
+    this.globe.draw(lat, lon, simMs, document.documentElement.dataset.theme === 'light');
+  }
+
+  // --- picking -------------------------------------------------------------
+
+  /** The pick's own state is in `pick-stage.ts`; the stage supplies it the one
+   * view matrix everything else is drawn through, so the pick, the ring and
+   * the drawn sky cannot disagree about where a star is. */
+  pickAt(clientX: number, clientY: number): PickHit | null {
+    return this.picking.pickAt(clientX, clientY);
+  }
+
+  /** The star a named-star callout points at, as a pick. */
+  brightHit(brightIndex: number): PickHit | null {
+    return this.picking.brightHit(brightIndex);
+  }
+
+  setHover(hit: PickHit | null): void {
+    this.picking.setHover(hit);
+  }
+
+  setPinned(hit: PickHit | null): void {
+    this.picking.setPinned(hit);
+  }
+
+  screenPosition(position: Vec3): [number, number] | null {
+    return this.picking.screenPosition(position);
+  }
+
+  /** Every named star on screen, for `?skydebug=1` and nothing else. */
+  debugNamed(): DebugStar[] {
+    return this.picking.debugNamed(this.named);
   }
 
   // --- the controls, all of which write the one observer -------------------
@@ -318,14 +342,8 @@ export class Stage {
 
   /** Which point on Earth a pointer event landed on, if it hit the globe. */
   pointAt(clientX: number, clientY: number): Point | null {
-    const canvas = this.globeCanvas;
-    if (!canvas) return null;
-    const bounds = canvas.getBoundingClientRect();
-    if (bounds.width <= 0 || bounds.height <= 0) return null;
     const [lat, lon] = this.observerNow();
-    const x = (2 * ((clientX - bounds.left) / bounds.width) - 1) / RADIUS;
-    const y = (1 - 2 * ((clientY - bounds.top) / bounds.height)) / RADIUS;
-    return unproject(x, y, lat, lon);
+    return this.globe.pointAt(clientX, clientY, lat, lon);
   }
 
   /** Ring a star in the canvas for a moment: the callout points at something,
@@ -343,58 +361,42 @@ export class Stage {
 
   // --- assets --------------------------------------------------------------
 
-  /** The catalog first and alone: the sky is the picture, and on a slow link
-   * every other byte in flight is a byte the stars are waiting behind. The
-   * globe's three textures are the largest and the last, because the globe
-   * draws as a blue sphere in the meantime and the corner of the frame is not
-   * what a visitor is waiting for. */
+  /** The fetch order lives in `stage-assets.ts`; what each arrival *means* is
+   * here, because it is the stage's own state that changes. */
   private loadAssets(): void {
-    void (async () => {
-      try {
-        const stars = await loadStars();
-        if (!this.live) return;
-        this.stars = stars;
+    void loadSkyAssets({
+      live: () => this.live,
+      stars: (catalog) => {
+        this.stars = catalog;
+        this.picking.picker.setCatalog(catalog, COLOUR_RAMP);
         this.draw();
-        const named = await loadNamed();
-        if (!this.live) return;
-        this.vectors = namedVectors(stars, named);
+      },
+      named: (named, vectors) => {
+        this.vectors = vectors;
         this.named = named.stars;
+        this.picking.picker.setNames(
+          new Map(named.stars.map((star) => [star.brightIndex, star.name] as const)),
+        );
         this.publish();
-      } catch {
-        // No catalog is no stars; the CSS starfield is still the picture.
-      }
-      await Promise.allSettled([
-        loadCities().then((cities) => {
-          if (!this.live) return;
-          this.cities = cities;
-          this.publish();
-        }),
+      },
+      cities: (cities) => {
+        this.cities = cities;
+        this.publish();
+      },
+      band: () =>
         this.sky.loadBand().then(() => {
           if (this.live) this.draw();
         }),
-      ]);
-      if (!this.live) return;
-      await this.loadGlobeTextures();
-      if (!this.live) return;
-      // Last and largest, competing with nothing (`deep-stage.ts`).
-      await this.deep.start();
-    })();
-  }
-
-  private async loadGlobeTextures(): Promise<void> {
-    try {
-      if (this.globeScene) {
-        await this.globeScene.loadTextures({
-          day: ASSETS.earthDay,
-          normal: ASSETS.earthNormal,
-          specular: ASSETS.earthSpecular,
-        });
-      } else {
-        this.earth = await loadImageData(ASSETS.earthDay, 1_024);
-      }
-      if (this.live) this.draw();
-    } catch {
-      // The globe keeps the neutral blue it starts on.
-    }
+      globe: async () => {
+        await this.globe.loadTextures();
+        if (this.live) this.draw();
+      },
+      deep: async () => {
+        await this.deep.start();
+        // g9 is the second half of what a pointer can pick, and it has only
+        // just landed.
+        this.picking.picker.setG9(this.sky.deepLayer()?.g9 ?? null);
+      },
+    });
   }
 }

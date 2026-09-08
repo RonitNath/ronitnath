@@ -61,11 +61,6 @@ export class DeepStreaming {
     this.layer = layer;
     this.streamer = streamer;
     this.redraw();
-    // The readout is a function rather than a snapshot: whoever asks gets the
-    // frame times and the queue as they are when they ask.
-    if (SKY_DEBUG) {
-      (window as unknown as { __sky: () => DeepReadout }).__sky = () => this.readout();
-    }
     if (!streamer.enabled) return;
     this.timer = window.setInterval(() => this.step(), TICK_MS);
   }

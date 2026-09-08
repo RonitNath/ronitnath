@@ -1,5 +1,6 @@
 import './atmosphere.css';
 import './sky-chrome.css';
+import './detail.css';
 import { SkyStage } from './sky-stage';
 
 /** The sky, back to front: the designed CSS starfield (the picture before the

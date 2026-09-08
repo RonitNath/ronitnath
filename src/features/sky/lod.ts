@@ -38,10 +38,13 @@ export const TILE_COUNT = RA_BINS * DEC_BINS;
  *
  * Brightest first is what makes a magnitude limit a *prefix*: the renderer
  * slides the limit with the device's pixel ratio and the theme, and sliding it
- * has to cost one number, not a pass over the buffer. The source id the file
- * carries is dropped here — the deep passes are not pickable (that is S3's,
- * over the bright catalogue), and keeping 8 bytes a star on the heap for
- * something nothing reads is 5 MB of nothing.
+ * has to cost one number, not a pass over the buffer.
+ *
+ * Source ids are kept only when they are asked for. `g9.bin` is pickable — S3
+ * hovers and clicks stars down to G = 9, and a pick has to be able to say
+ * *which* star — so its 165k ids are worth 1.3 MB on the heap. The 768 tiles
+ * are not pickable, and three million ids nothing reads would be 25 MB of
+ * nothing.
  */
 export interface DeepStars {
   count: number;
@@ -51,6 +54,9 @@ export interface DeepStars {
   magnitude: Float32Array;
   /** sRGB, 3 bytes per star, from the ramp below. */
   color: Uint8Array;
+  /** Gaia DR3 `source_id`, in the same order — only where the caller asked
+   * for it (`parseDeep(bytes, true)`). */
+  sourceId?: BigUint64Array;
 }
 
 /** The 24 colours `tools/starcat/colour.py` quantises a star's temperature
@@ -134,7 +140,7 @@ export function octDecode(ox: number, oy: number): Vec3 {
  * not have. That is the one length disagreement this accepts: a body of whole
  * records, no more than the header claims. Anything else is a truncated or
  * misrouted response and must not reach the GPU as noise. */
-export function parseDeep(bytes: Uint8Array): DeepStars {
+export function parseDeep(bytes: Uint8Array, keepIds = false): DeepStars {
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   for (let index = 0; index < 8; index += 1) {
     if (bytes[index] !== LOD_MAGIC.charCodeAt(index)) throw new Error('not a GDR3LOD1 file');
@@ -160,8 +166,10 @@ export function parseDeep(bytes: Uint8Array): DeepStars {
   const position = new Float32Array(count * 3);
   const color = new Uint8Array(count * 3);
   const sorted = new Float32Array(count);
+  const sourceId = keepIds ? new BigUint64Array(count) : undefined;
   for (let slot = 0; slot < count; slot += 1) {
     const at = LOD_HEADER_LEN + order[slot]! * LOD_RECORD_BYTES;
+    if (sourceId) sourceId[slot] = view.getBigUint64(at, true);
     const direction = octDecode(view.getInt16(at + 8, true), view.getInt16(at + 10, true));
     position[slot * 3] = direction[0];
     position[slot * 3 + 1] = direction[1];
@@ -172,7 +180,7 @@ export function parseDeep(bytes: Uint8Array): DeepStars {
     color[slot * 3 + 1] = rgb[1];
     color[slot * 3 + 2] = rgb[2];
   }
-  return { count, position, magnitude: sorted, color };
+  return { count, position, magnitude: sorted, color, sourceId };
 }
 
 /** How many of a magnitude-sorted array are at or below a limit. Binary

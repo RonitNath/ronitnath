@@ -1,11 +1,13 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { Callouts } from './callouts';
 import { Globe } from './globe';
 import { Grounding } from './grounding';
+import type { PickHit } from './pick';
 import { SkyCanvas } from './sky-canvas';
+import { StarPick } from './star-pick';
 import { type Readout, Stage } from './stage';
 
 const EMPTY: Readout = {
@@ -28,6 +30,18 @@ export function SkyStage({ serverEpochMs }: { serverEpochMs: number }) {
   const globeRef = useRef<HTMLCanvasElement>(null);
   const [stage, setStage] = useState<Stage | null>(null);
   const [readout, setReadout] = useState<Readout>(EMPTY);
+  /* One star is open at a time, and two things open it: a pick out of the sky
+   * and a click on a named-star callout. The state lives here so that both
+   * reach the same panel. */
+  const [pinned, setPinned] = useState<PickHit | null>(null);
+
+  const pin = useCallback(
+    (hit: PickHit | null) => {
+      setPinned(hit);
+      stage?.setPinned(hit);
+    },
+    [stage],
+  );
 
   useEffect(() => {
     const created = new Stage(serverEpochMs);
@@ -85,7 +99,8 @@ export function SkyStage({ serverEpochMs }: { serverEpochMs: number }) {
           ) : null}
         </div>
       </div>
-      <Callouts stage={stage} named={readout.named} />
+      <Callouts stage={stage} named={readout.named} onOpen={pin} panelOpen={pinned !== null} />
+      <StarPick stage={stage} pinned={pinned} onPin={pin} />
     </>
   );
 }

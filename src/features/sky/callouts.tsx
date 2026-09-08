@@ -17,6 +17,7 @@ import {
   RING_RADIUS_PX,
 } from './annotate';
 import type { NamedStar } from './catalog';
+import type { PickHit } from './pick';
 import type { Vec3 } from './sidereal';
 import { starDetail } from './label';
 import type { Stage } from './stage';
@@ -91,17 +92,24 @@ export function calloutFrame(
 /** The page's own chrome, off the page itself. The header and the corner block
  * are laid out by CSS and change size with the viewport and with the controls
  * in them, so they are measured rather than assumed; where there is nothing to
- * measure the estimate in `annotate.ts` stands in. */
+ * measure the estimate in `annotate.ts` stands in.
+ *
+ * The detail panel joins them while it is open — it is a pane of glass a third
+ * of the frame tall, and a callout placed under it is a label nobody can read
+ * (docs/sky-plan.md S3). It is *added* to the estimate rather than replacing
+ * it, so an open panel is a keep-out even where the other two could not be
+ * measured. */
 export function measureChrome(width: number, height: number): Box[] {
   const boxes: Box[] = [];
-  for (const selector of ['.topbar', '.sky-chrome']) {
+  for (const selector of ['.topbar', '.sky-chrome', '.star-detail']) {
     const node = document.querySelector(selector);
     if (!node) continue;
     const box = node.getBoundingClientRect();
     if (box.width > 0 && box.height > 0)
       boxes.push({ left: box.left, top: box.top, right: box.right, bottom: box.bottom });
   }
-  return boxes.length === 2 ? boxes : chromeBoxes(width, height);
+  const panel = boxes.length === 3 ? boxes.slice(2) : [];
+  return boxes.length >= 2 ? boxes : [...chromeBoxes(width, height), ...panel];
 }
 
 /** A callout's own label box, measured when it mounted. The CSS max-width is
@@ -155,7 +163,20 @@ function writeFrame(
   }
 }
 
-export function Callouts({ stage, named }: { stage: Stage | null; named: NamedStar[] }) {
+export function Callouts({
+  stage,
+  named,
+  onOpen,
+  panelOpen = false,
+}: {
+  stage: Stage | null;
+  named: NamedStar[];
+  /** A callout is a button onto the detail panel: the same panel a pick out
+   * of the sky opens, on the star the callout names. */
+  onOpen?: (hit: PickHit) => void;
+  /** Whether the panel is open, so its box joins the keep-outs. */
+  panelOpen?: boolean;
+}) {
   const [rendered, setRendered] = useState<Rendered[]>([]);
   const nodes = useRef(new Map<number, HTMLElement>());
   const latest = useRef<Placement[]>([]);
@@ -243,6 +264,12 @@ export function Callouts({ stage, named }: { stage: Stage | null; named: NamedSt
     };
   }, [stage]);
 
+  /* The panel is not laid out by the time it is asked for, so its box is taken
+   * after the commit that opened it — and given back when it closes. */
+  useEffect(() => {
+    chrome.current = measureChrome(innerWidth, innerHeight);
+  }, [panelOpen]);
+
   return (
     <div className="star-annotations">
       {rendered.map((callout) => {
@@ -282,7 +309,11 @@ export function Callouts({ stage, named }: { stage: Stage | null; named: NamedSt
               type="button"
               className="callout-label"
               aria-label={`${star.name}, ${detail}`}
-              onClick={() => stage?.ringStar(callout.vector)}
+              onClick={() => {
+                const hit = stage?.brightHit(star.brightIndex) ?? null;
+                if (hit && onOpen) onOpen(hit);
+                else stage?.ringStar(callout.vector);
+              }}
             >
               <strong>{star.name}</strong>
               <span>{detail}</span>

@@ -131,7 +131,9 @@ export class TileStreamer {
     if (!response.ok) throw new Error(`manifest: ${response.status}`);
     this.manifest = parseManifest(await response.json());
     this.tiles = tilesAllowed();
-    const g9 = await this.load(`${this.path}/${this.manifest.g9.file}`);
+    // With ids: `g9.bin` is the second half of what a pointer can pick, and
+    // a pick that cannot name its star is not one (`pick.ts`).
+    const g9 = await this.load(`${this.path}/${this.manifest.g9.file}`, undefined, true);
     if (!this.live) return;
     this.sink.setG9(g9);
   }
@@ -155,12 +157,12 @@ export class TileStreamer {
     this.inFlight.clear();
   }
 
-  private async load(url: string, init?: RequestInit): Promise<DeepStars> {
+  private async load(url: string, init?: RequestInit, keepIds = false): Promise<DeepStars> {
     const response = await fetch(url, { cache: 'force-cache', ...init });
     if (!response.ok) throw new Error(`${url}: ${response.status}`);
     const bytes = new Uint8Array(await response.arrayBuffer());
     this.bytes += bytes.byteLength;
-    return parseDeep(bytes);
+    return parseDeep(bytes, keepIds);
   }
 
   /** What a tile actually costs, which is not what it weighs.

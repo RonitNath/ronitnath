@@ -59,6 +59,10 @@ export class DeepLayer implements DeepSink {
 
   private g9Count = 0;
   private g9Magnitude: Float32Array = new Float32Array(0);
+  /** The g9 records as the CPU decoded them, kept for the picker: a pointer
+   * query needs positions and ids, and reading them back off the GPU is both
+   * slower and a pipeline stall (`pick.ts`). */
+  private g9Stars: DeepStars | null = null;
   private readonly slots = new Map<number, Slot>();
   private readonly free: number[] = [];
   private highWater = 0;
@@ -154,6 +158,12 @@ export class DeepLayer implements DeepSink {
     gl.bindVertexArray(null);
     this.g9Count = stars.count;
     this.g9Magnitude = stars.magnitude;
+    this.g9Stars = stars;
+  }
+
+  /** The streamed bright half, for whoever needs it on the CPU. */
+  get g9(): DeepStars | null {
+    return this.g9Stars;
   }
 
   hasTile(id: number): boolean {
