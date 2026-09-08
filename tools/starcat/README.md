@@ -14,6 +14,14 @@ committed.
 | `build_detail.py` | S3 star detail | `data/sky_star_detail.sha256`, `.stats.json` |
 | `load_detail.py` | the psql loader | `load_detail.sql` |
 
+`pnpm db:load-sky` runs `scripts/load-sky.mjs`, not `load_detail.py`: the
+deployment's image is `node:24-alpine` with the application's own dependencies
+and no Postgres client, so the shipped loader streams the file through Node's
+own zstd decoder and inserts in batches through `pg`. Same transaction, same
+full replacement, and about 80 seconds rather than five minutes.
+`load_detail.py` remains for a psql-driven load where `zstd` and `psql` are
+both to hand.
+
 ## build_star_lod.py — 768 tiles of Gaia DR3 G ≤ 12
 
 A 32 × 24 equal-angle grid over the sky, one static file per tile, so the client
@@ -162,7 +170,7 @@ another 80 MB for no information.
 ```sh
 python3 tools/starcat/build_star_lod.py                # tiles (no network)
 python3 tools/starcat/build_detail.py                  # ~40 min, resumable
-python3 tools/starcat/load_detail.py --run             # into $DATABASE_URL
+pnpm db:load-sky                                       # into $DATABASE_URL
 ```
 
 Delete the matching directory under `data/tap/` to force a stage to re-pull.
