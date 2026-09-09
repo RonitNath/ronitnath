@@ -81,7 +81,10 @@ async function capture(page, view, target, seen) {
   const pause = page.locator('button.sky-control', { hasText: 'Pause sky' });
   await pause.click();
   await wait(700);
-  await page.screenshot({ path: join(outDir, `${target.figure}-${view.name}.png`) });
+  await page.screenshot({
+    path: join(outDir, `${target.figure}-${view.name}.png`),
+    timeout: 60_000,
+  });
   const magnitudes = await page.evaluate(
     (name) => {
       const stars = globalThis.__sky?.().named ?? [];
