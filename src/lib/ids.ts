@@ -36,12 +36,31 @@ export class PublicIdError extends Error {}
 const TAG_BYTES = 8;
 const BLOCK_BYTES = 16;
 
-function key(): Buffer {
-  const hex = process.env.ID_KEY;
+function keyFrom(hex: string | undefined, name: string): Buffer {
   if (!hex || !/^[0-9a-fA-F]{32}$/.test(hex)) {
-    throw new PublicIdError('ID_KEY must be exactly 32 hex characters');
+    throw new PublicIdError(`${name} must be exactly 32 hex characters`);
   }
   return Buffer.from(hex, 'hex');
+}
+
+function key(): Buffer {
+  return keyFrom(process.env.ID_KEY, 'ID_KEY');
+}
+
+/* Rotation. A public id is printed, bookmarked and mailed, so the key that
+ * made it has to keep decoding after the key that makes new ones has changed:
+ * `ID_KEY_PREV` is read only on the way in, and `encodeId` never looks at it.
+ * The list is ordered — current first — so a live key does no extra work and
+ * only an id that fails under it pays for the second attempt.
+ *
+ * A malformed `ID_KEY_PREV` is not an error: an operator who half-set it would
+ * otherwise take the whole site down over ids that the current key still
+ * decodes. It is simply not a key we can try. */
+function decodeKeys(): Buffer[] {
+  const keys = [key()];
+  const prev = process.env.ID_KEY_PREV;
+  if (prev && /^[0-9a-fA-F]{32}$/.test(prev)) keys.push(Buffer.from(prev, 'hex'));
+  return keys;
 }
 
 function tag(type: IdType, k: Buffer): Buffer {
@@ -72,17 +91,17 @@ export function decodeId(type: IdType, publicId: string): number {
   const bytes = Buffer.from(body, 'base64url');
   if (bytes.length !== BLOCK_BYTES) throw new PublicIdError('malformed id');
 
-  const k = key();
-  const decipher = createDecipheriv('aes-128-ecb', k, null);
-  decipher.setAutoPadding(false);
-  const block = Buffer.concat([decipher.update(bytes), decipher.final()]);
+  for (const k of decodeKeys()) {
+    const decipher = createDecipheriv('aes-128-ecb', k, null);
+    decipher.setAutoPadding(false);
+    const block = Buffer.concat([decipher.update(bytes), decipher.final()]);
 
-  if (!timingSafeEqual(block.subarray(0, TAG_BYTES), tag(type, k))) {
-    throw new PublicIdError('wrong id type');
+    if (!timingSafeEqual(block.subarray(0, TAG_BYTES), tag(type, k))) continue;
+    const id = block.readBigUInt64BE(TAG_BYTES);
+    if (id <= 0n || id > BigInt(Number.MAX_SAFE_INTEGER)) throw new PublicIdError('malformed id');
+    return Number(id);
   }
-  const id = block.readBigUInt64BE(TAG_BYTES);
-  if (id <= 0n || id > BigInt(Number.MAX_SAFE_INTEGER)) throw new PublicIdError('malformed id');
-  return Number(id);
+  throw new PublicIdError('wrong id type');
 }
 
 /* For request paths, where a bad id is a 404 and not an exception. */

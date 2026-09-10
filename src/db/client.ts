@@ -6,7 +6,11 @@ import * as kernel from './schema';
 /* Two schema modules, one Drizzle instance. They are kept apart because
  * better-auth owns `auth.*` and this app owns the rest, and because both
  * modules would otherwise want the names `session` and `organization`. */
-const schema = { ...kernel, auth: authSchema };
+/* Both are spread rather than nested as namespaces: an `import * as` object has
+ * a null prototype, and Drizzle's `is()` reads `Object.getPrototypeOf(v).constructor`
+ * while it builds the relational config, so handing it a namespace throws before
+ * a connection is ever opened. */
+const schema = { ...kernel, auth: { ...authSchema } };
 
 /* The pool is opened on first query, never at import: the build collects page
  * data by loading every route module, and a route module must not need a
