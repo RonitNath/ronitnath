@@ -1,6 +1,12 @@
 import { drizzle, type NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
-import * as schema from './schema';
+import * as authSchema from './auth-schema';
+import * as kernel from './schema';
+
+/* Two schema modules, one Drizzle instance. They are kept apart because
+ * better-auth owns `auth.*` and this app owns the rest, and because both
+ * modules would otherwise want the names `session` and `organization`. */
+const schema = { ...kernel, auth: authSchema };
 
 /* The pool is opened on first query, never at import: the build collects page
  * data by loading every route module, and a route module must not need a
@@ -26,4 +32,4 @@ export function database(): NodePgDatabase<typeof schema> {
   return globalForDb.rnDb;
 }
 
-export { schema };
+export { schema, authSchema };

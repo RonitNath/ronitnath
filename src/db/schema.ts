@@ -6,6 +6,7 @@
 import { sql } from 'drizzle-orm';
 import {
   type AnyPgColumn,
+  bigint,
   bigserial,
   boolean,
   check,
@@ -14,6 +15,7 @@ import {
   jsonb,
   pgEnum,
   pgTable,
+  primaryKey,
   serial,
   smallint,
   text,
@@ -70,9 +72,20 @@ export const person = pgTable(
     mergedInto: integer('merged_into').references((): AnyPgColumn => person.id, {
       onDelete: 'set null',
     }),
+    /* The one join between the kernel model and the identity core. A guest is
+     * a person with no user: events, invites, rsvps and photos all reference
+     * `person`, never `auth.user`, so somebody who was only ever named by a
+     * host keeps working and becomes a member the day a user row is linked
+     * here (fleet-conventions §2). No foreign key: `auth.user` is better-auth's
+     * table in its own schema, and a cross-schema constraint would make
+     * deleting a user a decision this table gets to veto. */
+    userId: text('user_id'),
     createdAt: now(),
   },
-  (t) => [index('person_merged_into_idx').on(t.mergedInto)],
+  (t) => [
+    index('person_merged_into_idx').on(t.mergedInto),
+    uniqueIndex('person_user_id_key').on(t.userId),
+  ],
 );
 
 export const organization = pgTable(
@@ -473,4 +486,83 @@ export const skyStarDetail = pgTable(
     builtAt: timestamp('built_at', { withTimezone: true }).notNull().defaultNow(),
   },
   () => [index('sky_star_detail_hip_idx').on(sql`((payload ->> 'hip'))`)],
+);
+
+/* ── The spine ───────────────────────────────────────────────────────────────
+ *
+ * `domain_event` is the one append-only log every mutating transaction writes
+ * to (fleet-conventions §7). Realtime, audit, notifications and metering all
+ * read it, so a command that forgets to `emit` is invisible to all four.
+ *
+ * `seq` is gapless *per org*, assigned by a BEFORE INSERT trigger that takes a
+ * row lock on the org's cursor — that is what lets a reconnecting browser say
+ * `since=<seq>` and be certain it missed nothing. `org_id` here is a public
+ * id, not an integer: a person's or an organization's, because on this site a
+ * user's own stream is as much a stream as an organization's.
+ *
+ * Append-only is enforced in the database, not in the application: the UPDATE
+ * and DELETE triggers raise. */
+export const domainEvent = pgTable(
+  'domain_event',
+  {
+    id: bigserial('id', { mode: 'number' }).primaryKey(),
+    orgId: text('org_id').notNull(),
+    seq: bigint('seq', { mode: 'number' }).notNull(),
+    resourceKind: text('resource_kind').notNull(),
+    resourceId: text('resource_id').notNull(),
+    kind: text('kind').notNull(),
+    actorId: text('actor_id'),
+    subjectId: text('subject_id'),
+    actingOperatorId: text('acting_operator_id'),
+    correlationId: text('correlation_id').notNull(),
+    published: boolean('published').notNull().default(true),
+    payload: jsonb('payload'),
+    at: timestamp('at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('domain_event_org_seq').on(t.orgId, t.seq),
+    index('domain_event_resource_idx').on(t.resourceKind, t.resourceId),
+    index('domain_event_at_idx').on(t.at),
+  ],
+);
+
+export const domainEventCursor = pgTable('domain_event_cursor', {
+  orgId: text('org_id').primaryKey(),
+  seq: bigint('seq', { mode: 'number' }).notNull().default(0),
+});
+
+/* ── Configured records ──────────────────────────────────────────────────────
+ *
+ * Anything with a publish boundary: a draft row and a published row under the
+ * same key, and a version history beside them. Watchers refresh on `published`
+ * only; a save that carries a stale version is a 409 with the diff, never a
+ * merge (fleet-conventions §7, contracts.md). */
+export const configured = pgTable(
+  'configured',
+  {
+    orgId: text('org_id').notNull(),
+    key: text('key').notNull(),
+    state: text('state').notNull(),
+    version: integer('version').notNull().default(0),
+    body: jsonb('body').notNull(),
+    updatedBy: text('updated_by'),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.orgId, t.key, t.state] }),
+    check('configured_state', sql`${t.state} IN ('draft','published')`),
+  ],
+);
+
+export const configuredVersion = pgTable(
+  'configured_version',
+  {
+    orgId: text('org_id').notNull(),
+    key: text('key').notNull(),
+    version: integer('version').notNull(),
+    body: jsonb('body').notNull(),
+    publishedBy: text('published_by'),
+    at: timestamp('at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.orgId, t.key, t.version] })],
 );
