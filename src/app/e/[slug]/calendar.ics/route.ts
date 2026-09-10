@@ -10,7 +10,7 @@ import { and, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 
 import { database, schema } from '@/db/client';
-import { currentPrincipal } from '@/features/auth/session';
+import { currentPrincipal } from '@/features/auth/principal';
 import { publishedEvent } from '@/features/events/authority';
 import { calendarUid, renderCalendar } from '@/features/events/ics';
 import { readEventLink } from '@/features/events/links';

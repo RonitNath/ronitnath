@@ -2,12 +2,15 @@ import type { Metadata } from 'next';
 
 import { RevokeButton } from '@/features/auth/components/revoke';
 import { listSessions } from '@/features/auth/queries';
-import { encodeId } from '@/lib/ids';
 import { requireMember } from '@/lib/tiers';
 
 export const metadata: Metadata = { title: 'Sessions' };
 
 const SOURCE_LABEL: Record<string, string> = { local: 'Password', oidc: 'Isoastra' };
+
+/* One account, one door: which one it is belongs to the account, not to each
+ * session, so every row says the same thing and it is still the thing a
+ * reader wants to see beside "this one". */
 
 /* A user agent string is a paragraph nobody reads. What a person recognises is
  * the browser and the platform, so that is what the column says; the whole
@@ -39,7 +42,7 @@ function agentOf(raw: string | null): string {
 
 export default async function SessionsPage() {
   const { principal } = await requireMember('/app/sessions');
-  const sessions = await listSessions(principal.personId);
+  const sessions = await listSessions();
 
   return (
     <main className="indoors">
@@ -68,7 +71,7 @@ export default async function SessionsPage() {
                       {agentOf(row.userAgent)}
                       {current ? <span className="current"> · this one</span> : null}
                     </td>
-                    <td>{SOURCE_LABEL[row.source] ?? row.source}</td>
+                    <td>{SOURCE_LABEL[principal.source] ?? principal.source}</td>
                     <td className="mono">{row.ip ?? '—'}</td>
                     <td className="num">
                       <time dateTime={row.lastSeenAt.toISOString()}>
@@ -80,7 +83,7 @@ export default async function SessionsPage() {
                         {row.expiresAt.toISOString().slice(0, 10)}
                       </time>
                     </td>
-                    <td>{current ? null : <RevokeButton session={encodeId('session', row.id)} />}</td>
+                    <td>{current ? null : <RevokeButton session={row.handle} />}</td>
                   </tr>
                 );
               })}

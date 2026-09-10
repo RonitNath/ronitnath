@@ -78,3 +78,19 @@
   color: var(--fg);
   font-weight: 600;
 }
+
+/* The other door is a command now — better-auth builds the authorization URL,
+ * state and PKCE — so it is a button inside a form. The form must not take
+ * part in the aside's layout, or the row it sits in gains a wrapper the design
+ * never had; `display: contents` is exactly "this element lays nothing out".
+ * The button then has to be told the things an anchor gets for free. */
+.aside form {
+  display: contents;
+}
+
+button.federated {
+  background: none;
+  font: inherit;
+  font-size: var(--text-2);
+  cursor: pointer;
+}

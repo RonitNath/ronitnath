@@ -27,7 +27,7 @@ export const ACTING_OPERATOR = 'acting_operator';
  *  a unit test has no cookie jar, and asking for one must not throw. */
 async function actingOperator(): Promise<number | null> {
   try {
-    const { currentPrincipal } = await import('./session');
+    const { currentPrincipal } = await import('./principal');
     return (await currentPrincipal())?.actingOperatorId ?? null;
   } catch {
     return null;

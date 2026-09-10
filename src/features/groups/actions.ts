@@ -17,7 +17,7 @@ import { z } from 'zod';
 import { database, schema } from '@/db/client';
 import { recordAudit } from '@/features/auth/audit';
 import type { FormState } from '@/features/auth/form-state';
-import { currentPrincipal } from '@/features/auth/session';
+import { currentPrincipal } from '@/features/auth/principal';
 import {
   allows,
   grant,
@@ -40,7 +40,7 @@ function field(form: FormData, name: string): string {
 
 async function actor() {
   const principal = await currentPrincipal();
-  if (!principal) redirect('/auth');
+  if (!principal) redirect('/auth/sign-in');
   return { personId: principal.personId, isOperator: principal.isOperator };
 }
 

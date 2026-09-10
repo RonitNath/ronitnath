@@ -11,7 +11,7 @@ import { and, desc, eq, gt, ilike, inArray, isNull, or, sql, type SQL } from 'dr
 import { alias } from 'drizzle-orm/pg-core';
 
 import { database, schema } from '@/db/client';
-import { OPERATOR_RESOURCE } from '@/features/auth/session';
+import { OPERATOR_RESOURCE } from '@/features/auth/principal';
 import { encodeId, tryDecodeId, type IdType } from '@/lib/ids';
 
 export type PartyState = 'active' | 'disabled' | 'merged';

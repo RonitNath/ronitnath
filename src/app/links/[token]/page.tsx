@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 
 import { SignInForm } from '@/features/auth/components/forms';
-import { currentPrincipal } from '@/features/auth/session';
+import { currentPrincipal } from '@/features/auth/principal';
 import { ClaimForm, ClaimRegisterForm } from '@/features/people/components/claim';
 import { openClaimLink } from '@/features/people/invitations';
 import { normalizeHandle } from '@/features/people/handles';

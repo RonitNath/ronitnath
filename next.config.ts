@@ -6,7 +6,6 @@ const config: NextConfig = {
   output: 'standalone',
   reactStrictMode: true,
   poweredByHeader: false,
-  serverExternalPackages: ['openid-client'],
   env: { APP_VERSION: process.env.APP_VERSION ?? 'dev' },
   /* Every sky asset is content-addressed by its builder — the star catalogue,
    * the names, the figures, the band, the city list, the globe's textures, the

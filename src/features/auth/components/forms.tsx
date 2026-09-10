@@ -3,17 +3,22 @@
 /* The forms. Client components only because `useActionState` renders the
  * answer beside the field it came from and disables the button while the
  * command runs; the commands themselves are server actions, and every form
- * here submits without JavaScript as well. */
+ * here submits without JavaScript as well.
+ *
+ * The ZITADEL button is a form now rather than a link. Better-auth builds the
+ * authorization URL — state, PKCE and the redirect_uri that must match what
+ * the app is registered with — so starting the round trip is a command, and a
+ * command on this site is a server action. */
 
 import { useActionState } from 'react';
 
 import {
-  register,
   requestPasswordReset,
   requestVerification,
   resetPassword,
-  signIn,
-  verifyEmail,
+  signInEmail,
+  signInWithIsoastra,
+  signUpEmail,
 } from '@/features/auth/actions';
 import { UNVERIFIED, type FormState } from '@/features/auth/form-state';
 
@@ -60,7 +65,7 @@ function ConfirmPane({ email }: { email: string }) {
 /* `email` is prefilled from a claim link, where the address is already known
  * and typing it again would be a test the visitor can fail. */
 export function SignInForm({ next, email = '' }: { next: string; email?: string }) {
-  const [state, action, pending] = useActionState(signIn, EMPTY);
+  const [state, action, pending] = useActionState(signInEmail, EMPTY);
   if (state.unverified && state.email) return <ConfirmPane email={state.email} />;
   return (
     <form className="pane" action={action}>
@@ -97,7 +102,7 @@ export function SignInForm({ next, email = '' }: { next: string; email?: string 
 }
 
 export function RegisterForm() {
-  const [state, action, pending] = useActionState(register, EMPTY);
+  const [state, action, pending] = useActionState(signUpEmail, EMPTY);
   return (
     <form className="pane" action={action}>
       <h2>Register</h2>
@@ -131,6 +136,20 @@ export function RegisterForm() {
       <button type="submit" className="commit" disabled={pending}>
         Register
       </button>
+    </form>
+  );
+}
+
+/** The other door. Where it lands is where the reader was going. */
+export function IsoastraButton({ next }: { next: string }) {
+  const [state, action, pending] = useActionState(signInWithIsoastra, EMPTY);
+  return (
+    <form action={action}>
+      <input type="hidden" name="next" value={next} />
+      <button type="submit" className="federated" disabled={pending}>
+        Sign in with Isoastra
+      </button>
+      <Note state={state} />
     </form>
   );
 }
@@ -184,15 +203,29 @@ export function ResetForm({ token }: { token: string }) {
   );
 }
 
-export function VerifyForm({ token }: { token: string }) {
-  const [state, action, pending] = useActionState(verifyEmail, EMPTY);
+/** Confirming an address is a link click now, not a button press: better-auth
+ *  verifies at its own endpoint and bounces the reader here. What is left for
+ *  this form is the case where the link had already been used or had expired,
+ *  which is another letter. */
+export function ResendForm() {
+  const [state, action, pending] = useActionState(requestVerification, EMPTY);
   return (
     <form className="pane" action={action}>
-      <h2>Confirm your email</h2>
-      <input type="hidden" name="token" value={token} />
+      <h2>Send another link</h2>
+      <div className="field">
+        <label htmlFor="verify-email">Email</label>
+        <input
+          id="verify-email"
+          name="email"
+          type="email"
+          inputMode="email"
+          autoComplete="username"
+          required
+        />
+      </div>
       <Note state={state} />
       <button type="submit" className="commit" disabled={pending}>
-        Confirm
+        Send it again
       </button>
     </form>
   );

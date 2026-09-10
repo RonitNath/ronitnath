@@ -10,7 +10,7 @@ import { and, eq } from 'drizzle-orm';
 
 import { schema } from '@/db/client';
 import type { Transaction } from '@/features/auth/db';
-import { OPERATOR_RESOURCE } from '@/features/auth/session';
+import { OPERATOR_RESOURCE } from '@/features/auth/principal';
 
 export async function operatorPersonIds(tx: Transaction): Promise<number[]> {
   const rows = await tx
@@ -38,4 +38,19 @@ export function isLastOperator(operators: readonly number[], personId: number): 
 export function refusesRevoke(operators: readonly number[], personId: number): 'last' | 'no' | null {
   if (!operators.includes(personId)) return 'no';
   return isLastOperator(operators, personId) ? 'last' : null;
+}
+
+/** The one relation the platform tier grants: `person → operator → platform:*`.
+ *  Idempotent, because a seed script and a first sign-in may both write it. */
+export async function grantOperator(tx: Transaction, personId: number): Promise<void> {
+  await tx
+    .insert(schema.relation)
+    .values({
+      subjectKind: 'person',
+      subjectId: personId,
+      verb: 'operator',
+      resourceKind: OPERATOR_RESOURCE.kind,
+      resourceId: OPERATOR_RESOURCE.id,
+    })
+    .onConflictDoNothing();
 }

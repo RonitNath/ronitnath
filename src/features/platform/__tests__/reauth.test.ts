@@ -9,7 +9,7 @@ function principal(reauthenticatedAt: Date | null) {
   return {
     personId: 1,
     displayName: 'The Operator',
-    sessionId: 1,
+    sessionId: 'ses_1',
     source: 'local' as const,
     isOperator: true,
     actingOperatorId: null,

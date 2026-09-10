@@ -7,7 +7,7 @@ import { AnswerForm, LocalTime } from '@/features/events/components/guest';
 import { guestView } from '@/features/events/guest';
 import { readEventLink } from '@/features/events/links';
 import { readableWindow, zoneLabel } from '@/features/events/time';
-import { currentPrincipal } from '@/features/auth/session';
+import { currentPrincipal } from '@/features/auth/principal';
 import { ThemeToggle } from '@/app/theme-toggle';
 import { and, eq } from 'drizzle-orm';
 

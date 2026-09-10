@@ -1,5 +1,5 @@
 import { Shell } from '@/features/auth/components/shell';
-import { currentPrincipal } from '@/features/auth/session';
+import { currentPrincipal } from '@/features/auth/principal';
 
 import '../../app/app.css';
 

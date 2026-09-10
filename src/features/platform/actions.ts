@@ -10,20 +10,20 @@
 
 import { and, eq, isNull, ne, or, sql } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
+import { headers } from 'next/headers';
 import { z } from 'zod';
 
-import { database, schema } from '@/db/client';
+import { authSchema, database, schema } from '@/db/client';
 import { recordAudit } from '@/features/auth/audit';
 import type { FormState } from '@/features/auth/form-state';
-import { grantOperator as writeOperatorEdge } from '@/features/auth/provision';
-import { verifyPassword } from '@/features/auth/secrets';
-import { currentPrincipal, OPERATOR_RESOURCE, type Principal } from '@/features/auth/session';
+import { auth } from '@/features/auth/auth';
+import { currentPrincipal, OPERATOR_RESOURCE, type Principal } from '@/features/auth/principal';
 import { mergePersons } from '@/features/people/merge';
 import { SCORE } from '@/features/people/matches';
 import { tryDecodeId } from '@/lib/ids';
 import { requireOperator } from '@/lib/tiers';
 import { disableCascade, enableRestore } from './disable';
-import { operatorPersonIds, refusesRevoke } from './operators';
+import { grantOperator as writeOperatorEdge, operatorPersonIds, refusesRevoke } from './operators';
 import { needsReauth, REAUTH_REQUIRED } from './reauth';
 import { splitMerge } from './split';
 
@@ -59,32 +59,34 @@ export async function reauthenticate(_prev: FormState, form: FormData): Promise<
   const secret = field(form, 'password');
   if (secret.length === 0) return { error: 'A password.' };
 
-  const ok = await database().transaction(async (tx) => {
-    const rows = await tx
-      .select({ secret: schema.factor.secret })
-      .from(schema.factor)
-      .innerJoin(schema.identity, eq(schema.identity.id, schema.factor.identityId))
-      .where(
-        and(eq(schema.identity.personId, principal.personId), eq(schema.factor.kind, 'password')),
-      )
-      .limit(1);
-    const phc = rows[0]?.secret;
-    if (!phc || !(await verifyPassword(secret, phc))) return false;
+  /* The password is checked by better-auth against the account it belongs to,
+   * so this file never sees a hash and never has to know which parameters the
+   * stored one was made under. */
+  try {
+    await auth().api.verifyPassword({ body: { password: secret }, headers: await headers() });
+  } catch {
+    return { error: 'Authentication failed.' };
+  }
+
+  /* The stamp is a column this app added to `auth.session`; better-auth
+   * selects it and never lets a client set it, which is what makes the
+   * ten-minute window a session fact rather than a second cookie. */
+  await database().transaction(async (tx) => {
     await tx
-      .update(schema.session)
+      .update(authSchema.session)
       .set({ reauthenticatedAt: sql`now()` })
-      .where(eq(schema.session.id, principal.sessionId));
+      .where(eq(authSchema.session.id, principal.sessionId));
     await recordAudit(tx, {
       actorPersonId: principal.personId,
       command: 'reauthenticate',
-      targetKind: 'session',
-      targetId: principal.sessionId,
-      payload: { source: 'local' },
+      /* `audit.target_id` is an integer and a session id is text now, so the
+       * session is named in the payload and the target is the person. */
+      targetKind: 'person',
+      targetId: principal.personId,
+      payload: { source: 'local', session: principal.sessionId },
     });
-    return true;
   });
 
-  if (!ok) return { error: 'Authentication failed.' };
   revalidatePath('/platform');
   return { notice: 'Confirmed. The window is open for ten minutes.' };
 }

@@ -3,7 +3,6 @@ import Link from 'next/link';
 
 import { listIdentities } from '@/features/auth/queries';
 import {
-  AddEmailForm,
   ConfirmMatchButton,
   DisplayNameForm,
   RemoveIdentityButton,
@@ -140,7 +139,6 @@ export default async function AppHome() {
             The doors this account can be reached through. There are none on file.
           </p>
         ) : null}
-        <AddEmailForm />
       </section>
     </main>
   );

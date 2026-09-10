@@ -1,6 +1,6 @@
 import Link from 'next/link';
 
-import { currentPrincipal } from '@/features/auth/session';
+import { currentPrincipal } from '@/features/auth/principal';
 import { Atmosphere } from '@/features/sky/atmosphere';
 
 import './landing.css';
@@ -20,7 +20,7 @@ export default async function Home() {
         {principal ? (
           <Link href="/app">{principal.displayName}</Link>
         ) : (
-          <Link href="/auth">Sign in</Link>
+          <Link href="/auth/sign-in">Sign in</Link>
         )}
         <ThemeToggle />
       </header>

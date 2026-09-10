@@ -18,7 +18,9 @@
     "db:migrate": "tsx scripts/migrate.ts",
     "db:load-sky": "node scripts/load-sky.mjs",
     "e2e": "playwright test",
-    "seed:operator": "tsx scripts/seed-operator.ts"
+    "seed:operator": "tsx scripts/seed-operator.ts",
+    "migrate:identity": "tsx scripts/migrate-identity.ts",
+    "import:export": "tsx scripts/import-export.ts"
   },
   "dependencies": {
     "@node-rs/argon2": "^2.2.0",
@@ -26,7 +28,6 @@
     "drizzle-orm": "0.45.2",
     "next": "15.5.25",
     "nodemailer": "^10.0.0",
-    "openid-client": "^6.8.8",
     "pg": "8.23.0",
     "react": "19.2.8",
     "react-dom": "19.2.8",

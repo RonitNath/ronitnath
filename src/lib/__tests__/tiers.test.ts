@@ -7,21 +7,29 @@ vi.mock('next/navigation', () => ({
   redirect: (to: string) => {
     throw new Redirect(to);
   },
+  permanentRedirect: (to: string) => {
+    throw new Redirect(to);
+  },
   notFound: () => {
     throw new NotFound('not found');
   },
 }));
 
 /* The tiers ask exactly one question of the session store; the store itself is
- * exercised against a real database by the Playwright flows. */
+ * better-auth's and is exercised against a real database by the Playwright
+ * flows. */
 const principal = vi.fn();
-vi.mock('@/features/auth/session', () => ({ currentPrincipal: () => principal() }));
+vi.mock('@/features/auth/principal', () => ({
+  currentPrincipal: () => principal(),
+  OPERATOR_RESOURCE: { kind: 'platform', id: 0 },
+}));
 
 /* The org tier asks one more question — whether this asker operates that
  * handle — and `allows` is tested on its own in authority.test.ts. */
 const operated = vi.fn();
 vi.mock('@/features/organizations/queries', () => ({
   operatedOrganization: (handle: string, actor: unknown) => operated(handle, actor),
+  organizationByHandle: (handle: string) => operated(handle, null),
 }));
 
 const tiers = await import('../tiers');
@@ -29,9 +37,11 @@ const tiers = await import('../tiers');
 const OPERATOR = {
   personId: 7,
   displayName: 'Ronit',
-  sessionId: 3,
+  sessionId: 'ses_3',
   source: 'oidc' as const,
   isOperator: true,
+  actingOperatorId: null,
+  reauthenticatedAt: null,
 };
 const MEMBER = { ...OPERATOR, personId: 8, isOperator: false, source: 'local' as const };
 
@@ -45,11 +55,11 @@ describe('tier helpers', () => {
     });
   });
 
-  it('sends a signed-out member to /auth, carrying where they were going', async () => {
+  it('sends a signed-out member to the door, carrying where they were going', async () => {
     principal.mockResolvedValue(null);
-    await expect(tiers.requireMember()).rejects.toThrow('/auth');
+    await expect(tiers.requireMember()).rejects.toThrow('/auth/sign-in');
     await expect(tiers.requireMember('/app/sessions')).rejects.toThrow(
-      '/auth?next=%2Fapp%2Fsessions',
+      '/auth/sign-in?next=%2Fapp%2Fsessions',
     );
   });
 
@@ -78,7 +88,7 @@ describe('tier helpers', () => {
     principal.mockResolvedValue(null);
     operated.mockResolvedValue(null);
     await expect(tiers.requireOrgOperator('isoastra')).rejects.toThrow(
-      '/auth?next=%2Forg%2Fisoastra',
+      '/auth/sign-in?next=%2Forg%2Fisoastra',
     );
   });
 

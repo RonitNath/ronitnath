@@ -10,7 +10,7 @@
  * telling them to re-authenticate reveals nothing they do not hold, and not
  * telling them leaves a control that silently does nothing. */
 
-import type { Principal } from '@/features/auth/session';
+import type { Principal } from '@/features/auth/principal';
 
 export const REAUTH_WINDOW_MINUTES = 10;
 

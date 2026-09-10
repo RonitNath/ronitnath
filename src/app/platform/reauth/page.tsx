@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 
+import { IsoastraButton } from '@/features/auth/components/forms';
 import { ReauthForm } from '@/features/platform/components/reauth-form';
 import { isFresh, REAUTH_WINDOW_MINUTES } from '@/features/platform/reauth';
 import { requireOperator } from '@/lib/tiers';
@@ -16,8 +17,8 @@ function safeNext(raw: string | undefined): string {
 /* ReAuthenticate. A cookie says who is here; it does not say the person
  * holding it is still at the keyboard. The operator who signs in through
  * ZITADEL has no password on this side at all, so their half of this page is
- * a fresh round trip with `prompt=login` — the OP is asked to prove it, not
- * to remember it. */
+ * a fresh round trip: the OP is asked again, better-auth mints a new session
+ * when the callback lands, and `/auth/confirmed` stamps it. */
 export default async function ReauthPage({
   searchParams,
 }: {
@@ -47,14 +48,7 @@ export default async function ReauthPage({
             This account signs in through Isoastra and has no password here. One more round trip
             is the proof.
           </p>
-          <p>
-            <a
-              className="commit"
-              href={`/auth/oidc/start?reauth=1&next=${encodeURIComponent(next)}`}
-            >
-              Confirm with Isoastra
-            </a>
-          </p>
+          <IsoastraButton next={`/auth/confirmed?next=${encodeURIComponent(next)}`} />
         </section>
       ) : (
         <section>
