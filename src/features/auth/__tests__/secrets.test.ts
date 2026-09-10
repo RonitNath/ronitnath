@@ -1,37 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import {
-  TOKEN_BYTES,
-  digestsEqual,
-  hashPassword,
-  hashToken,
-  mintToken,
-  spendVerificationTime,
-  tokenLooksWellFormed,
-  verifyPassword,
-} from '../secrets';
-
-describe('passwords', () => {
-  it('verifies the password it hashed and nothing else', async () => {
-    const phc = await hashPassword('correct horse battery');
-    expect(phc.startsWith('$argon2id$')).toBe(true);
-    expect(await verifyPassword('correct horse battery', phc)).toBe(true);
-    expect(await verifyPassword('correct horse batteryy', phc)).toBe(false);
-  });
-
-  it('salts, so the same password hashes to two different strings', async () => {
-    const [a, b] = await Promise.all([hashPassword('same'), hashPassword('same')]);
-    expect(a).not.toBe(b);
-  });
-
-  it('treats a hash it cannot parse as a refusal rather than an exception', async () => {
-    await expect(verifyPassword('anything', 'not-a-phc-string')).resolves.toBe(false);
-  });
-
-  it('spends verification time against the dummy hash without throwing', async () => {
-    await expect(spendVerificationTime('whatever')).resolves.toBeUndefined();
-  });
-});
+import { TOKEN_BYTES, digestsEqual, hashToken, mintToken, tokenLooksWellFormed } from '../secrets';
 
 describe('tokens', () => {
   it('mints 256 bits of base64url', () => {

@@ -8,6 +8,7 @@
 
 import { and, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
+import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { z } from 'zod';
 
@@ -15,13 +16,11 @@ import { database, schema } from '@/db/client';
 import { recordAudit } from '@/features/auth/audit';
 import { isAllowlisted, looksLikeEmail, normalizeEmail } from '@/features/auth/email-address';
 import { CHECK_INBOX, type FormState } from '@/features/auth/form-state';
-import { VERIFY_TTL_HOURS, issueLink, linkUrl } from '@/features/auth/links';
-import { createPerson } from '@/features/auth/provision';
-import { hashPassword } from '@/features/auth/secrets';
-import { currentPrincipal, requestFingerprint } from '@/features/auth/session';
-import { RESET_LIMIT, overLimit } from '@/features/auth/throttle';
+import { auth } from '@/features/auth/auth';
+import { mirrorIdentity } from '@/features/auth/mirror';
+import { currentPrincipal } from '@/features/auth/principal';
+import { createPerson } from '@/features/people/provision';
 import { tryDecodeId } from '@/lib/ids';
-import { deliver, verificationMail } from '@/lib/mail';
 import { CONTACT, allows, livePerson } from './authority';
 import { HANDLE_MAX, normalizeHandle } from './handles';
 import { claimUrl, mintClaimLink, spendClaimLink } from './invitations';
@@ -49,13 +48,10 @@ const claimRegisterInput = z.object({
   email: z.string().trim().max(254).transform(normalizeEmail).refine(looksLikeEmail),
   password: z.string().min(10).max(200),
 });
-const emailInput = z.object({
-  email: z.string().trim().max(254).transform(normalizeEmail).refine(looksLikeEmail),
-});
 
 async function actor() {
   const principal = await currentPrincipal();
-  if (!principal) redirect('/auth');
+  if (!principal) redirect('/auth/sign-in');
   return { personId: principal.personId, isOperator: principal.isOperator };
 }
 
@@ -290,56 +286,11 @@ export async function setDisplayName(_prev: FormState, form: FormData): Promise<
   return { notice: 'Name changed.' };
 }
 
-/** AddEmail. A second door, confirmed the same way as the first: the letter
- *  arriving is the proof. */
-export async function addEmail(_prev: FormState, form: FormData): Promise<FormState> {
-  const me = await actor();
-  const parsed = emailInput.safeParse({ email: field(form, 'email') });
-  if (!parsed.success) return { error: 'An email address.' };
-  const address = parsed.data.email;
-  const where = await requestFingerprint();
-
-  const sent = await database().transaction(async (tx) => {
-    if (await overLimit(tx, RESET_LIMIT, ['email', address])) return null;
-    if (where.ip && (await overLimit(tx, RESET_LIMIT, ['ip', where.ip]))) return null;
-    /* An address already spoken for says nothing about who has it. */
-    const taken = await tx
-      .select({ id: schema.identity.id })
-      .from(schema.identity)
-      .where(and(eq(schema.identity.source, 'local'), eq(schema.identity.subject, address)))
-      .limit(1);
-    if (taken.length > 0) return null;
-
-    const rows = await tx
-      .insert(schema.identity)
-      .values({ personId: me.personId, source: 'local', subject: address })
-      .returning({ id: schema.identity.id });
-    const identityId = rows[0]!.id;
-    await tx.insert(schema.factor).values({ identityId, kind: 'email', meta: { address } });
-    const token = await issueLink(tx, {
-      kind: 'verify_email',
-      targetKind: 'identity',
-      targetId: identityId,
-      ttlHours: VERIFY_TTL_HOURS,
-      createdBy: me.personId,
-    });
-    await recordAudit(tx, {
-      actorPersonId: me.personId,
-      command: 'add-email',
-      targetKind: 'identity',
-      targetId: identityId,
-    });
-    return token;
-  });
-
-  if (sent) {
-    await deliver(verificationMail(address, linkUrl('verify_email', sent)), {
-      command: 'add-email',
-    });
-  }
-  revalidatePath('/app');
-  return { notice: CHECK_INBOX };
-}
+/* AddEmail is gone. An account has one address now: it is `auth.user.email`,
+ * better-auth owns changing it, and a second `identity` row would have
+ * advertised a door that does not open. Handles — the addresses a member
+ * writes down for somebody else — are unaffected and are still added by
+ * HoldPerson. */
 
 /** RemoveIdentity. Refuses the last door, because an account nobody can reach
  *  is not an account. */
@@ -389,10 +340,17 @@ export async function removeIdentity(_prev: FormState, form: FormData): Promise<
 
 /** ClaimLink for a visitor who has no account yet. Holding the link is what
  *  identifies them — that is what a personal link is for — so the account is
- *  created and the held person folded into it in one transaction. The address
+ *  created and the held person folded into it in the same command. The address
  *  still has to be confirmed before it becomes a door, exactly as it would
  *  from the register form; a bearer link says who somebody is, not that they
- *  own an address. */
+ *  own an address.
+ *
+ *  The account is created first, outside the transaction, because creating it
+ *  is better-auth's to do and it brings its own person row with it (the
+ *  `user.create.after` hook in features/auth/auth.ts). The link is spent and
+ *  the held person folded in afterwards, in one transaction: a link that lost
+ *  the race leaves a visitor with an account and nothing else, which is a
+ *  worse outcome than a spent link with no account by exactly nothing. */
 export async function claimByRegistering(_prev: FormState, form: FormData): Promise<FormState> {
   const parsed = claimRegisterInput.safeParse({
     token: field(form, 'token'),
@@ -404,35 +362,38 @@ export async function claimByRegistering(_prev: FormState, form: FormData): Prom
     return { error: 'A name, an address, and a password of at least 10 characters.' };
   }
   const { token, email: address, password: secret } = parsed.data;
-  const phc = await hashPassword(secret);
+  if (isAllowlisted(address)) {
+    return { error: 'That address cannot be used here. Sign in instead.' };
+  }
+
+  let userId: string;
+  try {
+    const created = await auth().api.signUpEmail({
+      body: {
+        email: address,
+        password: secret,
+        name: parsed.data.displayName,
+        callbackURL: '/auth/verify',
+      },
+      headers: await headers(),
+    });
+    userId = created.user.id;
+  } catch {
+    return { error: 'That address cannot be used here. Sign in instead.' };
+  }
+  await mirrorIdentity({ userId, email: address, verified: false, source: 'local' });
 
   const outcome = await database().transaction(async (tx) => {
-    const spent = await spendClaimLink(tx, token, null);
-    if (!spent) return 'gone' as const;
-    if (isAllowlisted(address)) return 'taken' as const;
-    const taken = await tx
-      .select({ id: schema.identity.id })
-      .from(schema.identity)
-      .where(and(eq(schema.identity.source, 'local'), eq(schema.identity.subject, address)))
+    const people = await tx
+      .select({ id: schema.person.id })
+      .from(schema.person)
+      .where(eq(schema.person.userId, userId))
       .limit(1);
-    if (taken.length > 0) return 'taken' as const;
+    const personId = people[0]?.id;
+    if (personId === undefined) return 'gone' as const;
 
-    const personId = await createPerson(tx, { displayName: parsed.data.displayName });
-    const identities = await tx
-      .insert(schema.identity)
-      .values({ personId, source: 'local', subject: address })
-      .returning({ id: schema.identity.id });
-    const identityId = identities[0]!.id;
-    await tx.insert(schema.factor).values([
-      { identityId, kind: 'email', meta: { address } },
-      { identityId, kind: 'password', secret: phc },
-    ]);
-    const verify = await issueLink(tx, {
-      kind: 'verify_email',
-      targetKind: 'identity',
-      targetId: identityId,
-      ttlHours: VERIFY_TTL_HOURS,
-    });
+    const spent = await spendClaimLink(tx, token, personId);
+    if (!spent) return 'gone' as const;
     await tx
       .update(schema.link)
       .set({ claimedBy: personId })
@@ -450,15 +411,9 @@ export async function claimByRegistering(_prev: FormState, form: FormData): Prom
       actorPersonId: personId,
       method: 'claim',
     });
-    return { verify, address } as const;
+    return 'claimed' as const;
   });
 
   if (outcome === 'gone') return { error: 'That link no longer works.' };
-  if (outcome === 'taken') {
-    return { error: 'That address cannot be used here. Sign in instead.' };
-  }
-  await deliver(verificationMail(outcome.address, linkUrl('verify_email', outcome.verify)), {
-    command: 'claim-link',
-  });
   return { notice: CHECK_INBOX };
 }

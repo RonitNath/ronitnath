@@ -1,19 +1,24 @@
 /* The four tiers. Every page and every action names the one it needs by
  * calling one of these; there is no per-route guard to forget.
  *
- * R2 makes the first three real: the session cookie resolves to a principal
- * once per request, `operator` is the relation `person → operator → platform:*`,
- * and an operator surface asked for by anyone else is a 404 — a visitor must
- * not be able to tell an internal page from a missing one. `requireOrgOperator`
- * answers off the relation table like everything else since R5. */
+ * This is the site's own vocabulary — visitor, member, org operator, platform
+ * operator — over the fleet's gates (`src/lib/fleet/gates.ts`), which is where
+ * the questions are actually asked now. The two exist side by side because
+ * the URL grammar has not moved yet: `requireOrgOperator` still speaks in
+ * handles under `/org/...`, and `requireOrg` speaks in slugs under `/o/...`.
+ * When the routes move, the pages move to the gates and this file goes.
+ *
+ * The session behind all of it is better-auth's: `currentPrincipal` resolves
+ * the cookie to a person once per request, `operator` is still the relation
+ * `person → operator → platform:*`, and an operator surface asked for by
+ * anyone else is a 404 — a visitor must not be able to tell an internal page
+ * from a missing one. */
 
 import { notFound, redirect } from 'next/navigation';
 
-import { currentPrincipal, type Principal } from '@/features/auth/session';
-import {
-  operatedOrganization,
-  type OrganizationRow,
-} from '@/features/organizations/queries';
+import { currentPrincipal, type Principal } from '@/features/auth/principal';
+import { operatedOrganization, type OrganizationRow } from '@/features/organizations/queries';
+import { signInPath as doorPath, requireOperator as gateOperator } from '@/lib/fleet/gates';
 
 export type Tier = 'visitor' | 'member' | 'orgOperator' | 'operator';
 
@@ -44,9 +49,10 @@ export async function requireVisitor(): Promise<VisitorContext> {
   return { tier: 'visitor', personId: null, principal: null };
 }
 
-/** Where to send an anonymous reader so that signing in returns them here. */
+/** Where to send an anonymous reader so that signing in returns them here.
+ *  The door moved to `/auth/sign-in`; `/auth` is a permanent redirect to it. */
 export function signInPath(next?: string): string {
-  return next ? `/auth?next=${encodeURIComponent(next)}` : '/auth';
+  return doorPath(next);
 }
 
 export async function requireMember(next?: string): Promise<MemberContext> {
@@ -71,7 +77,6 @@ export async function requireOrgOperator(handle: string): Promise<OrgOperatorCon
 }
 
 export async function requireOperator(): Promise<MemberContext> {
-  const principal = await currentPrincipal();
-  if (principal === null || !principal.isOperator) notFound();
-  return { tier: 'operator', personId: principal.personId, principal };
+  const { principal, personId } = await gateOperator();
+  return { tier: 'operator', personId, principal };
 }

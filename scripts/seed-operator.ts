@@ -1,138 +1,105 @@
-/* `pnpm seed:operator --email ronit@isoastra.com`
+/* `pnpm seed:operator --email ronit@isoastra.com [--password <secret>]`
  *
- * Creates the person that ZITADEL will attach itself to, and grants it
- * `operator` on `platform:*`. No factors and no identity: the OIDC callback
- * links the subject on first sign-in, and an identity seeded here would have
- * to guess a `sub` it cannot know. Running it twice changes nothing.
+ * Makes the account that runs the platform tier exist before anybody signs in,
+ * so that a first deploy is inspectable.
  *
- * It is a convenience rather than a requirement — the callback provisions the
- * same person if this never runs — but seeding it means the display name and
- * the operator grant exist before anyone signs in, which is what makes a first
- * deploy inspectable. */
+ * Two shapes, one command. With `--password` it seeds a local operator: a
+ * user, a `credential` account holding the argon2id hash, a person, and the
+ * relation `person → operator → platform:*`. That is what a deployment being
+ * tested and the Playwright run need — an operator they can sign in as without
+ * ZITADEL. Without one it seeds Ronit's own operator, which has no password
+ * and never will: a user row carrying the allowlisted address and nothing
+ * else, so that the first ZITADEL sign-in links its account to *this* user
+ * (`accountLinking.trustedProviders` includes `zitadel`) rather than making a
+ * second person nobody meant.
+ *
+ * Everything here is derived and upserted — the user id is a hash of the
+ * address — so running it twice changes nothing except the password, if one
+ * was named. */
 
 import { config } from 'dotenv';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 
 config({ path: ['.env.local', '.env'], quiet: true });
 
-async function main() {
-  const { database, schema } = await import('../src/db/client');
-  const { createPerson, grantOperator, seedSubject } = await import(
-    '../src/features/auth/provision'
-  );
-  const { normalizeEmail, oidcAllowlist } = await import('../src/features/auth/email-address');
+async function main(): Promise<void> {
+  const { createLocalAccountIssuer } = await import('better-auth');
+  const { authSchema, database, schema } = await import('../src/db/client');
+  const { hashPassword, identityId, normaliseEmail } = await import('../src/lib/fleet/identity');
+  const { oidcAllowlist } = await import('../src/features/auth/email-address');
+  const { grantOperator } = await import('../src/features/platform/operators');
+  const { createPerson } = await import('../src/features/people/provision');
 
   const flag = process.argv.indexOf('--email');
-  const email = normalizeEmail(
+  const email = normaliseEmail(
     flag >= 0 ? (process.argv[flag + 1] ?? '') : (oidcAllowlist()[0] ?? ''),
   );
   if (!email) throw new Error('usage: pnpm seed:operator --email <address> [--password <secret>]');
 
-  /* The local door. Ronit's own operator has no password and never will — the
-   * allowlist check below is what holds that — but a deployment being tested,
-   * and the Playwright run in particular, needs an operator it can sign in as
-   * without ZITADEL. Naming a password is what asks for one. */
   const passwordFlag = process.argv.indexOf('--password');
   const password = passwordFlag >= 0 ? (process.argv[passwordFlag + 1] ?? '') : '';
-  if (password) {
-    const personId = await seedLocalOperator(email, password);
-    console.log(
-      JSON.stringify({ level: 'info', event: 'seed.operator', email, personId, door: 'local' }),
-    );
-    process.exit(0);
-  }
-
-  if (!oidcAllowlist().includes(email)) {
-    throw new Error(`${email} is not on OIDC_ALLOWLIST; it could never sign in`);
+  if (!password && !oidcAllowlist().includes(email)) {
+    throw new Error(`${email} is not on OIDC_ALLOWLIST and has no password; it could never sign in`);
   }
 
   const db = database();
-  const marker = seedSubject(email);
-  const existing = await db
-    .select({ personId: schema.identity.personId })
-    .from(schema.identity)
-    .where(and(eq(schema.identity.source, 'oidc'), eq(schema.identity.subject, marker)))
-    .limit(1);
+  const userId = identityId(email);
+  const name = email.split('@')[0] ?? email;
+
+  await db
+    .insert(authSchema.user)
+    .values({ id: userId, name, email, emailVerified: true })
+    .onConflictDoNothing({ target: authSchema.user.id });
+
+  if (password) {
+    const phc = await hashPassword(password);
+    await db
+      .insert(authSchema.account)
+      .values({
+        id: identityId(`credential:${email}`),
+        /* The library's own value for a password account, not the site's
+         * origin: `/sign-in/email` looks the account up by it. */
+        issuer: createLocalAccountIssuer('credential'),
+        accountId: userId,
+        providerId: 'credential',
+        userId,
+        password: phc,
+      })
+      .onConflictDoUpdate({
+        target: authSchema.account.id,
+        set: { password: phc, issuer: createLocalAccountIssuer('credential'), updatedAt: new Date() },
+      });
+  }
 
   const personId = await db.transaction(async (tx) => {
-    if (existing[0]) {
-      await grantOperator(tx, existing[0].personId);
-      return existing[0].personId;
-    }
-    const id = await createPerson(tx, { displayName: email.split('@')[0] ?? email });
-    /* A placeholder subject so a second run recognises its own work. The
-     * callback links the real `sub` as a second identity on this person. */
-    await tx
-      .insert(schema.identity)
-      .values({ personId: id, source: 'oidc', subject: marker });
+    const existing = await tx
+      .select({ id: schema.person.id })
+      .from(schema.person)
+      .where(and(eq(schema.person.userId, userId), isNull(schema.person.mergedInto)))
+      .limit(1);
+    const id = existing[0]?.id ?? (await createPerson(tx, { displayName: name, userId }));
     await grantOperator(tx, id);
     await tx.insert(schema.audit).values({
       actorPersonId: id,
       command: 'seed-operator',
       targetKind: 'party',
       targetId: id,
-      payload: { email },
+      payload: { email, door: password ? 'local' : 'oidc' },
     });
     return id;
   });
 
-  console.log(JSON.stringify({ level: 'info', event: 'seed.operator', email, personId }));
+  console.log(
+    JSON.stringify({
+      level: 'info',
+      event: 'seed.operator',
+      email,
+      personId,
+      userId,
+      door: password ? 'local' : 'oidc',
+    }),
+  );
   process.exit(0);
-}
-
-/** A person with a confirmed local address, a password, and the operator
- *  relation. Running it twice resets the password and changes nothing else. */
-async function seedLocalOperator(email: string, password: string): Promise<number> {
-  const { database, schema } = await import('../src/db/client');
-  const { createPerson, grantOperator } = await import('../src/features/auth/provision');
-  const { hashPassword } = await import('../src/features/auth/secrets');
-  const phc = await hashPassword(password);
-
-  return database().transaction(async (tx) => {
-    const existing = await tx
-      .select({ id: schema.identity.id, personId: schema.identity.personId })
-      .from(schema.identity)
-      .where(and(eq(schema.identity.source, 'local'), eq(schema.identity.subject, email)))
-      .limit(1);
-
-    let identityId: number;
-    let personId: number;
-    if (existing[0]) {
-      identityId = existing[0].id;
-      personId = existing[0].personId;
-    } else {
-      personId = await createPerson(tx, { displayName: email.split('@')[0] ?? email });
-      const rows = await tx
-        .insert(schema.identity)
-        .values({ personId, source: 'local', subject: email, verifiedAt: new Date() })
-        .returning({ id: schema.identity.id });
-      identityId = rows[0]!.id;
-    }
-    await tx
-      .update(schema.identity)
-      .set({ verifiedAt: new Date() })
-      .where(eq(schema.identity.id, identityId));
-    await tx
-      .insert(schema.factor)
-      .values({ identityId, kind: 'email', meta: { address: email } })
-      .onConflictDoNothing();
-    await tx
-      .insert(schema.factor)
-      .values({ identityId, kind: 'password', secret: phc })
-      .onConflictDoUpdate({
-        target: [schema.factor.identityId, schema.factor.kind],
-        set: { secret: phc },
-      });
-    await grantOperator(tx, personId);
-    await tx.insert(schema.audit).values({
-      actorPersonId: personId,
-      command: 'seed-operator',
-      targetKind: 'party',
-      targetId: personId,
-      payload: { email, door: 'local' },
-    });
-    return personId;
-  });
 }
 
 void main().catch((error: unknown) => {

@@ -1,7 +1,7 @@
 import Link from 'next/link';
 
 import { signOut } from '@/features/auth/actions';
-import type { Principal } from '@/features/auth/session';
+import type { Principal } from '@/features/auth/principal';
 import { ThemeToggle } from '@/app/theme-toggle';
 
 /* The signed-in chrome. The nav is filtered by what the principal holds, not

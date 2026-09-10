@@ -8,7 +8,7 @@
 import { count, eq, isNull, sql } from 'drizzle-orm';
 
 import { database, schema } from '@/db/client';
-import { OPERATOR_RESOURCE } from '@/features/auth/session';
+import { OPERATOR_RESOURCE } from '@/features/auth/principal';
 import { encodeId } from '@/lib/ids';
 
 import journal from '../../../drizzle/meta/_journal.json';

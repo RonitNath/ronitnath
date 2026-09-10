@@ -19,8 +19,8 @@ import { database, schema } from '@/db/client';
 import { recordAudit } from '@/features/auth/audit';
 import type { Transaction } from '@/features/auth/db';
 import type { FormState } from '@/features/auth/form-state';
-import { createPerson } from '@/features/auth/provision';
-import { currentPrincipal } from '@/features/auth/session';
+import { createPerson } from '@/features/people/provision';
+import { currentPrincipal } from '@/features/auth/principal';
 import { CONTACT } from '@/features/people/authority';
 import { HANDLE_MAX, normalizeHandle } from '@/features/people/handles';
 import { claimUrl, mintClaimLink } from '@/features/people/invitations';
@@ -46,7 +46,7 @@ function field(form: FormData, name: string): string {
 
 async function actor() {
   const principal = await currentPrincipal();
-  if (!principal) redirect('/auth');
+  if (!principal) redirect('/auth/sign-in');
   return { personId: principal.personId, isOperator: principal.isOperator };
 }
 

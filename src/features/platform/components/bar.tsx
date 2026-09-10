@@ -1,7 +1,7 @@
 import { eq } from 'drizzle-orm';
 
 import { database, schema } from '@/db/client';
-import { currentPrincipal } from '@/features/auth/session';
+import { currentPrincipal } from '@/features/auth/principal';
 import { endImpersonation } from '../impersonation';
 
 /* The bar. It is in the root layout, so it is on the landing, on a guest

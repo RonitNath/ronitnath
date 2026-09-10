@@ -9,7 +9,7 @@ import { and, eq } from 'drizzle-orm';
 import { afterAll, describe, expect, it } from 'vitest';
 
 import { database, pool, schema } from '@/db/client';
-import { createPerson } from '@/features/auth/provision';
+import { createPerson } from '@/features/people/provision';
 
 const reachable = await (async () => {
   if (!process.env.DATABASE_URL) return false;

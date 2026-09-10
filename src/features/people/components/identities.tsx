@@ -7,7 +7,7 @@
 import { useActionState } from 'react';
 
 import type { FormState } from '@/features/auth/form-state';
-import { addEmail, confirmMatch, removeIdentity, setDisplayName } from '../actions';
+import { confirmMatch, removeIdentity, setDisplayName } from '../actions';
 
 const EMPTY: FormState = {};
 
@@ -46,22 +46,6 @@ export function DisplayNameForm({ displayName }: { displayName: string }) {
       </div>
       <button type="submit" className="commit" disabled={pending}>
         Save
-      </button>
-      <Note state={state} />
-    </form>
-  );
-}
-
-export function AddEmailForm() {
-  const [state, action, pending] = useActionState(addEmail, EMPTY);
-  return (
-    <form className="inline-form" action={action}>
-      <div className="field">
-        <label htmlFor="add-email">Add an address</label>
-        <input id="add-email" name="email" type="email" inputMode="email" required />
-      </div>
-      <button type="submit" className="commit" disabled={pending}>
-        Send the link
       </button>
       <Note state={state} />
     </form>

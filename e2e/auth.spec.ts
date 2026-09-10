@@ -16,8 +16,14 @@ function address(tag: string): string {
   return `${tag}-${Date.now()}-${Math.floor(Math.random() * 1e6)}@example.com`;
 }
 
+/* Better-auth's letters carry an absolute URL to one of its own endpoints —
+ * `/api/auth/verify-email?token=…` and `/api/auth/reset-password/<token>` —
+ * each of which does its work and bounces to the page named in `callbackURL`.
+ * A test follows the mailed URL exactly as a reader would, so what is matched
+ * here is the whole thing rather than a token this side would have to
+ * reassemble. */
 async function linkFor(to: string, path: string): Promise<string> {
-  const pattern = new RegExp(`${path}/([A-Za-z0-9_-]{43})`);
+  const pattern = new RegExp(`https?://[^\\s]*${path}[^\\s]*`);
   const deadline = Date.now() + 15_000;
   while (Date.now() < deadline) {
     let names: string[] = [];
@@ -30,7 +36,7 @@ async function linkFor(to: string, path: string): Promise<string> {
       const body = await readFile(join(MAIL_DIR, name), 'utf8');
       if (!body.includes(`To: ${to}`)) continue;
       const found = pattern.exec(body);
-      if (found) return `${path}/${found[1]}`;
+      if (found) return found[0];
     }
     await new Promise((resolve) => setTimeout(resolve, 200));
   }
@@ -39,21 +45,22 @@ async function linkFor(to: string, path: string): Promise<string> {
 
 async function registerAndVerify(page: Page, name: string): Promise<string> {
   const email = address('member');
-  await page.goto('/auth');
+  await page.goto('/auth/sign-in');
   await page.getByLabel('Name').fill(name);
   await page.locator('#register-email').fill(email);
   await page.locator('#register-password').fill(PASSWORD);
   await page.getByRole('button', { name: 'Register' }).click();
   await expect(page.getByText('Check your inbox')).toBeVisible();
 
-  await page.goto(await linkFor(email, '/auth/verify'));
-  await page.getByRole('button', { name: 'Confirm' }).click();
+  /* The click is the confirmation: better-auth verifies at its endpoint and
+   * lands the reader, signed in, on the page named in `callbackURL`. */
+  await page.goto(await linkFor(email, '/api/auth/verify-email'));
   await expect(page.getByText('Address confirmed')).toBeVisible();
   return email;
 }
 
 async function signIn(page: Page, email: string, password = PASSWORD) {
-  await page.goto('/auth');
+  await page.goto('/auth/sign-in');
   await page.locator('#sign-in-email').fill(email);
   await page.locator('#sign-in-password').fill(password);
   await page.getByRole('button', { name: 'Sign in' }).click();
@@ -104,7 +111,7 @@ test('the reset flow sets a new password and ends every open session', async ({ 
   await page.getByRole('button', { name: 'Send the link' }).click();
   await expect(page.getByText('Check your inbox')).toBeVisible();
 
-  await page.goto(await linkFor(email, '/auth/reset'));
+  await page.goto(await linkFor(email, '/api/auth/reset-password'));
   await page.getByLabel('New password').fill('an-entirely-new-password');
   await page.getByRole('button', { name: 'Set the password' }).click();
   await expect(page.getByText('Password set')).toBeVisible();
@@ -142,7 +149,7 @@ test('an anonymous visitor is sent from /app to the door, and back afterwards', 
   page,
 }) => {
   await page.goto('/app/sessions');
-  await expect(page).toHaveURL('/auth?next=%2Fapp%2Fsessions');
+  await expect(page).toHaveURL('/auth/sign-in?next=%2Fapp%2Fsessions');
   await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible();
 });
 
@@ -160,37 +167,15 @@ test('/platform is a 404 for an anonymous visitor too', async ({ page }) => {
   expect(response?.status()).toBe(404);
 });
 
-test('the Isoastra door redirects to ZITADEL with PKCE, state and nonce', async ({ request }) => {
-  test.skip(!process.env.OIDC_CLIENT_ID, 'OIDC credentials are not configured here');
-
-  const response = await request.get('/auth/oidc/start?next=%2Fapp', { maxRedirects: 0 });
-  expect(response.status()).toBe(302);
-  const location = new URL(response.headers()['location']!);
-  expect(location.origin).toBe('https://auth.isoastra.com');
-  expect(location.pathname).toBe('/oauth/v2/authorize');
-  expect(location.searchParams.get('response_type')).toBe('code');
-  expect(location.searchParams.get('code_challenge_method')).toBe('S256');
-  expect(location.searchParams.get('code_challenge')).toMatch(/^[A-Za-z0-9_-]{43}$/);
-  expect(location.searchParams.get('state')).toBeTruthy();
-  expect(location.searchParams.get('nonce')).toBeTruthy();
-  expect(location.searchParams.get('scope')).toContain('openid');
-  expect(response.headers()['set-cookie']).toContain('rn_oidc=');
-  expect(response.headers()['set-cookie']).toContain('HttpOnly');
-});
-
-test('a callback with no checks cookie declines without touching the database', async ({
-  request,
-}) => {
-  const response = await request.get('/auth/oidc/callback?code=nope&state=nope', {
-    maxRedirects: 0,
-  });
-  expect(response.status()).toBe(302);
-  expect(response.headers()['location']).toContain('/auth?declined=1');
-});
+/* The two ZITADEL route tests are gone with the routes. Better-auth owns the
+ * authorization URL, the state, the PKCE pair and the callback at
+ * `/api/auth/callback/zitadel`; a test asserting the query parameters it
+ * builds would be a test of the library, and a real round trip needs the
+ * deployed origin and the registered redirect URI. */
 
 test('a confirmation that never went out can be asked for again', async ({ page }) => {
   const email = address('unconfirmed');
-  await page.goto('/auth');
+  await page.goto('/auth/sign-in');
   await page.getByLabel('Name').fill('Unconfirmed Member');
   await page.locator('#register-email').fill(email);
   await page.locator('#register-password').fill(PASSWORD);
@@ -206,8 +191,7 @@ test('a confirmation that never went out can be asked for again', async ({ page 
   await page.getByRole('button', { name: 'Send it again' }).click();
   await expect(page.getByText('Check your inbox')).toBeVisible();
 
-  await page.goto(await linkFor(email, '/auth/verify'));
-  await page.getByRole('button', { name: 'Confirm' }).click();
+  await page.goto(await linkFor(email, '/api/auth/verify-email'));
   await expect(page.getByText('Address confirmed')).toBeVisible();
 
   await signIn(page, email);
@@ -219,7 +203,7 @@ test('registering when the mail transport fails still leaves an account', async 
    * this one address: the commit has happened, the letter has not, and the
    * visitor must see the page everyone else sees — not a server exception. */
   const email = address('mailfail');
-  await page.goto('/auth');
+  await page.goto('/auth/sign-in');
   await page.getByLabel('Name').fill('Undelivered Member');
   await page.locator('#register-email').fill(email);
   await page.locator('#register-password').fill(PASSWORD);

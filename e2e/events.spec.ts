@@ -14,7 +14,7 @@ function address(tag: string): string {
  *  and the verification path is R2's flow, tested there. */
 async function member(page: Page, name: string): Promise<string> {
   const email = address('host');
-  await page.goto('/auth');
+  await page.goto('/auth/sign-in');
   await page.getByLabel('Name').fill(name);
   await page.locator('#register-email').fill(email);
   await page.locator('#register-password').fill(PASSWORD);
@@ -37,18 +37,18 @@ async function signedInHost(page: Page, name: string): Promise<void> {
     for (const file of (await readdir(dir).catch(() => [])).sort().reverse()) {
       const body = await readFile(join(dir, file), 'utf8');
       if (!body.includes(`To: ${email}`)) continue;
-      const found = /\/auth\/verify\/([A-Za-z0-9_-]{43})/.exec(body);
+      const found = /https?:\/\/[^\s]*\/api\/auth\/verify-email[^\s]*/.exec(body);
       if (found) {
-        path = `/auth/verify/${found[1]}`;
+        path = found[0];
         break;
       }
     }
     if (path === null) await new Promise((resolve) => setTimeout(resolve, 200));
   }
   if (path === null) throw new Error('no verification link');
+  /* The click is the confirmation: better-auth verifies at its endpoint. */
   await page.goto(path);
-  await page.getByRole('button', { name: 'Confirm' }).click();
-  await page.goto('/auth');
+  await page.goto('/auth/sign-in');
   await page.locator('#sign-in-email').fill(email);
   await page.locator('#sign-in-password').fill(PASSWORD);
   await page.getByRole('button', { name: 'Sign in' }).click();

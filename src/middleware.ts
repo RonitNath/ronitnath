@@ -1,43 +1,44 @@
-/* The cookie half of the sliding window.
+/* The redirect, and nothing else.
  *
- * The database slides `expires_at` when a session is resolved, but a Server
- * Component cannot write a cookie, so without this the browser's copy would
- * still expire thirty days after it was minted no matter how often it was
- * used. Re-stamping the same value on each navigation is the whole job: no
- * database, no session lookup, nothing that has to run on Node. */
+ * Better-auth owns session expiry now: the cookie carries its own maximum age
+ * and the row behind it carries the real one, and the library slides both when
+ * it resolves a session. There is nothing left for an edge middleware to
+ * re-stamp, so this does the one job a middleware is the right place for —
+ * sending somebody with no cookie at all to the door, from the one place that
+ * knows the whole path a layout cannot read.
+ *
+ * It is a convenience, never the guard. `getSessionCookie` reads presence, not
+ * validity: it does not verify the signature, does not ask the database, and
+ * a forged cookie gets exactly as far as the page, where `requireUser` decides
+ * for real. That is the shape better-auth's own documentation asks for, and it
+ * is why this file needs neither a database nor the Node runtime. */
 
+import { getSessionCookie } from 'better-auth/cookies';
 import { NextResponse, type NextRequest } from 'next/server';
 
+/* The signed-in surfaces. `/u` and `/o` are the fleet's URL grammar and `/app`
+ * is what this site still answers on until the routes move; all three want a
+ * reader who is somebody. */
+const GUARDED = ['/app', '/u/', '/o/'];
+
+function guarded(pathname: string): boolean {
+  return GUARDED.some((prefix) => pathname === prefix.replace(/\/$/, '') || pathname.startsWith(prefix));
+}
+
 export function middleware(request: NextRequest) {
-  const name = process.env.SESSION_COOKIE ?? 'rn_session';
-  const token = request.cookies.get(name)?.value;
+  const { pathname } = request.nextUrl;
+  if (!guarded(pathname)) return NextResponse.next();
+  if (getSessionCookie(request)) return NextResponse.next();
 
-  /* The member tier's redirect, sent from the one place that knows the whole
-   * path: a layout cannot read it, so `requireMember` inside one can only
-   * name itself. This is a convenience, not the guard — `requireMember` still
-   * decides, and a cookie that resolves to nothing is turned away there. */
-  if (!token && request.nextUrl.pathname.startsWith('/app')) {
-    const door = new URL('/auth', process.env.PUBLIC_ORIGIN ?? request.url);
-    door.searchParams.set('next', request.nextUrl.pathname);
-    return NextResponse.redirect(door);
-  }
-
-  const response = NextResponse.next();
-  if (token) {
-    const days = Number(process.env.SESSION_TTL_DAYS ?? 30);
-    response.cookies.set(name, token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      path: '/',
-      maxAge: (Number.isFinite(days) && days > 0 ? days : 30) * 24 * 60 * 60,
-    });
-  }
-  return response;
+  /* Absolute from PUBLIC_ORIGIN, never from `request.url`: behind the edge
+   * that is the container's bind address (fleet-conventions §1). */
+  const door = new URL('/auth/sign-in', process.env.PUBLIC_ORIGIN ?? request.url);
+  door.searchParams.set('next', pathname);
+  return NextResponse.redirect(door);
 }
 
 export const config = {
-  /* Documents only. Static assets carry no session and re-stamping a cookie on
-   * each of them would be a Set-Cookie header on every image on the page. */
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|fonts/|healthz).*)'],
+  /* Documents only, and only the guarded prefixes — a static asset carries no
+   * session and has nothing to be redirected about. */
+  matcher: ['/app/:path*', '/u/:path*', '/o/:path*'],
 };

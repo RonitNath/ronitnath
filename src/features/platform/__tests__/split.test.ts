@@ -7,7 +7,7 @@ import { and, eq, sql } from 'drizzle-orm';
 import { afterAll, describe, expect, it } from 'vitest';
 
 import { database, pool, schema } from '@/db/client';
-import { createPerson } from '@/features/auth/provision';
+import { createPerson } from '@/features/people/provision';
 import { mergePersons } from '@/features/people/merge';
 import { disableCascade, enableRestore } from '../disable';
 import { factorsAtRisk, readUndo, splitMerge } from '../split';

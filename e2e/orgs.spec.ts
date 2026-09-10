@@ -17,8 +17,11 @@ function handle(tag: string): string {
   return `${tag}-${Date.now().toString(36)}-${Math.floor(Math.random() * 1e4)}`;
 }
 
+/* Better-auth's letters carry an absolute URL to one of its own endpoints,
+ * which does its work and bounces the reader to the page named in
+ * `callbackURL`; a test follows the mailed URL exactly as a reader would. */
 async function linkFor(to: string, path: string): Promise<string> {
-  const pattern = new RegExp(`${path}/([A-Za-z0-9_-]{43})`);
+  const pattern = new RegExp(`https?://[^\\s]*${path}[^\\s]*`);
   const deadline = Date.now() + 15_000;
   while (Date.now() < deadline) {
     let names: string[] = [];
@@ -31,7 +34,7 @@ async function linkFor(to: string, path: string): Promise<string> {
       const body = await readFile(join(MAIL_DIR, name), 'utf8');
       if (!body.includes(`To: ${to}`)) continue;
       const found = pattern.exec(body);
-      if (found) return `${path}/${found[1]}`;
+      if (found) return found[0];
     }
     await new Promise((resolve) => setTimeout(resolve, 200));
   }
@@ -39,7 +42,7 @@ async function linkFor(to: string, path: string): Promise<string> {
 }
 
 async function signIn(page: Page, email: string) {
-  await page.goto('/auth');
+  await page.goto('/auth/sign-in');
   await page.locator('#sign-in-email').fill(email);
   await page.locator('#sign-in-password').fill(PASSWORD);
   await page.getByRole('button', { name: 'Sign in' }).click();
@@ -49,14 +52,13 @@ async function signIn(page: Page, email: string) {
 /** Register, confirm, and sign in: a member with a door of their own. */
 async function member(page: Page, name: string): Promise<string> {
   const email = address('r5');
-  await page.goto('/auth');
+  await page.goto('/auth/sign-in');
   await page.getByLabel('Name').fill(name);
   await page.locator('#register-email').fill(email);
   await page.locator('#register-password').fill(PASSWORD);
   await page.getByRole('button', { name: 'Register' }).click();
   await expect(page.getByText('Check your inbox')).toBeVisible();
-  await page.goto(await linkFor(email, '/auth/verify'));
-  await page.getByRole('button', { name: 'Confirm' }).click();
+  await page.goto(await linkFor(email, '/api/auth/verify-email'));
   await signIn(page, email);
   return email;
 }
@@ -102,8 +104,7 @@ test('an organization asks somebody in, and the handle is theirs afterwards', as
   await colleague.locator('#claim-password').fill(PASSWORD);
   await colleague.getByRole('button', { name: 'Claim' }).click();
   await expect(colleague.getByText('Check your inbox')).toBeVisible();
-  await colleague.goto(await linkFor(guest, '/auth/verify'));
-  await colleague.getByRole('button', { name: 'Confirm' }).click();
+  await colleague.goto(await linkFor(guest, '/api/auth/verify-email'));
   await signIn(colleague, guest);
   await expect(colleague.getByRole('row', { name: /Isoastra Test/ })).toContainText('member');
 
@@ -161,8 +162,7 @@ test('a document is shared a level at a time, and taken back', async ({ page, br
   await reader.goto(claim);
   await reader.locator('#claim-password').fill(PASSWORD);
   await reader.getByRole('button', { name: 'Claim' }).click();
-  await reader.goto(await linkFor(readerAddress, '/auth/verify'));
-  await reader.getByRole('button', { name: 'Confirm' }).click();
+  await reader.goto(await linkFor(readerAddress, '/api/auth/verify-email'));
   await signIn(reader, readerAddress);
 
   /* The author writes something. */
