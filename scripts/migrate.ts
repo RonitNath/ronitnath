@@ -6,6 +6,7 @@
 
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { createHash } from 'node:crypto';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import { sql } from 'drizzle-orm';
@@ -32,17 +33,23 @@ async function main(): Promise<void> {
   const pool = new Pool({ connectionString, max: 2 });
   const db = drizzle(pool);
   try {
+    await verifyHistory(db, journal);
     const before = await applied(db);
     const lock = await pool.connect();
     try {
-      await withMigrationLock(lock, 7403140, {
-        mode: 'expand',
-        compatibleFrom: ['d2373d4823d43beb4a7d2b24741636ee7b449098'],
-        lockTimeoutMs: 30_000,
-        statementTimeoutMs: 120_000,
-        transactional: true,
-        backfillRequired: false,
-      }, () => migrate(db, { migrationsFolder: folder }));
+      await withMigrationLock(
+        lock,
+        7403140,
+        {
+          mode: 'expand',
+          compatibleFrom: ['d2373d4823d43beb4a7d2b24741636ee7b449098'],
+          lockTimeoutMs: 30_000,
+          statementTimeoutMs: 120_000,
+          transactional: true,
+          backfillRequired: false,
+        },
+        () => migrate(db, { migrationsFolder: folder }),
+      );
     } finally {
       lock.release();
     }
@@ -55,8 +62,28 @@ async function main(): Promise<void> {
         `expected ${journal.entries.length} migrations to be recorded, found ${after}`,
       );
     }
+    await verifyHistory(db, journal);
   } finally {
     await pool.end();
+  }
+}
+
+async function verifyHistory(db: ReturnType<typeof drizzle>, journal: Journal): Promise<void> {
+  const exists = await db.execute<{ n: string }>(sql`
+    select count(*)::text as n from information_schema.tables
+    where table_schema = 'drizzle' and table_name = '__drizzle_migrations'`);
+  if (exists.rows[0]?.n === '0') return;
+  const recorded = await db.execute<{ hash: string; created_at: string }>(sql`
+    select hash, created_at::text from drizzle.__drizzle_migrations order by created_at`);
+  if (recorded.rows.length > journal.entries.length)
+    throw new Error('database migration history is ahead of this artifact');
+  for (const [index, row] of recorded.rows.entries()) {
+    const entry = journal.entries[index];
+    if (!entry) throw new Error(`migration history has an unknown entry at index ${index}`);
+    const expected = createHash('sha256')
+      .update(readFileSync(join(folder, `${entry.tag}.sql`)))
+      .digest('hex');
+    if (row.hash !== expected) throw new Error(`migration checksum drift at ${entry.tag}`);
   }
 }
 
