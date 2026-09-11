@@ -21,6 +21,7 @@ export function Shell({ principal, user }: { principal: Principal; user: string 
         <Link href={userPath(user)}>Account</Link>
         <Link href={userPath(user, 'people')}>People</Link>
         <Link href={userPath(user, 'events')}>Events</Link>
+        <Link href={userPath(user, 'calendar')}>Calendar</Link>
         <Link href={userPath(user, 'groups')}>Groups</Link>
         <Link href={userPath(user, 'documents')}>Documents</Link>
         <Link href={userPath(user, 'sessions')}>Sessions</Link>

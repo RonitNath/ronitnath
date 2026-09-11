@@ -4,10 +4,34 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+overrides:
+  '@isoastra/calendar-core': file:vendor/grid-calendar/isoastra-calendar-core-0.1.0.tgz
+  '@isoastra/calendar-ical': file:vendor/grid-calendar/isoastra-calendar-ical-0.1.0.tgz
+  '@isoastra/calendar-react': file:vendor/grid-calendar/isoastra-calendar-react-0.1.0.tgz
+  '@isoastra/fleet-calendar': file:vendor/grid-calendar/isoastra-fleet-calendar-0.1.0.tgz
+
 importers:
 
   .:
     dependencies:
+      '@fullcalendar/core':
+        specifier: 7.1.0
+        version: 7.1.0(@full-ui/headless-calendar@7.1.0(temporal-polyfill@1.0.4))(temporal-polyfill@1.0.4)
+      '@fullcalendar/react':
+        specifier: 7.1.0
+        version: 7.1.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(temporal-polyfill@1.0.4)
+      '@isoastra/calendar-core':
+        specifier: file:vendor/grid-calendar/isoastra-calendar-core-0.1.0.tgz
+        version: file:vendor/grid-calendar/isoastra-calendar-core-0.1.0.tgz
+      '@isoastra/calendar-ical':
+        specifier: file:vendor/grid-calendar/isoastra-calendar-ical-0.1.0.tgz
+        version: file:vendor/grid-calendar/isoastra-calendar-ical-0.1.0.tgz
+      '@isoastra/calendar-react':
+        specifier: file:vendor/grid-calendar/isoastra-calendar-react-0.1.0.tgz
+        version: file:vendor/grid-calendar/isoastra-calendar-react-0.1.0.tgz(@full-ui/headless-calendar@7.1.0(temporal-polyfill@1.0.4))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(temporal-polyfill@1.0.4)
+      '@isoastra/fleet-calendar':
+        specifier: file:vendor/grid-calendar/isoastra-fleet-calendar-0.1.0.tgz
+        version: file:vendor/grid-calendar/isoastra-fleet-calendar-0.1.0.tgz(drizzle-orm@0.45.2(@types/pg@8.23.1)(kysely@0.29.5)(pg@8.23.0))(next@15.5.25(@playwright/test@1.63.0)(@types/node@24.13.3)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(pg@8.23.0)(react@19.2.8)(zod@4.5.4)
       '@isoastra/fleet-configured':
         specifier: 0.1.3
         version: 0.1.3(drizzle-orm@0.45.2(@types/pg@8.23.1)(kysely@0.29.5)(pg@8.23.0))(next@15.5.25(@playwright/test@1.63.0)(@types/node@24.13.3)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(pg@8.23.0)(react@19.2.8)(zod@4.5.4)
@@ -41,6 +65,9 @@ importers:
       drizzle-orm:
         specifier: 0.45.2
         version: 0.45.2(@types/pg@8.23.1)(kysely@0.29.5)(pg@8.23.0)
+      ical.js:
+        specifier: 2.2.1
+        version: 2.2.1
       next:
         specifier: 15.5.25
         version: 15.5.25(@playwright/test@1.63.0)(@types/node@24.13.3)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
@@ -56,6 +83,9 @@ importers:
       react-dom:
         specifier: 19.2.8
         version: 19.2.8(react@19.2.8)
+      temporal-polyfill:
+        specifier: 1.0.4
+        version: 1.0.4
       zod:
         specifier: ^4.5.4
         version: 4.5.4
@@ -712,6 +742,24 @@ packages:
     resolution: {integrity: sha512-43/qtrDUokr7LJqoF2c3+RInu/t4zfrpYdoSDfYyhg52rwLV6TnOvdG4fXm7IkSB3wErkcmJS9iEhjVtOSEjjA==}
     engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
 
+  '@full-ui/headless-calendar@7.1.0':
+    resolution: {integrity: sha512-T54tSUik/ia9Jj4xduFHv1p98eVBgLnE33Q6qhpg+WWkqKCLBCbtVyMcTPPIOP5jjTV2MbtjrRvRt1RLSryGHA==}
+    peerDependencies:
+      temporal-polyfill: ^1.0.1
+
+  '@fullcalendar/core@7.1.0':
+    resolution: {integrity: sha512-a+ABP7zQpPWpwPT8EsOdShpeOVrJyx/XYStqERd8ibld/FLi/dzpd95r7w3RIdFqFm9iUv0gdGvBshSlI/dbPw==}
+    peerDependencies:
+      '@full-ui/headless-calendar': 7.1.0
+      temporal-polyfill: ^1.0.1
+
+  '@fullcalendar/react@7.1.0':
+    resolution: {integrity: sha512-FI5hTnbiVLcW+/ZnPKteBgLpK/ldyTaSDWn9A3ri3vLToAbGt49JqRhQ9CMpH+nhmuNX4ihnCQcVzoqVCsIbBw==}
+    peerDependencies:
+      react: ^17 || ^18 || ^19
+      react-dom: ^17 || ^18 || ^19
+      temporal-polyfill: ^1.0.1
+
   '@humanfs/core@0.19.2':
     resolution: {integrity: sha512-UhXNm+CFMWcbChXywFwkmhqjs3PRCmcSa/hfBgLIb7oQ5HNb1wS0icWsGtSAUNgefHeI+eBrA8I1fxmbHsGdvA==}
     engines: {node: '>=18.18.0'}
@@ -877,6 +925,28 @@ packages:
     engines: {node: '>=20.9.0'}
     cpu: [x64]
     os: [win32]
+
+  '@isoastra/calendar-core@file:vendor/grid-calendar/isoastra-calendar-core-0.1.0.tgz':
+    resolution: {integrity: sha512-cHxlacaZHNgK8GBehsoYuAuazxynbONzXkBHU1k7Cnej4/9xxnhRx7eq+uTECcxf0Xg4o8h6MKvo/+pryAaHNA==, tarball: file:vendor/grid-calendar/isoastra-calendar-core-0.1.0.tgz}
+    version: 0.1.0
+
+  '@isoastra/calendar-ical@file:vendor/grid-calendar/isoastra-calendar-ical-0.1.0.tgz':
+    resolution: {integrity: sha512-8rnYLJoxqkb+brITVKFUdXEqPgD/oW3X0ZMPuHPj3G2pXzroeR6XxK7Wzx271+O+zWOmC/zrBpkLglsBFRaCCQ==, tarball: file:vendor/grid-calendar/isoastra-calendar-ical-0.1.0.tgz}
+    version: 0.1.0
+
+  '@isoastra/calendar-react@file:vendor/grid-calendar/isoastra-calendar-react-0.1.0.tgz':
+    resolution: {integrity: sha512-Yk6SeQlnldr7coPXO9Q4yVRwfMRFv4MsDcIhkYl+cRG5cAgznXhzq7Wm0aJpRtEG2BN4ab2Ko6XPc1Ir572J5g==, tarball: file:vendor/grid-calendar/isoastra-calendar-react-0.1.0.tgz}
+    version: 0.1.0
+    peerDependencies:
+      react: ^19.0.0
+      react-dom: ^19.0.0
+
+  '@isoastra/fleet-calendar@file:vendor/grid-calendar/isoastra-fleet-calendar-0.1.0.tgz':
+    resolution: {integrity: sha512-kBYAAuL4QQai7SuJnPFY9p2M/blOVf+RSupJ1yUthkVcByVDcuw1WpPd/bCmLoeOnQcpEBMBVHMatscS0/MrzQ==, tarball: file:vendor/grid-calendar/isoastra-fleet-calendar-0.1.0.tgz}
+    version: 0.1.0
+    peerDependencies:
+      drizzle-orm: '>=0.44.0 <0.46.0'
+      pg: ^8.11.0
 
   '@isoastra/fleet-configured@0.1.3':
     resolution: {integrity: sha512-rHzOVrDV+lVd2j9aGbaLTW/Fb/jD6q3uTt00S+GBrNMas8m6MUvZ+X1XIs09Pcz7tgnMfCGEexUm59w8riyngw==, tarball: https://npm.pkg.github.com/download/@isoastra/fleet-configured/0.1.3/606fcf466caa7e7ddf220131f6d57fd8892bff6d}
@@ -2295,6 +2365,9 @@ packages:
     resolution: {integrity: sha512-T2UbfbBEF32wiepXIsMlTW9+dDYC6wMh/t/vYA4tuOMKqWz/n3vr1NFSxQiyP+zk2mXsoMA/i/7qV6LKut1t1A==}
     engines: {node: '>= 0.4'}
 
+  ical.js@2.2.1:
+    resolution: {integrity: sha512-yK/UlPbEs316igb/tjRgbFA8ZV75rCsBJp/hWOatpyaPNlgw0dGDmU+FoicOcwX4xXkeXOkYiOmCqNPFpNPkQg==}
+
   ignore@5.3.2:
     resolution: {integrity: sha512-hsBTNUqQTDwkWtcdYI2i06Y/nUBEsNEDJKjWdigLvegy8kDuJAS8uRlpkkcQpyEXL0Z/pjDy5HBmMjRCJ2gq+g==}
     engines: {node: '>= 4'}
@@ -3026,6 +3099,15 @@ packages:
     resolution: {integrity: sha512-uxc/zpqFg6x7C8vOE7lh6Lbda8eEL9zmVm/PLeTPBRhh1xCgdWaQ+J1CUieGpIfm2HdtsUpRv+HshiasBMcc6A==}
     engines: {node: '>=6'}
 
+  temporal-polyfill@1.0.4:
+    resolution: {integrity: sha512-MLEU0qOD2uXlz24oINNtdLZQl8RgmMxSnRtKEGZGGetTJjlRwQJjk+VsJ4EREaUoiaTb8NJOcUiKtoAiWn9EBg==}
+
+  temporal-spec@1.0.1:
+    resolution: {integrity: sha512-wxVoanmDeavXie1vu2JaQ3WIc3JZnWAOYFBsJyATaVsXsycKYUflGsyBmrRSnoCpZJpwPyr38VpgSUlQ8CbFxg==}
+
+  temporal-utils@1.0.2:
+    resolution: {integrity: sha512-1B8Dl4KzrOvsNUlpoWGno2VLQlxroLjDgc5NBjVC9ax9ymdo+ezfyvhyjEMx+IVfhINr6CIG2gcnlP95iRrybQ==}
+
   tinybench@2.9.0:
     resolution: {integrity: sha512-0+DUvqWMValLmha6lr4kD8iAMK1HzV0/aKnCtWb9v9641TnP/MFb7Pc2bxoxQjTXAErryXVgUOfv2YqNllqGeg==}
 
@@ -3597,6 +3679,23 @@ snapshots:
       '@eslint/core': 0.17.0
       levn: 0.4.1
 
+  '@full-ui/headless-calendar@7.1.0(temporal-polyfill@1.0.4)':
+    dependencies:
+      temporal-polyfill: 1.0.4
+
+  '@fullcalendar/core@7.1.0(@full-ui/headless-calendar@7.1.0(temporal-polyfill@1.0.4))(temporal-polyfill@1.0.4)':
+    dependencies:
+      '@full-ui/headless-calendar': 7.1.0(temporal-polyfill@1.0.4)
+      temporal-polyfill: 1.0.4
+
+  '@fullcalendar/react@7.1.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(temporal-polyfill@1.0.4)':
+    dependencies:
+      '@full-ui/headless-calendar': 7.1.0(temporal-polyfill@1.0.4)
+      '@fullcalendar/core': 7.1.0(@full-ui/headless-calendar@7.1.0(temporal-polyfill@1.0.4))(temporal-polyfill@1.0.4)
+      react: 19.2.8
+      react-dom: 19.2.8(react@19.2.8)
+      temporal-polyfill: 1.0.4
+
   '@humanfs/core@0.19.2':
     dependencies:
       '@humanfs/types': 0.15.0
@@ -3719,6 +3818,39 @@ snapshots:
 
   '@img/sharp-win32-x64@0.35.4':
     optional: true
+
+  '@isoastra/calendar-core@file:vendor/grid-calendar/isoastra-calendar-core-0.1.0.tgz':
+    dependencies:
+      temporal-polyfill: 1.0.4
+
+  '@isoastra/calendar-ical@file:vendor/grid-calendar/isoastra-calendar-ical-0.1.0.tgz':
+    dependencies:
+      '@isoastra/calendar-core': file:vendor/grid-calendar/isoastra-calendar-core-0.1.0.tgz
+      ical.js: 2.2.1
+      temporal-polyfill: 1.0.4
+
+  '@isoastra/calendar-react@file:vendor/grid-calendar/isoastra-calendar-react-0.1.0.tgz(@full-ui/headless-calendar@7.1.0(temporal-polyfill@1.0.4))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(temporal-polyfill@1.0.4)':
+    dependencies:
+      '@fullcalendar/core': 7.1.0(@full-ui/headless-calendar@7.1.0(temporal-polyfill@1.0.4))(temporal-polyfill@1.0.4)
+      '@fullcalendar/react': 7.1.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(temporal-polyfill@1.0.4)
+      '@isoastra/calendar-core': file:vendor/grid-calendar/isoastra-calendar-core-0.1.0.tgz
+      react: 19.2.8
+      react-dom: 19.2.8(react@19.2.8)
+    transitivePeerDependencies:
+      - '@full-ui/headless-calendar'
+      - temporal-polyfill
+
+  '@isoastra/fleet-calendar@file:vendor/grid-calendar/isoastra-fleet-calendar-0.1.0.tgz(drizzle-orm@0.45.2(@types/pg@8.23.1)(kysely@0.29.5)(pg@8.23.0))(next@15.5.25(@playwright/test@1.63.0)(@types/node@24.13.3)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(pg@8.23.0)(react@19.2.8)(zod@4.5.4)':
+    dependencies:
+      '@isoastra/calendar-core': file:vendor/grid-calendar/isoastra-calendar-core-0.1.0.tgz
+      '@isoastra/fleet-events': 0.2.3(drizzle-orm@0.45.2(@types/pg@8.23.1)(kysely@0.29.5)(pg@8.23.0))(next@15.5.25(@playwright/test@1.63.0)(@types/node@24.13.3)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(pg@8.23.0)(react@19.2.8)(zod@4.5.4)
+      drizzle-orm: 0.45.2(@types/pg@8.23.1)(kysely@0.29.5)(pg@8.23.0)
+      pg: 8.23.0
+      temporal-polyfill: 1.0.4
+    transitivePeerDependencies:
+      - next
+      - react
+      - zod
 
   '@isoastra/fleet-configured@0.1.3(drizzle-orm@0.45.2(@types/pg@8.23.1)(kysely@0.29.5)(pg@8.23.0))(next@15.5.25(@playwright/test@1.63.0)(@types/node@24.13.3)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(pg@8.23.0)(react@19.2.8)(zod@4.5.4)':
     dependencies:
@@ -5136,6 +5268,8 @@ snapshots:
     dependencies:
       function-bind: 1.1.2
 
+  ical.js@2.2.1: {}
+
   ignore@5.3.2: {}
 
   ignore@7.0.8: {}
@@ -5917,6 +6051,15 @@ snapshots:
   tailwindcss@4.3.3: {}
 
   tapable@2.3.3: {}
+
+  temporal-polyfill@1.0.4:
+    dependencies:
+      temporal-spec: 1.0.1
+      temporal-utils: 1.0.2
+
+  temporal-spec@1.0.1: {}
+
+  temporal-utils@1.0.2: {}
 
   tinybench@2.9.0: {}
 

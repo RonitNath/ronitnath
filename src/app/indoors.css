@@ -368,3 +368,25 @@
   color: var(--fg);
   font-weight: 600;
 }
+
+.calendar-page { max-width: 96rem; }
+.calendar-toolbar { align-items: end; display: flex; gap: 1rem; justify-content: space-between; margin-bottom: 1rem; }
+.calendar-toolbar > div:last-child,
+.calendar-dialog > div { display: flex; flex-wrap: wrap; gap: .5rem; }
+.calendar-layout { display: grid; gap: 1rem; grid-template-columns: minmax(0, 1fr) 20rem; }
+.calendar-board,
+.calendar-sidebar { border: 1px solid var(--border); padding: 1rem; }
+.calendar-sidebar { align-content: start; display: grid; gap: 1rem; }
+.calendar-event { display: grid; line-height: 1.2; overflow: hidden; }
+.calendar-event strong { overflow: hidden; text-overflow: ellipsis; }
+.calendar-notice { display: block; margin: .75rem 0; }
+.calendar-dialog { border: 1px solid var(--border); inset: 10% auto auto 50%; margin: 0; max-height: 80vh; overflow: auto; padding: 1.25rem; position: fixed; transform: translateX(-50%); width: min(28rem, calc(100vw - 2rem)); z-index: 20; }
+.calendar-dialog::backdrop { background: color-mix(in srgb, var(--background) 75%, transparent); }
+.calendar-dialog label,
+.file-field { display: grid; gap: .3rem; margin-block: .5rem; }
+.personal-calendar[data-pending='true'] { opacity: .72; }
+@media (max-width: 800px) {
+  .calendar-layout { grid-template-columns: 1fr; }
+  .calendar-toolbar { align-items: stretch; flex-direction: column; }
+  .calendar-board { overflow-x: auto; padding: .5rem; }
+}
