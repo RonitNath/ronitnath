@@ -2,6 +2,17 @@ import { readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
 
+/* A signed-in reader's own surfaces are `/u/<their public id>`: there is no
+ * `/app` any more and no constant to assert against. A test asserts the shape
+ * and gets there the way a reader with an old bookmark does — through the
+ * stub that resolves the session and forwards, permanently. */
+const HOME = /\/u\/p_[A-Za-z0-9_-]+$/;
+
+async function go(page: Page, view = ''): Promise<void> {
+  await page.goto(view === '' ? '/app' : `/app/${view}`);
+}
+
+
 /* R5's golden flows: an organization asks somebody in, a document is handed
  * around a level at a time, and a group decides who a guest sees first.
  * Everything here runs against the standalone server and the dev database. */
@@ -43,10 +54,21 @@ async function linkFor(to: string, path: string): Promise<string> {
 
 async function signIn(page: Page, email: string) {
   await page.goto('/auth/sign-in');
+  /* Confirming an address signs the reader in, and the door does not stand
+     open to somebody who is already through it: it sends them to their own
+     surfaces. A test that means to prove a password has to leave first, and it
+     signs out and waits for the landing: the session row has to go, because
+     the sessions list counts it, and a sign-out still in flight would arrive
+     after the next sign-in and end that one instead. */
+  if (!page.url().includes('/auth/sign-in')) {
+    await page.getByRole('button', { name: 'Sign out' }).click();
+    await page.waitForURL(/\/$/);
+    await page.goto('/auth/sign-in');
+  }
   await page.locator('#sign-in-email').fill(email);
   await page.locator('#sign-in-password').fill(PASSWORD);
-  await page.getByRole('button', { name: 'Sign in' }).click();
-  await expect(page).toHaveURL('/app');
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click();
+  await expect(page).toHaveURL(HOME);
 }
 
 /** Register, confirm, and sign in: a member with a door of their own. */
@@ -76,11 +98,11 @@ test('an organization asks somebody in, and the handle is theirs afterwards', as
   await member(page, 'The Founder');
   const org = handle('org');
 
-  await page.goto('/app');
+  await go(page);
   await page.getByLabel('Organization').fill('Isoastra Test');
   await page.getByLabel('Handle').fill(org);
   await page.getByRole('button', { name: 'Create' }).click();
-  await expect(page).toHaveURL(`/org/${org}`);
+  await expect(page).toHaveURL(`/o/${org}`);
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Isoastra Test');
   await expect(page.getByRole('row', { name: /The Founder/ })).toContainText('owner');
 
@@ -109,7 +131,7 @@ test('an organization asks somebody in, and the handle is theirs afterwards', as
   await expect(colleague.getByRole('row', { name: /Isoastra Test/ })).toContainText('member');
 
   /* A member is not an operator: the page they are in is not their page. */
-  await colleague.goto(`/org/${org}`);
+  await colleague.goto(`/o/${org}`);
   await expect(colleague.getByText('could not be found')).toBeVisible();
 
   /* The founder makes them an admin, and now it is. */
@@ -125,7 +147,7 @@ test('an organization asks somebody in, and the handle is theirs afterwards', as
       .getByRole('cell', { name: 'admin', exact: true }),
   ).toBeVisible();
 
-  await colleague.goto(`/org/${org}`);
+  await colleague.goto(`/o/${org}`);
   await expect(colleague.getByRole('heading', { level: 1 })).toHaveText('Isoastra Test');
   await theirs.close();
 
@@ -134,9 +156,9 @@ test('an organization asks somebody in, and the handle is theirs afterwards', as
   const outside = await browser.newContext();
   const stranger = await outside.newPage();
   await member(stranger, 'A Stranger');
-  await stranger.goto(`/org/${org}`);
+  await stranger.goto(`/o/${org}`);
   await expect(stranger.getByText('could not be found')).toBeVisible();
-  await stranger.goto('/org/no-such-organization');
+  await stranger.goto('/o/no-such-organization');
   await expect(stranger.getByText('could not be found')).toBeVisible();
   await outside.close();
 });
@@ -147,7 +169,7 @@ test('a document is shared a level at a time, and taken back', async ({ page, br
   /* The reader has to be somebody the author holds, so they are held and they
    * claim — R3's path, which is how a person gets into an address book. */
   const readerAddress = address('reader');
-  await page.goto('/app/people');
+  await go(page, 'people');
   await page.getByLabel('Email, phone, or name').fill(readerAddress);
   await page.getByLabel('What you call them').fill('The Reader');
   await page.getByRole('button', { name: 'Hold' }).click();
@@ -167,10 +189,10 @@ test('a document is shared a level at a time, and taken back', async ({ page, br
 
   /* The author writes something. */
   const title = `A memo ${Date.now()}`;
-  await page.goto('/app/documents');
+  await go(page, 'documents');
   await page.getByLabel('Title').fill(title);
   await page.getByRole('button', { name: 'Create' }).click();
-  await expect(page).toHaveURL(/\/app\/documents\/r_/);
+  await expect(page).toHaveURL(/\/u\/p_[A-Za-z0-9_-]+\/documents\/r_/);
   const url = new URL(page.url()).pathname;
   await page.getByLabel('Body').fill('The first paragraph.\n\n- one\n- two');
   await page.getByRole('button', { name: 'Save' }).click();

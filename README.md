@@ -159,7 +159,7 @@ the Playwright run uses because Next's standalone server changes directory.
 with no factors, ready for ZITADEL to attach itself on first sign-in. Adding
 `--password <secret>` seeds a _local_ operator instead — a confirmed address, a
 password and the `operator` relation — which is how the Playwright run reaches
-`/platform` without an identity provider. The allowlisted address never takes
+`/o/isoastra` without an identity provider. The allowlisted address never takes
 that path.
 
 `RN_IMPERSONATION=off` removes SignInAs entirely: the control is not drawn and

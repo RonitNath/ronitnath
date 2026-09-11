@@ -21,11 +21,15 @@
  * arrive over HTTP, which is why the counters that matter here are the ones
  * the library keeps on `/api/auth/*` and the edge keeps in front of it. */
 
+import { and, eq, isNull } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { z } from 'zod';
 
+import { database, schema } from '@/db/client';
+import { encodeId } from '@/lib/ids';
+import { LEGACY_APP_ROOT, userPath, userRoute } from '@/lib/paths';
 import { auth, rehashOnSignIn } from './auth';
 import { isAllowlisted, looksLikeEmail, normalizeEmail } from './email-address';
 import { AUTH_FAILED, CHECK_INBOX, RESET_SENT, type FormState } from './form-state';
@@ -62,17 +66,31 @@ function field(form: FormData, name: string): string {
 /* Where a `next=` may send someone: this site, by path, and never back to the
  * door it just came from. Not exported — everything a `'use server'` module
  * exports is a callable endpoint, and a predicate does not need to be one. */
-function safeNext(raw: string): string {
-  return /^\/(?!\/|auth(\/|$))[A-Za-z0-9\-._~/]*$/.test(raw) ? raw : '/app';
+function safeNext(raw: string, fallback: string): string {
+  return /^\/(?!\/|auth(\/|$))[A-Za-z0-9\-._~/]*$/.test(raw) ? raw : fallback;
+}
+
+/** Where somebody lands when they asked for nothing in particular: their own
+ *  surfaces, which are addressed by their public id and so cannot be named by
+ *  a constant. A user with no person behind it has no indoors to go to and
+ *  gets the landing. */
+async function homeOf(userId: string): Promise<string> {
+  const rows = await database()
+    .select({ personId: schema.person.id })
+    .from(schema.person)
+    .where(and(eq(schema.person.userId, userId), isNull(schema.person.mergedInto)))
+    .limit(1);
+  const row = rows[0];
+  return row ? userPath(encodeId('person', row.personId)) : '/';
 }
 
 /* Where an OAuth round trip may land. Wider than `safeNext` by exactly one
  * path: `/auth/confirmed` is the re-authentication landing, which is on this
  * site, carries only a `next` of its own, and is the one auth route a
  * callback is allowed to name. */
-function safeCallback(raw: string): string {
-  if (/^\/auth\/confirmed\?next=%2Fplatform[A-Za-z0-9%\-._~]*$/.test(raw)) return raw;
-  return safeNext(raw);
+function safeCallback(raw: string, fallback: string): string {
+  if (/^\/auth\/confirmed\?next=%2Fo%2Fisoastra[A-Za-z0-9%\-._~]*$/.test(raw)) return raw;
+  return safeNext(raw, fallback);
 }
 
 /* Better-auth's refusals arrive as its `APIError`, and `instanceof` is not the
@@ -174,7 +192,7 @@ export async function signInEmail(_prev: FormState, form: FormData): Promise<For
   await rehashOnSignIn(address, secret);
   await mirrorIdentity({ userId, email: address, verified: true, source: 'local' });
 
-  redirect(safeNext(next));
+  redirect(safeNext(next, await homeOf(userId)));
 }
 
 /** The other door. Better-auth registers the ZITADEL config as a provider, so
@@ -182,7 +200,10 @@ export async function signInEmail(_prev: FormState, form: FormData): Promise<For
  *  library's own `/api/auth/callback/zitadel`; the allowlist is enforced in
  *  the factory, where the profile arrives. */
 export async function signInWithIsoastra(_prev: FormState, form: FormData): Promise<FormState> {
-  const next = safeCallback(field(form, 'next'));
+  /* The round trip has not happened yet, so there is nobody to send home:
+   * `/app` is the one path that resolves "me" from the session it is given,
+   * and it permanently redirects to `/u/<me>` the moment the callback lands. */
+  const next = safeCallback(field(form, 'next'), LEGACY_APP_ROOT);
   let url: string;
   try {
     const started = await auth().api.signInSocial({
@@ -297,6 +318,6 @@ export async function revokeSession(_prev: FormState, form: FormData): Promise<F
   }
 
   await auth().api.revokeSession({ body: { token: target.token }, ...request });
-  revalidatePath('/app/sessions');
+  revalidatePath(userRoute('sessions'), 'page');
   return { notice: 'Session ended.' };
 }

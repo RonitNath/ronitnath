@@ -165,6 +165,32 @@ function build() {
           },
         },
       },
+      session: {
+        create: {
+          /* A retired party keeps every row it had and loses its door. Without
+           * this the door still opens: better-auth knows nothing about
+           * `party.disabled_at`, so a disabled person could present the right
+           * password, be handed a session, and only then be turned away by
+           * `currentPrincipal` — which confirms to them that their password is
+           * still good and leaves a session row behind. Refusing here makes the
+           * sign-in decline like any other wrong answer.
+           *
+           * The party is asked rather than a copy of the fact in
+           * `user.disabled_at`, because retirement is something this site knows
+           * about a person and two copies of it would be two things to keep in
+           * step. */
+          before: async (session) => {
+            const rows = await database()
+              .select({ disabledAt: schema.party.disabledAt })
+              .from(schema.person)
+              .innerJoin(schema.party, eq(schema.party.id, schema.person.id))
+              .where(eq(schema.person.userId, session.userId))
+              .limit(1);
+            if (rows[0]?.disabledAt) return false;
+            return { data: session };
+          },
+        },
+      },
     },
     plugins: [
       ...(oidcConfigured()

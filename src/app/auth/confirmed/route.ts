@@ -21,6 +21,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { authSchema, database } from '@/db/client';
 import { auth } from '@/features/auth/auth';
 import { publicOrigin } from '@/lib/env';
+import { OPERATOR_ROOT, operatorPath } from '@/lib/paths';
 
 export const dynamic = 'force-dynamic';
 
@@ -28,7 +29,9 @@ const FRESH_SECONDS = 120;
 
 /** Only a path back into the operator surface. */
 function safeNext(raw: string | null): string {
-  return raw && /^\/platform(\/[A-Za-z0-9\-._~/]*)?$/.test(raw) ? raw : '/platform';
+  return raw && new RegExp(`^${OPERATOR_ROOT}(/[A-Za-z0-9\\-._~/]*)?$`).test(raw)
+    ? raw
+    : operatorPath();
 }
 
 export async function GET(request: NextRequest): Promise<NextResponse> {

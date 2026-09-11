@@ -78,6 +78,13 @@
       "when": 1789081400649,
       "tag": "0010_auth_core",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1789092340824,
+      "tag": "0011_auth_rate_limit",
+      "breakpoints": true
     }
   ]
 }

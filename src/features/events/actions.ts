@@ -21,13 +21,14 @@ import { currentPrincipal } from '@/features/auth/principal';
 import { CONTACT } from '@/features/people/authority';
 import { HANDLE_MAX, normalizeHandle } from '@/features/people/handles';
 import { encodeId, tryDecodeId } from '@/lib/ids';
+import { userPath } from '@/lib/paths';
 import { HOST, INVITED, dropRelation, hostedEvent, writeRelation } from './authority';
 import { guestUrl, mintOpenLink, mintPersonalLink } from './links';
 import { slugCandidate } from './slug';
 import { fromWallClock, isZone } from './time';
+import { emit } from '@/lib/fleet/events';
 
 const NO_SUCH = 'That is not something you can do here.';
-const EVENTS = '/app/events';
 
 function field(form: FormData, name: string): string {
   const value = form.get(name);
@@ -38,6 +39,22 @@ async function actor() {
   const principal = await currentPrincipal();
   if (!principal) redirect('/auth/sign-in');
   return { personId: principal.personId, isOperator: principal.isOperator };
+}
+
+/* Where the host who ran this command looks at what it changed. A host's
+ * surfaces are addressed by their public id, so the path is a function of who
+ * is asking rather than a constant. */
+function home(me: { personId: number }, view = ''): string {
+  return userPath(encodeId('person', me.personId), view);
+}
+
+/* The stream a person's own changes are published on: their public id, which
+ * is also the `[user]` segment of every page that shows them. The event goes
+ * in the same transaction as the row it is about and the audit row beside it:
+ * an event written after the commit is an event a rollback cannot take back,
+ * and one written outside it is a change nobody is told about (§7). */
+function streamOf(me: { personId: number }): string {
+  return encodeId('person', me.personId);
 }
 
 const copy = {
@@ -93,7 +110,7 @@ function readForm(form: FormData) {
 const BAD_COPY = 'A title, a start, and a zone the clock knows.';
 
 /** CreateEvent. Created is not published: the event exists, it has a slug,
- *  and nothing outside `/app` can see it yet. */
+ *  and nothing outside the host's own pages can see it yet. */
 export async function createEvent(_prev: FormState, form: FormData): Promise<FormState> {
   const me = await actor();
   const parsed = createInput.safeParse(readForm(form));
@@ -143,14 +160,20 @@ export async function createEvent(_prev: FormState, form: FormData): Promise<For
         targetId: row.id,
         payload: { slug },
       });
+      await emit(tx, {
+        orgId: streamOf(me),
+        resourceKind: 'event',
+        resourceId: encodeId('event', row.id),
+        kind: 'created',
+      });
       return row.id;
     }
     return null;
   });
 
   if (created === null) return { error: 'That name is taken too many times over.' };
-  revalidatePath(EVENTS);
-  redirect(`${EVENTS}/${encodeId('event', created)}`);
+  revalidatePath(home(me, 'events'));
+  redirect(home(me, `events/${encodeId('event', created)}`));
 }
 
 /** UpdateEvent. A change after publication simply updates the page — nobody
@@ -206,11 +229,17 @@ export async function updateEvent(_prev: FormState, form: FormData): Promise<For
       targetId: target,
       payload: { sequence: event.publishedAt ? event.sequence + 1 : event.sequence },
     });
+    await emit(tx, {
+      orgId: streamOf(me),
+      resourceKind: 'event',
+      resourceId: encodeId('event', target),
+      kind: 'updated',
+    });
     return true;
   });
 
   if (!ok) return { error: NO_SUCH };
-  revalidatePath(`${EVENTS}/${field(form, 'event')}`);
+  revalidatePath(home(me, `events/${field(form, 'event')}`));
   return { notice: 'Saved.' };
 }
 
@@ -281,11 +310,17 @@ export async function publishEvent(_prev: FormState, form: FormData): Promise<Fo
       targetId: target,
       payload: { minted: minted.length },
     });
+    await emit(tx, {
+      orgId: streamOf(me),
+      resourceKind: 'event',
+      resourceId: encodeId('event', target),
+      kind: 'published',
+    });
     return minted;
   });
 
   if (ok === null) return { error: NO_SUCH };
-  revalidatePath(`${EVENTS}/${field(form, 'event')}`);
+  revalidatePath(home(me, `events/${field(form, 'event')}`));
   return {
     mintedLinks: ok,
     notice:
@@ -316,11 +351,17 @@ export async function unpublishEvent(_prev: FormState, form: FormData): Promise<
       targetKind: 'event',
       targetId: target,
     });
+    await emit(tx, {
+      orgId: streamOf(me),
+      resourceKind: 'event',
+      resourceId: encodeId('event', target),
+      kind: 'updated',
+    });
     return true;
   });
 
   if (!ok) return { error: NO_SUCH };
-  revalidatePath(`${EVENTS}/${field(form, 'event')}`);
+  revalidatePath(home(me, `events/${field(form, 'event')}`));
   return { notice: 'Unpublished. The links decline until you publish again.' };
 }
 
@@ -434,11 +475,17 @@ export async function invitePeople(_prev: FormState, form: FormData): Promise<Fo
       targetId: target,
       payload: { added: count },
     });
+    await emit(tx, {
+      orgId: streamOf(me),
+      resourceKind: 'event',
+      resourceId: encodeId('event', target),
+      kind: 'updated',
+    });
     return count;
   });
 
   if (added === null) return { error: NO_SUCH };
-  revalidatePath(`${EVENTS}/${field(form, 'event')}`);
+  revalidatePath(home(me, `events/${field(form, 'event')}`));
   return { notice: added === 0 ? 'Everyone there was already invited.' : `${added} invited.` };
 }
 
@@ -475,11 +522,17 @@ export async function removeInvite(_prev: FormState, form: FormData): Promise<Fo
       targetId: target,
       payload: { person },
     });
+    await emit(tx, {
+      orgId: streamOf(me),
+      resourceKind: 'event',
+      resourceId: encodeId('event', target),
+      kind: 'updated',
+    });
     return true;
   });
 
   if (!ok) return { error: NO_SUCH };
-  revalidatePath(`${EVENTS}/${field(form, 'event')}`);
+  revalidatePath(home(me, `events/${field(form, 'event')}`));
   return { notice: 'Removed.' };
 }
 
@@ -513,6 +566,12 @@ export async function mintGuestLink(_prev: FormState, form: FormData): Promise<F
         targetKind: 'event',
         targetId: target,
       });
+      await emit(tx, {
+        orgId: streamOf(me),
+        resourceKind: 'event',
+        resourceId: encodeId('event', target),
+        kind: 'updated',
+      });
       return guestUrl(event.slug, token);
     }
     const rows = await tx
@@ -540,11 +599,17 @@ export async function mintGuestLink(_prev: FormState, form: FormData): Promise<F
       targetId: target,
       payload: { person },
     });
+    await emit(tx, {
+      orgId: streamOf(me),
+      resourceKind: 'event',
+      resourceId: encodeId('event', target),
+      kind: 'updated',
+    });
     return guestUrl(event.slug, token);
   });
 
   if (minted === null) return { error: NO_SUCH };
-  revalidatePath(`${EVENTS}/${field(form, 'event')}`);
+  revalidatePath(home(me, `events/${field(form, 'event')}`));
   return { minted, notice: 'Copy it now — it is not stored and cannot be shown again.' };
 }
 

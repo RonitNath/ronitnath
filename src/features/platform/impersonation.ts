@@ -27,6 +27,8 @@ import { currentPrincipal, OPERATOR_RESOURCE } from '@/features/auth/principal';
 import { tryDecodeId } from '@/lib/ids';
 import { requireOperator } from '@/lib/tiers';
 import { impersonationEnabled, needsReauth, REAUTH_REQUIRED } from './reauth';
+import { encodeId } from '@/lib/ids';
+import { operatorPath, userPath } from '@/lib/paths';
 
 const NO_SUCH = 'That is not something you can do here.';
 
@@ -122,7 +124,10 @@ export async function signInAs(_prev: FormState, form: FormData): Promise<FormSt
   await endSession(principal.sessionId);
   await wearCookieFor(minted);
 
-  redirect('/app');
+  /* Wearing somebody's name lands on that person's own surfaces, which are
+   * addressed by their public id: there is no audience route to land on any
+   * more, and the operator bar above says whose name is being worn. */
+  redirect(userPath(encodeId('person', target)));
 }
 
 /** EndImpersonation. The worn session ends and the operator gets a fresh one
@@ -155,5 +160,5 @@ export async function endImpersonation(): Promise<void> {
   const minted = await mintSession(door.userId, null);
   await endSession(principal.sessionId);
   await wearCookieFor(minted);
-  redirect('/platform');
+  redirect(operatorPath());
 }
