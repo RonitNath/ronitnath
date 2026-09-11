@@ -31,8 +31,8 @@ import { eq } from 'drizzle-orm';
 import { authSchema, database, schema } from '@/db/client';
 import { publicOrigin, required } from '@/lib/env';
 import { hashPassword, isCurrent, normaliseEmail, verifyPassword } from '@/lib/fleet/identity';
-import { deliver } from '@/lib/mail';
 import { passwordResetMail, verificationMail } from '@/lib/mail';
+import { queueMailIntent } from '@/lib/mail-queue';
 
 /** Who ZITADEL is allowed to vouch for. Employee SSO is for employees; the
  *  ruling is one address, and an empty list means the door is shut rather than
@@ -130,13 +130,13 @@ function build() {
         verify: ({ hash, password }) => verifyPassword(hash, password),
       },
       sendResetPassword: async ({ user, url }) => {
-        await deliver(passwordResetMail(user.email, url));
+        await queueMailIntent('reset_password', passwordResetMail(user.email, url), new Date(Date.now() + 3_600_000));
       },
     },
     emailVerification: {
       autoSignInAfterVerification: true,
       sendVerificationEmail: async ({ user, url }) => {
-        await deliver(verificationMail(user.email, url));
+        await queueMailIntent('verify_email', verificationMail(user.email, url), new Date(Date.now() + 3_600_000));
       },
     },
     account: {

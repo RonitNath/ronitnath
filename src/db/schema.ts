@@ -721,3 +721,41 @@ export const realtimeDelivery = pgTable(
     index('realtime_delivery_view_idx').on(t.viewId, t.selectedAt),
   ],
 );
+
+/* Durable outbound communication intent. Bodies are retained only while a
+ * worker can still deliver them; terminal rows keep non-sensitive evidence. */
+export const mailIntent = pgTable(
+  'mail_intent',
+  {
+    id: uuid('id').primaryKey(),
+    deduplicationKey: text('deduplication_key').notNull(),
+    kind: text('kind').notNull(),
+    recipient: text('recipient').notNull(),
+    message: jsonb('message').$type<{ to: string; subject: string; text: string; html: string }>(),
+    correlationId: text('correlation_id').notNull(),
+    state: text('state').notNull().default('pending'),
+    workflowId: text('workflow_id'),
+    dispatchGeneration: integer('dispatch_generation').notNull().default(0),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    completedAt: timestamp('completed_at', { withTimezone: true }),
+  },
+  (t) => [
+    uniqueIndex('mail_intent_deduplication_key').on(t.deduplicationKey),
+    index('mail_intent_pending_idx').on(t.state, t.createdAt),
+    check('mail_intent_state', sql`${t.state} IN ('pending','dispatching','accepted','failed','expired')`),
+  ],
+);
+
+export const mailAttempt = pgTable(
+  'mail_attempt',
+  {
+    id: bigserial('id', { mode: 'number' }).primaryKey(),
+    intentId: uuid('intent_id').notNull().references(() => mailIntent.id, { onDelete: 'cascade' }),
+    ordinal: smallint('ordinal').notNull(),
+    outcome: text('outcome').notNull(),
+    detail: text('detail'),
+    attemptedAt: timestamp('attempted_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex('mail_attempt_intent_ordinal').on(t.intentId, t.ordinal)],
+);

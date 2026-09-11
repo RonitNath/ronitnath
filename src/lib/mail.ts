@@ -5,9 +5,9 @@
  * the production path — the useSend SMTP proxy on the mesh advertises
  * STARTTLS without a certificate, so no SMTP client can authenticate to it.
  * `SMTP_URL`: nodemailer, for any plain SMTP relay. Without either — every dev machine and the
- * Playwright run — the message is logged to stdout *and* written to
- * `.mail/<timestamp>.eml`, because a test that has to click a verification
- * link needs to read one, and scraping a log is worse than opening a file.
+ * Playwright run — the message is written to `.mail/<timestamp>.eml`, because
+ * a test that has to click a verification link needs to read one. Token-bearing
+ * message bodies are never copied into process logs.
  * The directory is gitignored; nothing else in the app reads it. */
 
 import { mkdir, writeFile } from 'node:fs/promises';
@@ -19,6 +19,13 @@ export interface Message {
   subject: string;
   text: string;
   html: string;
+}
+
+export type MailFailureKind = 'transient' | 'permanent' | 'ambiguous';
+export class MailDeliveryError extends Error {
+  constructor(message: string, readonly kind: MailFailureKind, readonly retryAfterMs?: number) {
+    super(message);
+  }
 }
 
 /* Where the dev transport writes. `MAIL_DIR` exists because Next's standalone
@@ -55,19 +62,27 @@ function asEml(message: Message): string {
 }
 
 async function sendViaUseSend(base: string, key: string, message: Message): Promise<void> {
-  const res = await fetch(`${base.replace(/\/$/, '')}/api/v1/emails`, {
-    method: 'POST',
-    headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json' },
-    body: JSON.stringify({
-      from: from(),
-      to: message.to,
-      subject: message.subject,
-      text: message.text,
-      html: message.html,
-    }),
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${base.replace(/\/$/, '')}/api/v1/emails`, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json' },
+      body: JSON.stringify({ from: from(), to: message.to, subject: message.subject, text: message.text, html: message.html }),
+    });
+  } catch (error) {
+    throw new MailDeliveryError(error instanceof Error ? error.message : String(error), 'ambiguous');
+  }
   if (!res.ok) {
-    throw new Error(`usesend: ${res.status} ${(await res.text()).slice(0, 200)}`);
+    const raw = res.headers.get('retry-after');
+    const seconds = raw && /^\d+$/.test(raw) ? Number(raw) : null;
+    const dateDelay = raw && seconds === null ? Date.parse(raw) - Date.now() : NaN;
+    const requestedDelay = seconds === null ? dateDelay : seconds * 1_000;
+    const retryAfterMs = Number.isFinite(requestedDelay)
+      ? Math.max(0, Math.min(300_000, requestedDelay))
+      : undefined;
+    const kind: MailFailureKind = res.status === 429 || res.status >= 500 ? 'transient' : 'permanent';
+    await res.body?.cancel().catch(() => undefined);
+    throw new MailDeliveryError(`usesend: ${res.status}`, kind, retryAfterMs);
   }
 }
 
@@ -81,7 +96,7 @@ function refuses(to: string): boolean {
 }
 
 export async function sendMail(message: Message): Promise<void> {
-  if (refuses(message.to)) throw new Error('mail: refused by MAIL_FAIL');
+  if (refuses(message.to)) throw new MailDeliveryError('mail: refused by MAIL_FAIL', 'permanent');
   const apiUrl = process.env.USESEND_API_URL;
   const apiKey = process.env.USESEND_API_KEY;
   if (apiUrl && apiKey) {
@@ -90,13 +105,11 @@ export async function sendMail(message: Message): Promise<void> {
   }
   const url = process.env.SMTP_URL;
   if (url) {
-    await transport(url).sendMail({
-      from: from(),
-      to: message.to,
-      subject: message.subject,
-      text: message.text,
-      html: message.html,
-    });
+    try {
+      await transport(url).sendMail({ from: from(), to: message.to, subject: message.subject, text: message.text, html: message.html });
+    } catch (error) {
+      throw new MailDeliveryError(error instanceof Error ? error.message : String(error), 'ambiguous');
+    }
     return;
   }
 
@@ -108,46 +121,24 @@ export async function sendMail(message: Message): Promise<void> {
   console.log(
     JSON.stringify({ level: 'info', event: 'mail.console', to: message.to, subject: message.subject, path }),
   );
-  console.log(message.text);
 }
 
-/* Sending, for the callers that have already committed. A letter cannot be
- * rolled back and a letter that did not go out must not undo the row that
- * asked for it: the visitor's account exists either way, and what they see is
- * the same page. The failure is a structured line in the log, which is the
- * only place it can be acted on. */
-export async function deliver(
-  message: Message,
-  context: Record<string, unknown> = {},
-): Promise<boolean> {
-  try {
-    await sendMail(message);
-    return true;
-  } catch (error) {
-    console.error(
-      JSON.stringify({
-        level: 'error',
-        event: 'mail.failed',
-        to: message.to,
-        subject: message.subject,
-        reason: error instanceof Error ? error.message : String(error),
-        ...context,
-      }),
-    );
-    return false;
-  }
+export async function closeMailTransport(): Promise<void> {
+  const current = globalForMail.rnMailer;
+  globalForMail.rnMailer = undefined;
+  if (current) current.close();
 }
 
 /* The letters this rung sends. Both are one sentence, one link and the
  * time it dies: an email that explains itself at length reads as a phish. */
 
 export function verificationMail(to: string, url: string): Message {
-  const text = `Confirm this address to finish setting up your account on ronitnath.com.\n\n${url}\n\nThe link works once and expires in 24 hours. If you did not register, ignore this message.\n`;
+  const text = `Confirm this address to finish setting up your account on ronitnath.com.\n\n${url}\n\nThe link works once and expires in 1 hour. If you did not register, ignore this message.\n`;
   return {
     to,
     subject: 'Confirm your email',
     text,
-    html: `<p>Confirm this address to finish setting up your account on ronitnath.com.</p><p><a href="${url}">${url}</a></p><p>The link works once and expires in 24 hours. If you did not register, ignore this message.</p>`,
+    html: `<p>Confirm this address to finish setting up your account on ronitnath.com.</p><p><a href="${url}">${url}</a></p><p>The link works once and expires in 1 hour. If you did not register, ignore this message.</p>`,
   };
 }
 
