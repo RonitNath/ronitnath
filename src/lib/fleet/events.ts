@@ -22,7 +22,8 @@
  * The payload is a courtesy, not a contract. Readers refetch through the
  * authorized read path; what the event says is *that* something changed. */
 
-import { and, desc, eq, gt, sql } from 'drizzle-orm';
+import { and, desc, eq, gt } from 'drizzle-orm';
+import { emit as sharedEmit, withActorContext } from '@isoastra/fleet-events';
 
 import { database, schema } from '@/db/client';
 import { requestContext } from './context';
@@ -42,7 +43,7 @@ export interface EmitInput {
    * told to refresh only on published changes, and the audit trail still keeps
    * every one of them. Default true. */
   published?: boolean;
-  payload?: unknown;
+  payload?: Record<string, unknown> | null;
 }
 
 export type DomainEventRow = typeof schema.domainEvent.$inferSelect;
@@ -51,22 +52,7 @@ export type DomainEventRow = typeof schema.domainEvent.$inferSelect;
  *  database assigned, which is what a caller hands a client as `since`. */
 export async function emit(tx: Transaction, input: EmitInput): Promise<number> {
   const ctx = await requestContext();
-  const payload = input.payload === undefined ? null : JSON.stringify(input.payload);
-
-  const result = await tx.execute<{ seq: string | number }>(sql`
-    INSERT INTO domain_event
-      (org_id, resource_kind, resource_id, kind,
-       actor_id, subject_id, acting_operator_id, correlation_id, published, payload)
-    VALUES
-      (${input.orgId}, ${input.resourceKind}, ${input.resourceId}, ${input.kind},
-       ${ctx.actorId}, ${ctx.subjectId}, ${ctx.actingOperatorId}, ${ctx.correlationId},
-       ${input.published ?? true}, ${payload}::jsonb)
-    RETURNING seq
-  `);
-
-  const row = result.rows[0];
-  if (!row) throw new Error('domain_event insert returned no row');
-  return Number(row.seq);
+  return withActorContext(ctx, () => sharedEmit(tx, input));
 }
 
 /** The org's events after `sinceSeq`, oldest first — the replay a stream sends

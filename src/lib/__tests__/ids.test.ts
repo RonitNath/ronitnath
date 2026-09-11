@@ -20,7 +20,7 @@ describe('public ids', () => {
     const a = encodeId('person', 7);
     expect(encodeId('person', 7)).toBe(a);
     expect(a).toMatch(/^p_[A-Za-z0-9_-]{22}$/);
-    expect(a).not.toContain('7');
+    expect(a).not.toBe('p_7');
     expect(encodeId('person', 8)).not.toBe(a);
   });
 

@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation';
 
 import { publishedDocument } from '@/features/documents/queries';
 import { renderBody } from '@/features/events/markup';
+import { encodeId } from '@/lib/ids';
 import { SkyBackdrop, SkySheet } from '@/features/sky/backdrop';
 import { ThemeToggle } from '../../theme-toggle';
 
@@ -42,7 +43,11 @@ export default async function PublicDocument({
         <ThemeToggle />
       </header>
       <SkySheet>
-        <main className="indoors reading">
+        <main
+          className="indoors reading"
+          data-realtime-resource={`document:${encodeId('document', document.id)}`}
+          data-realtime-section="published-document"
+        >
           <h1>{document.title}</h1>
           <p className="note">
             {document.ownerName}

@@ -7,6 +7,7 @@ import './landing.css';
 import { ThemeToggle } from './theme-toggle';
 import { encodeId } from '@/lib/ids';
 import { userPath } from '@/lib/paths';
+import { publicConfiguration } from '@/features/configuration/model';
 
 /** The public landing. Server-rendered whole; the only client code on the page
  * is the sky canvas and the theme toggle. */
@@ -14,6 +15,7 @@ export default async function Home() {
   /* The chrome says who is here, and nothing more: a name when the visitor is
    * signed in, the way in when they are not. */
   const principal = await currentPrincipal();
+  const configuration = await publicConfiguration();
   return (
     <>
       <Atmosphere />
@@ -29,14 +31,20 @@ export default async function Home() {
         <ThemeToggle />
       </header>
       <main className="home-hero">
-        <div className="home-card">
-          <h1>Ronit Nath</h1>
-          <p className="tagline">
-            Founder of{' '}
-            <a href="https://isoastra.com" rel="noopener" target="_blank">
-              Isoastra
-            </a>
-          </p>
+        <div
+          className="home-card"
+          data-realtime-config="homepage:published"
+          data-realtime-section="hero"
+        >
+          {configuration.announcement.enabled ? (
+            <p className="note" data-realtime-config="announcement:live">
+              {configuration.announcement.text}
+            </p>
+          ) : (
+            <span data-realtime-config="announcement:live" />
+          )}
+          <h1>{configuration.home.heading}</h1>
+          <p className="tagline">{configuration.home.tagline}</p>
           <ul className="social-links">
             <li>
               <a href="https://github.com/RonitNath" rel="me noopener" target="_blank">

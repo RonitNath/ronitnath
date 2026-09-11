@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 
 import { ImpersonationBar } from '@/features/platform/components/bar';
+import { RealtimeReporter } from '@/features/realtime/reporter';
 
 import './globals.css';
 
@@ -25,6 +26,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <script dangerouslySetInnerHTML={{ __html: prePaint }} />
       </head>
       <body>
+        <RealtimeReporter />
         <ImpersonationBar />
         {children}
       </body>

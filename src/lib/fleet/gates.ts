@@ -32,6 +32,7 @@ import { organizationByHandle, type OrganizationRow } from '@/features/organizat
 import { allows, type Role } from '@/lib/authority';
 import { tryDecodeId } from '@/lib/ids';
 import { and, eq, isNull } from 'drizzle-orm';
+import { createFleetGates } from '@isoastra/fleet-gates';
 
 /** The door. Every redirect to it carries where the reader was going. */
 export const SIGN_IN = '/auth/sign-in';
@@ -39,6 +40,21 @@ export const SIGN_IN = '/auth/sign-in';
 /** The one thing a refused command ever says. A field-level hint is a lookup
  *  service for whoever is asking. */
 export const DECLINED = 'That is not something you can do here.';
+
+const sharedGates = createFleetGates<Principal>({
+  navigation: { redirect, permanentRedirect, notFound },
+  currentUser: currentPrincipal,
+  userId: (user) => String(user.personId),
+  isOperator: (user) => user.isOperator,
+  membership: async (slug) =>
+    slug === 'isoastra' ? { organizationId: 'isoastra', role: 'owner' } : null,
+  organizationBySlug: async (slug) => {
+    const organization = await organizationByHandle(slug);
+    return organization ? { id: String(organization.id), slug: organization.handle } : null;
+  },
+  operatorOrgSlug: 'isoastra',
+  signInPath: (next) => (next ? `${SIGN_IN}?next=${encodeURIComponent(next)}` : SIGN_IN),
+});
 
 export interface VisitorGate {
   principal: null;
@@ -122,8 +138,9 @@ export async function requireSubject(slug: string, userId: string): Promise<Subj
 /** The platform tier. Not being one is not an error message: it is a 404. */
 export async function requireOperator(): Promise<UserGate> {
   const principal = await currentPrincipal();
-  if (principal === null || !principal.isOperator) notFound();
-  return { principal, personId: principal.personId };
+  if (!principal?.isOperator) notFound();
+  const context = await sharedGates.requireOperator();
+  return { principal: context.user, personId: context.user.personId };
 }
 
 export interface ActionScope {
@@ -202,7 +219,11 @@ export async function withAction<T>(
   }
 }
 
-async function note(name: string, scope: ActionScope, outcome: 'ok' | 'declined'): Promise<void> {
+async function note(
+  name: string,
+  scope: ActionScope,
+  outcome: 'ok' | 'declined',
+): Promise<void> {
   try {
     await database().transaction((tx) =>
       recordAudit(tx, {

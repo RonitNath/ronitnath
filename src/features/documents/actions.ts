@@ -10,7 +10,7 @@
  * the level between reading and writing is a real one and a share granted
  * today should not have to be regranted when the comments arrive. */
 
-import { and, eq, isNull, sql } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { z } from 'zod';
@@ -31,6 +31,7 @@ import {
 import { encodeId, tryDecodeId } from '@/lib/ids';
 import { userPath } from '@/lib/paths';
 import { emit } from '@/lib/fleet/events';
+import { snapshotDocument, writeDocumentDraft } from './lww';
 
 const NO_SUCH = 'That is not something you can do here.';
 
@@ -65,7 +66,12 @@ function documentPath(me: { personId: number }, id: number): string {
 }
 
 const createInput = z.object({ title: z.string().trim().min(1).max(200) });
-const editInput = createInput.extend({ body: z.string().max(40_000) });
+const editInput = createInput.extend({
+  body: z.string().max(40_000),
+  originalTitle: z.string().max(200),
+  originalBody: z.string().max(40_000),
+  mutationId: z.string().uuid(),
+});
 
 /** Whichever subject a public id names: a person, a group, or an
  *  organization. One field on the share form, and the prefix says which. */
@@ -132,16 +138,25 @@ export async function createDocument(_prev: FormState, form: FormData): Promise<
 export async function editDocument(_prev: FormState, form: FormData): Promise<FormState> {
   const me = await actor();
   const id = tryDecodeId('document', field(form, 'document'));
-  const parsed = editInput.safeParse({ title: field(form, 'title'), body: field(form, 'body') });
+  const parsed = editInput.safeParse({
+    title: field(form, 'title'),
+    body: field(form, 'body'),
+    originalTitle: field(form, 'originalTitle'),
+    originalBody: field(form, 'originalBody'),
+    mutationId: field(form, 'mutationId'),
+  });
   if (id === null) return { error: NO_SUCH };
   if (!parsed.success) return { error: 'A title, and a body under 40,000 characters.' };
 
   const ok = await database().transaction(async (tx) => {
     if (!(await allows(tx, me, { on: 'document', id, need: 'editor' }))) return false;
-    await tx
-      .update(schema.document)
-      .set({ title: parsed.data.title, body: parsed.data.body, updatedAt: sql`now()` })
-      .where(eq(schema.document.id, id));
+    const result = await writeDocumentDraft(tx, {
+      documentId: id,
+      actorPersonId: me.personId,
+      ...parsed.data,
+    });
+    if (!result) return false;
+    if (!result.changed) return true;
     await recordAudit(tx, {
       actorPersonId: me.personId,
       command: 'edit-document',
@@ -170,22 +185,32 @@ export async function setPublication(_prev: FormState, form: FormData): Promise<
   const id = tryDecodeId('document', field(form, 'document'));
   if (id === null) return { error: NO_SUCH };
   const publish = field(form, 'publish') === 'yes';
+  const mutationId = field(form, 'mutationId');
+  if (!z.string().uuid().safeParse(mutationId).success) return { error: NO_SUCH };
 
   const outcome = await database().transaction(async (tx) => {
     if (!(await allows(tx, me, { on: 'document', id, need: 'owner' }))) return null;
-    const rows = await tx
-      .update(schema.document)
-      .set({ publishedAt: publish ? sql`now()` : null })
-      .where(eq(schema.document.id, id))
-      .returning({ slug: schema.document.slug });
-    if (rows.length === 0) return null;
+    const result = await snapshotDocument(tx, {
+      documentId: id,
+      mutationId,
+      actorPersonId: me.personId,
+      publish,
+    });
+    if (!result) return null;
+    if (!result.changed) return result.slug;
     await recordAudit(tx, {
       actorPersonId: me.personId,
       command: publish ? 'publish-document' : 'unpublish-document',
       targetKind: 'document',
       targetId: id,
     });
-    return rows[0]!.slug;
+    await emit(tx, {
+      orgId: streamOf(me),
+      resourceKind: 'document',
+      resourceId: encodeId('document', id),
+      kind: publish ? 'published' : 'unpublished',
+    });
+    return result.slug;
   });
 
   if (outcome === null) return { error: NO_SUCH };

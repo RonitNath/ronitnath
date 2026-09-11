@@ -2,7 +2,7 @@
 
 /* The controls on `/app/documents`. */
 
-import { useActionState } from 'react';
+import { useActionState, useEffect, useState } from 'react';
 
 import type { FormState } from '@/features/auth/form-state';
 import { Note } from '@/features/organizations/components/org';
@@ -63,9 +63,16 @@ export function EditDocumentForm({
   body: string;
 }) {
   const [state, action, pending] = useActionState(editDocument, EMPTY);
+  const [mutationId, setMutationId] = useState(() => crypto.randomUUID());
+  useEffect(() => {
+    if (state.notice) setMutationId(crypto.randomUUID());
+  }, [state.notice]);
   return (
     <form className="pane event-form" action={action}>
       <input type="hidden" name="document" value={document} />
+      <input type="hidden" name="mutationId" value={mutationId} />
+      <input type="hidden" name="originalTitle" value={title} />
+      <input type="hidden" name="originalBody" value={body} />
       <div className="field">
         <label htmlFor="edit-title">Title</label>
         <input id="edit-title" name="title" type="text" defaultValue={title} required />
@@ -92,11 +99,16 @@ export function PublishButton({
   slug: string | null;
 }) {
   const [state, action, pending] = useActionState(setPublication, EMPTY);
+  const [mutationId, setMutationId] = useState(() => crypto.randomUUID());
+  useEffect(() => {
+    if (state.notice) setMutationId(crypto.randomUUID());
+  }, [state.notice]);
   return (
     <div className="publish">
       <form action={action}>
         <input type="hidden" name="document" value={document} />
         <input type="hidden" name="publish" value={published ? 'no' : 'yes'} />
+        <input type="hidden" name="mutationId" value={mutationId} />
         <button type="submit" className="commit" disabled={pending}>
           {published ? 'Unpublish' : 'Publish'}
         </button>

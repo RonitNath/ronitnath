@@ -25,6 +25,8 @@ export default async function PlatformLayout({ children }: { children: React.Rea
         <Link href={operatorPath('audit')}>Audit</Link>
         <Link href={operatorPath('operators')}>Operators</Link>
         <Link href={operatorPath('deployment')}>Deployment</Link>
+        <Link href={operatorPath('realtime')}>Realtime</Link>
+        <Link href={operatorPath('configuration')}>Configuration</Link>
       </nav>
       {children}
     </>

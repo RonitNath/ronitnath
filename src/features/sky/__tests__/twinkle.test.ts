@@ -28,15 +28,19 @@ describe('scintillation', () => {
   });
 
   it('never puts a star out and never doubles it, at any airmass', () => {
+    let lowest = Infinity;
+    let highest = -Infinity;
     for (const zenithCos of [1, 0.5, 0.2, 0.05, 0.01]) {
       for (let seed = 0; seed < 200; seed += 1) {
         for (let time = 0; time < 2_000; time += 13) {
           const value = twinkleFactor(1, zenithCos, seed, time);
-          expect(value).toBeGreaterThan(0.5);
-          expect(value).toBeLessThan(1.5);
+          lowest = Math.min(lowest, value);
+          highest = Math.max(highest, value);
         }
       }
     }
+    expect(lowest).toBeGreaterThan(0.5);
+    expect(highest).toBeLessThan(1.5);
   });
 
   it('gives each star its own period inside the stated range', () => {

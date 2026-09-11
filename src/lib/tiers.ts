@@ -91,6 +91,8 @@ export async function requireOrgOperator(handle: string): Promise<OrgOperatorCon
 }
 
 export async function requireOperator(): Promise<MemberContext> {
+  const asker = await currentPrincipal();
+  if (!asker?.isOperator) notFound();
   const { principal, personId } = await gateOperator();
   return { tier: 'operator', personId, principal };
 }

@@ -66,6 +66,12 @@ export default async function PlatformPage() {
           <li>
             <Link href={operatorPath('deployment')}>Deployment</Link>
           </li>
+          <li>
+            <Link href={operatorPath('realtime')}>Realtime</Link>
+          </li>
+          <li>
+            <Link href={operatorPath('configuration')}>Configuration</Link>
+          </li>
         </ul>
       </section>
     </main>

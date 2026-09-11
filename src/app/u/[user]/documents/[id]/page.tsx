@@ -41,11 +41,12 @@ export default async function DocumentPage({
   if (subject === null) notFound();
   const viewingOther = subject !== principal.personId;
   if (viewingOther && !principal.isOperator) {
-    permanentRedirect(
-      userPath(encodeId('person', principal.personId), `documents/${id}`),
-    );
+    permanentRedirect(userPath(encodeId('person', principal.personId), `documents/${id}`));
   }
-  const me = { personId: viewingOther ? subject : principal.personId, isOperator: principal.isOperator };
+  const me = {
+    personId: viewingOther ? subject : principal.personId,
+    isOperator: principal.isOperator,
+  };
   const internal = tryDecodeId('document', id);
   if (internal === null) notFound();
   const document = await documentDetail(me, internal);
@@ -64,7 +65,7 @@ export default async function DocumentPage({
   }));
 
   return (
-    <main className="indoors">
+    <main className="indoors" data-realtime-resource={`document:${id}`}>
       <h1>{document.title}</h1>
       <p className="note">
         {document.ownerName}
@@ -76,11 +77,7 @@ export default async function DocumentPage({
 
       {mayEdit ? (
         <section>
-          <EditDocumentForm
-            document={id}
-            title={document.title}
-            body={document.body}
-          />
+          <EditDocumentForm document={id} title={document.title} body={document.body} />
         </section>
       ) : (
         <section>
@@ -101,6 +98,34 @@ export default async function DocumentPage({
               published={document.publishedAt !== null}
               slug={document.slug}
             />
+          </section>
+
+          <section data-realtime-section="revision-history">
+            <h2>Revision history</h2>
+            <div className="scroller">
+              <table className="rows dense">
+                <thead>
+                  <tr>
+                    <th>Revision</th>
+                    <th>Change</th>
+                    <th>Fields</th>
+                    <th>At</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {document.revisions.map((revision) => (
+                    <tr
+                      key={`${revision.kind}:${revision.version}:${revision.createdAt.toISOString()}`}
+                    >
+                      <td className="mono">{revision.version}</td>
+                      <td>{revision.kind}</td>
+                      <td>{revision.fields.join(', ') || 'snapshot'}</td>
+                      <td className="mono">{revision.createdAt.toISOString()}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </section>
 
           <section>

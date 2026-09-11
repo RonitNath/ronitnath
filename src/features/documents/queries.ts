@@ -63,7 +63,10 @@ export async function listDocuments(actor: Actor): Promise<DocumentRow[]> {
       .where(or(...clauses))
       .orderBy(desc(schema.document.updatedAt));
 
-    const owners = await partyNames(tx, rows.map((row) => row.ownerPartyId));
+    const owners = await partyNames(
+      tx,
+      rows.map((row) => row.ownerPartyId),
+    );
     return Promise.all(
       rows.map(async (row) => ({
         ...row,
@@ -75,7 +78,9 @@ export async function listDocuments(actor: Actor): Promise<DocumentRow[]> {
 }
 
 /** The documents an organization owns. */
-export async function listOrganizationDocuments(organizationId: number): Promise<DocumentRow[]> {
+export async function listOrganizationDocuments(
+  organizationId: number,
+): Promise<DocumentRow[]> {
   return database().transaction(async (tx) => {
     const rows = await tx
       .select({
@@ -100,7 +105,16 @@ export async function listOrganizationDocuments(organizationId: number): Promise
 
 export interface DocumentDetail extends DocumentRow {
   body: string;
+  draftVersion: number;
   shares: ShareRow[];
+  revisions: {
+    version: number;
+    kind: string;
+    fields: string[];
+    title: string;
+    body: string;
+    createdAt: Date;
+  }[];
 }
 
 export interface ShareRow {
@@ -118,6 +132,7 @@ export async function documentDetail(actor: Actor, id: number): Promise<Document
         id: schema.document.id,
         title: schema.document.title,
         body: schema.document.body,
+        draftVersion: schema.document.draftVersion,
         slug: schema.document.slug,
         ownerPartyId: schema.document.ownerPartyId,
         publishedAt: schema.document.publishedAt,
@@ -138,6 +153,19 @@ export async function documentDetail(actor: Actor, id: number): Promise<Document
       ownerName: owners.get(row.ownerPartyId) ?? 'Somebody',
       level,
       shares: level === 'owner' ? await listShares(tx, id) : [],
+      revisions: await tx
+        .select({
+          version: schema.documentRevision.version,
+          kind: schema.documentRevision.kind,
+          fields: schema.documentRevision.fields,
+          title: schema.documentRevision.title,
+          body: schema.documentRevision.body,
+          createdAt: schema.documentRevision.createdAt,
+        })
+        .from(schema.documentRevision)
+        .where(eq(schema.documentRevision.documentId, id))
+        .orderBy(desc(schema.documentRevision.version))
+        .limit(30),
     };
   });
 }
@@ -161,7 +189,9 @@ export async function listShares(tx: Transaction, documentId: number): Promise<S
   const partyIds = rows
     .filter((row) => row.subjectKind !== 'group')
     .map((row) => row.subjectId);
-  const groupIds = rows.filter((row) => row.subjectKind === 'group').map((row) => row.subjectId);
+  const groupIds = rows
+    .filter((row) => row.subjectKind === 'group')
+    .map((row) => row.subjectId);
   const names = await partyNames(tx, partyIds);
   const groups = new Map<number, string>();
   if (groupIds.length > 0) {
@@ -185,12 +215,21 @@ export async function listShares(tx: Transaction, documentId: number): Promise<S
 /** The published document behind a slug, for anybody at all. */
 export async function publishedDocument(
   slug: string,
-): Promise<{ title: string; body: string; ownerName: string; publishedAt: Date } | null> {
+): Promise<{
+  id: number;
+  title: string;
+  body: string;
+  ownerName: string;
+  publishedAt: Date;
+  publishedVersion: number;
+} | null> {
   return database().transaction(async (tx) => {
     const rows = await tx
       .select({
-        title: schema.document.title,
-        body: schema.document.body,
+        id: schema.document.id,
+        title: schema.document.publishedTitle,
+        body: schema.document.publishedBody,
+        publishedVersion: schema.document.publishedVersion,
         ownerPartyId: schema.document.ownerPartyId,
         publishedAt: schema.document.publishedAt,
       })
@@ -198,11 +237,20 @@ export async function publishedDocument(
       .where(eq(schema.document.slug, slug))
       .limit(1);
     const row = rows[0];
-    if (!row || row.publishedAt === null) return null;
+    if (
+      !row ||
+      row.publishedAt === null ||
+      row.title === null ||
+      row.body === null ||
+      row.publishedVersion === null
+    )
+      return null;
     const owners = await partyNames(tx, [row.ownerPartyId]);
     return {
       title: row.title,
       body: row.body,
+      id: row.id,
+      publishedVersion: row.publishedVersion,
       ownerName: owners.get(row.ownerPartyId) ?? 'Ronit Nath',
       publishedAt: row.publishedAt,
     };

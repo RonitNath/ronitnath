@@ -8,6 +8,30 @@ importers:
 
   .:
     dependencies:
+      '@isoastra/fleet-configured':
+        specifier: 0.1.3
+        version: 0.1.3(drizzle-orm@0.45.2(@types/pg@8.23.1)(kysely@0.29.5)(pg@8.23.0))(next@15.5.25(@playwright/test@1.63.0)(@types/node@24.13.3)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(pg@8.23.0)(react@19.2.8)(zod@4.5.4)
+      '@isoastra/fleet-events':
+        specifier: 0.2.3
+        version: 0.2.3(drizzle-orm@0.45.2(@types/pg@8.23.1)(kysely@0.29.5)(pg@8.23.0))(next@15.5.25(@playwright/test@1.63.0)(@types/node@24.13.3)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(pg@8.23.0)(react@19.2.8)(zod@4.5.4)
+      '@isoastra/fleet-gates':
+        specifier: 0.1.3
+        version: 0.1.3(next@15.5.25(@playwright/test@1.63.0)(@types/node@24.13.3)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))
+      '@isoastra/fleet-identity':
+        specifier: 0.1.1
+        version: 0.1.1(better-auth@1.7.2(drizzle-kit@0.31.10)(drizzle-orm@0.45.2(@types/pg@8.23.1)(kysely@0.29.5)(pg@8.23.0))(next@15.5.25(@playwright/test@1.63.0)(@types/node@24.13.3)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(pg@8.23.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(vitest@3.2.7(@types/node@24.13.3)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.13)))
+      '@isoastra/fleet-ids':
+        specifier: 0.1.1
+        version: 0.1.1
+      '@isoastra/grid-core':
+        specifier: 0.1.0
+        version: 0.1.0
+      '@isoastra/grid-next':
+        specifier: 0.1.0
+        version: 0.1.0(next@15.5.25(@playwright/test@1.63.0)(@types/node@24.13.3)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)
+      '@isoastra/grid-react':
+        specifier: 0.1.0
+        version: 0.1.0(react@19.2.8)
       '@node-rs/argon2':
         specifier: ^2.2.0
         version: 2.2.0
@@ -853,6 +877,49 @@ packages:
     engines: {node: '>=20.9.0'}
     cpu: [x64]
     os: [win32]
+
+  '@isoastra/fleet-configured@0.1.3':
+    resolution: {integrity: sha512-rHzOVrDV+lVd2j9aGbaLTW/Fb/jD6q3uTt00S+GBrNMas8m6MUvZ+X1XIs09Pcz7tgnMfCGEexUm59w8riyngw==, tarball: https://npm.pkg.github.com/download/@isoastra/fleet-configured/0.1.3/606fcf466caa7e7ddf220131f6d57fd8892bff6d}
+    peerDependencies:
+      drizzle-orm: '>=0.44.0 <0.46.0'
+      pg: ^8.11.0
+      zod: ^3.23.0 || ^4.0.0
+
+  '@isoastra/fleet-events@0.2.3':
+    resolution: {integrity: sha512-EzZF66acgUn9K+pZEASqVzbC61FfiKJy8NnhsOo4/WD4sJzWVzRZ077ShuojDuiJPI405ZOOFxX+BtMNgfUOhQ==, tarball: https://npm.pkg.github.com/download/@isoastra/fleet-events/0.2.3/3954faa0d3aed44497b75d729d20f135b795ea28}
+    peerDependencies:
+      drizzle-orm: '>=0.44.0 <0.46.0'
+      next: '>=15.0.0'
+      pg: ^8.11.0
+      react: ^19.0.0
+      zod: ^4.0.0
+
+  '@isoastra/fleet-gates@0.1.3':
+    resolution: {integrity: sha512-DL5/RwdxTSoFZTjOe90yy7zKpXg5M4bpwrgmoygHcdxcEM7ZzzesT+dFjkuycakg6MZBPQxYZ6OzoxA4Ko/XqQ==, tarball: https://npm.pkg.github.com/download/@isoastra/fleet-gates/0.1.3/228db07a52d18c15fb896fdaab3fa390b896b8d2}
+    peerDependencies:
+      next: '>=15.0.0'
+
+  '@isoastra/fleet-identity@0.1.1':
+    resolution: {integrity: sha512-EK8PWwQFr0bN4rZq0zSn40xULvWEruY4O8ej9XX0WLHaF2iOWYynN/kNGK+sqoeja/OWqbctQ3TwQBGV6zEjfg==, tarball: https://npm.pkg.github.com/download/@isoastra/fleet-identity/0.1.1/0a4252d2a1efddd1ab6fef9832b5119332907fab}
+    peerDependencies:
+      better-auth: 1.7.2
+
+  '@isoastra/fleet-ids@0.1.1':
+    resolution: {integrity: sha512-GxxpYKScNUaV67kqvt//rVQgoxXsvyitKMEulF2RxU0mrg4FX7nrfY/fmsmPRf4KnE6cYH0XEnlEy9Yq3jI44w==, tarball: https://npm.pkg.github.com/download/@isoastra/fleet-ids/0.1.1/1aa2fc71810f33ec7ecab022c1baee6b84aaa181}
+
+  '@isoastra/grid-core@0.1.0':
+    resolution: {integrity: sha512-j20dlQUQohWQBShvOvwSBpzdMF7/YzRm0zVXSdDlfSL+XUF5XjwXkW9YcsdfuANWg9SlZuaQ06WZKQQGyo+lKQ==, tarball: https://npm.pkg.github.com/download/@isoastra/grid-core/0.1.0/359da17610b24b1127b0ba4d37150c0256c1fc8d}
+
+  '@isoastra/grid-next@0.1.0':
+    resolution: {integrity: sha512-PGCimMID2fRANd+ihURBRMHke0NMnIqt2M7NtWGjzbtw5DsUHimEC6Ug6Ld/1EhHrdifq72tZaXKngbQEC2YWg==, tarball: https://npm.pkg.github.com/download/@isoastra/grid-next/0.1.0/6956fc61e54ab2954a28f184cd03b8c00ba953de}
+    peerDependencies:
+      next: ^15.0.0
+      react: ^19.0.0
+
+  '@isoastra/grid-react@0.1.0':
+    resolution: {integrity: sha512-yHyryCotwq73EcY2RRum3QyQ9WftgtPObXbqdNEjh/Ucp3djAuvzxa5UiYib4rs/3DPKQPp26m6SWbuuRvRA2A==, tarball: https://npm.pkg.github.com/download/@isoastra/grid-react/0.1.0/d5dc6b417b7751897b5566c8f2964bcf2a78c679}
+    peerDependencies:
+      react: ^19.0.0
 
   '@jridgewell/gen-mapping@0.3.13':
     resolution: {integrity: sha512-2kkt/7niJ6MgEPxF0bYdQ6etZaA+fQvDcLKckhy1yIQOzaoKjBBjSj63/aLVjYE3qhRt5dvM+uUyfCg6UKCBbA==}
@@ -3652,6 +3719,48 @@ snapshots:
 
   '@img/sharp-win32-x64@0.35.4':
     optional: true
+
+  '@isoastra/fleet-configured@0.1.3(drizzle-orm@0.45.2(@types/pg@8.23.1)(kysely@0.29.5)(pg@8.23.0))(next@15.5.25(@playwright/test@1.63.0)(@types/node@24.13.3)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(pg@8.23.0)(react@19.2.8)(zod@4.5.4)':
+    dependencies:
+      '@isoastra/fleet-events': 0.2.3(drizzle-orm@0.45.2(@types/pg@8.23.1)(kysely@0.29.5)(pg@8.23.0))(next@15.5.25(@playwright/test@1.63.0)(@types/node@24.13.3)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(pg@8.23.0)(react@19.2.8)(zod@4.5.4)
+      drizzle-orm: 0.45.2(@types/pg@8.23.1)(kysely@0.29.5)(pg@8.23.0)
+      pg: 8.23.0
+      zod: 4.5.4
+    transitivePeerDependencies:
+      - next
+      - react
+
+  '@isoastra/fleet-events@0.2.3(drizzle-orm@0.45.2(@types/pg@8.23.1)(kysely@0.29.5)(pg@8.23.0))(next@15.5.25(@playwright/test@1.63.0)(@types/node@24.13.3)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(pg@8.23.0)(react@19.2.8)(zod@4.5.4)':
+    dependencies:
+      drizzle-orm: 0.45.2(@types/pg@8.23.1)(kysely@0.29.5)(pg@8.23.0)
+      next: 15.5.25(@playwright/test@1.63.0)(@types/node@24.13.3)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      pg: 8.23.0
+      react: 19.2.8
+      zod: 4.5.4
+
+  '@isoastra/fleet-gates@0.1.3(next@15.5.25(@playwright/test@1.63.0)(@types/node@24.13.3)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))':
+    dependencies:
+      next: 15.5.25(@playwright/test@1.63.0)(@types/node@24.13.3)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+
+  '@isoastra/fleet-identity@0.1.1(better-auth@1.7.2(drizzle-kit@0.31.10)(drizzle-orm@0.45.2(@types/pg@8.23.1)(kysely@0.29.5)(pg@8.23.0))(next@15.5.25(@playwright/test@1.63.0)(@types/node@24.13.3)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(pg@8.23.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(vitest@3.2.7(@types/node@24.13.3)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.13)))':
+    dependencies:
+      '@node-rs/argon2': 2.2.0
+      better-auth: 1.7.2(drizzle-kit@0.31.10)(drizzle-orm@0.45.2(@types/pg@8.23.1)(kysely@0.29.5)(pg@8.23.0))(next@15.5.25(@playwright/test@1.63.0)(@types/node@24.13.3)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(pg@8.23.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(vitest@3.2.7(@types/node@24.13.3)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.13))
+
+  '@isoastra/fleet-ids@0.1.1': {}
+
+  '@isoastra/grid-core@0.1.0': {}
+
+  '@isoastra/grid-next@0.1.0(next@15.5.25(@playwright/test@1.63.0)(@types/node@24.13.3)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)':
+    dependencies:
+      '@isoastra/grid-core': 0.1.0
+      next: 15.5.25(@playwright/test@1.63.0)(@types/node@24.13.3)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      react: 19.2.8
+
+  '@isoastra/grid-react@0.1.0(react@19.2.8)':
+    dependencies:
+      '@isoastra/grid-core': 0.1.0
+      react: 19.2.8
 
   '@jridgewell/gen-mapping@0.3.13':
     dependencies:

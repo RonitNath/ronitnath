@@ -92,6 +92,13 @@
       "when": 1789093528830,
       "tag": "0012_event_photos",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1789122000000,
+      "tag": "0013_realtime_presence",
+      "breakpoints": true
     }
   ]
 }

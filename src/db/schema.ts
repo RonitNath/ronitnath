@@ -22,7 +22,9 @@ import {
   text,
   timestamp,
   uniqueIndex,
+  uuid,
 } from 'drizzle-orm/pg-core';
+import type { RealtimeSubscription } from '@isoastra/fleet-events/presence';
 
 const now = () => timestamp('created_at', { withTimezone: true }).notNull().defaultNow();
 
@@ -46,7 +48,11 @@ export const rsvpResponse = pgEnum('rsvp_response', ['yes', 'maybe', 'no']);
 /* Why two identities might be one person, and what was decided about it.
  * A score orders the operator's queue (R6) and never merges anything by
  * itself — a merge is always somebody's answer. */
-export const matchSignal = pgEnum('match_signal', ['verified_email', 'claimed_link', 'operator']);
+export const matchSignal = pgEnum('match_signal', [
+  'verified_email',
+  'claimed_link',
+  'operator',
+]);
 export const matchStatus = pgEnum('match_status', ['proposed', 'confirmed', 'rejected']);
 
 /* Every addressable subject is a party; person and organization extend it by
@@ -284,16 +290,47 @@ export const document = pgTable(
     /* Markdown-lite, as it was typed; the HTML is rendered on the way out by
      * the events `markup` module, so there is one place markup can be born. */
     body: text('body').notNull().default(''),
+    draftVersion: integer('draft_version').notNull().default(0),
+    titleVersion: integer('title_version').notNull().default(0),
+    bodyVersion: integer('body_version').notNull().default(0),
     /* Derived from the title once, at creation, and then it belongs to the
      * URL: a rewritten title does not break a link somebody already pasted. */
     slug: text('slug'),
     publishedAt: timestamp('published_at', { withTimezone: true }),
+    publishedTitle: text('published_title'),
+    publishedBody: text('published_body'),
+    publishedVersion: integer('published_version'),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
     createdAt: now(),
   },
   (t) => [
     index('document_owner_idx').on(t.ownerPartyId),
     uniqueIndex('document_slug_key').on(t.slug),
+  ],
+);
+
+export const documentRevision = pgTable(
+  'document_revision',
+  {
+    id: bigserial('id', { mode: 'number' }).primaryKey(),
+    documentId: integer('document_id')
+      .notNull()
+      .references(() => document.id, { onDelete: 'cascade' }),
+    version: integer('version').notNull(),
+    mutationId: text('mutation_id').notNull(),
+    kind: text('kind').notNull(),
+    fields: jsonb('fields').$type<string[]>().notNull().default([]),
+    title: text('title').notNull(),
+    body: text('body').notNull(),
+    previous: jsonb('previous'),
+    actorPersonId: integer('actor_person_id').references(() => person.id, {
+      onDelete: 'set null',
+    }),
+    createdAt: now(),
+  },
+  (t) => [
+    uniqueIndex('document_revision_mutation_key').on(t.documentId, t.mutationId),
+    index('document_revision_history_idx').on(t.documentId, t.version),
   ],
 );
 
@@ -481,7 +518,9 @@ export const authThrottle = pgTable(
     id: serial('id').primaryKey(),
     scope: text('scope').notNull(),
     key: text('key').notNull(),
-    windowStartedAt: timestamp('window_started_at', { withTimezone: true }).notNull().defaultNow(),
+    windowStartedAt: timestamp('window_started_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
     count: integer('count').notNull().default(0),
   },
   (t) => [uniqueIndex('auth_throttle_scope_key').on(t.scope, t.key)],
@@ -615,4 +654,70 @@ export const configuredVersion = pgTable(
     at: timestamp('at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [primaryKey({ columns: [t.orgId, t.key, t.version] })],
+);
+
+/* Browser presence is shared database state. Every process may hold sockets,
+ * but the rows below are what decides who is owed an update and what the
+ * operator console inspects. */
+export const realtimeView = pgTable(
+  'realtime_view',
+  {
+    id: uuid('id').primaryKey(),
+    visitorId: uuid('visitor_id').notNull(),
+    tabId: uuid('tab_id').notNull(),
+    sessionId: text('session_id'),
+    personId: text('person_id'),
+    path: text('path').notNull(),
+    title: text('title').notNull().default(''),
+    visible: boolean('visible').notNull().default(true),
+    visibleSections: jsonb('visible_sections').$type<string[]>().notNull().default([]),
+    visibleRows: jsonb('visible_rows').$type<string[]>().notNull().default([]),
+    interactedAt: timestamp('interacted_at', { withTimezone: true }),
+    connectedAt: timestamp('connected_at', { withTimezone: true }).notNull().defaultNow(),
+    lastHeartbeatAt: timestamp('last_heartbeat_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    leaseExpiresAt: timestamp('lease_expires_at', { withTimezone: true }).notNull(),
+    disconnectedAt: timestamp('disconnected_at', { withTimezone: true }),
+  },
+  (t) => [
+    uniqueIndex('realtime_view_visitor_tab_key').on(t.visitorId, t.tabId),
+    index('realtime_view_lease_idx').on(t.leaseExpiresAt),
+    index('realtime_view_person_idx').on(t.personId, t.lastHeartbeatAt),
+  ],
+);
+
+export const realtimeSubscription = pgTable(
+  'realtime_subscription',
+  {
+    viewId: uuid('view_id')
+      .notNull()
+      .references(() => realtimeView.id, { onDelete: 'cascade' }),
+    subscriptionKey: text('subscription_key').notNull(),
+    descriptor: jsonb('descriptor').$type<RealtimeSubscription>().notNull(),
+    authorizedAt: timestamp('authorized_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.viewId, t.subscriptionKey] })],
+);
+
+export const realtimeDelivery = pgTable(
+  'realtime_delivery',
+  {
+    id: uuid('id').primaryKey(),
+    viewId: uuid('view_id')
+      .notNull()
+      .references(() => realtimeView.id, { onDelete: 'cascade' }),
+    eventOrgId: text('event_org_id').notNull(),
+    eventSeq: bigint('event_seq', { mode: 'number' }).notNull(),
+    revision: text('revision').notNull(),
+    reason: text('reason').notNull(),
+    selectedAt: timestamp('selected_at', { withTimezone: true }).notNull().defaultNow(),
+    sentAt: timestamp('sent_at', { withTimezone: true }),
+    receivedAt: timestamp('received_at', { withTimezone: true }),
+    appliedAt: timestamp('applied_at', { withTimezone: true }),
+  },
+  (t) => [
+    uniqueIndex('realtime_delivery_view_event_key').on(t.viewId, t.eventOrgId, t.eventSeq),
+    index('realtime_delivery_view_idx').on(t.viewId, t.selectedAt),
+  ],
 );
