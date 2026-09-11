@@ -58,6 +58,7 @@
     "@types/react-dom": "19.2.7",
     "dotenv": "17.2.4",
     "drizzle-kit": "0.31.10",
+    "esbuild": "0.25.12",
     "eslint": "9.39.5",
     "eslint-config-next": "15.5.25",
     "eslint-config-prettier": "10.1.8",
