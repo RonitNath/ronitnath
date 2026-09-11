@@ -29,6 +29,8 @@ export const ID_TYPES = {
    * the bytes and the button that hides one — so it gets a prefix of its
    * own rather than travelling as a row number. */
   photo: 'h',
+  /* A private voice memo. */
+  memo: 'v',
   /* An audit row. The operator's Split names the merge it is undoing, and the
    * only name a merge has is the row that recorded it (R6). */
   audit: 'a',

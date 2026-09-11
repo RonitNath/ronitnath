@@ -721,3 +721,80 @@ export const realtimeDelivery = pgTable(
     index('realtime_delivery_view_idx').on(t.viewId, t.selectedAt),
   ],
 );
+
+/* Private voice memos. Media bytes live behind MediaStorage; these rows are
+ * the transactional identity, ownership and processing truth. */
+export const voiceMemo = pgTable(
+  'voice_memo',
+  {
+    id: serial('id').primaryKey(),
+    personId: integer('person_id').notNull().references(() => person.id, { onDelete: 'cascade' }),
+    localId: uuid('local_id').notNull(),
+    title: text('title').notNull(),
+    state: text('state').notNull().default('uploading'),
+    uploadId: text('upload_id'),
+    uploadComplete: boolean('upload_complete').notNull().default(false),
+    durableBytes: bigint('durable_bytes', { mode: 'number' }).notNull().default(0),
+    playableThroughMs: integer('playable_through_ms').notNull().default(0),
+    processingMode: text('processing_mode').notNull().default('probing'),
+    generation: integer('generation').notNull().default(0),
+    sourceKey: text('source_key').notNull(),
+    sourceMimeType: text('source_mime_type').notNull(),
+    sourceBytes: bigint('source_bytes', { mode: 'number' }).notNull(),
+    sourceFormat: text('source_format'),
+    sourceCodec: text('source_codec'),
+    durationMs: integer('duration_ms'),
+    hlsMasterKey: text('hls_master_key'),
+    fallbackKey: text('fallback_key'),
+    waveformKey: text('waveform_key'),
+    playbackPositionMs: integer('playback_position_ms').notNull().default(0),
+    failure: text('failure'),
+    trashedAt: timestamp('trashed_at', { withTimezone: true }),
+    createdAt: now(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('voice_memo_person_local_key').on(t.personId, t.localId),
+    index('voice_memo_person_created_idx').on(t.personId, t.createdAt),
+    uniqueIndex('voice_memo_upload_key').on(t.uploadId),
+    check('voice_memo_state', sql`${t.state} IN ('uploading','processing','playable','ready','failed','deleting')`),
+    check('voice_memo_processing_mode', sql`${t.processingMode} IN ('probing','streaming','after-upload','complete')`),
+  ],
+);
+
+export const voiceMemoJob = pgTable(
+  'voice_memo_job',
+  {
+    memoId: integer('memo_id').primaryKey().references(() => voiceMemo.id, { onDelete: 'cascade' }),
+    kind: text('kind').notNull().default('process'),
+    state: text('state').notNull().default('queued'),
+    attempts: integer('attempts').notNull().default(0),
+    availableAt: timestamp('available_at', { withTimezone: true }).notNull().defaultNow(),
+    leaseUntil: timestamp('lease_until', { withTimezone: true }),
+    leaseToken: uuid('lease_token'),
+    error: text('error'),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index('voice_memo_job_ready_idx').on(t.state, t.availableAt),
+    check('voice_memo_job_kind', sql`${t.kind} IN ('process','delete')`),
+    check('voice_memo_job_state', sql`${t.state} IN ('queued','running','failed')`),
+  ],
+);
+
+export const voiceMemoSegment = pgTable(
+  'voice_memo_segment',
+  {
+    memoId: integer('memo_id').notNull().references(() => voiceMemo.id, { onDelete: 'cascade' }),
+    generation: integer('generation').notNull(),
+    rendition: smallint('rendition').notNull(),
+    sequence: integer('sequence').notNull(),
+    durationMs: integer('duration_ms').notNull(),
+    key: text('key').notNull(),
+    createdAt: now(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.memoId, t.generation, t.rendition, t.sequence] }),
+    check('voice_memo_segment_rendition', sql`${t.rendition} IN (32,64)`),
+  ],
+);

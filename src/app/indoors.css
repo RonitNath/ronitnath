@@ -123,6 +123,134 @@
   color: var(--fg-subtle);
 }
 
+.memo-recorder,
+.memo-card {
+  max-width: 52rem;
+  border: 1px solid var(--border);
+  padding: 1rem;
+}
+
+.memo-recorder > input,
+.memo-rename input {
+  display: block;
+  width: min(100%, 28rem);
+  margin: 0.35rem 0 0.75rem;
+}
+
+.memo-heading,
+.memo-actions,
+.memo-controls,
+.memo-rename {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.memo-heading {
+  max-width: 52rem;
+  justify-content: space-between;
+}
+
+.memo-heading h2 {
+  margin: 0;
+}
+
+.memo-quality {
+  display: block;
+  margin: 1rem 0;
+}
+
+.memo-list {
+  display: grid;
+  gap: 1rem;
+}
+
+.memo-card .note {
+  margin: 0.25rem 0 0.75rem;
+}
+
+.memo-player > div {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0.5rem 0;
+}
+
+.memo-player .audio-waveform {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 4.5rem;
+  margin: 0.75rem 0 0.25rem;
+  overflow: hidden;
+  border-block: 1px solid var(--border);
+  color: var(--accent);
+  cursor: pointer;
+}
+
+.memo-player .audio-waveform svg,
+.memo-player .audio-waveform input,
+.memo-player .audio-waveform-placeholder {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.memo-player .audio-waveform input {
+  margin: 0;
+  opacity: 0;
+  cursor: ew-resize;
+}
+
+.memo-player .audio-waveform:focus-within {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.memo-player .audio-waveform-placeholder {
+  background: linear-gradient(to right, transparent, var(--border), transparent);
+}
+
+.memo-player button,
+.memo-player select {
+  min-height: 2rem;
+}
+
+.memo-player output {
+  display: block;
+  color: var(--fg-muted);
+  font-size: var(--text-2);
+}
+
+.level-meter {
+  width: min(100%, 28rem);
+  height: 0.4rem;
+  margin: 0.75rem 0;
+  background: var(--border);
+  overflow: hidden;
+}
+
+.level-meter span {
+  width: 100%;
+  height: 100%;
+  background: var(--accent);
+}
+
+.import-button {
+  display: inline-block;
+  margin-top: 0.75rem;
+  color: var(--accent);
+  cursor: pointer;
+}
+
+.import-button input {
+  display: block;
+  margin-top: 0.35rem;
+  color: var(--fg);
+}
+
 @media (max-width: 34rem) {
   .shell {
     flex-wrap: wrap;
