@@ -24,6 +24,7 @@ export function Shell({ principal, user }: { principal: Principal; user: string 
         <Link href={userPath(user, 'groups')}>Groups</Link>
         <Link href={userPath(user, 'documents')}>Documents</Link>
         <Link href={userPath(user, 'sessions')}>Sessions</Link>
+        <Link href={userPath(user, 'billing')}>Billing</Link>
         {principal.isOperator ? <Link href={operatorPath()}>Platform</Link> : null}
       </nav>
       <span className="who">{principal.displayName}</span>

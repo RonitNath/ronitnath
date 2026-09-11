@@ -129,6 +129,7 @@ const PAGES = [
   `${CONSOLE}/audit`,
   `${CONSOLE}/operators`,
   `${CONSOLE}/deployment`,
+  `${CONSOLE}/billing`,
 ];
 
 test('every platform page is the operator’s, and nobody else’s', async ({ page, browser }) => {

@@ -11,7 +11,10 @@ import { drizzle } from 'drizzle-orm/node-postgres';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import { sql } from 'drizzle-orm';
 import { Pool } from 'pg';
+import { config as loadEnv } from 'dotenv';
 import { withMigrationLock } from '@isoastra/fleet-delivery/postgres';
+
+loadEnv({ path: ['.env.local', '.env'], quiet: true });
 
 const folder = join(process.cwd(), 'drizzle');
 

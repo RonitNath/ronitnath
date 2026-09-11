@@ -14,6 +14,7 @@ import {
   index,
   integer,
   jsonb,
+  numeric,
   pgEnum,
   pgTable,
   primaryKey,
@@ -750,3 +751,39 @@ export const deliveryRunEvent = pgTable(
   },
   (t) => [primaryKey({ columns: [t.runId, t.seq] }), index('delivery_event_at_idx').on(t.at)],
 );
+
+export const billingSeller = pgTable('billing_seller', {
+  id: text('id').primaryKey(), name: text('name').notNull(), bookId: text('book_id').notNull().unique(),
+  chart: jsonb('chart').notNull(), enabled: boolean('enabled').notNull().default(false), createdAt: now(),
+});
+export const billingOfferVersion = pgTable('billing_offer_version', {
+  namespace: text('namespace').notNull(), id: text('id').notNull(), version: integer('version').notNull(),
+  sellerId: text('seller_id').notNull().references(() => billingSeller.id), terms: jsonb('terms').notNull(),
+  publishedAt: timestamp('published_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [primaryKey({ columns: [t.namespace, t.id, t.version] })]);
+export const billingOffer = pgTable('billing_offer', {
+  namespace: text('namespace').notNull(), id: text('id').notNull(), publishedVersion: integer('published_version').notNull(),
+  available: boolean('available').notNull(), updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [primaryKey({ columns: [t.namespace, t.id] })]);
+export const billingOrder = pgTable('billing_order', {
+  id: uuid('id').primaryKey().defaultRandom(), operationKey: text('operation_key').notNull().unique(),
+  customerPersonId: integer('customer_person_id').notNull().references(() => person.id), sellerId: text('seller_id').notNull().references(() => billingSeller.id),
+  offerNamespace: text('offer_namespace').notNull(), offerId: text('offer_id').notNull(), offerVersion: integer('offer_version').notNull(), invoiceId: text('invoice_id').notNull().unique(),
+  kind: text('kind').notNull(), state: text('state').notNull(), version: integer('version').notNull().default(1), renewsOrderId: uuid('renews_order_id'),
+  totalAtoms: numeric('total_atoms', { precision: 39, scale: 0, mode: 'bigint' }).notNull(), paidAtoms: numeric('paid_atoms', { precision: 39, scale: 0, mode: 'bigint' }).notNull().default(sql`0`),
+  fulfilledAt: timestamp('fulfilled_at', { withTimezone: true }), createdAt: now(),
+}, (t) => [index('billing_order_customer_idx').on(t.customerPersonId), index('billing_order_state_idx').on(t.state)]);
+export const billingMembership = pgTable('billing_membership', {
+  id: uuid('id').primaryKey().defaultRandom(), orderId: uuid('order_id').notNull().references(() => billingOrder.id),
+  state: text('state').notNull(), version: integer('version').notNull().default(1), serviceStartsAt: timestamp('service_starts_at', { withTimezone: true }).notNull(), serviceEndsAt: timestamp('service_ends_at', { withTimezone: true }).notNull(),
+  suspendedAt: timestamp('suspended_at', { withTimezone: true }), cancelAt: timestamp('cancel_at', { withTimezone: true }), pendingOfferId: text('pending_offer_id'), pendingOfferVersion: integer('pending_offer_version'), createdAt: now(),
+});
+export const billingReceiptClaim = pgTable('billing_receipt_claim', {
+  id: uuid('id').primaryKey().defaultRandom(), operationKey: text('operation_key').notNull().unique(), customerPersonId: integer('customer_person_id').notNull().references(() => person.id),
+  invoiceId: text('invoice_id').notNull(), amountAtoms: numeric('amount_atoms', { precision: 39, scale: 0, mode: 'bigint' }).notNull(), evidence: text('evidence').notNull(), state: text('state').notNull().default('pending'),
+  confirmedAt: timestamp('confirmed_at', { withTimezone: true }), createdAt: now(),
+}, (t) => [index('billing_receipt_state_idx').on(t.state)]);
+export const billingAdjustment = pgTable('billing_adjustment', {
+  id: uuid('id').primaryKey().defaultRandom(), operationKey: text('operation_key').notNull().unique(), orderId: uuid('order_id').notNull().references(() => billingOrder.id),
+  kind: text('kind').notNull(), amountAtoms: numeric('amount_atoms', { precision: 39, scale: 0, mode: 'bigint' }).notNull(), evidence: text('evidence'), createdAt: now(),
+});

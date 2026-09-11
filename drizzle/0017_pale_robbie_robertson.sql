@@ -1,0 +1,1 @@
+ALTER TABLE "billing_order" ADD COLUMN "renews_order_id" uuid;

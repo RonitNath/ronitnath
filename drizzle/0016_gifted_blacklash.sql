@@ -1,0 +1,1 @@
+ALTER TABLE "billing_membership" ADD COLUMN "pending_offer_id" text;

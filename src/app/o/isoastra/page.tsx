@@ -72,6 +72,9 @@ export default async function PlatformPage() {
           <li>
             <Link href={operatorPath('configuration')}>Configuration</Link>
           </li>
+          <li>
+            <Link href={operatorPath('billing')}>Billing</Link>
+          </li>
         </ul>
       </section>
     </main>
