@@ -21,23 +21,20 @@
   margin: 1.5rem auto 3rem;
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  background: color-mix(in oklab, var(--bg) 72%, transparent);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
+  background: color-mix(in oklab, var(--bg) 86%, transparent);
 }
+
+/* The sheet is deliberately a tint rather than a backdrop filter. Chromium
+ * can promote a filtered sheet into a viewport-wide compositor strip, leaving
+ * a hard horizontal seam at the sheet's bottom even though the sheet itself
+ * is narrow. The tint keeps the text grounded without changing the sky beyond
+ * the sheet's actual border. */
 
 /* A page whose content already has a measure of its own — the invitation's
  * 34rem — wants the sheet to be that measure plus its own padding, or the
  * glass reads as a frame around a card rather than as the page. */
 .sky-sheet.narrow {
   width: min(100% - 2rem, 38rem);
-}
-
-/* Without the blur the glass is a window, so it becomes the ground instead. */
-@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .sky-sheet {
-    background: var(--bg);
-  }
 }
 
 /* The chrome of a page with the sky behind it crosses the darkest end of the

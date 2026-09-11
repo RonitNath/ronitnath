@@ -43,13 +43,20 @@ async function main(): Promise<void> {
   }
 
   const db = database();
-  const userId = identityId(email);
+  const existingUser = await db
+    .select({ id: authSchema.user.id })
+    .from(authSchema.user)
+    .where(eq(authSchema.user.email, email))
+    .limit(1);
+  const userId = existingUser[0]?.id ?? identityId(email);
   const name = email.split('@')[0] ?? email;
 
-  await db
-    .insert(authSchema.user)
-    .values({ id: userId, name, email, emailVerified: true })
-    .onConflictDoNothing({ target: authSchema.user.id });
+  if (existingUser.length === 0) {
+    await db
+      .insert(authSchema.user)
+      .values({ id: userId, name, email, emailVerified: true })
+      .onConflictDoNothing({ target: authSchema.user.id });
+  }
 
   if (password) {
     const phc = await hashPassword(password);
