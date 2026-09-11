@@ -4,9 +4,14 @@ import Link from 'next/link';
 import { database, schema } from '@/db/client';
 import { publishedEvent } from '@/features/events/authority';
 import { AnswerForm, LocalTime } from '@/features/events/components/guest';
+import { Gallery } from '@/features/events/components/gallery';
+import { PhotoForm } from '@/features/events/components/photos';
 import { guestView } from '@/features/events/guest';
+import { mayAddPhoto, photosOpen } from '@/features/events/photos';
+import { photosOf } from '@/features/events/queries';
 import { readEventLink } from '@/features/events/links';
 import { readableWindow, zoneLabel } from '@/features/events/time';
+import { SkyBackdrop, SkySheet } from '@/features/sky/backdrop';
 import { currentPrincipal } from '@/features/auth/principal';
 import { ThemeToggle } from '@/app/theme-toggle';
 import { and, eq } from 'drizzle-orm';
@@ -52,8 +57,11 @@ export default async function GuestPage({
 
     /* A personal link names the guest; it opens this page only if that guest
      * was asked to this event. */
-    let viewer: { personId: number | null; name: string | null; plusOneAllowed: boolean } | null =
-      null;
+    let viewer: {
+      personId: number | null;
+      name: string | null;
+      plusOneAllowed: boolean;
+    } | null = null;
     if (link?.kind === 'event_personal') {
       const rows = await tx
         .select({
@@ -71,7 +79,11 @@ export default async function GuestPage({
         .limit(1);
       const row = rows[0];
       if (!row) return null;
-      viewer = { personId: link.targetId, name: row.displayName, plusOneAllowed: row.plusOneAllowed };
+      viewer = {
+        personId: link.targetId,
+        name: row.displayName,
+        plusOneAllowed: row.plusOneAllowed,
+      };
     } else if (link?.kind === 'event_open') {
       viewer = { personId: null, name: null, plusOneAllowed: true };
     } else if (principal) {
@@ -97,6 +109,9 @@ export default async function GuestPage({
     return { event, viewer, open: link?.kind === 'event_open' };
   });
 
+  /* The sky is behind every public page, and an invitation is the most public
+     page this site has: it is the one a stranger is handed. Prose over a
+     turning sky needs the sheet. */
   const header = (
     <header className="topbar">
       <ThemeToggle />
@@ -105,8 +120,11 @@ export default async function GuestPage({
   if (!seen) {
     return (
       <>
+        <SkyBackdrop />
         {header}
-        <Declined />
+        <SkySheet measure="narrow">
+          <Declined />
+        </SkySheet>
       </>
     );
   }
@@ -114,90 +132,108 @@ export default async function GuestPage({
   const view = await guestView(seen.event, seen.viewer);
   const answer = view.viewer?.answer ?? null;
   const said = answer?.response ?? null;
+  /* Pictures open when the evening starts and stay open for a fortnight past
+     its end; only a guest who said yes may add one. Before then the section is
+     not on the page at all. */
+  const taking = photosOpen(seen.event);
+  const photos = taking ? await photosOf(seen.event.id) : [];
   const server = `${readableWindow(view.startsAt, view.endsAt, view.timezone)} ${zoneLabel(view.startsAt, view.timezone)}`;
 
   return (
     <>
+      <SkyBackdrop />
       {header}
-      <main className="door invite" data-colour={view.colour ?? undefined}>
-        {view.posterUrl ? (
-          /* eslint-disable-next-line @next/next/no-img-element */
-          <img className="poster" src={view.posterUrl} alt="" />
-        ) : null}
-        <h1>{view.title}</h1>
-        <p className="lede">
-          <LocalTime
-            startsAt={view.startsAt.toISOString()}
-            endsAt={view.endsAt?.toISOString() ?? null}
-            timezone={view.timezone}
-            server={server}
-          />
-          {view.location ? <> · {view.location}</> : null}
-          <br />
-          <span className="host">{view.hostName} is hosting</span>
-          {view.viewer?.name ? <> · {view.viewer.name}</> : null}
-        </p>
+      <SkySheet measure="narrow">
+        <main className="door invite" data-colour={view.colour ?? undefined}>
+          {view.posterUrl ? (
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img className="poster" src={view.posterUrl} alt="" />
+          ) : null}
+          <h1>{view.title}</h1>
+          <p className="lede">
+            <LocalTime
+              startsAt={view.startsAt.toISOString()}
+              endsAt={view.endsAt?.toISOString() ?? null}
+              timezone={view.timezone}
+              server={server}
+            />
+            {view.location ? <> · {view.location}</> : null}
+            <br />
+            <span className="host">{view.hostName} is hosting</span>
+            {view.viewer?.name ? <> · {view.viewer.name}</> : null}
+          </p>
 
-        {view.bodyHtml ? (
-          /* Markdown-lite, escaped and rebuilt by src/features/events/markup.ts:
-           * the only tags here are the ones that file can emit. */
-          <div className="body" dangerouslySetInnerHTML={{ __html: view.bodyHtml }} />
-        ) : null}
+          {view.bodyHtml ? (
+            /* Markdown-lite, escaped and rebuilt by src/features/events/markup.ts:
+             * the only tags here are the ones that file can emit. */
+            <div className="body" dangerouslySetInnerHTML={{ __html: view.bodyHtml }} />
+          ) : null}
 
-        {said === 'yes' && view.address ? (
-          <section className="details">
-            <h2>Where</h2>
-            <p>{view.address}</p>
+          {said === 'yes' && view.address ? (
+            <section className="details">
+              <h2>Where</h2>
+              <p>{view.address}</p>
+              <p className="aside-line">
+                <a href={`/e/${view.slug}/calendar.ics${token ? `?l=${token}` : ''}`}>
+                  Add to calendar
+                </a>
+              </p>
+            </section>
+          ) : null}
+          {said === 'yes' && !view.address ? (
             <p className="aside-line">
               <a href={`/e/${view.slug}/calendar.ics${token ? `?l=${token}` : ''}`}>
                 Add to calendar
               </a>
             </p>
-          </section>
-        ) : null}
-        {said === 'yes' && !view.address ? (
-          <p className="aside-line">
-            <a href={`/e/${view.slug}/calendar.ics${token ? `?l=${token}` : ''}`}>Add to calendar</a>
-          </p>
-        ) : null}
-
-        <section className="who-list" data-blurred={view.blurred}>
-          <h2>
-            Who&rsquo;s coming
-            {view.room === 'full' ? <span className="full"> · full</span> : null}
-          </h2>
-          {said === 'yes' && view.room === 'full' ? (
-            <p className="note">The room is full. You are on the list past the line.</p>
           ) : null}
-          {view.guests.length === 0 ? (
-            <p className="note">Nobody has answered yet. You can be first.</p>
-          ) : (
-            <ul className="names">
-              {view.guests.map((guest, index) => (
-                <li key={index} className="name" data-shared={guest.shared}>
-                  {guest.label}
-                  {guest.plusOne > 0 ? ` +${guest.plusOne}` : null}
-                </li>
-              ))}
-              {view.more > 0 ? <li className="more">and {view.more} more</li> : null}
-            </ul>
-          )}
-        </section>
 
-        <AnswerForm
-          slug={view.slug}
-          token={token}
-          answer={said}
-          plusOne={answer?.plusOne ?? 0}
-          note={answer?.note ?? ''}
-          needsName={seen.open}
-          plusOneAllowed={view.plusOneAllowed}
-        />
+          <section className="who-list" data-blurred={view.blurred}>
+            <h2>
+              Who&rsquo;s coming
+              {view.room === 'full' ? <span className="full"> · full</span> : null}
+            </h2>
+            {said === 'yes' && view.room === 'full' ? (
+              <p className="note">The room is full. You are on the list past the line.</p>
+            ) : null}
+            {view.guests.length === 0 ? (
+              <p className="note">Nobody has answered yet. You can be first.</p>
+            ) : (
+              <ul className="names">
+                {view.guests.map((guest, index) => (
+                  <li key={index} className="name" data-shared={guest.shared}>
+                    {guest.label}
+                    {guest.plusOne > 0 ? ` +${guest.plusOne}` : null}
+                  </li>
+                ))}
+                {view.more > 0 ? <li className="more">and {view.more} more</li> : null}
+              </ul>
+            )}
+          </section>
 
-        <div className="aside">
-          <span>No account needed. Come back to this link to change your answer.</span>
-        </div>
-      </main>
+          {taking ? (
+            <Gallery slug={view.slug} token={token} photos={photos}>
+              {mayAddPhoto(seen.event, answer) ? (
+                <PhotoForm slug={view.slug} token={token} />
+              ) : null}
+            </Gallery>
+          ) : null}
+
+          <AnswerForm
+            slug={view.slug}
+            token={token}
+            answer={said}
+            plusOne={answer?.plusOne ?? 0}
+            note={answer?.note ?? ''}
+            needsName={seen.open}
+            plusOneAllowed={view.plusOneAllowed}
+          />
+
+          <div className="aside">
+            <span>No account needed. Come back to this link to change your answer.</span>
+          </div>
+        </main>
+      </SkySheet>
     </>
   );
 }

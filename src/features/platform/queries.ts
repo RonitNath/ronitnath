@@ -7,7 +7,7 @@
  * below name their kind and nothing else, so a password hash cannot reach a
  * page even by accident. */
 
-import { and, desc, eq, gt, ilike, inArray, isNull, or, sql, type SQL } from 'drizzle-orm';
+import { and, desc, eq, gt, ilike, inArray, isNull, lt, or, sql, type SQL } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 
 import { database, schema } from '@/db/client';
@@ -122,7 +122,16 @@ export interface AuditDetail {
   id: number;
   command: string;
   actorName: string | null;
+  /* Which of the three kinds of caller this was. A signed-in member has a
+   * name and a way in; a guest is a held person, named by somebody else and
+   * holding nothing but a link; a row with no person at all was written by
+   * the system — a script, a migration, the seed. One column cannot carry
+   * "who did this" here without saying which kind of id it is carrying. */
+  actorHeld: boolean | null;
   targetKind: string | null;
+  /* Which row, not just which kind of row. Without it the feed says that an
+   * event was published and leaves the operator to guess which event. */
+  targetId: number | null;
   at: Date;
   payload: unknown;
 }
@@ -250,9 +259,11 @@ export async function partyDetail(id: number): Promise<PartyDetail | null> {
       id: schema.audit.id,
       command: schema.audit.command,
       targetKind: schema.audit.targetKind,
+      targetId: schema.audit.targetId,
       at: schema.audit.at,
       payload: schema.audit.payload,
       actorName: schema.person.displayName,
+      actorHeld: schema.person.held,
     })
     .from(schema.audit)
     .leftJoin(schema.person, eq(schema.person.id, schema.audit.actorPersonId))
@@ -390,16 +401,22 @@ export async function listSessions(filter?: { personId?: number }): Promise<Sess
 
 export const AUDIT_PAGE = 50;
 
-/** The audit table read forward by id: the feed is append-only, so a cursor
- *  is the last id a page showed and nothing can slide underneath it. */
+/** The audit table, newest first, read by id.
+ *
+ *  Newest first because that is the question an operator has: what has this
+ *  deployment just done. Read by id rather than by offset because the table is
+ *  append-only — new rows land above the page rather than inside it, so a
+ *  cursor is the oldest id the previous page showed and nothing can slide
+ *  underneath it. A page numbered by offset would show the same row twice the
+ *  moment a command ran between two clicks. */
 export async function readAudit(filter: {
-  after?: number;
+  before?: number;
   actor?: number;
   command?: string;
   targetKind?: string;
 }): Promise<{ rows: AuditDetail[]; next: number | null }> {
   const clauses: SQL[] = [];
-  if (filter.after) clauses.push(gt(schema.audit.id, filter.after));
+  if (filter.before) clauses.push(lt(schema.audit.id, filter.before));
   if (filter.actor) clauses.push(eq(schema.audit.actorPersonId, filter.actor));
   if (filter.command) clauses.push(eq(schema.audit.command, filter.command));
   if (filter.targetKind) clauses.push(eq(schema.audit.targetKind, filter.targetKind));
@@ -409,14 +426,16 @@ export async function readAudit(filter: {
       id: schema.audit.id,
       command: schema.audit.command,
       targetKind: schema.audit.targetKind,
+      targetId: schema.audit.targetId,
       at: schema.audit.at,
       payload: schema.audit.payload,
       actorName: schema.person.displayName,
+      actorHeld: schema.person.held,
     })
     .from(schema.audit)
     .leftJoin(schema.person, eq(schema.person.id, schema.audit.actorPersonId))
     .where(clauses.length > 0 ? and(...clauses) : undefined)
-    .orderBy(schema.audit.id)
+    .orderBy(desc(schema.audit.id))
     .limit(AUDIT_PAGE + 1);
 
   const page = rows.slice(0, AUDIT_PAGE);

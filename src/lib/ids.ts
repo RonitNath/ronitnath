@@ -24,6 +24,11 @@ export const ID_TYPES = {
   /* A match candidate. It is a row in the model like any other and it reaches
    * a form on /app, so it gets a prefix rather than borrowing one. */
   match: 'm',
+  /* A picture on an event page. `p` is the person's, so a photograph takes
+   * the other letter in the word. It reaches a URL — the route that serves
+   * the bytes and the button that hides one — so it gets a prefix of its
+   * own rather than travelling as a row number. */
+  photo: 'h',
   /* An audit row. The operator's Split names the merge it is undoing, and the
    * only name a merge has is the row that recorded it (R6). */
   audit: 'a',

@@ -8,19 +8,9 @@
   --card-narrow: 31rem;
 }
 
-/* In the light theme the topbar crosses the darkest end of the dusk ramp,
- * where ordinary near-black ink is invisible. It re-tints its own token set
- * rather than each child overriding a colour, so anything added to the header
- * later inherits the correction. */
-:root[data-theme='light'] .topbar {
-  --fg: var(--on-dusk-fg);
-  --fg-muted: var(--on-dusk-muted);
-  --border: var(--on-dusk-border);
-  --accent: var(--on-dusk-accent);
-  --accent-hover: var(--on-dusk-fg);
-  --surface-glass: var(--on-dusk-glass);
-  --surface-glass-hover: var(--on-dusk-glass-hover);
-}
+/* The topbar's dusk re-tint is not here any more: every page with the sky
+ * behind it needs it, not only this one, so it lives with the backdrop
+ * (src/features/sky/sky-sheet.css) and keys on the starfield being present. */
 
 .home-hero {
   position: relative;

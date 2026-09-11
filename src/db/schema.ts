@@ -10,6 +10,7 @@ import {
   bigserial,
   boolean,
   check,
+  customType,
   index,
   integer,
   jsonb,
@@ -383,6 +384,55 @@ export const rsvp = pgTable(
     uniqueIndex('rsvp_event_person_key').on(t.eventId, t.personId),
     index('rsvp_event_idx').on(t.eventId),
   ],
+);
+
+/* Raw bytes, as a column. There is no object store in this deployment — no
+ * bucket, no CDN, no signed URL — and adding one to carry a handful of party
+ * photographs would be a second system to provision, secure and back up for a
+ * feature that the database this app already has can hold. A photograph is a
+ * few megabytes; `bytea` puts it in TOAST storage out of line with the row, so
+ * a query that does not name this column does not read it.
+ *
+ * The boundary this buys is worth more than the bytes it costs: a picture in
+ * the table is a picture inside the same transaction, the same backup and the
+ * same delete-cascade as the event it belongs to, and it cannot be reached by
+ * guessing a URL on a public bucket. */
+const bytea = customType<{ data: Buffer; driverData: Buffer }>({
+  dataType: () => 'bytea',
+});
+
+/* A picture a guest added after the evening started.
+ *
+ * `hidden_at` rather than a delete, which is the donor's ruling and the right
+ * one: taking a picture off the gallery is the host's everyday act, it has to
+ * be reversible, and the row is also the only thing that says the picture was
+ * ever there. A hidden picture is absent from the gallery's HTML rather than
+ * styled out of it — the host's act has to mean the bytes stop being named.
+ *
+ * `person_id` is who added it and is nullable only because a person may be
+ * merged or removed later; the picture stays with the event either way. */
+export const photo = pgTable(
+  'photo',
+  {
+    id: serial('id').primaryKey(),
+    eventId: integer('event_id')
+      .notNull()
+      .references(() => event.id, { onDelete: 'cascade' }),
+    personId: integer('person_id').references(() => person.id, { onDelete: 'set null' }),
+    /* One of the three the upload path accepts, and the one the bytes were
+     * sniffed as rather than the one the browser claimed. */
+    mimeType: text('mime_type').notNull(),
+    bytes: bytea('bytes').notNull(),
+    byteSize: integer('byte_size').notNull(),
+    /* Read out of the file's own header on the way in, so the grid can
+     * reserve the right box before an image loads. */
+    width: integer('width').notNull(),
+    height: integer('height').notNull(),
+    hiddenAt: timestamp('hidden_at', { withTimezone: true }),
+    hiddenBy: integer('hidden_by').references(() => person.id, { onDelete: 'set null' }),
+    createdAt: now(),
+  },
+  (t) => [index('photo_event_idx').on(t.eventId), index('photo_person_idx').on(t.personId)],
 );
 
 /* Two identities that might be one person. A row is written by whatever

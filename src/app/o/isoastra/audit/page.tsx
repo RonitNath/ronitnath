@@ -3,14 +3,51 @@ import Link from 'next/link';
 
 import { pretty, stamp } from '@/features/platform/format';
 import { auditCommands, listParties, readAudit } from '@/features/platform/queries';
-import { tryDecodeId } from '@/lib/ids';
+import { ID_TYPES, type IdType, encodeId, tryDecodeId } from '@/lib/ids';
 import { requireOperator } from '@/lib/tiers';
 import { operatorPath } from '@/lib/paths';
 
 export const metadata: Metadata = { title: 'Audit' };
 export const dynamic = 'force-dynamic';
 
-const TARGETS = ['person', 'organization', 'identity', 'session', 'link', 'match', 'document', 'event', 'group', 'party'];
+const TARGETS = [
+  'person',
+  'organization',
+  'identity',
+  'session',
+  'link',
+  'match',
+  'document',
+  'event',
+  'group',
+  'photo',
+  'party',
+];
+
+/* Which row the command was about, in the spelling the rest of the site uses
+ * for it. An internal integer is not an answer an operator can act on — it
+ * cannot be pasted into a URL or compared with anything they are looking at —
+ * so a target whose kind has a public id is shown as one. `party` and the
+ * kinds that never reach a URL keep their number, which is still better than
+ * the kind on its own. */
+function target(kind: string | null, id: number | null): string {
+  if (!kind) return '—';
+  if (id === null) return kind;
+  if (kind in ID_TYPES) {
+    try {
+      return encodeId(kind as IdType, id);
+    } catch {
+      return `#${id}`;
+    }
+  }
+  return `#${id}`;
+}
+
+/* Who ran it, and which of the three kinds of caller they were. */
+function actorOf(row: { actorName: string | null; actorHeld: boolean | null }): string {
+  if (row.actorName === null) return 'System';
+  return row.actorHeld ? `${row.actorName} (guest)` : row.actorName;
+}
 
 /* The feed, read forward by id. The table is append-only, so a cursor is the
  * last id the previous page showed and nothing can slide underneath it — a
@@ -19,13 +56,13 @@ const TARGETS = ['person', 'organization', 'identity', 'session', 'link', 'match
 export default async function AuditPage({
   searchParams,
 }: {
-  searchParams: Promise<{ after?: string; actor?: string; command?: string; target?: string }>;
+  searchParams: Promise<{ before?: string; actor?: string; command?: string; target?: string }>;
 }) {
   await requireOperator();
   const query = await searchParams;
   const actor = query.actor ? tryDecodeId('person', query.actor) : null;
   const { rows, next } = await readAudit({
-    after: query.after ? Number(query.after) : undefined,
+    before: query.before ? Number(query.before) : undefined,
     actor: actor ?? undefined,
     command: query.command || undefined,
     targetKind: query.target || undefined,
@@ -38,14 +75,14 @@ export default async function AuditPage({
   if (query.command) params.set('command', query.command);
   if (query.target) params.set('target', query.target);
   const nextParams = new URLSearchParams(params);
-  if (next !== null) nextParams.set('after', String(next));
+  if (next !== null) nextParams.set('before', String(next));
 
   return (
     <main className="indoors">
       <h1>Audit</h1>
       <p className="note">
-        One row per command, written inside that command&apos;s own transaction. Payloads carry
-        what happened and never a secret.
+        One row per command, written inside that command&apos;s own transaction, newest first.
+        Payloads carry what happened and never a secret.
       </p>
 
       <form className="filters" method="get">
@@ -97,6 +134,7 @@ export default async function AuditPage({
                 <th>Command</th>
                 <th>Actor</th>
                 <th>Target</th>
+                <th>Which</th>
                 <th>Payload</th>
               </tr>
             </thead>
@@ -106,8 +144,9 @@ export default async function AuditPage({
                   <td className="mono">{row.id}</td>
                   <td className="mono">{stamp(row.at)}</td>
                   <td>{row.command}</td>
-                  <td>{row.actorName ?? '—'}</td>
+                  <td>{actorOf(row)}</td>
                   <td>{row.targetKind ?? '—'}</td>
+                  <td className="mono">{target(row.targetKind, row.targetId)}</td>
                   <td>{row.payload ? <pre className="payload">{pretty(row.payload)}</pre> : '—'}</td>
                 </tr>
               ))}
@@ -119,14 +158,14 @@ export default async function AuditPage({
         ) : null}
         <p className="pager">
           {next === null ? (
-            <span className="note">The end of the feed.</span>
+            <span className="note">The beginning of the feed.</span>
           ) : (
-            <Link href={`${operatorPath('audit')}?${nextParams.toString()}`}>Next</Link>
+            <Link href={`${operatorPath('audit')}?${nextParams.toString()}`}>Older</Link>
           )}
-          {query.after ? (
+          {query.before ? (
             <>
               {' · '}
-              <Link href={`${operatorPath('audit')}?${params.toString()}`}>Back to the start</Link>
+              <Link href={`${operatorPath('audit')}?${params.toString()}`}>Back to the newest</Link>
             </>
           ) : null}
         </p>

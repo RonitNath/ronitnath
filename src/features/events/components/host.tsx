@@ -40,7 +40,9 @@ const EMPTY: FormState = {};
  *  is a subscription, not a widget, and a "live" badge beside a guest list is
  *  chrome explaining a mechanism rather than showing a fact. */
 export function GuestListStream({ stream }: { stream: string }) {
-  useRefreshOn(stream, ['rsvp']);
+  /* Pictures ride the same subscription: a guest adding one is the other
+     thing that changes this page while the host is looking at it. */
+  useRefreshOn(stream, ['rsvp', 'photo']);
   return null;
 }
 

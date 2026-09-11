@@ -47,8 +47,21 @@ function rememberLines(on: boolean): void {
  * asset fetches — and re-renders only the HTML parts: the callouts, the
  * caption and the controls. The instant is handed down from the server so SSR
  * and hydration agree about which sky this is; the client re-syncs from its
- * own clock against that offset from then on. */
-export function SkyStage({ serverEpochMs }: { serverEpochMs: number }) {
+ * own clock against that offset from then on.
+ *
+ * With `chrome` false none of those HTML parts exist. The stage still runs — it
+ * is what draws the sky — but nothing is rendered that could be read, hovered
+ * or clicked, so the constellation figures are held off too: the toggle that
+ * would turn them back on is one of the things that is gone. Behind a page
+ * whose content is something else, the instruments are a second interface
+ * arguing with the first. */
+export function SkyStage({
+  chrome = true,
+  serverEpochMs,
+}: {
+  chrome?: boolean;
+  serverEpochMs: number;
+}) {
   const skyRef = useRef<HTMLCanvasElement>(null);
   const flatRef = useRef<HTMLCanvasElement>(null);
   const globeRef = useRef<HTMLCanvasElement>(null);
@@ -70,7 +83,7 @@ export function SkyStage({ serverEpochMs }: { serverEpochMs: number }) {
   useEffect(() => {
     const created = new Stage(serverEpochMs);
     created.attach(skyRef.current, flatRef.current, globeRef.current);
-    created.setLines(storedLines());
+    created.setLines(chrome ? storedLines() : false);
     const unsubscribe = created.subscribe(setReadout);
     created.start();
     setStage(created);
@@ -95,7 +108,12 @@ export function SkyStage({ serverEpochMs }: { serverEpochMs: number }) {
       reduced.removeEventListener('change', onReduced);
       removeEventListener('resize', onResize);
     };
-  }, [serverEpochMs]);
+  }, [chrome, serverEpochMs]);
+
+  /* Not hidden and not pushed behind: absent, and taking no clicks. */
+  if (!chrome) {
+    return <SkyCanvas canvasRef={skyRef} flatRef={flatRef} />;
+  }
 
   return (
     <>

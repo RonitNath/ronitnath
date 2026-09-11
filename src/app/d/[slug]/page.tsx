@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation';
 
 import { publishedDocument } from '@/features/documents/queries';
 import { renderBody } from '@/features/events/markup';
+import { SkyBackdrop, SkySheet } from '@/features/sky/backdrop';
 import { ThemeToggle } from '../../theme-toggle';
 
 import '../../indoors.css';
@@ -23,30 +24,42 @@ export async function generateMetadata({
 
 /* An unpublished document, a document that was published and taken back, and
  * a slug nobody ever used are one answer. */
-export default async function PublicDocument({ params }: { params: Promise<{ slug: string }> }) {
+export default async function PublicDocument({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}) {
   const { slug } = await params;
   const document = await publishedDocument(slug);
   if (!document) notFound();
 
   return (
     <>
+      {/* A published document is a public page, so it stands where the rest of
+          them stand: on the sheet, over the sky. */}
+      <SkyBackdrop />
       <header className="topbar">
         <ThemeToggle />
       </header>
-      <main className="indoors reading">
-        <h1>{document.title}</h1>
-        <p className="note">
-          {document.ownerName}
-          {' · '}
-          <time dateTime={document.publishedAt.toISOString()}>
-            {document.publishedAt.toISOString().slice(0, 10)}
-          </time>
-        </p>
-        <article className="prose" dangerouslySetInnerHTML={{ __html: renderBody(document.body) }} />
-        <p className="aside-line">
-          <Link href="/">Ronit Nath</Link>
-        </p>
-      </main>
+      <SkySheet>
+        <main className="indoors reading">
+          <h1>{document.title}</h1>
+          <p className="note">
+            {document.ownerName}
+            {' · '}
+            <time dateTime={document.publishedAt.toISOString()}>
+              {document.publishedAt.toISOString().slice(0, 10)}
+            </time>
+          </p>
+          <article
+            className="prose"
+            dangerouslySetInnerHTML={{ __html: renderBody(document.body) }}
+          />
+          <p className="aside-line">
+            <Link href="/">Ronit Nath</Link>
+          </p>
+        </main>
+      </SkySheet>
     </>
   );
 }
