@@ -8,7 +8,7 @@ chmod 700 "$state"
 
 read -r action sha image migration extra <<<"${SSH_ORIGINAL_COMMAND:-}"
 [[ "${sha:-}" =~ ^[a-f0-9]{40}$ ]] || { echo 'invalid candidate' >&2; exit 64; }
-image_re='^ghcr\.io/ronitnath/ronitnath@sha256:[a-f0-9]{64}$'
+image_re='^ghcr\.io/ronitnath/ronitnath-app@sha256:[a-f0-9]{64}$'
 
 case "${action:-}" in
   preflight)

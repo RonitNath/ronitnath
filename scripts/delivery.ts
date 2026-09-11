@@ -436,9 +436,17 @@ async function publish() {
   );
 }
 
+function deploymentKeyPath(): string {
+  return join(
+    process.env.RUNNER_TEMP ?? '/tmp',
+    `ronitnath-deploy-${process.env.GITHUB_RUN_ID ?? 'local'}`,
+  );
+}
 async function deployKey(): Promise<string> {
-  const path = join(process.cwd(), '.delivery/deploy-key');
-  await writeFile(path, process.env.DEPLOY_SSH_KEY ?? '', { mode: 0o600 });
+  const path = deploymentKeyPath();
+  const value = process.env.DEPLOY_SSH_KEY?.trimEnd();
+  if (!value) throw new Error('DEPLOY_SSH_KEY is required');
+  await writeFile(path, `${value}\n`, { mode: 0o600 });
   return path;
 }
 async function remote(host: string, args: string[]) {
@@ -499,6 +507,7 @@ async function cleanup() {
   await ignore('docker', ['rm', '-f', webName]);
   await ignore('docker', ['rm', '-f', dbName]);
   await ignore('docker', ['network', 'rm', network]);
+  await rm(deploymentKeyPath(), { force: true });
 }
 
 async function main() {
