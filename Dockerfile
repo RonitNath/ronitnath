@@ -4,7 +4,8 @@ FROM node:24-alpine AS deps
 WORKDIR /app
 RUN corepack enable
 COPY package.json pnpm-lock.yaml .npmrc ./
-RUN pnpm install --frozen-lockfile
+RUN --mount=type=secret,id=npm_token,required=true \
+    sh -eu -c 'cp .npmrc /tmp/build.npmrc; printf "\n//npm.pkg.github.com/:_authToken=%s\n" "$(cat /run/secrets/npm_token)" >> /tmp/build.npmrc; NPM_CONFIG_USERCONFIG=/tmp/build.npmrc pnpm install --frozen-lockfile; rm -f /tmp/build.npmrc'
 
 FROM node:24-alpine AS build
 WORKDIR /app
