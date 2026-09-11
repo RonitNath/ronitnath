@@ -34,11 +34,19 @@ async function run(
   args: string[],
   options: { env?: NodeJS.ProcessEnv; cwd?: string; quiet?: boolean } = {},
 ) {
-  const result = await exec(file, args, {
-    env: { ...process.env, ...options.env },
-    cwd: options.cwd,
-    maxBuffer: 20 * 1024 * 1024,
-  });
+  let result: { stdout: string; stderr: string };
+  try {
+    result = await exec(file, args, {
+      env: { ...process.env, ...options.env },
+      cwd: options.cwd,
+      maxBuffer: 20 * 1024 * 1024,
+    });
+  } catch (error: unknown) {
+    const failed = error as { stdout?: string; stderr?: string };
+    if (failed.stdout) process.stdout.write(failed.stdout);
+    if (failed.stderr) process.stderr.write(failed.stderr);
+    throw error;
+  }
   if (!options.quiet) {
     if (result.stdout) process.stdout.write(result.stdout);
     if (result.stderr) process.stderr.write(result.stderr);
