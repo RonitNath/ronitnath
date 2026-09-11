@@ -15,9 +15,11 @@ async function signIn(page: Page) {
 }
 
 test.beforeAll(async () => {
-  await run('pnpm', ['seed:operator', '--email', OPERATOR, '--password', PASSWORD], {
-    cwd: process.cwd(),
-  });
+  await run(
+    './node_modules/.bin/tsx',
+    ['scripts/seed-operator.ts', '--email', OPERATOR, '--password', PASSWORD],
+    { cwd: process.cwd() },
+  );
 });
 
 test('an operator can inspect and drive an anonymous browser view', async ({ browser }) => {

@@ -43,8 +43,8 @@ async function run(
     });
   } catch (error: unknown) {
     const failed = error as { stdout?: string; stderr?: string };
-    if (failed.stdout) process.stdout.write(failed.stdout);
-    if (failed.stderr) process.stderr.write(failed.stderr);
+    if (!options.quiet && failed.stdout) process.stdout.write(failed.stdout);
+    if (!options.quiet && failed.stderr) process.stderr.write(failed.stderr);
     throw error;
   }
   if (!options.quiet) {
@@ -71,7 +71,11 @@ async function waitForDb() {
 }
 async function startDb() {
   await ignore('docker', ['rm', '-f', dbName]);
-  await ignore('docker', ['network', 'create', network]);
+  try {
+    await run('docker', ['network', 'inspect', network], { quiet: true });
+  } catch {
+    await run('docker', ['network', 'create', network], { quiet: true });
+  }
   await run(
     'docker',
     [
