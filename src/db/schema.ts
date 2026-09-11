@@ -25,6 +25,7 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core';
 import type { RealtimeSubscription } from '@isoastra/fleet-events/presence';
+import type { RunEvent, ReleaseManifest } from '@isoastra/fleet-delivery';
 
 const now = () => timestamp('created_at', { withTimezone: true }).notNull().defaultNow();
 
@@ -720,4 +721,32 @@ export const realtimeDelivery = pgTable(
     uniqueIndex('realtime_delivery_view_event_key').on(t.viewId, t.eventOrgId, t.eventSeq),
     index('realtime_delivery_view_idx').on(t.viewId, t.selectedAt),
   ],
+);
+
+/* Delivery telemetry is append-only. The run row is a compact projection for
+ * the inspector; GitHub artifacts and the runner journal remain recovery truth. */
+export const deliveryRun = pgTable(
+  'delivery_run',
+  {
+    id: uuid('id').primaryKey(),
+    requestedSha: text('requested_sha').notNull(),
+    state: text('state').notNull(),
+    lastSeq: bigint('last_seq', { mode: 'number' }).notNull().default(-1),
+    manifest: jsonb('manifest').$type<ReleaseManifest>(),
+    startedAt: timestamp('started_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+    finishedAt: timestamp('finished_at', { withTimezone: true }),
+  },
+  (t) => [index('delivery_run_started_idx').on(t.startedAt)],
+);
+
+export const deliveryRunEvent = pgTable(
+  'delivery_run_event',
+  {
+    runId: uuid('run_id').notNull().references(() => deliveryRun.id, { onDelete: 'cascade' }),
+    seq: bigint('seq', { mode: 'number' }).notNull(),
+    event: jsonb('event').$type<RunEvent>().notNull(),
+    at: timestamp('at', { withTimezone: true }).notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.runId, t.seq] }), index('delivery_event_at_idx').on(t.at)],
 );

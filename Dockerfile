@@ -1,13 +1,13 @@
 # syntax=docker/dockerfile:1
 
-FROM node:24-alpine AS deps
+FROM node:24-alpine@sha256:50c8e8ca1d27439048670df5883f32d57cf81cff6233222c893fd0d9884cbd81 AS deps
 WORKDIR /app
 RUN corepack enable
 COPY package.json pnpm-lock.yaml .npmrc ./
 RUN --mount=type=secret,id=npm_token,required=true \
     sh -eu -c 'cp .npmrc /tmp/build.npmrc; printf "\n//npm.pkg.github.com/:_authToken=%s\n" "$(cat /run/secrets/npm_token)" >> /tmp/build.npmrc; NPM_CONFIG_USERCONFIG=/tmp/build.npmrc pnpm install --frozen-lockfile; rm -f /tmp/build.npmrc'
 
-FROM node:24-alpine AS build
+FROM node:24-alpine@sha256:50c8e8ca1d27439048670df5883f32d57cf81cff6233222c893fd0d9884cbd81 AS build
 WORKDIR /app
 RUN corepack enable
 ARG APP_VERSION=dev
@@ -21,7 +21,7 @@ RUN pnpm build
 FROM build AS migrate
 CMD ["pnpm", "db:migrate"]
 
-FROM node:24-alpine AS runtime
+FROM node:24-alpine@sha256:50c8e8ca1d27439048670df5883f32d57cf81cff6233222c893fd0d9884cbd81 AS runtime
 WORKDIR /app
 ARG APP_VERSION=dev
 ENV NODE_ENV=production \

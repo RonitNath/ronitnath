@@ -1,7 +1,10 @@
 # Deploying ronitnath.com
 
-Manual, `docker compose`, one host. No CI deploys anything; a deploy is a
-person running these commands.
+The `deploy` branch is the production control plane. `@isoastra/fleet-delivery`
+validates and tests the exact SHA, publishes digest-bound runtime and migration
+artifacts, then rolls NYC before SFO through the restricted `host-command.sh`.
+Pushes to `main` store work and do not start Actions. The manual commands below
+are retained for recovery.
 
 - Service: `web`, host network, listening on `PORT=3140`. The edge proxies
   `ronitnath.com` to `127.0.0.1:3140`.

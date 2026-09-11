@@ -10,6 +10,7 @@ import { drizzle } from 'drizzle-orm/node-postgres';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import { sql } from 'drizzle-orm';
 import { Pool } from 'pg';
+import { withMigrationLock } from '@isoastra/fleet-delivery/postgres';
 
 const folder = join(process.cwd(), 'drizzle');
 
@@ -27,11 +28,24 @@ async function main(): Promise<void> {
   const last = journal.entries.at(-1);
   if (!last) throw new Error('no migrations in drizzle/meta/_journal.json');
 
-  const pool = new Pool({ connectionString, max: 1 });
+  /* One dedicated advisory-lock connection plus the migrator connection. */
+  const pool = new Pool({ connectionString, max: 2 });
   const db = drizzle(pool);
   try {
     const before = await applied(db);
-    await migrate(db, { migrationsFolder: folder });
+    const lock = await pool.connect();
+    try {
+      await withMigrationLock(lock, 7403140, {
+        mode: 'expand',
+        compatibleFrom: ['d2373d4823d43beb4a7d2b24741636ee7b449098'],
+        lockTimeoutMs: 30_000,
+        statementTimeoutMs: 120_000,
+        transactional: true,
+        backfillRequired: false,
+      }, () => migrate(db, { migrationsFolder: folder }));
+    } finally {
+      lock.release();
+    }
     const after = await applied(db);
     console.log(
       `migrate: ${after - before} applied, ${after} of ${journal.entries.length} total, at ${last.tag}`,
