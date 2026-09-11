@@ -29,7 +29,7 @@
   },
   "dependencies": {
     "@isoastra/fleet-configured": "0.1.3",
-    "@isoastra/fleet-delivery": "0.1.0",
+    "@isoastra/fleet-delivery": "0.1.1",
     "@isoastra/fleet-events": "0.2.3",
     "@isoastra/fleet-gates": "0.1.3",
     "@isoastra/fleet-identity": "0.1.1",

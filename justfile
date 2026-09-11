@@ -24,4 +24,4 @@ e2e:
     pnpm exec playwright test
 
 image tag=`git rev-parse --short HEAD`:
-    docker build --build-arg APP_VERSION={{tag}} -t ghcr.io/ronitnath/ronitnath:{{tag}} .
+    docker build --build-arg APP_VERSION={{tag}} -t ghcr.io/ronitnath/ronitnath-app:{{tag}} .

@@ -13,7 +13,7 @@ const postgresImage =
   'postgres:17-alpine@sha256:18cfe3ef5e6815560c98237d6216d1e5119702fb0f3894c8785dd58b8bbe5d73';
 const playwrightImage =
   'mcr.microsoft.com/playwright:v1.63.0-noble@sha256:eff16c30e6f3f4af0a03fa4b706120d5e9b0891c344a27d64559aff5900a4a27';
-const repository = 'ghcr.io/ronitnath/ronitnath';
+const repository = 'ghcr.io/ronitnath/ronitnath-app';
 const compatibilitySha = 'd2373d4823d43beb4a7d2b24741636ee7b449098';
 
 function sha(): string {

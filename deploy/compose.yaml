@@ -1,6 +1,6 @@
 services:
   web:
-    image: ${IMAGE:-ghcr.io/ronitnath/ronitnath:${TAG}}
+    image: ${IMAGE:-ghcr.io/ronitnath/ronitnath-app:${TAG}}
     container_name: ronitnath-web
     restart: unless-stopped
     network_mode: host

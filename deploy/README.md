@@ -66,7 +66,7 @@ accepts no address but the one on `OIDC_ALLOWLIST`.
 ```sh
 docker run --rm --network host \
   --env-file /data/crypt/ronitnath/web.env \
-  ghcr.io/ronitnath/ronitnath:"$TAG"-migrate \
+  ghcr.io/ronitnath/ronitnath-app:"$TAG"-migrate \
   pnpm seed:operator --email ronit@isoastra.com
 ```
 
@@ -85,16 +85,16 @@ Either build on the target:
 
 ```sh
 export TAG=$(git rev-parse --short HEAD)
-docker build --build-arg APP_VERSION="$TAG" -t ghcr.io/ronitnath/ronitnath:"$TAG" .
-docker build --target migrate -t ghcr.io/ronitnath/ronitnath:"$TAG"-migrate .
+docker build --build-arg APP_VERSION="$TAG" -t ghcr.io/ronitnath/ronitnath-app:"$TAG" .
+docker build --target migrate -t ghcr.io/ronitnath/ronitnath-app:"$TAG"-migrate .
 ```
 
 or pull what was built elsewhere:
 
 ```sh
 export TAG=<tag>
-docker pull ghcr.io/ronitnath/ronitnath:"$TAG"
-docker pull ghcr.io/ronitnath/ronitnath:"$TAG"-migrate
+docker pull ghcr.io/ronitnath/ronitnath-app:"$TAG"
+docker pull ghcr.io/ronitnath/ronitnath-app:"$TAG"-migrate
 ```
 
 ## Migrate, then start
@@ -104,7 +104,7 @@ Migrations never run at boot. Apply them from a one-off container first:
 ```sh
 docker run --rm --network host \
   --env-file /data/crypt/ronitnath/web.env \
-  ghcr.io/ronitnath/ronitnath:"$TAG"-migrate
+  ghcr.io/ronitnath/ronitnath-app:"$TAG"-migrate
 ```
 
 ### The star catalogue, once per environment
@@ -125,7 +125,7 @@ scp data/sky_star_detail.csv.zst alien:/data/crypt/ronitnath/
 docker run --rm --network host \
   --env-file /data/crypt/ronitnath/web.env \
   -v /data/crypt/ronitnath/sky_star_detail.csv.zst:/data/sky_star_detail.csv.zst:ro \
-  ghcr.io/ronitnath/ronitnath:"$TAG"-migrate \
+  ghcr.io/ronitnath/ronitnath-app:"$TAG"-migrate \
   node scripts/load-sky.mjs /data/sky_star_detail.csv.zst
 ```
 
@@ -143,7 +143,7 @@ sudo mv /tmp/sky_star_detail.delta.csv /data/crypt/ronitnath/
 docker run --rm --network host \
   --env-file /data/crypt/ronitnath/web.env \
   -v /data/crypt/ronitnath/sky_star_detail.delta.csv:/app/data/delta.csv:ro \
-  ghcr.io/ronitnath/ronitnath:"$TAG"-migrate \
+  ghcr.io/ronitnath/ronitnath-app:"$TAG"-migrate \
   node scripts/load-sky.mjs --delta /app/data/delta.csv
 ```
 
