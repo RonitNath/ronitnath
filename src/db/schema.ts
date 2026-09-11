@@ -721,3 +721,54 @@ export const realtimeDelivery = pgTable(
     index('realtime_delivery_view_idx').on(t.viewId, t.selectedAt),
   ],
 );
+
+/* Private voice memos. Media bytes live behind MediaStorage; these rows are
+ * the transactional identity, ownership and processing truth. */
+export const voiceMemo = pgTable(
+  'voice_memo',
+  {
+    id: serial('id').primaryKey(),
+    personId: integer('person_id').notNull().references(() => person.id, { onDelete: 'cascade' }),
+    localId: uuid('local_id').notNull(),
+    title: text('title').notNull(),
+    state: text('state').notNull().default('processing'),
+    sourceKey: text('source_key').notNull(),
+    sourceMimeType: text('source_mime_type').notNull(),
+    sourceBytes: bigint('source_bytes', { mode: 'number' }).notNull(),
+    sourceFormat: text('source_format'),
+    sourceCodec: text('source_codec'),
+    durationMs: integer('duration_ms'),
+    hlsMasterKey: text('hls_master_key'),
+    fallbackKey: text('fallback_key'),
+    waveformKey: text('waveform_key'),
+    playbackPositionMs: integer('playback_position_ms').notNull().default(0),
+    failure: text('failure'),
+    trashedAt: timestamp('trashed_at', { withTimezone: true }),
+    createdAt: now(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('voice_memo_person_local_key').on(t.personId, t.localId),
+    index('voice_memo_person_created_idx').on(t.personId, t.createdAt),
+    check('voice_memo_state', sql`${t.state} IN ('processing','ready','failed','deleting')`),
+  ],
+);
+
+export const voiceMemoJob = pgTable(
+  'voice_memo_job',
+  {
+    memoId: integer('memo_id').primaryKey().references(() => voiceMemo.id, { onDelete: 'cascade' }),
+    kind: text('kind').notNull().default('process'),
+    state: text('state').notNull().default('queued'),
+    attempts: integer('attempts').notNull().default(0),
+    availableAt: timestamp('available_at', { withTimezone: true }).notNull().defaultNow(),
+    leaseUntil: timestamp('lease_until', { withTimezone: true }),
+    error: text('error'),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index('voice_memo_job_ready_idx').on(t.state, t.availableAt),
+    check('voice_memo_job_kind', sql`${t.kind} IN ('process','delete')`),
+    check('voice_memo_job_state', sql`${t.state} IN ('queued','running','failed')`),
+  ],
+);

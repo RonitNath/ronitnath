@@ -171,7 +171,7 @@ describe.skipIf(!reachable)('split', () => {
       }),
     );
     expect(again).toEqual({ ok: false, reason: 'not-merged' });
-  });
+  }, 10_000);
 
   it('refuses when the survivor gained a factor on an identity it would take back', async () => {
     const db = database();

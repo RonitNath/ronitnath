@@ -1,0 +1,5 @@
+packages:
+  - .
+  - ../grid-voice-memos/packages/audio-core
+  - ../grid-voice-memos/packages/audio-react
+  - ../grid-voice-memos/packages/audio-node
