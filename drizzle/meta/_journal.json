@@ -85,6 +85,13 @@
       "when": 1789092340824,
       "tag": "0011_auth_rate_limit",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1789093528830,
+      "tag": "0012_event_photos",
+      "breakpoints": true
     }
   ]
 }

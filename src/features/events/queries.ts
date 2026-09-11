@@ -269,3 +269,68 @@ export async function hostName(personId: number): Promise<string | null> {
     .limit(1);
   return rows[0]?.displayName ?? null;
 }
+
+export interface PhotoRow {
+  id: number;
+  personId: number | null;
+  addedBy: string | null;
+  mimeType: string;
+  width: number;
+  height: number;
+  hiddenAt: Date | null;
+  createdAt: Date;
+}
+
+/* The pictures of one event, newest first. The bytes are not in the select:
+ * `bytea` is stored out of line, and a gallery of twelve photographs would be
+ * fifty megabytes of Postgres traffic to draw twelve `<img>` tags that are
+ * each going to be fetched anyway.
+ *
+ * `hidden` is the host's own view. A guest is given the visible ones only —
+ * absent from the HTML rather than styled out of it, because the host's act of
+ * taking a picture down has to mean the bytes stop being named in anybody's
+ * page. */
+export async function photosOf(
+  eventId: number,
+  options: { hidden?: boolean } = {},
+): Promise<PhotoRow[]> {
+  const where = options.hidden
+    ? eq(schema.photo.eventId, eventId)
+    : and(eq(schema.photo.eventId, eventId), isNull(schema.photo.hiddenAt));
+  return database()
+    .select({
+      id: schema.photo.id,
+      personId: schema.photo.personId,
+      addedBy: schema.person.displayName,
+      mimeType: schema.photo.mimeType,
+      width: schema.photo.width,
+      height: schema.photo.height,
+      hiddenAt: schema.photo.hiddenAt,
+      createdAt: schema.photo.createdAt,
+    })
+    .from(schema.photo)
+    .leftJoin(schema.person, eq(schema.person.id, schema.photo.personId))
+    .where(where)
+    .orderBy(desc(schema.photo.createdAt), desc(schema.photo.id));
+}
+
+/** One picture's bytes, for the route that serves them. Null for a hidden
+ *  picture as well as for one that was never there: once the host takes it
+ *  down, the URL that was in somebody's history stops answering.
+ *
+ *  The host is the exception, and has to be: the page where a picture is put
+ *  back has to show which picture it is. */
+export async function photoBytes(
+  eventId: number,
+  photoId: number,
+  options: { hidden?: boolean } = {},
+): Promise<{ bytes: Buffer; mimeType: string } | null> {
+  const clauses = [eq(schema.photo.id, photoId), eq(schema.photo.eventId, eventId)];
+  if (!options.hidden) clauses.push(isNull(schema.photo.hiddenAt));
+  const rows = await database()
+    .select({ bytes: schema.photo.bytes, mimeType: schema.photo.mimeType })
+    .from(schema.photo)
+    .where(and(...clauses))
+    .limit(1);
+  return rows[0] ?? null;
+}

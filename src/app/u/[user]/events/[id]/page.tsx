@@ -13,8 +13,9 @@ import {
   PublishButton,
   RemoveInviteButton,
 } from '@/features/events/components/host';
+import { Gallery } from '@/features/events/components/gallery';
 import type { LinkState } from '@/features/people/invitations';
-import { listInvites, openLinkState } from '@/features/events/queries';
+import { listInvites, openLinkState, photosOf } from '@/features/events/queries';
 import { readableWindow, toWallClock, zoneLabel } from '@/features/events/time';
 import { encodeId, tryDecodeId } from '@/lib/ids';
 import { publicOrigin } from '@/lib/env';
@@ -47,6 +48,9 @@ export default async function EventPage({
   if (!event) notFound();
 
   const invites = await listInvites(event.id);
+  /* The host sees the pictures they have taken down as well as the ones on
+     the page: the control that puts one back has to show which one it is. */
+  const photos = await photosOf(event.id, { hidden: true });
   const open = await openLinkState(event.id);
   const counts = headcount(
     invites
@@ -180,6 +184,21 @@ export default async function EventPage({
         </div>
         {invites.length === 0 ? (
           <p className="empty">Nobody invited yet. The open link works without a list.</p>
+        ) : null}
+      </section>
+
+      {/* Guests add these from the event page once the evening has started.
+          Hiding one is reversible and is recorded: the row stays, the picture
+          stops being named in anybody's HTML. */}
+      <section>
+        <Gallery slug={event.slug} photos={photos} host={{ event: id }} />
+        {photos.length === 0 ? (
+          <>
+            <h2>Pictures</h2>
+            <p className="empty">
+              Nothing yet. Guests who said yes can add pictures once the evening has started.
+            </p>
+          </>
         ) : null}
       </section>
     </main>
