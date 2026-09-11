@@ -1,13 +1,22 @@
 # syntax=docker/dockerfile:1
 
-FROM node:24-alpine AS deps
+FROM node:24-alpine@sha256:50c8e8ca1d27439048670df5883f32d57cf81cff6233222c893fd0d9884cbd81 AS deps
 WORKDIR /app
 RUN corepack enable
 COPY package.json pnpm-lock.yaml .npmrc ./
+COPY vendor ./vendor
 RUN --mount=type=secret,id=npm_token,required=true \
     sh -eu -c 'cp .npmrc /tmp/build.npmrc; printf "\n//npm.pkg.github.com/:_authToken=%s\n" "$(cat /run/secrets/npm_token)" >> /tmp/build.npmrc; NPM_CONFIG_USERCONFIG=/tmp/build.npmrc pnpm install --frozen-lockfile; rm -f /tmp/build.npmrc'
 
-FROM node:24-alpine AS build
+FROM node:24-alpine@sha256:50c8e8ca1d27439048670df5883f32d57cf81cff6233222c893fd0d9884cbd81 AS prod-deps
+WORKDIR /app
+RUN corepack enable
+COPY package.json pnpm-lock.yaml .npmrc ./
+COPY vendor ./vendor
+RUN --mount=type=secret,id=npm_token,required=true \
+    sh -eu -c 'cp .npmrc /tmp/build.npmrc; printf "\n//npm.pkg.github.com/:_authToken=%s\n" "$(cat /run/secrets/npm_token)" >> /tmp/build.npmrc; NPM_CONFIG_USERCONFIG=/tmp/build.npmrc pnpm install --prod --frozen-lockfile; rm -f /tmp/build.npmrc'
+
+FROM node:24-alpine@sha256:50c8e8ca1d27439048670df5883f32d57cf81cff6233222c893fd0d9884cbd81 AS build
 WORKDIR /app
 RUN corepack enable
 ARG APP_VERSION=dev
@@ -19,9 +28,9 @@ RUN pnpm build
 # Migrations are applied by hand from a one-off container: this stage keeps the
 # full toolchain (drizzle-kit is a dev dependency) and never serves traffic.
 FROM build AS migrate
-CMD ["pnpm", "db:migrate"]
+CMD ["pnpm", "db:migrate:all"]
 
-FROM node:24-alpine AS runtime
+FROM node:24-alpine@sha256:50c8e8ca1d27439048670df5883f32d57cf81cff6233222c893fd0d9884cbd81 AS runtime
 WORKDIR /app
 ARG APP_VERSION=dev
 ENV NODE_ENV=production \
@@ -30,13 +39,15 @@ ENV NODE_ENV=production \
     PORT=3140 \
     HOSTNAME=0.0.0.0
 RUN apk add --no-cache curl
-COPY --from=build --chown=node:node /app/.next/standalone ./
-COPY --from=build --chown=node:node /app/.next/static ./.next/static
+COPY --from=prod-deps --chown=node:node /app/node_modules ./node_modules
+COPY --from=build --chown=node:node /app/package.json ./package.json
+COPY --from=build --chown=node:node /app/.next ./.next
 COPY --from=build --chown=node:node /app/public ./public
+COPY --from=build --chown=node:node /app/dist-runtime ./dist-runtime
 # Migrations travel with the image; a one-off container applies them by hand.
 COPY --from=build --chown=node:node /app/drizzle ./drizzle
 USER node
 EXPOSE 3140
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
   CMD curl -fsS "http://127.0.0.1:${PORT}/healthz" || exit 1
-CMD ["node", "server.js"]
+CMD ["node", "dist-runtime/runtime/supervisor.mjs"]

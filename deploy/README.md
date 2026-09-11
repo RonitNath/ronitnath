@@ -181,3 +181,8 @@ that is not purely additive. `sky_star_detail` is excluded from those dumps
 (`--exclude-table sky_star_detail`): it is 2.5 GB of data that is rebuilt from
 a file that is checksummed and kept, and a backup of it is a copy of something
 that is not lost.
+# Runtime note
+
+The image now starts an HTTP child and DBOS worker under one supervisor. Set a
+stable, distinct `REPLICA_ID` on each host, apply `pnpm db:migrate:all` from the
+migrate stage, and read `docs/dbos-runtime.md` before the first deployment.

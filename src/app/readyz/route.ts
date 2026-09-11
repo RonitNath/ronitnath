@@ -16,6 +16,7 @@
 
 import { sql } from 'drizzle-orm';
 import { database } from '@/db/client';
+import { runtimeStatus } from '@/lib/runtime';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -27,6 +28,10 @@ const REQUIRED = ['domain_event_assign_seq', 'domain_event_notify', 'domain_even
 
 export async function GET() {
   try {
+    const runtime = runtimeStatus();
+    if (runtime.draining || runtime.worker !== 'ready') {
+      return Response.json({ ok: false, runtime, version }, { status: 503, headers });
+    }
     const found = await database().execute<{ tgname: string }>(sql`
       select t.tgname from pg_trigger t
       join pg_class c on c.oid = t.tgrelid
@@ -36,7 +41,16 @@ export async function GET() {
     if (missing.length > 0) {
       return Response.json({ ok: false, missing, version }, { status: 503, headers });
     }
-    return Response.json({ ok: true, spine: 'ok', version }, { status: 200, headers });
+    const schemas = await database().execute<{ workflow: boolean; mail: boolean; generation: boolean }>(sql`
+      select
+        to_regclass('dbos.workflow_status') is not null as workflow,
+        to_regclass('public.mail_intent') is not null as mail,
+        exists(select 1 from information_schema.columns
+          where table_schema='public' and table_name='mail_intent' and column_name='dispatch_generation') as generation`);
+    if (!schemas.rows[0]?.workflow || !schemas.rows[0]?.mail || !schemas.rows[0]?.generation) {
+      return Response.json({ ok: false, schemas: 'incompatible', version }, { status: 503, headers });
+    }
+    return Response.json({ ok: true, spine: 'ok', workflow: 'ready', version }, { status: 200, headers });
   } catch (error) {
     console.error(JSON.stringify({ level: 'error', at: 'readyz', message: String(error) }));
     return Response.json({ ok: false, db: 'down', version }, { status: 503, headers });

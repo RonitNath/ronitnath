@@ -48,7 +48,10 @@ export function middleware(request: NextRequest) {
 
   /* Absolute from PUBLIC_ORIGIN, never from `request.url`: behind the edge
    * that is the container's bind address (fleet-conventions §1). */
-  const door = new URL('/auth/sign-in', process.env.PUBLIC_ORIGIN ?? request.url);
+  const forwardedHost = request.headers.get('x-forwarded-host');
+  const forwardedProtocol = request.headers.get('x-forwarded-proto') ?? 'https';
+  const origin = forwardedHost ? `${forwardedProtocol}://${forwardedHost}` : request.url;
+  const door = new URL('/auth/sign-in', origin);
   door.searchParams.set('next', pathname);
   return NextResponse.redirect(door);
 }

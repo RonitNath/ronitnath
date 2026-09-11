@@ -3,6 +3,8 @@ services:
     image: ghcr.io/ronitnath/ronitnath:${TAG}
     container_name: ronitnath-web
     restart: unless-stopped
+    init: true
+    stop_grace_period: 60s
     network_mode: host
     env_file: /data/crypt/ronitnath/web.env
     environment:
