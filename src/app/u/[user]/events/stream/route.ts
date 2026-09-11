@@ -86,6 +86,7 @@ export async function GET(
     db: database(),
     orgId: user,
     since,
+    signal: request.signal,
     reach: (row) => row.orgId === user,
   });
 }

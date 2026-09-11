@@ -26,9 +26,25 @@ export function pool(): Pool {
   if (globalForDb.rnPool) return globalForDb.rnPool;
   const connectionString = process.env.DATABASE_URL;
   if (!connectionString) throw new Error('DATABASE_URL is not set');
-  const created = new Pool({ connectionString, max: 10, idleTimeoutMillis: 30_000 });
+  const created = new Pool({
+    connectionString,
+    max: 10,
+    idleTimeoutMillis: 30_000,
+    connectionTimeoutMillis: 5_000,
+    query_timeout: 15_000,
+  });
+  created.on('error', (error) => {
+    console.error(JSON.stringify({ level: 'error', event: 'database.idle-error', message: error.message }));
+  });
   globalForDb.rnPool = created;
   return created;
+}
+
+export async function closePool(): Promise<void> {
+  const current = globalForDb.rnPool;
+  globalForDb.rnPool = undefined;
+  globalForDb.rnDb = undefined;
+  if (current) await current.end();
 }
 
 export function database(): NodePgDatabase<typeof schema> {

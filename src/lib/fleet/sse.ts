@@ -27,6 +27,7 @@
 
 import { eventsSince, latestSeq, type DomainEventRow, type Queryable } from './events';
 import { subscribe } from './stream';
+import { registerStream } from '@/lib/runtime';
 
 /** Beyond this many missed rows, a reset is cheaper for everyone than a
  *  replay — for the client, which is going to refetch the page anyway, and for
@@ -72,6 +73,7 @@ export interface StreamOptions {
   /** The client's last seen sequence. 0 or less means "start from now". */
   since: number;
   reach: Reach;
+  signal?: AbortSignal;
 }
 
 export function frameOf(row: DomainEventRow): EventFrame {
@@ -99,7 +101,7 @@ export function formatReset(seq: number): string {
 /** The whole endpoint: replay, live fan-out, coalescing, pings and teardown.
  *  A route handler is `return streamResponse({ db, orgId, since, reach })`
  *  after it has decided who is asking. */
-export function streamResponse({ db, orgId, since, reach }: StreamOptions): Response {
+export function streamResponse({ db, orgId, since, reach, signal }: StreamOptions): Response {
   const encoder = new TextEncoder();
   let sent = Number.isFinite(since) && since > 0 ? Math.floor(since) : 0;
 
@@ -115,6 +117,7 @@ export function streamResponse({ db, orgId, since, reach }: StreamOptions): Resp
    * read sets this flag and the read loops instead. */
   let reading = false;
   let again = false;
+  let unregisterDrain: (() => void) | null = null;
 
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
@@ -127,7 +130,14 @@ export function streamResponse({ db, orgId, since, reach }: StreamOptions): Resp
         if (coalesce) clearTimeout(coalesce);
         ping = null;
         coalesce = null;
+        unregisterDrain?.();
+        unregisterDrain = null;
       };
+      unregisterDrain = registerStream(() => {
+        teardown();
+        try { controller.close(); } catch { /* already closed */ }
+      });
+      signal?.addEventListener('abort', teardown, { once: true });
 
       const write = (text: string): boolean => {
         if (closed) return false;

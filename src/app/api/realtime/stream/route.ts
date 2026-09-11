@@ -1,5 +1,6 @@
 import { markSent, pendingDeliveries } from '@/features/realtime/server';
 import { subscribeDeliveries } from '@/features/realtime/delivery-stream';
+import { registerStream } from '@/lib/runtime';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -15,8 +16,24 @@ export async function GET(request: Request): Promise<Response> {
   let draining = false;
   let again = false;
   let closed = false;
+  let unregisterDrain: (() => void) | null = null;
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
+      const teardown = () => {
+        if (closed) return;
+        closed = true;
+        unsubscribe?.();
+        unsubscribe = null;
+        if (ping) clearInterval(ping);
+        ping = null;
+        unregisterDrain?.();
+        unregisterDrain = null;
+      };
+      unregisterDrain = registerStream(() => {
+        teardown();
+        try { controller.close(); } catch { /* already closed */ }
+      });
+      request.signal.addEventListener('abort', teardown, { once: true });
       const write = (text: string) => {
         if (!closed) controller.enqueue(encoder.encode(text));
       };
@@ -50,9 +67,12 @@ export async function GET(request: Request): Promise<Response> {
       }, 20_000);
     },
     cancel() {
+      if (closed) return;
       closed = true;
       unsubscribe?.();
       if (ping) clearInterval(ping);
+      unregisterDrain?.();
+      unregisterDrain = null;
     },
   });
   return new Response(stream, {
