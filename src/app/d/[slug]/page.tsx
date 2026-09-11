@@ -6,7 +6,7 @@ import { publishedDocument } from '@/features/documents/queries';
 import { renderBody } from '@/features/events/markup';
 import { ThemeToggle } from '../../theme-toggle';
 
-import '../../app/app.css';
+import '../../indoors.css';
 import './document.css';
 
 export const dynamic = 'force-dynamic';

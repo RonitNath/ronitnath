@@ -20,15 +20,27 @@ import { auth } from '@/features/auth/auth';
 import { currentPrincipal, OPERATOR_RESOURCE, type Principal } from '@/features/auth/principal';
 import { mergePersons } from '@/features/people/merge';
 import { SCORE } from '@/features/people/matches';
-import { tryDecodeId } from '@/lib/ids';
+import { encodeId, tryDecodeId } from '@/lib/ids';
 import { requireOperator } from '@/lib/tiers';
 import { disableCascade, enableRestore } from './disable';
 import { grantOperator as writeOperatorEdge, operatorPersonIds, refusesRevoke } from './operators';
 import { needsReauth, REAUTH_REQUIRED } from './reauth';
 import { splitMerge } from './split';
+import { emit } from '@/lib/fleet/events';
+import { operatorPath } from '@/lib/paths';
 
 const NO_SUCH = 'That is not something you can do here.';
-const PARTIES = '/platform/parties';
+const PARTIES = operatorPath('parties');
+
+/* An operator's commands are about somebody else, so they are published on
+ * *that* person's stream: the point of the event is that the person's own
+ * open tabs learn their sessions were ended or their account disabled. The
+ * operator console has no stream of its own — `/o/isoastra` is a static
+ * segment and does not reach the `/o/[org]` route — and adding one is a leg
+ * of its own rather than a side effect of this one. */
+function streamOf(personId: number): string {
+  return encodeId('person', personId);
+}
 
 function field(form: FormData, name: string): string {
   const value = form.get(name);
@@ -85,9 +97,15 @@ export async function reauthenticate(_prev: FormState, form: FormData): Promise<
       targetId: principal.personId,
       payload: { source: 'local', session: principal.sessionId },
     });
+    await emit(tx, {
+      orgId: streamOf(principal.personId),
+      resourceKind: 'person',
+      resourceId: encodeId('person', principal.personId),
+      kind: 'updated',
+    });
   });
 
-  revalidatePath('/platform');
+  revalidatePath(operatorPath());
   return { notice: 'Confirmed. The window is open for ten minutes.' };
 }
 
@@ -133,13 +151,22 @@ export async function proposeMatch(_prev: FormState, form: FormData): Promise<Fo
       targetId: rows[0]!.id,
       payload: { signal: 'operator', identity_a: identityA, identity_b: identityB },
     });
+    /* Both sides: the question appears on each person's own account page. */
+    for (const personId of [left, right]) {
+      await emit(tx, {
+        orgId: streamOf(personId),
+        resourceKind: 'person',
+        resourceId: encodeId('person', personId),
+        kind: 'updated',
+      });
+    }
     return 'written' as const;
   });
 
   if (outcome === 'no-identity') {
     return { error: 'One of those parties has no identity to match against.' };
   }
-  revalidatePath('/platform/matches');
+  revalidatePath(operatorPath('matches'));
   return outcome === 'already'
     ? { notice: 'That question is already open.' }
     : { notice: 'Proposed. Nothing has merged.' };
@@ -192,6 +219,16 @@ export async function ruleMatch(_prev: FormState, form: FormData): Promise<FormS
       .update(schema.match)
       .set({ status: 'confirmed', decidedAt: sql`now()`, decidedBy: me.personId })
       .where(eq(schema.match.id, matchId));
+    /* One person absorbs the other: the survivor's surfaces gain rows, and
+     * the absorbed person's stop being anybody's. */
+    for (const personId of [survivor, absorbed]) {
+      await emit(tx, {
+        orgId: streamOf(personId),
+        resourceKind: 'person',
+        resourceId: encodeId('person', personId),
+        kind: 'updated',
+      });
+    }
     return mergePersons(tx, {
       survivor,
       absorbed,
@@ -202,7 +239,7 @@ export async function ruleMatch(_prev: FormState, form: FormData): Promise<FormS
   });
 
   if (!ok) return { error: NO_SUCH };
-  revalidatePath('/platform/matches');
+  revalidatePath(operatorPath('matches'));
   revalidatePath(PARTIES);
   return { notice: 'Merged. The reason is in the audit.' };
 }
@@ -232,7 +269,7 @@ export async function split(_prev: FormState, form: FormData): Promise<FormState
   );
 
   if (outcome.ok) {
-    revalidatePath('/platform/matches');
+    revalidatePath(operatorPath('matches'));
     revalidatePath(PARTIES);
     return { notice: 'Split. The two people are two people again.' };
   }
@@ -268,8 +305,14 @@ export async function revokeSession(_prev: FormState, form: FormData): Promise<F
       targetId: target,
       payload: { person: rows[0]!.personId, by: 'operator' },
     });
+    await emit(tx, {
+      orgId: streamOf(rows[0]!.personId),
+      resourceKind: 'person',
+      resourceId: encodeId('person', rows[0]!.personId),
+      kind: 'updated',
+    });
   });
-  revalidatePath('/platform/sessions');
+  revalidatePath(operatorPath('sessions'));
   return { notice: 'Session ended.' };
 }
 
@@ -291,9 +334,15 @@ export async function revokeAllSessions(_prev: FormState, form: FormData): Promi
       targetId: target,
       payload: { sessions: rows.length },
     });
+    await emit(tx, {
+      orgId: streamOf(target),
+      resourceKind: 'person',
+      resourceId: encodeId('person', target),
+      kind: 'updated',
+    });
     return rows.length;
   });
-  revalidatePath('/platform/sessions');
+  revalidatePath(operatorPath('sessions'));
   revalidatePath(PARTIES);
   return { notice: `${ended} session${ended === 1 ? '' : 's'} ended.` };
 }
@@ -329,12 +378,18 @@ export async function disableParty(_prev: FormState, form: FormData): Promise<Fo
         links_revoked: cascade.links,
       },
     });
+    await emit(tx, {
+      orgId: streamOf(target),
+      resourceKind: 'person',
+      resourceId: encodeId('person', target),
+      kind: 'updated',
+    });
     return { sessions: cascade.sessions, links: cascade.links.length };
   });
 
   if (outcome === null) return { error: NO_SUCH };
   revalidatePath(PARTIES);
-  revalidatePath('/platform/sessions');
+  revalidatePath(operatorPath('sessions'));
   return {
     notice: `Disabled. ${outcome.sessions} session${
       outcome.sessions === 1 ? '' : 's'
@@ -360,6 +415,12 @@ export async function enableParty(_prev: FormState, form: FormData): Promise<For
       targetKind: 'party',
       targetId: target,
       payload: { links_restored: restored },
+    });
+    await emit(tx, {
+      orgId: streamOf(target),
+      resourceKind: 'person',
+      resourceId: encodeId('person', target),
+      kind: 'updated',
     });
     return true;
   });
@@ -402,11 +463,17 @@ export async function grantOperator(_prev: FormState, form: FormData): Promise<F
       targetId: target,
       payload: { reason: parsed.data.reason },
     });
+    await emit(tx, {
+      orgId: streamOf(target),
+      resourceKind: 'person',
+      resourceId: encodeId('person', target),
+      kind: 'updated',
+    });
     return true;
   });
 
   if (!ok) return { error: NO_SUCH };
-  revalidatePath('/platform/operators');
+  revalidatePath(operatorPath('operators'));
   return { notice: 'Granted.' };
 }
 
@@ -456,6 +523,12 @@ export async function revokeOperator(_prev: FormState, form: FormData): Promise<
       targetId: target,
       payload: { reason: parsed.data.reason },
     });
+    await emit(tx, {
+      orgId: streamOf(target),
+      resourceKind: 'person',
+      resourceId: encodeId('person', target),
+      kind: 'updated',
+    });
     return 'gone' as const;
   });
 
@@ -463,7 +536,7 @@ export async function revokeOperator(_prev: FormState, form: FormData): Promise<
     return { error: 'That is the last operator. Grant another one first.' };
   }
   if (outcome === 'no') return { error: NO_SUCH };
-  revalidatePath('/platform/operators');
+  revalidatePath(operatorPath('operators'));
   return { notice: 'Revoked.' };
 }
 

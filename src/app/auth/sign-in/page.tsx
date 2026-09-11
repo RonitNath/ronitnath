@@ -8,6 +8,8 @@ import { currentPrincipal } from '@/features/auth/principal';
 import { ThemeToggle } from '../../theme-toggle';
 
 import '../auth.css';
+import { encodeId } from '@/lib/ids';
+import { LEGACY_APP_ROOT, userPath } from '@/lib/paths';
 
 export const metadata: Metadata = { title: 'Sign in' };
 export const dynamic = 'force-dynamic';
@@ -24,9 +26,13 @@ export default async function SignInPage({
 }: {
   searchParams: Promise<{ next?: string; declined?: string }>;
 }) {
-  if (await currentPrincipal()) redirect('/app');
+  const principal = await currentPrincipal();
+  if (principal) redirect(userPath(encodeId('person', principal.personId)));
   const params = await searchParams;
-  const next = params.next && params.next.startsWith('/') ? params.next : '/app';
+  /* Nobody is signed in yet, so the fallback cannot name a person: `/app` is
+   * the stub that resolves the session and forwards to `/u/<me>` once there
+   * is one. */
+  const next = params.next && params.next.startsWith('/') ? params.next : LEGACY_APP_ROOT;
 
   return (
     <>

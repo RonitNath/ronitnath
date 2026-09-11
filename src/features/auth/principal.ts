@@ -21,10 +21,12 @@
  * a session id as its target it records it in the payload instead. */
 
 import { and, eq, isNull } from 'drizzle-orm';
-import { headers } from 'next/headers';
+import { cookies, headers } from 'next/headers';
 import { cache } from 'react';
 
 import { authSchema, database, schema } from '@/db/client';
+import { setRequestContext } from '@/lib/fleet/context';
+import { encodeId } from '@/lib/ids';
 import { auth } from './auth';
 
 /** The resource every operator grant is written against: `platform:0`. The
@@ -73,7 +75,27 @@ function asPersonId(value: string | null | undefined): number | null {
   return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
 }
 
+/* better-auth's session cookie is `<prefix>.session_token`, and a secure
+ * context puts `__Secure-` in front of that. Rather than restate the prefix —
+ * which is configuration, and would be wrong the day somebody changes it — the
+ * check below matches the part the library never varies. */
+const SESSION_COOKIE_SUFFIX = 'session_token';
+
 async function resolve(): Promise<Principal | null> {
+  /* The cookie is asked for first, and not only to save a round trip. Reading
+   * it is a dynamic API Next recognises, so a page that calls this is opted out
+   * of static generation at the point where it asks rather than deep inside
+   * better-auth — which is what made `next build` try to prerender the landing
+   * page and fail on a missing AUTH_SECRET in an image that has no `.env`.
+   *
+   * The saving is real too: an anonymous reader of the landing page now
+   * constructs no auth instance and opens no connection. Presence is not
+   * validity — a cookie that is there and means nothing is turned away below,
+   * by the library. */
+  const jar = await cookies();
+  const hasSession = jar.getAll().some((entry) => entry.name.endsWith(SESSION_COOKIE_SUFFIX));
+  if (!hasSession) return null;
+
   const found = await auth().api.getSession({ headers: await headers() });
   if (!found) return null;
   const session = found.session as typeof found.session & FleetSessionFields;
@@ -97,6 +119,8 @@ async function resolve(): Promise<Principal | null> {
   /* Two small reads rather than one join: which door this user holds, and
    * whether they operate the platform. Both are single-row index lookups and
    * both are wanted by almost every page. */
+  const actingOperatorId = asPersonId(session.actingOperatorId);
+
   const [federated, operator] = await Promise.all([
     db
       .select({ id: authSchema.account.id })
@@ -123,6 +147,16 @@ async function resolve(): Promise<Principal | null> {
       .limit(1),
   ]);
 
+  /* The seam the spine's request context is waiting for: every `emit` and
+   * every audit row wants the actor, and this is the one place per request
+   * that learns who it is. It is filled in here rather than passed down
+   * thirty call stacks (src/lib/fleet/context.ts). */
+  setRequestContext({
+    actorId: encodeId('person', row.personId),
+    actingOperatorId:
+      actingOperatorId === null ? null : encodeId('person', actingOperatorId),
+  });
+
   return {
     personId: row.personId,
     displayName: row.displayName,
@@ -132,7 +166,7 @@ async function resolve(): Promise<Principal | null> {
      * two cannot disagree in a way a reader would notice. */
     source: federated.length > 0 ? 'oidc' : 'local',
     isOperator: operator.length > 0,
-    actingOperatorId: asPersonId(session.actingOperatorId),
+    actingOperatorId,
     reauthenticatedAt: asDate(session.reauthenticatedAt),
   };
 }

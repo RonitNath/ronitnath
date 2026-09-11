@@ -35,15 +35,18 @@ lives in this repo's archival refs (read, never copy verbatim):
 
 Four audiences, and the boundary between them is the whole authorisation
 model. Every page/action names the tier it needs via one of four server
-helpers (`requireVisitor|requireMember|requireOrgOperator|requireOperator`);
-there is no per-route guard to forget.
+helpers (`requireVisitor|requireMember|requireSubjectPerson|requireOrgOperator|
+requireOperator`); there is no per-route guard to forget. The path says which
+object a page is about: `<user>` is a person's public id and `<org>` an
+organization's handle (fleet-conventions §1). `/app`, `/org/<handle>` and
+`/platform` are permanent redirects to the three above.
 
 | tier | who | surface |
 |---|---|---|
 | visitor | anonymous | `/` landing (orbiting sky), public pages, `/auth`, `/links/<token>`, `/e/<slug>` guest pages |
-| member | signed-in person | `/app` — profile, identities/factors, sessions, held people, invitations |
-| organization operator | admin/owner in an org | `/org/<handle>` — members, groups, invitations, shares |
-| platform operator | `operator` relation | `/platform` — parties, identities, matches, sessions, audit, disable |
+| member | signed-in person | `/u/<user>` — profile, identities/factors, sessions, held people, invitations |
+| organization operator | admin/owner in an org | `/o/<org>` — members, groups, invitations, shares |
+| platform operator | `operator` relation | `/o/isoastra` — parties, identities, matches, sessions, audit, disable |
 
 Identity (owner ruling 2026-09-05):
 - **Ronit signs in only via OIDC at `auth.isoastra.com`** (ZITADEL, Isoastra

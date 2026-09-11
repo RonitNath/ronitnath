@@ -20,17 +20,18 @@ import { auth } from '@/features/auth/auth';
 import { mirrorIdentity } from '@/features/auth/mirror';
 import { currentPrincipal } from '@/features/auth/principal';
 import { createPerson } from '@/features/people/provision';
-import { tryDecodeId } from '@/lib/ids';
+import { encodeId, tryDecodeId } from '@/lib/ids';
 import { CONTACT, allows, livePerson } from './authority';
 import { HANDLE_MAX, normalizeHandle } from './handles';
 import { claimUrl, mintClaimLink, spendClaimLink } from './invitations';
 import { mergePersons } from './merge';
 import { settleMatchesFor } from './matches';
+import { userPath } from '@/lib/paths';
+import { emit } from '@/lib/fleet/events';
 
 /* One sentence for everything a member may not do, whether because the row
  * is not theirs or because it is not there. */
 const NO_SUCH = 'That is not something you can do here.';
-const PEOPLE = '/app/people';
 
 function field(form: FormData, name: string): string {
   const value = form.get(name);
@@ -53,6 +54,21 @@ async function actor() {
   const principal = await currentPrincipal();
   if (!principal) redirect('/auth/sign-in');
   return { personId: principal.personId, isOperator: principal.isOperator };
+}
+/* Where the person who ran this command looks at what it changed. Their
+ * surfaces are addressed by their public id, so the path is a function of
+ * who is asking and cannot be a constant. */
+function home(me: { personId: number }, view = ''): string {
+  return userPath(encodeId('person', me.personId), view);
+}
+
+/* The stream a person's own changes are published on: their public id, which
+ * is also the `[user]` segment of every page that shows them. The event goes
+ * in the same transaction as the row it is about and the audit row beside it:
+ * an event written after the commit is an event a rollback cannot take back,
+ * and one written outside it is a change nobody is told about (§7). */
+function streamOf(me: { personId: number }): string {
+  return encodeId('person', me.personId);
 }
 
 /** HoldPerson. A member writes down somebody who has no account: a person row
@@ -115,10 +131,16 @@ export async function holdPerson(_prev: FormState, form: FormData): Promise<Form
       targetId: heldId,
       payload: { handle: handle.kind },
     });
+    await emit(tx, {
+      orgId: streamOf(me),
+      resourceKind: 'person',
+      resourceId: encodeId('person', heldId),
+      kind: 'created',
+    });
     return 'created' as const;
   });
 
-  revalidatePath(PEOPLE);
+  revalidatePath(home(me, 'people'));
   return outcome === 'held'
     ? { notice: `You already hold ${handle.raw}.` }
     : { notice: `${name} is yours to invite.` };
@@ -146,11 +168,17 @@ export async function invite(_prev: FormState, form: FormData): Promise<FormStat
       targetId: linkId,
       payload: { person: target },
     });
+    await emit(tx, {
+      orgId: streamOf(me),
+      resourceKind: 'person',
+      resourceId: encodeId('person', target),
+      kind: 'updated',
+    });
     return claimUrl(token);
   });
 
   if (minted === null) return { error: NO_SUCH };
-  revalidatePath(PEOPLE);
+  revalidatePath(home(me, 'people'));
   return { minted, notice: 'Copy it now — it is not stored and cannot be shown again.' };
 }
 
@@ -182,11 +210,17 @@ export async function revokeLink(_prev: FormState, form: FormData): Promise<Form
       targetKind: 'link',
       targetId: target,
     });
+    await emit(tx, {
+      orgId: streamOf(me),
+      resourceKind: 'person',
+      resourceId: encodeId('link', target),
+      kind: 'updated',
+    });
     return true;
   });
 
   if (!ok) return { error: NO_SUCH };
-  revalidatePath(PEOPLE);
+  revalidatePath(home(me, 'people'));
   return { notice: 'That link no longer works.' };
 }
 
@@ -207,6 +241,12 @@ export async function claimLink(_prev: FormState, form: FormData): Promise<FormS
       targetId: spent.linkId,
       payload: { held: spent.personId, person: principal.personId },
     });
+    await emit(tx, {
+      orgId: streamOf(principal),
+      resourceKind: 'person',
+      resourceId: encodeId('person', principal.personId),
+      kind: 'updated',
+    });
     return mergePersons(tx, {
       survivor: principal.personId,
       absorbed: spent.personId,
@@ -216,11 +256,11 @@ export async function claimLink(_prev: FormState, form: FormData): Promise<FormS
   });
 
   if (!ok) return { error: 'That link no longer works.' };
-  redirect('/app');
+  redirect(home(principal));
 }
 
 /** ConfirmMatch, the member's half: the same merge a claim performs, asked
- *  for from `/app` instead of from a link. */
+ *  for from the account page instead of from a link. */
 export async function confirmMatch(_prev: FormState, form: FormData): Promise<FormState> {
   const me = await actor();
   const target = tryDecodeId('match', field(form, 'match'));
@@ -243,13 +283,21 @@ export async function confirmMatch(_prev: FormState, form: FormData): Promise<Fo
       .select({ id: schema.identity.id, personId: schema.identity.personId })
       .from(schema.identity)
       .where(inArray(schema.identity.id, [candidate.identityA, candidate.identityB]));
-    const mine = sides.find((row) => row.personId === me.personId);
+    const own = sides.find((row) => row.personId === me.personId);
     const other = sides.find((row) => row.personId !== me.personId);
     /* One side has to be the asker's own. Ruling on a pair that is nobody's
      * own is the operator's, in R6. */
-    if (!mine || !other) return false;
+    if (!own || !other) return false;
 
     await settleMatchesFor(tx, { matchId: candidate.id, personId: me.personId });
+    /* A merge is two people becoming one; the survivor's own surfaces are what
+     * change, so the event goes on their stream. */
+    await emit(tx, {
+      orgId: streamOf(me),
+      resourceKind: 'person',
+      resourceId: encodeId('person', me.personId),
+      kind: 'updated',
+    });
     return mergePersons(tx, {
       survivor: me.personId,
       absorbed: other.personId,
@@ -259,8 +307,8 @@ export async function confirmMatch(_prev: FormState, form: FormData): Promise<Fo
   });
 
   if (!ok) return { error: NO_SUCH };
-  revalidatePath('/app');
-  revalidatePath(PEOPLE);
+  revalidatePath(home(me));
+  revalidatePath(home(me, 'people'));
   return { notice: 'Merged. What they held is yours.' };
 }
 
@@ -281,8 +329,14 @@ export async function setDisplayName(_prev: FormState, form: FormData): Promise<
       targetKind: 'person',
       targetId: me.personId,
     });
+    await emit(tx, {
+      orgId: streamOf(me),
+      resourceKind: 'person',
+      resourceId: encodeId('person', me.personId),
+      kind: 'updated',
+    });
   });
-  revalidatePath('/app');
+  revalidatePath(home(me));
   return { notice: 'Name changed.' };
 }
 
@@ -329,12 +383,18 @@ export async function removeIdentity(_prev: FormState, form: FormData): Promise<
       targetId: target,
       payload: { source: row.source },
     });
+    await emit(tx, {
+      orgId: streamOf(me),
+      resourceKind: 'person',
+      resourceId: encodeId('identity', target),
+      kind: 'deleted',
+    });
     return 'gone' as const;
   });
 
   if (outcome === 'no') return { error: NO_SUCH };
   if (outcome === 'last') return { error: 'That is the only way in. Add another one first.' };
-  revalidatePath('/app');
+  revalidatePath(home(me));
   return { notice: 'Removed.' };
 }
 
@@ -404,6 +464,12 @@ export async function claimByRegistering(_prev: FormState, form: FormData): Prom
       targetKind: 'link',
       targetId: spent.linkId,
       payload: { held: spent.personId, person: personId, registered: true },
+    });
+    await emit(tx, {
+      orgId: encodeId('person', personId),
+      resourceKind: 'person',
+      resourceId: encodeId('person', personId),
+      kind: 'created',
     });
     await mergePersons(tx, {
       survivor: personId,

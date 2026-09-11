@@ -2,6 +2,9 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 
 import { ResendForm } from '@/features/auth/components/forms';
+import { currentPrincipal } from '@/features/auth/principal';
+import { encodeId } from '@/lib/ids';
+import { userPath } from '@/lib/paths';
 import { ThemeToggle } from '../../theme-toggle';
 
 import '../auth.css';
@@ -23,6 +26,10 @@ export default async function VerifyPage({
   searchParams: Promise<{ error?: string }>;
 }) {
   const { error } = await searchParams;
+  /* The reader arrives here signed in when the link worked, so "your account"
+   * can name them; when it did not, there is nobody to name and the only way
+   * on is the door. */
+  const principal = await currentPrincipal();
 
   return (
     <>
@@ -44,7 +51,9 @@ export default async function VerifyPage({
           </p>
         )}
         <div className="aside">
-          <Link href="/app">Your account</Link>
+          {principal ? (
+            <Link href={userPath(encodeId('person', principal.personId))}>Your account</Link>
+          ) : null}
           <Link href="/auth/sign-in">Sign in</Link>
         </div>
       </main>

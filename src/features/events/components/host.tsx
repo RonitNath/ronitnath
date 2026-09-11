@@ -7,6 +7,7 @@
 import { useActionState, useState } from 'react';
 
 import type { FormState } from '@/features/auth/form-state';
+import { useRefreshOn } from '@/features/realtime/use-events';
 import {
   createEvent,
   invitePeople,
@@ -17,6 +18,31 @@ import {
 } from '../actions';
 
 const EMPTY: FormState = {};
+
+/** The guest list, live.
+ *
+ *  A host watching their own page while people answer on their own phones is
+ *  the site's first realtime surface, and it is the one that makes the case
+ *  for the spine: the numbers in the heading, the word beside each guest and
+ *  the line about capacity are all derived from rsvp rows, and a page that
+ *  only told the truth when somebody pressed reload was quietly wrong the
+ *  whole time it was open.
+ *
+ *  It listens on the host's own stream — every rsvp for an event they host is
+ *  emitted there — and filters to the one resource kind, so an invitation
+ *  being minted or a contact being renamed does not refetch this page. The
+ *  answer to an event is `router.refresh()`: the frame says only that
+ *  something moved, and the numbers are recomputed by the server component
+ *  through the same authorized read path that drew them, so nothing here ever
+ *  holds a fact that did not pass the gate.
+ *
+ *  It renders nothing. The list it refreshes is the page's own table — this
+ *  is a subscription, not a widget, and a "live" badge beside a guest list is
+ *  chrome explaining a mechanism rather than showing a fact. */
+export function GuestListStream({ stream }: { stream: string }) {
+  useRefreshOn(stream, ['rsvp']);
+  return null;
+}
 
 function Note({ state }: { state: FormState }) {
   if (state.error) {

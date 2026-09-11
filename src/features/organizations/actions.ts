@@ -34,8 +34,10 @@ import {
   rankOf,
   revoke,
 } from '@/lib/authority';
-import { tryDecodeId } from '@/lib/ids';
+import { encodeId, tryDecodeId } from '@/lib/ids';
 import { ORG_HANDLE_MAX, normalizeOrgHandle } from './handles';
+import { orgPath, userPath } from '@/lib/paths';
+import { emit } from '@/lib/fleet/events';
 
 const NO_SUCH = 'That is not something you can do here.';
 
@@ -49,9 +51,20 @@ async function actor() {
   if (!principal) redirect('/auth/sign-in');
   return { personId: principal.personId, isOperator: principal.isOperator };
 }
+/* Where the person who ran this command looks at what it changed. Their
+ * surfaces are addressed by their public id, so the path is a function of
+ * who is asking and cannot be a constant. */
+function home(me: { personId: number }, view = ''): string {
+  return userPath(encodeId('person', me.personId), view);
+}
 
-function orgPath(handle: string): string {
-  return `/org/${handle}`;
+/* The stream a person's own changes are published on: their public id, which
+ * is also the `[user]` segment of every page that shows them. The event goes
+ * in the same transaction as the row it is about and the audit row beside it:
+ * an event written after the commit is an event a rollback cannot take back,
+ * and one written outside it is a change nobody is told about (§7). */
+function streamOf(me: { personId: number }): string {
+  return encodeId('person', me.personId);
 }
 
 /** The path to revalidate after a command that changed an organization. */
@@ -115,11 +128,24 @@ export async function createOrganization(_prev: FormState, form: FormData): Prom
       targetId: id,
       payload: { handle },
     });
+    await emit(tx, {
+      orgId: handle,
+      resourceKind: 'organization',
+      resourceId: encodeId('organization', id),
+      kind: 'created',
+    });
+    /* The maker's own account page lists the organizations they belong to. */
+    await emit(tx, {
+      orgId: streamOf(me),
+      resourceKind: 'organization',
+      resourceId: encodeId('organization', id),
+      kind: 'created',
+    });
     return id;
   });
 
   if (made === null) return { error: 'That handle is taken.' };
-  revalidatePath('/app');
+  revalidatePath(home(me));
   redirect(orgPath(handle));
 }
 
@@ -147,6 +173,14 @@ export async function setOrganizationProfile(
       command: 'set-organization-profile',
       targetKind: 'organization',
       targetId: id,
+    });
+    /* An organization's stream is keyed by its handle, which is the segment in
+     * `/o/<org>` and so the thing its own SSE route listens on. */
+    await emit(tx, {
+      orgId: await handleOf(tx, id),
+      resourceKind: 'organization',
+      resourceId: encodeId('organization', id),
+      kind: 'updated',
     });
     return rows[0]!.handle;
   });
@@ -207,6 +241,14 @@ export async function inviteToOrganization(_prev: FormState, form: FormData): Pr
       targetKind: 'organization',
       targetId: id,
       payload: { person: heldId, role, link: linkId },
+    });
+    /* An organization's stream is keyed by its handle, which is the segment in
+     * `/o/<org>` and so the thing its own SSE route listens on. */
+    await emit(tx, {
+      orgId: await handleOf(tx, id),
+      resourceKind: 'organization',
+      resourceId: encodeId('organization', id),
+      kind: 'updated',
     });
     const org = await tx
       .select({ handle: schema.organization.handle })
@@ -276,6 +318,14 @@ export async function setRole(_prev: FormState, form: FormData): Promise<FormSta
       targetId: organizationId,
       payload: { person: personId, role },
     });
+    /* An organization's stream is keyed by its handle, which is the segment in
+     * `/o/<org>` and so the thing its own SSE route listens on. */
+    await emit(tx, {
+      orgId: await handleOf(tx, organizationId),
+      resourceKind: 'organization',
+      resourceId: encodeId('organization', organizationId),
+      kind: 'updated',
+    });
     return { at: await handleOf(tx, organizationId) };
   });
 
@@ -320,6 +370,14 @@ export async function removeMember(_prev: FormState, form: FormData): Promise<Fo
       targetId: organizationId,
       payload: { person: personId },
     });
+    /* An organization's stream is keyed by its handle, which is the segment in
+     * `/o/<org>` and so the thing its own SSE route listens on. */
+    await emit(tx, {
+      orgId: await handleOf(tx, organizationId),
+      resourceKind: 'organization',
+      resourceId: encodeId('organization', organizationId),
+      kind: 'updated',
+    });
     return { at: await handleOf(tx, organizationId) };
   });
 
@@ -347,6 +405,18 @@ export async function leaveOrganization(_prev: FormState, form: FormData): Promi
       targetKind: 'organization',
       targetId: id,
     });
+    await emit(tx, {
+      orgId: await handleOf(tx, id),
+      resourceKind: 'organization',
+      resourceId: encodeId('organization', id),
+      kind: 'updated',
+    });
+    await emit(tx, {
+      orgId: streamOf(me),
+      resourceKind: 'organization',
+      resourceId: encodeId('organization', id),
+      kind: 'updated',
+    });
     return 'done' as const;
   });
 
@@ -354,8 +424,8 @@ export async function leaveOrganization(_prev: FormState, form: FormData): Promi
     return { error: 'You are the last owner. Give it to somebody else first.' };
   }
   if (outcome === 'no') return { error: NO_SUCH };
-  revalidatePath('/app');
-  redirect('/app');
+  revalidatePath(home(me));
+  redirect(home(me));
 }
 
 /** Transfer, of the organization itself: the new owner is made one, and the
@@ -398,6 +468,14 @@ export async function transferOrganization(_prev: FormState, form: FormData): Pr
       targetId: organizationId,
       payload: { to: personId },
     });
+    /* An organization's stream is keyed by its handle, which is the segment in
+     * `/o/<org>` and so the thing its own SSE route listens on. */
+    await emit(tx, {
+      orgId: await handleOf(tx, organizationId),
+      resourceKind: 'organization',
+      resourceId: encodeId('organization', organizationId),
+      kind: 'updated',
+    });
     return { at: await handleOf(tx, organizationId) };
   });
 
@@ -434,6 +512,14 @@ export async function revokeInvitation(_prev: FormState, form: FormData): Promis
       targetKind: 'link',
       targetId: linkId,
       payload: { organization: id },
+    });
+    /* An organization's stream is keyed by its handle, which is the segment in
+     * `/o/<org>` and so the thing its own SSE route listens on. */
+    await emit(tx, {
+      orgId: await handleOf(tx, id),
+      resourceKind: 'organization',
+      resourceId: encodeId('organization', id),
+      kind: 'updated',
     });
     return { at: await handleOf(tx, id) };
   });

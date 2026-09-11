@@ -17,7 +17,7 @@
  * The last two are what makes sign-in-as and the ten-minute re-authentication
  * window session facts rather than a second cookie. */
 
-import { boolean, pgSchema, text, timestamp } from 'drizzle-orm/pg-core';
+import { bigint, boolean, integer, pgSchema, text, timestamp } from 'drizzle-orm/pg-core';
 
 export const authSchema = pgSchema('auth');
 
@@ -124,4 +124,20 @@ export const invitation = authSchema.table('invitation', {
   inviterId: text('inviter_id')
     .notNull()
     .references(() => user.id, { onDelete: 'cascade' }),
+});
+
+/* Rate limits, counted in the database because there are two replicas and a
+ * per-process counter is a limit of twice what it says. better-auth only ever
+ * applies these to its own client-initiated endpoints — a direct `auth.api`
+ * call bypasses them — and only in production, which is exactly why a missing
+ * table shows up in the image rather than on a development machine.
+ *
+ * `last_request` is a Unix millisecond count, not a timestamp: that is the
+ * shape the library reads and writes, and storing it as anything else means it
+ * cannot. */
+export const rateLimit = authSchema.table('rateLimit', {
+  id: text('id').primaryKey(),
+  key: text('key').notNull(),
+  count: integer('count').notNull(),
+  lastRequest: bigint('last_request', { mode: 'number' }).notNull(),
 });

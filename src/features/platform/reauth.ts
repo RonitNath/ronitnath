@@ -11,6 +11,7 @@
  * telling them leaves a control that silently does nothing. */
 
 import type { Principal } from '@/features/auth/principal';
+import { operatorPath } from '@/lib/paths';
 
 export const REAUTH_WINDOW_MINUTES = 10;
 
@@ -41,7 +42,7 @@ export function needsReauth(principal: Principal, now = new Date()): boolean {
 
 /** Where a refused command sends the operator back to. */
 export function reauthPath(next: string): string {
-  return `/platform/reauth?next=${encodeURIComponent(next)}`;
+  return `${operatorPath('reauth')}?next=${encodeURIComponent(next)}`;
 }
 
 /** SignInAs, switched off for a deployment that does not want it at all.

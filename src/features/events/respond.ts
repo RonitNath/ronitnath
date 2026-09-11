@@ -20,6 +20,8 @@ import { redirect } from 'next/navigation';
 import { z } from 'zod';
 
 import { database, schema } from '@/db/client';
+import { emit } from '@/lib/fleet/events';
+import { encodeId } from '@/lib/ids';
 import { recordAudit } from '@/features/auth/audit';
 import type { FormState } from '@/features/auth/form-state';
 import type { Transaction } from '@/features/auth/db';
@@ -201,6 +203,20 @@ export async function respond(_prev: FormState, form: FormData): Promise<FormSta
       targetKind: 'event',
       targetId: event.id,
       payload: { response: input.response, plusOne, via: input.token ? 'link' : 'session', room },
+    });
+    /* The one event a stranger causes, and the site's first live surface. It is
+     * published on the *host's* stream — an rsvp is a change to the guest list
+     * the host is looking at, and the guest has no stream of their own to watch —
+     * and it names the event rather than the rsvp row, because the event's public
+     * id is the thing the host's page is addressed by and the thing a refetch
+     * needs. Who answered is in the payload, which no reader trusts: the page
+     * refetches through the read path that already drew it. */
+    await emit(tx, {
+      orgId: encodeId('person', event.hostPersonId),
+      resourceKind: 'rsvp',
+      resourceId: encodeId('event', event.id),
+      kind: 'answered',
+      payload: { response: input.response, plusOne },
     });
     return { room, own: who.token } as const;
   });

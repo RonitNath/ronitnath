@@ -10,6 +10,17 @@ import { expect, test, type Page } from '@playwright/test';
  * database do not collide. */
 
 const MAIL_DIR = join(process.cwd(), '.mail');
+/* A signed-in reader's own surfaces are `/u/<their public id>` — there is no
+ * `/app` any more, and no constant a test could assert against. What a test
+ * can assert is the shape, and it learns the id the way a reader does: by
+ * being sent there. */
+const HOME = /\/u\/p_[A-Za-z0-9_-]+$/;
+
+/** One of the signed-in reader's own views, from wherever they are standing
+ *  on their own surfaces. */
+function view(page: Page, name: string): string {
+  return `${new URL(page.url()).pathname}/${name}`;
+}
 const PASSWORD = 'a-long-enough-password';
 
 function address(tag: string): string {
@@ -61,9 +72,20 @@ async function registerAndVerify(page: Page, name: string): Promise<string> {
 
 async function signIn(page: Page, email: string, password = PASSWORD) {
   await page.goto('/auth/sign-in');
+  /* Confirming an address signs the reader in, and the door does not stand
+     open to somebody who is already through it: it sends them to their own
+     surfaces. A test that means to prove a password has to leave first, and it
+     signs out and waits for the landing: the session row has to go, because
+     the sessions list counts it, and a sign-out still in flight would arrive
+     after the next sign-in and end that one instead. */
+  if (!page.url().includes('/auth/sign-in')) {
+    await page.getByRole('button', { name: 'Sign out' }).click();
+    await page.waitForURL(/\/$/);
+    await page.goto('/auth/sign-in');
+  }
   await page.locator('#sign-in-email').fill(email);
   await page.locator('#sign-in-password').fill(password);
-  await page.getByRole('button', { name: 'Sign in' }).click();
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click();
 }
 
 test('register, verify, sign in, list sessions, revoke another, sign out', async ({
@@ -73,7 +95,7 @@ test('register, verify, sign in, list sessions, revoke another, sign out', async
   const email = await registerAndVerify(page, 'Test Member');
 
   await signIn(page, email);
-  await expect(page).toHaveURL('/app');
+  await expect(page).toHaveURL(HOME);
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Test Member');
   await expect(page.getByText(email)).toBeVisible();
   /* A member is not an operator: the nav must not offer the surface. */
@@ -83,9 +105,9 @@ test('register, verify, sign in, list sessions, revoke another, sign out', async
   const other = await browser.newContext();
   const otherPage = await other.newPage();
   await signIn(otherPage, email);
-  await expect(otherPage).toHaveURL('/app');
+  await expect(otherPage).toHaveURL(HOME);
 
-  await page.goto('/app/sessions');
+  await page.goto(view(page, 'sessions'));
   await expect(page.getByRole('row')).toHaveCount(3); // header + two sessions
   await expect(page.getByText('this one')).toHaveCount(1);
   await page.getByRole('button', { name: 'Revoke' }).click();
@@ -104,7 +126,7 @@ test('register, verify, sign in, list sessions, revoke another, sign out', async
 test('the reset flow sets a new password and ends every open session', async ({ page }) => {
   const email = await registerAndVerify(page, 'Reset Member');
   await signIn(page, email);
-  await expect(page).toHaveURL('/app');
+  await expect(page).toHaveURL(HOME);
 
   await page.goto('/auth/reset');
   await page.getByLabel('Email').fill(email);
@@ -121,7 +143,7 @@ test('the reset flow sets a new password and ends every open session', async ({ 
   await expect(page).toHaveURL(/\/auth/);
 
   await signIn(page, email, 'an-entirely-new-password');
-  await expect(page).toHaveURL('/app');
+  await expect(page).toHaveURL(HOME);
 });
 
 test('an unknown address and a wrong password decline identically', async ({ page }) => {
@@ -153,18 +175,36 @@ test('an anonymous visitor is sent from /app to the door, and back afterwards', 
   await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible();
 });
 
-test('/platform is a 404 for a member, and is not linked at all', async ({ page }) => {
+test('the operator console is a 404 for a member, and is not linked at all', async ({ page }) => {
   const email = await registerAndVerify(page, 'Not An Operator');
   await signIn(page, email);
-  await expect(page).toHaveURL('/app');
+  await expect(page).toHaveURL(HOME);
 
-  const response = await page.goto('/platform');
+  const response = await page.goto('/o/isoastra');
   expect(response?.status()).toBe(404);
 });
 
-test('/platform is a 404 for an anonymous visitor too', async ({ page }) => {
-  const response = await page.goto('/platform');
+test('the operator console is a 404 for an anonymous visitor too', async ({ page }) => {
+  const response = await page.goto('/o/isoastra');
   expect(response?.status()).toBe(404);
+});
+
+test('the old paths still work, permanently', async ({ page }) => {
+  const email = await registerAndVerify(page, 'Old Link Member');
+  await signIn(page, email);
+  await expect(page).toHaveURL(HOME);
+
+  /* `/app/...` cannot be a static rewrite: where it goes depends on who is
+   * asking. The stub resolves the session and forwards for good. */
+  await page.goto('/app/people');
+  await expect(page).toHaveURL(/\/u\/p_[A-Za-z0-9_-]+\/people$/);
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('People');
+
+  /* `/platform` and `/org/<handle>` need no session and are answered by the
+   * edge of the app before a render. */
+  const console_ = await page.goto('/platform');
+  expect(console_?.status()).toBe(404);
+  await expect(page).toHaveURL('/o/isoastra');
 });
 
 /* The two ZITADEL route tests are gone with the routes. Better-auth owns the
@@ -195,7 +235,7 @@ test('a confirmation that never went out can be asked for again', async ({ page 
   await expect(page.getByText('Address confirmed')).toBeVisible();
 
   await signIn(page, email);
-  await expect(page).toHaveURL('/app');
+  await expect(page).toHaveURL(HOME);
 });
 
 test('registering when the mail transport fails still leaves an account', async ({ page }) => {

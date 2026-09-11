@@ -4,9 +4,19 @@
  * This is the site's own vocabulary — visitor, member, org operator, platform
  * operator — over the fleet's gates (`src/lib/fleet/gates.ts`), which is where
  * the questions are actually asked now. The two exist side by side because
- * the URL grammar has not moved yet: `requireOrgOperator` still speaks in
- * handles under `/org/...`, and `requireOrg` speaks in slugs under `/o/...`.
- * When the routes move, the pages move to the gates and this file goes.
+ * this site's sharing model is its own policy module: `requireOrgOperator`
+ * asks the `relation` table for admin-or-owner of one organization, which is
+ * what `/o/<org>` means here, and `requireOrg` asks the same table through
+ * `allows`. Both now speak the same handle under the same `/o/` prefix.
+ *
+ * `requireSubjectPerson` is the `/u/<user>` half of the contract's
+ * `requireSubject`. The fleet gate is org-scoped — it answers for
+ * `/o/<org>/u/<user>`, where an org admin may read a member — and this site's
+ * user-scoped product has no org in the path at all, so the same question
+ * (who is the path about, and may the asker read them?) is asked here with
+ * the platform tier as the only answer above "yourself". The shapes are
+ * deliberately the same so that the two collapse into one when the shared
+ * `@isoastra/authority` package lands.
  *
  * The session behind all of it is better-auth's: `currentPrincipal` resolves
  * the cookie to a person once per request, `operator` is still the relation
@@ -14,11 +24,15 @@
  * anyone else is a 404 — a visitor must not be able to tell an internal page
  * from a missing one. */
 
+import { and, eq, isNull } from 'drizzle-orm';
 import { notFound, redirect } from 'next/navigation';
 
+import { database, schema } from '@/db/client';
 import { currentPrincipal, type Principal } from '@/features/auth/principal';
 import { operatedOrganization, type OrganizationRow } from '@/features/organizations/queries';
 import { signInPath as doorPath, requireOperator as gateOperator } from '@/lib/fleet/gates';
+import { tryDecodeId } from '@/lib/ids';
+import { orgPath, userPath } from '@/lib/paths';
 
 export type Tier = 'visitor' | 'member' | 'orgOperator' | 'operator';
 
@@ -67,7 +81,7 @@ export async function requireMember(next?: string): Promise<MemberContext> {
  *  difference is the fact a stranger would like to learn. */
 export async function requireOrgOperator(handle: string): Promise<OrgOperatorContext> {
   const principal = await currentPrincipal();
-  if (principal === null) redirect(signInPath(`/org/${handle}`));
+  if (principal === null) redirect(signInPath(orgPath(handle)));
   const organization = await operatedOrganization(handle, {
     personId: principal.personId,
     isOperator: principal.isOperator,
@@ -79,4 +93,75 @@ export async function requireOrgOperator(handle: string): Promise<OrgOperatorCon
 export async function requireOperator(): Promise<MemberContext> {
   const { principal, personId } = await gateOperator();
   return { tier: 'operator', personId, principal };
+}
+
+export interface SubjectContext extends MemberContext {
+  /** The `[user]` segment exactly as it appears in the path, for building the
+   *  links a page draws: every one of them stays on the subject it is about. */
+  user: string;
+  /** Who the path is about, which is not always who is asking. */
+  subjectPersonId: number;
+  /** Their name, for the band that says whose page an operator is reading. */
+  subjectName: string;
+  /** What the page's reads are made as. The subject supplies the person —
+   *  an operator reading somebody else's page sees that person's rows, not
+   *  their own — and the actor supplies the platform standing, because that
+   *  is what the authority table already uses to let an operator past. */
+  reader: { personId: number; isOperator: boolean };
+  /** True while an operator is reading somebody else's page. */
+  viewingOther: boolean;
+}
+
+/** The gate on every `/u/<user>/…` page.
+ *
+ *  `user` is a person's public id. A visitor is sent to the door carrying
+ *  where they were going. A member reading their own pages is the ordinary
+ *  case. A platform operator may read another person's — that is what the
+ *  tier is for, and the audit row names both of them — and anybody else gets
+ *  the 404 that a person who does not exist gets, because the difference is
+ *  the fact a stranger would like to learn.
+ *
+ *  A malformed or unknown id is the same 404: a public id that does not
+ *  decode must not be distinguishable from one that decodes to somebody who
+ *  is not there. */
+export async function requireSubjectPerson(
+  user: string,
+  view = '',
+): Promise<SubjectContext> {
+  const principal = await currentPrincipal();
+  if (principal === null) redirect(signInPath(userPath(user, view)));
+
+  const subjectPersonId = tryDecodeId('person', user);
+  if (subjectPersonId === null) notFound();
+  let subjectName = principal.displayName;
+
+  if (subjectPersonId !== principal.personId) {
+    if (!principal.isOperator) notFound();
+    const rows = await database()
+      .select({ id: schema.person.id, displayName: schema.person.displayName })
+      .from(schema.person)
+      .innerJoin(schema.party, eq(schema.party.id, schema.person.id))
+      .where(
+        and(
+          eq(schema.person.id, subjectPersonId),
+          isNull(schema.person.mergedInto),
+          isNull(schema.party.disabledAt),
+        ),
+      )
+      .limit(1);
+    const found = rows[0];
+    if (!found) notFound();
+    subjectName = found.displayName;
+  }
+
+  return {
+    tier: principal.isOperator ? 'operator' : 'member',
+    personId: principal.personId,
+    principal,
+    user,
+    subjectPersonId,
+    subjectName,
+    reader: { personId: subjectPersonId, isOperator: principal.isOperator },
+    viewingOther: subjectPersonId !== principal.personId,
+  };
 }

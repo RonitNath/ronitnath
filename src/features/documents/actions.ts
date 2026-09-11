@@ -29,9 +29,10 @@ import {
   type Subject,
 } from '@/lib/authority';
 import { encodeId, tryDecodeId } from '@/lib/ids';
+import { userPath } from '@/lib/paths';
+import { emit } from '@/lib/fleet/events';
 
 const NO_SUCH = 'That is not something you can do here.';
-const DOCUMENTS = '/app/documents';
 
 function field(form: FormData, name: string): string {
   const value = form.get(name);
@@ -43,9 +44,24 @@ async function actor() {
   if (!principal) redirect('/auth/sign-in');
   return { personId: principal.personId, isOperator: principal.isOperator };
 }
+/* Where the person who ran this command looks at what it changed. Their
+ * surfaces are addressed by their public id, so the path is a function of
+ * who is asking and cannot be a constant. */
+function home(me: { personId: number }, view = ''): string {
+  return userPath(encodeId('person', me.personId), view);
+}
 
-function documentPath(id: number): string {
-  return `${DOCUMENTS}/${encodeId('document', id)}`;
+/* The stream a person's own changes are published on: their public id, which
+ * is also the `[user]` segment of every page that shows them. The event goes
+ * in the same transaction as the row it is about and the audit row beside it:
+ * an event written after the commit is an event a rollback cannot take back,
+ * and one written outside it is a change nobody is told about (§7). */
+function streamOf(me: { personId: number }): string {
+  return encodeId('person', me.personId);
+}
+
+function documentPath(me: { personId: number }, id: number): string {
+  return home(me, `documents/${encodeId('document', id)}`);
 }
 
 const createInput = z.object({ title: z.string().trim().min(1).max(200) });
@@ -96,14 +112,20 @@ export async function createDocument(_prev: FormState, form: FormData): Promise<
         targetId: row.id,
         payload: { owner: ownerPartyId, slug },
       });
+      await emit(tx, {
+        orgId: streamOf(me),
+        resourceKind: 'document',
+        resourceId: encodeId('document', row.id),
+        kind: 'created',
+      });
       return row.id;
     }
     return null;
   });
 
   if (made === null) return { error: NO_SUCH };
-  revalidatePath(DOCUMENTS);
-  redirect(documentPath(made));
+  revalidatePath(home(me, 'documents'));
+  redirect(documentPath(me, made));
 }
 
 /** EditDocument. Editor or above. */
@@ -126,11 +148,17 @@ export async function editDocument(_prev: FormState, form: FormData): Promise<Fo
       targetKind: 'document',
       targetId: id,
     });
+    await emit(tx, {
+      orgId: streamOf(me),
+      resourceKind: 'document',
+      resourceId: encodeId('document', id),
+      kind: 'updated',
+    });
     return true;
   });
 
   if (!ok) return { error: NO_SUCH };
-  revalidatePath(DOCUMENTS);
+  revalidatePath(home(me, 'documents'));
   return { notice: 'Saved.' };
 }
 
@@ -161,7 +189,7 @@ export async function setPublication(_prev: FormState, form: FormData): Promise<
   });
 
   if (outcome === null) return { error: NO_SUCH };
-  revalidatePath(DOCUMENTS);
+  revalidatePath(home(me, 'documents'));
   if (outcome) revalidatePath(`/d/${outcome}`);
   return { notice: publish ? 'Published.' : 'Unpublished.' };
 }
@@ -192,11 +220,17 @@ export async function shareDocument(_prev: FormState, form: FormData): Promise<F
       targetId: id,
       payload: { subject: `${subject.kind}:${subject.id}`, level },
     });
+    await emit(tx, {
+      orgId: streamOf(me),
+      resourceKind: 'document',
+      resourceId: encodeId('document', id),
+      kind: 'updated',
+    });
     return true;
   });
 
   if (!ok) return { error: NO_SUCH };
-  revalidatePath(DOCUMENTS);
+  revalidatePath(home(me, 'documents'));
   return { notice: 'Shared.' };
 }
 
@@ -217,11 +251,17 @@ export async function revokeShare(_prev: FormState, form: FormData): Promise<For
       targetId: id,
       payload: { subject: `${subject.kind}:${subject.id}` },
     });
+    await emit(tx, {
+      orgId: streamOf(me),
+      resourceKind: 'document',
+      resourceId: encodeId('document', id),
+      kind: 'updated',
+    });
     return true;
   });
 
   if (!ok) return { error: NO_SUCH };
-  revalidatePath(DOCUMENTS);
+  revalidatePath(home(me, 'documents'));
   return { notice: 'Revoked.' };
 }
 
@@ -254,10 +294,16 @@ export async function transferDocument(_prev: FormState, form: FormData): Promis
       targetId: id,
       payload: { to: `${subject.kind}:${subject.id}` },
     });
+    await emit(tx, {
+      orgId: streamOf(me),
+      resourceKind: 'document',
+      resourceId: encodeId('document', id),
+      kind: 'updated',
+    });
     return true;
   });
 
   if (!ok) return { error: NO_SUCH };
-  revalidatePath(DOCUMENTS);
+  revalidatePath(home(me, 'documents'));
   return { notice: 'Handed over.' };
 }

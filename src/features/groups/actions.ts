@@ -28,10 +28,11 @@ import {
   wouldCycle,
   type Subject,
 } from '@/lib/authority';
-import { tryDecodeId } from '@/lib/ids';
+import { encodeId, tryDecodeId } from '@/lib/ids';
+import { userPath } from '@/lib/paths';
+import { emit } from '@/lib/fleet/events';
 
 const NO_SUCH = 'That is not something you can do here.';
-const GROUPS = '/app/groups';
 
 function field(form: FormData, name: string): string {
   const value = form.get(name);
@@ -42,6 +43,21 @@ async function actor() {
   const principal = await currentPrincipal();
   if (!principal) redirect('/auth/sign-in');
   return { personId: principal.personId, isOperator: principal.isOperator };
+}
+/* Where the person who ran this command looks at what it changed. Their
+ * surfaces are addressed by their public id, so the path is a function of
+ * who is asking and cannot be a constant. */
+function home(me: { personId: number }, view = ''): string {
+  return userPath(encodeId('person', me.personId), view);
+}
+
+/* The stream a person's own changes are published on: their public id, which
+ * is also the `[user]` segment of every page that shows them. The event goes
+ * in the same transaction as the row it is about and the audit row beside it:
+ * an event written after the commit is an event a rollback cannot take back,
+ * and one written outside it is a change nobody is told about (§7). */
+function streamOf(me: { personId: number }): string {
+  return encodeId('person', me.personId);
 }
 
 const nameInput = z.object({ name: z.string().trim().min(1).max(120) });
@@ -89,11 +105,17 @@ export async function createGroup(_prev: FormState, form: FormData): Promise<For
       targetId: id,
       payload: { owner: ownerPartyId },
     });
+    await emit(tx, {
+      orgId: streamOf(me),
+      resourceKind: 'group',
+      resourceId: encodeId('group', id),
+      kind: 'created',
+    });
     return id;
   });
 
   if (made === null) return { error: NO_SUCH };
-  revalidatePath(GROUPS);
+  revalidatePath(home(me, 'groups'));
   return { notice: `${parsed.data.name} exists.` };
 }
 
@@ -114,11 +136,17 @@ export async function renameGroup(_prev: FormState, form: FormData): Promise<For
       targetKind: 'group',
       targetId: id,
     });
+    await emit(tx, {
+      orgId: streamOf(me),
+      resourceKind: 'group',
+      resourceId: encodeId('group', id),
+      kind: 'updated',
+    });
     return true;
   });
 
   if (!ok) return { error: NO_SUCH };
-  revalidatePath(GROUPS);
+  revalidatePath(home(me, 'groups'));
   return { notice: 'Renamed.' };
 }
 
@@ -157,12 +185,18 @@ export async function addToGroup(_prev: FormState, form: FormData): Promise<Form
       targetId: id,
       payload: { subject: `${subject.kind}:${subject.id}`, role },
     });
+    await emit(tx, {
+      orgId: streamOf(me),
+      resourceKind: 'group',
+      resourceId: encodeId('group', id),
+      kind: 'updated',
+    });
     return 'done' as const;
   });
 
   if (outcome === 'cycle') return { error: 'A group cannot contain itself.' };
   if (outcome === 'no') return { error: NO_SUCH };
-  revalidatePath(GROUPS);
+  revalidatePath(home(me, 'groups'));
   return { notice: 'Added.' };
 }
 
@@ -183,11 +217,17 @@ export async function removeFromGroup(_prev: FormState, form: FormData): Promise
       targetId: id,
       payload: { subject: `${subject.kind}:${subject.id}` },
     });
+    await emit(tx, {
+      orgId: streamOf(me),
+      resourceKind: 'group',
+      resourceId: encodeId('group', id),
+      kind: 'updated',
+    });
     return true;
   });
 
   if (!ok) return { error: NO_SUCH };
-  revalidatePath(GROUPS);
+  revalidatePath(home(me, 'groups'));
   return { notice: 'Removed.' };
 }
 
@@ -218,10 +258,16 @@ export async function deleteGroup(_prev: FormState, form: FormData): Promise<For
       targetKind: 'group',
       targetId: id,
     });
+    await emit(tx, {
+      orgId: streamOf(me),
+      resourceKind: 'group',
+      resourceId: encodeId('group', id),
+      kind: 'deleted',
+    });
     return true;
   });
 
   if (!ok) return { error: NO_SUCH };
-  revalidatePath(GROUPS);
+  revalidatePath(home(me, 'groups'));
   return { notice: 'Gone.' };
 }

@@ -1,5 +1,16 @@
 import { expect, test, type Page } from '@playwright/test';
 
+/* A signed-in reader's own surfaces are `/u/<their public id>`: there is no
+ * `/app` any more and no constant to assert against. A test asserts the shape
+ * and gets there the way a reader with an old bookmark does — through the
+ * stub that resolves the session and forwards, permanently. */
+const HOME = /\/u\/p_[A-Za-z0-9_-]+$/;
+
+async function go(page: Page, view = ''): Promise<void> {
+  await page.goto(view === '' ? '/app' : `/app/${view}`);
+}
+
+
 /* R4's golden flows: a host makes a page, hands out links, and strangers
  * answer without an account. Everything here runs against the standalone
  * server and the dev database. */
@@ -49,10 +60,20 @@ async function signedInHost(page: Page, name: string): Promise<void> {
   /* The click is the confirmation: better-auth verifies at its endpoint. */
   await page.goto(path);
   await page.goto('/auth/sign-in');
+  /* Confirming an address signs the reader in, and the door does not stand
+     open to somebody already through it: it sends them to their own surfaces.
+     A test that means to prove a password has to leave first, and it drops the
+     cookie rather than pressing Sign out — a sign-out still in flight arrives
+     after the next sign-in and ends that session instead. */
+  if (!page.url().includes('/auth/sign-in')) {
+    await page.getByRole('button', { name: 'Sign out' }).click();
+    await page.waitForURL(/\/$/);
+    await page.goto('/auth/sign-in');
+  }
   await page.locator('#sign-in-email').fill(email);
   await page.locator('#sign-in-password').fill(PASSWORD);
-  await page.getByRole('button', { name: 'Sign in' }).click();
-  await expect(page).toHaveURL('/app');
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click();
+  await expect(page).toHaveURL(HOME);
 }
 
 interface Draft {
@@ -63,7 +84,7 @@ interface Draft {
 
 /** Create an event and land on its page. */
 async function createEvent(page: Page, draft: Draft): Promise<string> {
-  await page.goto('/app/events/new');
+  await go(page, 'events/new');
   await page.getByLabel('Title').fill(draft.title);
   await page.getByLabel('Starts').fill('2026-08-30T14:00');
   await page.getByLabel('Ends').fill('2026-08-30T19:00');
@@ -72,7 +93,7 @@ async function createEvent(page: Page, draft: Draft): Promise<string> {
   if (draft.capacity) await page.getByLabel('Capacity').fill(draft.capacity);
   await page.getByLabel('Body').fill('Board games and hanging out.\n\n- snacks\n- a game');
   await page.getByRole('button', { name: 'Create' }).click();
-  await expect(page).toHaveURL(/\/app\/events\/e_/);
+  await expect(page).toHaveURL(/\/u\/p_[A-Za-z0-9_-]+\/events\/e_/);
   return page.url();
 }
 
@@ -260,7 +281,7 @@ test('a shared circle comes first in the list of who is coming', async ({ page, 
   const links = await publish(page);
 
   /* R5: a circle is a group. Two of the three guests are in one. */
-  await page.goto('/app/groups');
+  await go(page, 'groups');
   await page.getByLabel('Name').fill('Inner');
   await page.getByRole('button', { name: 'Create' }).click();
   await expect(page.getByRole('heading', { name: /^Inner/ })).toBeVisible();
@@ -276,6 +297,10 @@ test('a shared circle comes first in the list of who is coming', async ({ page, 
   await cy.goto(links.get('Cy Outside')!);
   await cy.getByRole('radio', { name: 'Yes', exact: true }).check();
   await cy.locator('.answer button[type="submit"]').click();
+  /* Wait for the answer to land before the browser goes away: closing the
+     context on the click aborts the POST that is still in flight, and the
+     guest list this test is about is then a list of nobody. */
+  await expect(cy.locator('.who-list')).toHaveAttribute('data-blurred', 'false');
   await outside.close();
 
   const second = await browser.newContext();
@@ -283,6 +308,7 @@ test('a shared circle comes first in the list of who is coming', async ({ page, 
   await bo.goto(links.get('Bo Circle')!);
   await bo.getByRole('radio', { name: 'Yes', exact: true }).check();
   await bo.locator('.answer button[type="submit"]').click();
+  await expect(bo.locator('.who-list')).toHaveAttribute('data-blurred', 'false');
   await second.close();
 
   /* Ada shares a group with Bo and not with Cy, so Bo is read first. */

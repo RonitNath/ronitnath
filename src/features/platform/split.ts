@@ -18,7 +18,11 @@ import { z } from 'zod';
 
 import { schema } from '@/db/client';
 import { recordAudit } from '@/features/auth/audit';
-import type { Transaction } from '@/features/auth/db';
+/* The spine's transaction type rather than `features/auth/db`'s: the two
+ * describe the same handle, but only this one carries the `auth` schema the
+ * Drizzle instance is actually built with, and `emit` is typed against it. */
+import { emit, type Transaction } from '@/lib/fleet/events';
+import { encodeId } from '@/lib/ids';
 
 /** What `mergePersons` wrote down about what it did. */
 export const undoRecord = z.object({
@@ -193,6 +197,15 @@ export async function splitMerge(
       relations_removed: undo.copied_relations.length,
     },
   });
+  /* Two people are two people again; each one's own surfaces change. */
+  for (const personId of [undo.survivor, undo.absorbed]) {
+    await emit(tx, {
+      orgId: encodeId('person', personId),
+      resourceKind: 'person',
+      resourceId: encodeId('person', personId),
+      kind: 'updated',
+    });
+  }
   return { ok: true, restored: undo.moved_identities.length };
 }
 

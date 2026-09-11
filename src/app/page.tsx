@@ -5,6 +5,8 @@ import { Atmosphere } from '@/features/sky/atmosphere';
 
 import './landing.css';
 import { ThemeToggle } from './theme-toggle';
+import { encodeId } from '@/lib/ids';
+import { userPath } from '@/lib/paths';
 
 /** The public landing. Server-rendered whole; the only client code on the page
  * is the sky canvas and the theme toggle. */
@@ -18,7 +20,9 @@ export default async function Home() {
       <header className="topbar">
         <Link href="/about">About the sky</Link>
         {principal ? (
-          <Link href="/app">{principal.displayName}</Link>
+          <Link href={userPath(encodeId('person', principal.personId))}>
+            {principal.displayName}
+          </Link>
         ) : (
           <Link href="/auth/sign-in">Sign in</Link>
         )}

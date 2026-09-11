@@ -2,6 +2,17 @@ import { readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
 
+/* A signed-in reader's own surfaces are `/u/<their public id>`: there is no
+ * `/app` any more and no constant to assert against. A test asserts the shape
+ * and gets there the way a reader with an old bookmark does — through the
+ * stub that resolves the session and forwards, permanently. */
+const HOME = /\/u\/p_[A-Za-z0-9_-]+$/;
+
+async function go(page: Page, view = ''): Promise<void> {
+  await page.goto(view === '' ? '/app' : `/app/${view}`);
+}
+
+
 /* R3's golden flows: a member writes somebody down, hands them a URL, and the
  * two rows turn out to be one person. Everything here runs against the
  * standalone server and the dev database, and reads its mail off disk. */
@@ -39,9 +50,20 @@ async function linkFor(to: string, path: string): Promise<string> {
 
 async function signIn(page: Page, email: string, password = PASSWORD) {
   await page.goto('/auth/sign-in');
+  /* Confirming an address signs the reader in, and the door does not stand
+     open to somebody who is already through it: it sends them to their own
+     surfaces. A test that means to prove a password has to leave first, and it
+     signs out and waits for the landing: the session row has to go, because
+     the sessions list counts it, and a sign-out still in flight would arrive
+     after the next sign-in and end that one instead. */
+  if (!page.url().includes('/auth/sign-in')) {
+    await page.getByRole('button', { name: 'Sign out' }).click();
+    await page.waitForURL(/\/$/);
+    await page.goto('/auth/sign-in');
+  }
   await page.locator('#sign-in-email').fill(email);
   await page.locator('#sign-in-password').fill(password);
-  await page.getByRole('button', { name: 'Sign in' }).click();
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click();
 }
 
 async function member(page: Page, name: string): Promise<string> {
@@ -55,7 +77,7 @@ async function member(page: Page, name: string): Promise<string> {
   await page.goto(await linkFor(email, '/api/auth/verify-email'));
   await expect(page.getByText('Address confirmed')).toBeVisible();
   await signIn(page, email);
-  await expect(page).toHaveURL('/app');
+  await expect(page).toHaveURL(HOME);
   return email;
 }
 
@@ -63,7 +85,7 @@ async function member(page: Page, name: string): Promise<string> {
  *  an absolute URL built from PUBLIC_ORIGIN, which is not where the test
  *  server listens; what the visitor follows is the path. */
 async function hold(page: Page, handle: string, name: string): Promise<string> {
-  await page.goto('/app/people');
+  await go(page, 'people');
   await page.getByLabel('Email, phone, or name').fill(handle);
   await page.getByLabel('What you call them').fill(name);
   await page.getByRole('button', { name: 'Hold' }).click();
@@ -97,7 +119,7 @@ test('hold, invite, and claim as somebody with no account', async ({ page, brows
   /* The claim already happened: the member's list says so, and the row is
    * the same row — the contact edge followed the merge onto a person who now
    * has an account of their own. */
-  await page.goto('/app/people');
+  await go(page, 'people');
   const row = page.getByRole('row', { name: /A Guest/ });
   await expect(row).toContainText('joined');
   await expect(row).toContainText('Claimed');
@@ -106,7 +128,7 @@ test('hold, invite, and claim as somebody with no account', async ({ page, brows
   /* And the account is real once the address is confirmed. */
   await visitor.goto(await linkFor(guest, '/api/auth/verify-email'));
   await signIn(visitor, guest);
-  await expect(visitor).toHaveURL('/app');
+  await expect(visitor).toHaveURL(HOME);
   await expect(visitor.getByRole('heading', { level: 1 })).toHaveText('A Guest');
   /* One address, not two: the handle and the confirmed address were the same
    * address, and the merge did not leave a second row saying so. */
@@ -130,7 +152,7 @@ test('hold, invite, and claim while already signed in', async ({ page, browser }
   await expect(claimant.getByText('Another Holder')).toBeVisible();
   await expect(claimant.getByText('Signed in as')).toBeVisible();
   await claimant.getByRole('button', { name: 'This is me' }).click();
-  await expect(claimant).toHaveURL('/app');
+  await expect(claimant).toHaveURL(HOME);
 
   /* What the contact card carried is now theirs: the phone handle moved,
    * because nothing they already held spelled it. */
@@ -139,7 +161,7 @@ test('hold, invite, and claim while already signed in', async ({ page, browser }
 
   /* The member's list keeps the row and loses the placeholder name: it is
    * the person themselves now, under the name they chose. */
-  await page.goto('/app/people');
+  await go(page, 'people');
   await expect(page.getByRole('row', { name: /Phone Friend/ })).toHaveCount(0);
   await expect(page.getByRole('row', { name: /Already A Member/ })).toContainText('joined');
   await other.close();
@@ -152,7 +174,7 @@ test('a revoked link and a link that never existed decline identically', async (
   await member(page, 'Careful Holder');
   const url = await hold(page, address('revoked'), 'Second Thoughts');
 
-  await page.goto('/app/people');
+  await go(page, 'people');
   const revoked = page.getByRole('row', { name: /Second Thoughts/ });
   await revoked.getByRole('button', { name: 'Revoke' }).click();
   await expect(revoked).toContainText('Revoked');
@@ -177,7 +199,7 @@ test('an invitation is watched: not opened, then opened', async ({ page, browser
   await member(page, 'Watching Holder');
   const url = await hold(page, address('watched'), 'Watched Guest');
 
-  await page.goto('/app/people');
+  await go(page, 'people');
   const row = page.getByRole('row', { name: /Watched Guest/ });
   await expect(row).toContainText('Not opened');
 
@@ -197,7 +219,7 @@ test('a confirmed address that somebody else holds becomes a question, not a mer
 }) => {
   await member(page, 'Proposing Holder');
   const shared = address('proposed');
-  await page.goto('/app/people');
+  await go(page, 'people');
   await page.getByLabel('Email, phone, or name').fill(shared);
   await page.getByLabel('What you call them').fill('Maybe You');
   await page.getByRole('button', { name: 'Hold' }).click();
@@ -221,39 +243,26 @@ test('a confirmed address that somebody else holds becomes a question, not a mer
   /* The question is answered and gone; what is left is one person. */
   await expect(claimant.getByRole('heading', { name: 'Is this you?' })).toHaveCount(0);
 
-  await page.goto('/app/people');
+  await go(page, 'people');
   await expect(page.getByRole('row', { name: /The Real One/ })).toContainText('joined');
   await other.close();
 });
 
-test('a member may add a second address and remove one, but never the last', async ({ page }) => {
-  const first = await member(page, 'Two Doors');
+test('a member has one door, and it may not be taken away', async ({ page }) => {
+  const only = await member(page, 'One Door');
 
-  await page.goto('/app');
-  await expect(page.getByRole('button', { name: 'Remove' })).toHaveCount(0);
-
-  const second = address('second');
-  await page.getByLabel('Add an address').fill(second);
-  await page.getByRole('button', { name: 'Send the link' }).click();
-  await expect(page.getByText('Check your inbox')).toBeVisible();
-
-  await page.goto(await linkFor(second, '/api/auth/verify-email'));
-  await expect(page.getByText('Address confirmed')).toBeVisible();
-
-  await page.goto('/app');
-  await expect(page.getByRole('cell', { name: second })).toBeVisible();
-  /* Two doors, so either may go. */
-  await page.getByRole('row', { name: new RegExp(second) }).getByRole('button', { name: 'Remove' }).click();
-  await expect(page.getByRole('cell', { name: second })).toHaveCount(0);
-
-  /* One door, so it may not. */
-  await expect(page.getByRole('cell', { name: first })).toBeVisible();
+  await go(page);
+  /* An account has one address now: better-auth owns it, AddEmail is gone, and
+     a second identity row would have advertised a door that does not open
+     (src/features/people/actions.ts). What is left to assert is the refusal —
+     the one way in cannot be removed, so the control is not even drawn. */
+  await expect(page.getByRole('cell', { name: only })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Remove' })).toHaveCount(0);
 });
 
 test('a member can change what they are called', async ({ page }) => {
   await member(page, 'Before');
-  await page.goto('/app');
+  await go(page);
   await page.getByLabel('Name').fill('After');
   await page.getByRole('button', { name: 'Save' }).click();
   await expect(page.getByText('Name changed')).toBeVisible();
