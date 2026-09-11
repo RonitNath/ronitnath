@@ -1,0 +1,55 @@
+# ronitnath.com, served by the ronitnath application itself again (payload
+# removal W1, agentstate-qc4.3). The Payload tenant is gone; the upstream is the
+# app on :3140 on the production pair.
+#
+# The sky's assets are content-addressed and answered `immutable` for a year by
+# the application itself (next.config.ts headers), so the edge needs no rule of
+# its own for /stars, /sky, /cities or /textures.
+#
+# Umami is NOT in-page in this application, so the edge injects it the way it
+# does for every other first-party host, which is why the upstream is asked for
+# an identity encoding and the response is not compressed before the rewrite.
+ronitnath.com {
+  import cloudflare_tls
+  import umami_csp
+  header Strict-Transport-Security "max-age=31536000"
+  header X-Content-Type-Options "nosniff"
+  header Referrer-Policy "strict-origin-when-cross-origin"
+
+  # Server-sent events. A stream must not be buffered, compressed, or passed
+  # through a body rewriter that waits for a </head> that will never come, so
+  # this matcher is handled before the encode and the injection and shares
+  # nothing with them.
+  #
+  # The user stream is /u/<user>/events/stream, not /u/<user>/events: that path
+  # is the page listing the events somebody is hosting, and a Next segment
+  # cannot be both. The org stream is at the contract path.
+  @events path /u/*/events/stream /o/*/events
+  handle @events {
+    reverse_proxy http://100.88.42.226:3140 http://100.88.223.144:3140 {
+      lb_policy first
+      lb_try_duration 5s
+      lb_try_interval 250ms
+      health_uri /healthz
+      health_interval 10s
+      health_timeout 5s
+      health_status 200
+      flush_interval -1
+    }
+  }
+
+  handle {
+    encode zstd gzip
+    import umami_inject ba50852f-45e9-43e9-983c-ceaa773bc7dd
+    reverse_proxy http://100.88.42.226:3140 http://100.88.223.144:3140 {
+      lb_policy first
+      lb_try_duration 5s
+      lb_try_interval 250ms
+      health_uri /healthz
+      health_interval 10s
+      health_timeout 5s
+      health_status 200
+      header_up Accept-Encoding identity
+    }
+  }
+}
