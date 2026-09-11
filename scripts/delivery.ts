@@ -369,7 +369,7 @@ async function artifact() {
       playwrightImage,
       'bash',
       '-lc',
-      'corepack pnpm exec playwright test --config playwright.delivery.config.ts',
+      './node_modules/.bin/playwright test --config playwright.delivery.config.ts',
     ]);
     await startWeb(compatibilityTag('runtime'));
     await exercisePreviousWriter();
