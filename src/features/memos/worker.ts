@@ -103,6 +103,19 @@ async function filesBelow(root: string, directory = root): Promise<string[]> {
   return found;
 }
 
+async function publishFiles(storage: ReturnType<typeof memoStorage>, prefix: string, root: string, paths: readonly string[]) {
+  const pending = [...paths];
+  const publish = async () => {
+    for (;;) {
+      const path = pending.pop();
+      if (!path) return;
+      const key = `${prefix}/${relative(root, path)}`;
+      if (!(await storage.stat(key))) await storage.put(key, createReadStream(path));
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(32, pending.length) }, publish));
+}
+
 async function removeMemo(job: ClaimedJob) {
   if (!(await fenced(job))) return;
   const memo = (await database().select().from(schema.voiceMemo).where(eq(schema.voiceMemo.id, job.memoId)).limit(1))[0];
@@ -132,7 +145,7 @@ async function processMemo(job: ClaimedJob, signal: AbortSignal) {
     if (!generation) throw new Error('Processing generation was not allocated');
     const prefix = `${memoPrefix(memo.personId, memo.localId)}/derived/g${generation}`;
     await writeFile(join(out, 'master.m3u8'), ['#EXTM3U','#EXT-X-VERSION:7','#EXT-X-STREAM-INF:BANDWIDTH=36000,CODECS="mp4a.40.2"','hls-32/index.m3u8','#EXT-X-STREAM-INF:BANDWIDTH=70000,CODECS="mp4a.40.2"','hls-64/index.m3u8',''].join('\n'));
-    for (const path of await filesBelow(out)) await storage.put(`${prefix}/${relative(out, path)}`, createReadStream(path));
+    await publishFiles(storage, prefix, out, await filesBelow(out));
     const segments:Array<{memoId:number;generation:number;rendition:32|64;sequence:number;durationMs:number;key:string}>=[];
     for(const rendition of [32,64] as const){
       const lines=(await readFile(join(out,`hls-${rendition}/index.m3u8`),'utf8')).split('\n');
