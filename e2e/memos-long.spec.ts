@@ -34,7 +34,11 @@ test.afterAll(async()=>{
   if(worker.exitCode===null)worker.kill('SIGKILL');
 });
 
-test('keeps hour-long playback segmented and meets repeated local start and seek targets',async({page})=>{
+test('keeps hour-long playback segmented and meets repeated shaped-network start and seek targets',async({page})=>{
+  const cdp=await page.context().newCDPSession(page);
+  await cdp.send('Network.enable');
+  await cdp.send('Network.setCacheDisabled',{cacheDisabled:true});
+  await cdp.send('Network.emulateNetworkConditions',{offline:false,latency:50,downloadThroughput:1_250_000,uploadThroughput:1_250_000,connectionType:'wifi'});
   await signIn(page);
   const title=`Hour memo ${Date.now()}`,mediaRequests:string[]=[];
   page.on('request',(request)=>{if(request.url().includes('/api/memos/')&&request.url().includes('/media/'))mediaRequests.push(request.url());});
