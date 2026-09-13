@@ -1,4 +1,4 @@
-import { and, eq } from 'drizzle-orm';
+import { and, eq, isNull, ne } from 'drizzle-orm';
 import { database, schema } from '@/db/client';
 import type { Principal } from '@/features/auth/principal';
 import { tryDecodeId } from '@/lib/ids';
@@ -6,9 +6,8 @@ import { tryDecodeId } from '@/lib/ids';
 export async function authorizedMemo(publicId: string, principal: Principal) {
   const id = tryDecodeId('memo', publicId);
   if (id === null) return null;
-  const rows = await database().select().from(schema.voiceMemo).where(
-    principal.isOperator ? eq(schema.voiceMemo.id, id) : and(eq(schema.voiceMemo.id, id), eq(schema.voiceMemo.personId, principal.personId)),
-  ).limit(1);
+  const ownership = principal.isOperator ? eq(schema.voiceMemo.id, id) : and(eq(schema.voiceMemo.id, id), eq(schema.voiceMemo.personId, principal.personId));
+  const rows = await database().select().from(schema.voiceMemo).where(and(ownership, isNull(schema.voiceMemo.trashedAt), ne(schema.voiceMemo.state, 'deleting'))).limit(1);
   return rows[0] ?? null;
 }
 

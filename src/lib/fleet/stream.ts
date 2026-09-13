@@ -124,6 +124,12 @@ function connect(): void {
         return;
       }
       h.client = client;
+      /* A notification can land while LISTEN is reconnecting. Wake every
+       * subscriber once after the server confirms LISTEN so durable readers
+       * drain from their own cursor and close that gap. */
+      for (const [orgId, handlers] of h.subscribers) for (const handler of [...handlers]) {
+        try { handler({ orgId, seq: Number.MAX_SAFE_INTEGER }); } catch { /* isolated subscriber */ }
+      }
     })
     .catch(() => {
       h.connecting = false;

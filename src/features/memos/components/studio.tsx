@@ -19,6 +19,20 @@ async function upload(user: string, input: { localId: string; blob: Blob; mimeTy
   });
 }
 
+async function recoverUploadUrl(user: string, localId: string, signal?: AbortSignal) {
+  const response = await fetch(`/api/memos/upload-recovery?user=${encodeURIComponent(user)}&localId=${encodeURIComponent(localId)}`, { signal });
+  if (response.status === 404) return null;
+  if (!response.ok) throw new Error(`Could not recover upload identity (${response.status})`);
+  return (await response.json() as { uploadUrl: string }).uploadUrl;
+}
+
+async function finalizeUpload(uploadUrl: string, _totalBytes: number, signal?: AbortSignal) {
+  const response = await fetch('/api/memos/finalize', {
+    method: 'POST', signal, headers: { 'content-type': 'application/json' }, body: JSON.stringify({ uploadUrl }),
+  });
+  if (!response.ok) throw new Error(`Could not finalize upload (${response.status})`);
+}
+
 function MemoCommand({ memo, user, kind }: { memo: MemoRow; user: string; kind: 'trash' | 'restore' | 'delete' | 'retry' }) {
   const action = kind === 'trash' ? trashMemo : kind === 'restore' ? restoreMemo : kind === 'retry' ? retryMemo : deleteMemoPermanently;
   const [state, run, pending] = useActionState<FormState, FormData>(action as (state: FormState, form: FormData) => Promise<FormState>, EMPTY);
@@ -44,17 +58,22 @@ export function MemoStudio({ user, memos, trash, canCreate }: { user: string; me
   const [liveMemos,setLiveMemos]=useState(memos);
   const [title, setTitle] = useState('');
   const [recovery, setRecovery] = useState('');
+  const [recoveryItems,setRecoveryItems]=useState<Array<{id:string;mimeType:string;bytes:number}>>([]);
   const [quality, setQuality] = useState<'automatic' | 'data-saver' | 'high'>('automatic');
+  const [streamEpoch,setStreamEpoch]=useState(0);
   const uploader = useCallback(async (input: { localId: string; blob: Blob; mimeType: string; onProgress: (bytes: number) => void }) => {
     await upload(user, { ...input, title: title.trim() || undefined });
   }, [title, user]);
   const incrementalUploader = useCallback(async (input: { localId: string; blob: Blob; blobOffset: number; mimeType: string; complete: boolean; uploadUrl: string | null; acknowledgedBytes: number; onProgress: (bytes: number, uploadUrl: string) => void }) => {
-    await appendToTus({
+    const result = await appendToTus({
       endpoint: '/api/memos/upload', blob: input.blob, uploadUrl: input.uploadUrl,
       acknowledgedBytes: input.acknowledgedBytes, blobOffset: input.blobOffset, complete: input.complete,
       metadata: { localId: input.localId, user, filetype: input.mimeType, filename: `recording-${input.localId}.${input.mimeType.includes('mp4') ? 'm4a' : 'webm'}`, ...(title.trim() ? { title: title.trim() } : {}) },
+      recoverUploadUrl: (localId, signal) => recoverUploadUrl(user, localId, signal),
+      finalize: finalizeUpload,
       onProgress: (bytes, _total, uploadUrl) => input.onProgress(bytes, uploadUrl),
     });
+    return { serverFinalized: result.serverFinalized };
   }, [title, user]);
   const recorder = useAudioRecorder({ accountId:user, uploader, incrementalUploader, onUploaded: () => setTitle('') });
 
@@ -65,26 +84,34 @@ export function MemoStudio({ user, memos, trash, canCreate }: { user: string; me
       setLiveMemos(value.memos.map((memo)=>({...memo,createdAt:new Date(memo.createdAt),trashedAt:memo.trashedAt?new Date(memo.trashedAt):null})));
     };
     source.addEventListener('snapshot',snapshot as EventListener);
+    source.onerror=()=>setStreamEpoch((value)=>value+1);
     return()=>source.close();
   },[trash,user]);
 
   const recover = useCallback(async () => {
     const store = await PendingRecordingStore.open();
     try {
+      const accountRows = await store.list(user);
+      for(const row of accountRows.filter((candidate)=>!candidate.complete&&candidate.mimeType.includes('webm'))) await store.markComplete(row.id);
       const pending = (await store.list(user)).filter((row) => row.complete);
-      if (!pending.length) { setRecovery(''); return; }
-      setRecovery(`${pending.length} locally saved memo${pending.length === 1 ? '' : 's'} waiting to upload.`);
+      const unrecoverable=accountRows.filter((row)=>!row.complete&&!row.mimeType.includes('webm')).length;
+      setRecoveryItems(accountRows.filter((row)=>!row.complete&&!row.mimeType.includes('webm')).map(({id,mimeType,bytes})=>({id,mimeType,bytes})));
+      if (!pending.length) { setRecovery(unrecoverable?`${unrecoverable} interrupted recording needs export or deletion.`:''); return; }
+      setRecovery(`${pending.length} locally saved memo${pending.length === 1 ? '' : 's'} waiting to upload.${unrecoverable?` ${unrecoverable} interrupted recording needs export or deletion.`:''}`);
       if (!navigator.onLine) return;
       for (const row of pending) {
         const result = await withUploadLock(`${user}:${row.id}`, async () => {
           let persistence = Promise.resolve();
-          let offset=row.acknowledgedBytes, uploadUrl=row.uploadUrl;
-          while(offset<row.bytes){
+          let offset=row.acknowledgedBytes, uploadUrl=row.uploadUrl, finalized=row.serverFinalized;
+          do {
             const blob=await store.readSlice(row.id,offset);
-            await appendToTus({endpoint:'/api/memos/upload',blob,blobOffset:offset,uploadUrl,acknowledgedBytes:offset,complete:row.complete&&offset+blob.size===row.bytes,metadata:{localId:row.id,user,filetype:row.mimeType,filename:`recording-${row.id}.${row.mimeType.includes('mp4')?'m4a':'webm'}`},onProgress:(bytes,_total,url)=>{uploadUrl=url;persistence=persistence.then(()=>store.setUploadState(row.id,url,bytes));}});
-            offset+=blob.size;
-          }
+            const result=await appendToTus({endpoint:'/api/memos/upload',blob,blobOffset:offset,uploadUrl,acknowledgedBytes:offset,complete:row.complete&&offset+blob.size===row.bytes,metadata:{localId:row.id,user,filetype:row.mimeType,filename:row.filename??`recording-${row.id}.${row.mimeType.includes('mp4')?'m4a':'webm'}`,...(row.title?{title:row.title}:{})},recoverUploadUrl:(localId,signal)=>recoverUploadUrl(user,localId,signal),finalize:finalizeUpload,onProgress:(bytes,_total,url)=>{uploadUrl=url;offset=bytes;persistence=persistence.then(()=>store.setUploadState(row.id,url,bytes));}});
+            finalized=result.serverFinalized;
+            if (!blob.size && !finalized) break;
+          } while(offset<row.bytes||!finalized);
           await persistence;
+          if (!finalized) return false;
+          await store.markServerFinalized(row.id);
           await store.remove(row.id);
           return true;
         });
@@ -98,7 +125,21 @@ export function MemoStudio({ user, memos, trash, canCreate }: { user: string; me
 
   useEffect(() => { void recover(); window.addEventListener('online', recover); return () => window.removeEventListener('online', recover); }, [recover]);
 
-  return <AudioRuntimeProvider>
+  const exportPending=useCallback(async(id:string,mimeType:string)=>{
+    const store=await PendingRecordingStore.open();
+    try{
+      const blob=await store.blob(id),url=URL.createObjectURL(blob),anchor=document.createElement('a');
+      anchor.href=url;anchor.download=`interrupted-${id}.${mimeType.includes('mp4')?'m4a':'bin'}`;anchor.click();
+      setTimeout(()=>URL.revokeObjectURL(url),1_000);
+    }finally{store.close();}
+  },[]);
+  const removePending=useCallback(async(id:string)=>{
+    if(!window.confirm('Delete this interrupted recording from this device?'))return;
+    const store=await PendingRecordingStore.open();
+    try{await store.remove(id);setRecoveryItems((items)=>items.filter((item)=>item.id!==id));}finally{store.close();}
+  },[]);
+
+  return <AudioRuntimeProvider stopKey={`${user}:${streamEpoch}`}>
     {canCreate && !trash ? <section className="memo-recorder">
       <h2>New memo</h2>
       <label htmlFor="memo-title">Title <span className="note">optional</span></label>
@@ -107,11 +148,16 @@ export function MemoStudio({ user, memos, trash, canCreate }: { user: string; me
       <label className="import-button">Import audio<input type="file" accept="audio/*" onChange={(event) => {
         const file = event.target.files?.[0];
         if (!file) return;
+        event.currentTarget.value='';
         setRecovery(`Saving ${file.name} on this device…`);
         void (async()=>{
           const store=await PendingRecordingStore.open();
           try{
-            const row=await store.create(file.type||'application/octet-stream',crypto.randomUUID(),user);
+            const estimate=await navigator.storage?.estimate?.();
+            const available=(estimate?.quota??Infinity)-(estimate?.usage??0);
+            if(file.size>AUDIO_LIMITS.uploadBytes)throw new Error('This memo exceeds the 512 MiB upload limit.');
+            if((await store.totalBytes())+file.size>AUDIO_LIMITS.pendingLocalBytes||available<file.size+1024*1024)throw new Error('There is not enough local space to save this import.');
+            const row=await store.create(file.type||'application/octet-stream',crypto.randomUUID(),user,{title:title.trim()||undefined,filename:file.name});
             let sequence=0;
             for(let offset=0;offset<file.size;offset+=AUDIO_LIMITS.transferBufferBytes) await store.append(row.id,sequence++,file.slice(offset,Math.min(file.size,offset+AUDIO_LIMITS.transferBufferBytes)),0);
             await store.markComplete(row.id);
@@ -121,6 +167,11 @@ export function MemoStudio({ user, memos, trash, canCreate }: { user: string; me
         })().catch((error:Error)=>setRecovery(error.message));
       }} /></label>
       {recovery ? <p className="note" role="status">{recovery}</p> : null}
+      {recoveryItems.map((item)=><div className="memo-actions" key={item.id}>
+        <span className="note">Interrupted recording, {Math.ceil(item.bytes/1024)} KiB</span>
+        <button type="button" className="linkish" onClick={()=>void exportPending(item.id,item.mimeType)}>Export bytes</button>
+        <button type="button" className="linkish" onClick={()=>void removePending(item.id)}>Delete local copy</button>
+      </div>)}
     </section> : null}
 
     <section>

@@ -734,13 +734,18 @@ export const voiceMemo = pgTable(
     state: text('state').notNull().default('uploading'),
     uploadId: text('upload_id'),
     uploadComplete: boolean('upload_complete').notNull().default(false),
+    uploadFinalizedAt: timestamp('upload_finalized_at', { withTimezone: true }),
     durableBytes: bigint('durable_bytes', { mode: 'number' }).notNull().default(0),
     playableThroughMs: integer('playable_through_ms').notNull().default(0),
     processingMode: text('processing_mode').notNull().default('probing'),
     generation: integer('generation').notNull().default(0),
+    nextGeneration: integer('next_generation').notNull().default(1),
+    processingGeneration: integer('processing_generation'),
+    publicationRevision: integer('publication_revision').notNull().default(0),
     sourceKey: text('source_key').notNull(),
     sourceMimeType: text('source_mime_type').notNull(),
     sourceBytes: bigint('source_bytes', { mode: 'number' }).notNull(),
+    sourceSha256: text('source_sha256'),
     sourceFormat: text('source_format'),
     sourceCodec: text('source_codec'),
     durationMs: integer('duration_ms'),
@@ -772,12 +777,13 @@ export const voiceMemoJob = pgTable(
     availableAt: timestamp('available_at', { withTimezone: true }).notNull().defaultNow(),
     leaseUntil: timestamp('lease_until', { withTimezone: true }),
     leaseToken: uuid('lease_token'),
+    generation: integer('generation'),
     error: text('error'),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
     index('voice_memo_job_ready_idx').on(t.state, t.availableAt),
-    check('voice_memo_job_kind', sql`${t.kind} IN ('process','delete')`),
+    check('voice_memo_job_kind', sql`${t.kind} IN ('ingest','process','delete')`),
     check('voice_memo_job_state', sql`${t.state} IN ('queued','running','failed')`),
   ],
 );
@@ -796,5 +802,22 @@ export const voiceMemoSegment = pgTable(
   (t) => [
     primaryKey({ columns: [t.memoId, t.generation, t.rendition, t.sequence] }),
     check('voice_memo_segment_rendition', sql`${t.rendition} IN (32,64)`),
+  ],
+);
+
+export const voiceMemoWaveformTile = pgTable(
+  'voice_memo_waveform_tile',
+  {
+    memoId: integer('memo_id').notNull().references(() => voiceMemo.id, { onDelete: 'cascade' }),
+    generation: integer('generation').notNull(),
+    level: smallint('level').notNull(),
+    startPeak: integer('start_peak').notNull(),
+    peakCount: integer('peak_count').notNull(),
+    key: text('key').notNull(),
+    createdAt: now(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.memoId, t.generation, t.level, t.startPeak] }),
+    check('voice_memo_waveform_level', sql`${t.level} IN (1,10,100)`),
   ],
 );
