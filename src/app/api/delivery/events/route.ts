@@ -1,6 +1,11 @@
 import { timingSafeEqual } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
-import { StoredRunEventSchema, type StoredRunEvent } from '@isoastra/fleet-delivery';
+import {
+  EnvironmentEventV3Schema,
+  StoredRunEventSchema,
+  type EnvironmentEventV3,
+  type StoredRunEvent,
+} from '@isoastra/fleet-delivery';
 import { and, eq, sql } from 'drizzle-orm';
 import { z } from 'zod';
 
@@ -18,12 +23,17 @@ function authorized(request: Request): boolean {
   const b = Buffer.from(expected);
   return a.length === b.length && timingSafeEqual(a, b);
 }
-function identity(event: StoredRunEvent) {
+type DeliveryEvent = StoredRunEvent | EnvironmentEventV3;
+const DeliveryEventSchema = z.union([StoredRunEventSchema, EnvironmentEventV3Schema]);
+function identity(event: DeliveryEvent) {
+  if (event.schemaVersion === 3)
+    return { runId: event.instanceId, producerId: event.producerId };
   return event.schemaVersion === 2
     ? { runId: event.releaseId, producerId: event.producerId }
     : { runId: event.runId, producerId: 'legacy' };
 }
-function requestedSha(event: StoredRunEvent): string | undefined {
+function requestedSha(event: DeliveryEvent): string | undefined {
+  if (event.schemaVersion === 3) return `environment:${event.instance.mode}`;
   if (event.schemaVersion === 2 && event.type === 'release-requested')
     return event.requestedSha;
   if (
@@ -33,7 +43,8 @@ function requestedSha(event: StoredRunEvent): string | undefined {
   )
     return event.sha;
 }
-function terminalState(event: StoredRunEvent): string | undefined {
+function terminalState(event: DeliveryEvent): string | undefined {
+  if (event.schemaVersion === 3) return event.instance.state;
   if (event.schemaVersion === 2 && event.type === 'release-finished') return event.state;
   if (
     event.schemaVersion === 2 &&
@@ -53,7 +64,7 @@ export async function POST(request: Request): Promise<Response> {
   if (!authorized(request)) return new Response(null, { status: 404 });
   const payload: unknown = await request.json();
   const events = z
-    .array(StoredRunEventSchema)
+    .array(DeliveryEventSchema)
     .min(1)
     .max(1000)
     .parse(Array.isArray(payload) ? payload : [payload]);

@@ -25,7 +25,7 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core';
 import type { RealtimeSubscription } from '@isoastra/fleet-events/presence';
-import type { ReleaseManifest, StoredRunEvent } from '@isoastra/fleet-delivery';
+import type { EnvironmentEventV3, ReleaseManifest, StoredRunEvent } from '@isoastra/fleet-delivery';
 
 const now = () => timestamp('created_at', { withTimezone: true }).notNull().defaultNow();
 
@@ -746,7 +746,7 @@ export const deliveryRunEvent = pgTable(
     runId: uuid('run_id').notNull().references(() => deliveryRun.id, { onDelete: 'cascade' }),
     producerId: text('producer_id').notNull().default('legacy'),
     seq: bigint('seq', { mode: 'number' }).notNull(),
-    event: jsonb('event').$type<StoredRunEvent>().notNull(),
+    event: jsonb('event').$type<StoredRunEvent | EnvironmentEventV3>().notNull(),
     at: timestamp('at', { withTimezone: true }).notNull(),
   },
   (t) => [primaryKey({ columns: [t.runId, t.producerId, t.seq] }), index('delivery_event_at_idx').on(t.at)],

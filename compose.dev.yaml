@@ -1,7 +1,6 @@
 services:
   db:
     image: postgres:17
-    container_name: ronitnath-dev-db
     restart: unless-stopped
     ports:
       # 5433 is the documented default; DEV_DB_PORT moves it when another

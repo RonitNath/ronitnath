@@ -148,4 +148,3 @@ describe('the subject gate', () => {
     ).rejects.toBeInstanceOf(NotFound);
   });
 });
-

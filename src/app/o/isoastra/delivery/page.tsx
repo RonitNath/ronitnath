@@ -1,4 +1,4 @@
-import type { StoredRunEvent } from '@isoastra/fleet-delivery';
+import type { EnvironmentEventV3, StoredRunEvent } from '@isoastra/fleet-delivery';
 
 import { DeliveryInspector } from '@/features/delivery/inspector';
 import { deliveryReport } from '@/features/delivery/model';
@@ -6,7 +6,23 @@ import { requireOperator } from '@/lib/tiers';
 
 export const dynamic = 'force-dynamic';
 
-function eventRow(event: StoredRunEvent) {
+function eventRow(event: StoredRunEvent | EnvironmentEventV3) {
+  if (event.schemaVersion === 3) {
+    return {
+      id: `${event.producerId}:${event.seq}`,
+      seq: event.seq,
+      producer: event.producerId,
+      label: `${event.instance.mode}/${event.instance.namespace}`,
+      state: event.instance.state,
+      queueMs: null,
+      admissionMs: null,
+      wallMs: null,
+      cpuMs: null,
+      peakMemoryBytes: null,
+      ioBytes: null,
+      scope: `environment/${event.reporting}`,
+    };
+  }
   if (event.schemaVersion === 2 && event.type === 'stage-finished') {
     const { result } = event;
     return {
@@ -84,6 +100,9 @@ export default async function DeliveryPage({
         : null,
     )
     .find((value) => value !== null);
+  const environment = report.events
+    .map(({ event }) => (event.schemaVersion === 3 ? event : null))
+    .find((value) => value !== null);
   return (
     <main className="indoors" data-realtime-section="delivery-runs">
       <h1>Delivery</h1>
@@ -122,6 +141,17 @@ export default async function DeliveryPage({
               <div><dt>Migration digest</dt><dd className="mono">{manifest.artifacts.migration.digest.slice(0, 19)}…</dd></div>
               <div><dt>Migration policy</dt><dd>{manifest.migrations.entries.map((entry) => `${entry.name} (${entry.mode})`).join(', ') || 'none'}</dd></div>
               <div><dt>Compatibility</dt><dd>{manifest.compatibility.previousRead && manifest.compatibility.previousWrite && manifest.compatibility.rollbackRead && manifest.compatibility.repeatedMigration ? 'previous/candidate/rollback verified' : 'incomplete'}</dd></div>
+            </dl>
+          ) : null}
+          {environment ? (
+            <dl className="facts">
+              <div><dt>Environment</dt><dd>{environment.instance.mode}</dd></div>
+              <div><dt>Owner</dt><dd>{environment.instance.owner}</dd></div>
+              <div><dt>Namespace</dt><dd className="mono">{environment.instance.namespace}</dd></div>
+              <div><dt>Expiry</dt><dd>{environment.instance.expiresAt ?? 'persistent'}</dd></div>
+              <div><dt>Exposure</dt><dd>{environment.instance.exposures.map(({ url }) => url).join(', ') || 'local only'}</dd></div>
+              <div><dt>Services</dt><dd>{environment.services.map(({ service, state }) => `${service}: ${state}`).join(', ')}</dd></div>
+              <div><dt>Reporting</dt><dd>{environment.reporting}</dd></div>
             </dl>
           ) : null}
           <div className="scroller">

@@ -4,11 +4,14 @@ import { generateGithubWorkflow } from '@isoastra/fleet-delivery/github';
 async function main() {
   const path = '.github/workflows/deploy.yml';
   const expected = generateGithubWorkflow({
-    packageVersion: '0.2.7',
+    packageVersion: '0.3.1',
     runnerLabels: ['self-hosted', 'ronitnath-delivery', 'delenda'],
     pipelineFile: 'delivery.pipeline.json',
     nodeVersion: '24.13.0',
     pnpmVersion: '10.28.1',
+    concurrencyGroup: 'ronitnath-production',
+    telemetryUrl: 'https://ronitnath.com/api/delivery/events',
+    artifactDirectory: '.delivery',
     workflowEnvironment: {
       DOCKER_HOST: 'unix:///run/user/2101/docker.sock',
       XDG_RUNTIME_DIR: '/run/user/2101',

@@ -13,7 +13,7 @@ process.env.DATABASE_URL ??= file.DATABASE_URL;
 /* And the id key, for the same reason: the database-backed suites run real
  * commands, and a real command now appends a `domain_event` whose `org_id` is
  * a public id. Encoding one needs the key the deployment uses. */
-process.env.ID_KEY ??= file.ID_KEY;
+process.env.ID_KEY ??= file.ID_KEY ?? '00112233445566778899aabbccddeeff';
 
 export default defineConfig({
   test: {
