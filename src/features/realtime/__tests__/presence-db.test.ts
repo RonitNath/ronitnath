@@ -105,14 +105,21 @@ describe.skipIf(!reachable)('realtime PostgreSQL authority', () => {
     const listener = await pool().connect();
     try {
       await listener.query('LISTEN realtime_delivery');
-      const noticed = new Promise<string>((resolve, reject) => {
-        const timer = setTimeout(() => reject(new Error('notification timed out')), 2_000);
-        listener.once('notification', (message) => {
-          clearTimeout(timer);
-          resolve(message.payload ?? '');
-        });
-      });
       const orgId = anOrg('replica');
+      const noticed = new Promise<string>((resolve, reject) => {
+        const timer = setTimeout(() => {
+          listener.off('notification', onNotification);
+          reject(new Error('notification timed out'));
+        }, 2_000);
+        const onNotification = (message: { payload?: string }) => {
+          const payload = message.payload ?? '';
+          if (!payload.startsWith(`${orgId}|`)) return;
+          clearTimeout(timer);
+          listener.off('notification', onNotification);
+          resolve(payload);
+        };
+        listener.on('notification', onNotification);
+      });
       await event(orgId, 'document', 'r_replica');
       await expect(noticed).resolves.toContain(`${orgId}|`);
     } finally {
