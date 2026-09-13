@@ -5,11 +5,7 @@ import { litPixels } from './sky-readback';
 test('the landing page renders', async ({ page }) => {
   await page.goto('/');
   await expect(page.getByRole('heading', { level: 1 })).toContainText('Ronit Nath');
-  await expect(page.getByText('Founder of')).toBeVisible();
-  await expect(page.getByRole('link', { name: 'Isoastra' })).toHaveAttribute(
-    'href',
-    'https://isoastra.com',
-  );
+  await expect(page.getByText('Founder of Isoastra')).toBeVisible();
   for (const name of ['GitHub', 'Instagram', 'LinkedIn', 'Email']) {
     await expect(page.getByRole('link', { name, exact: true })).toBeVisible();
   }

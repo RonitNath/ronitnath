@@ -17,6 +17,8 @@ const data = join(scratch, 'data');
 let started = false;
 let child;
 let interrupted = false;
+const inherited = Object.fromEntries(['PATH', 'HOME', 'TMPDIR', 'LANG', 'LC_ALL'].flatMap((key) =>
+  process.env[key] === undefined ? [] : [[key, process.env[key]]]));
 function stopChild(signal = 'SIGTERM') {
   if (!child?.pid || child.exitCode !== null) return;
   try { process.kill(-child.pid, signal); } catch { /* already stopped */ }
@@ -34,7 +36,9 @@ try {
   await execFile(join(pgBin, 'createdb'), ['-h', '127.0.0.1', '-p', String(port), '-U', 'postgres', 'ronitnath']);
   child = spawn('pnpm', ['exec', 'playwright', 'test', ...process.argv.slice(2)], {
     cwd: process.cwd(), stdio: 'inherit', detached: true,
-    env: { ...process.env, E2E_DATABASE_URL: `postgres://postgres@127.0.0.1:${port}/ronitnath` },
+    env: { ...inherited, E2E_DATABASE_URL: `postgres://postgres@127.0.0.1:${port}/ronitnath`,
+      ...(process.env.E2E_SOFTWARE_GL ? { E2E_SOFTWARE_GL: process.env.E2E_SOFTWARE_GL } : {}),
+      ...(process.env.E2E_SCREENSHOT ? { E2E_SCREENSHOT: process.env.E2E_SCREENSHOT } : {}) },
   });
   const code = await new Promise((resolve) => child.once('exit', (value) => resolve(value ?? 1)));
   if (code !== 0 && !interrupted) {

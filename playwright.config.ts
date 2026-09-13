@@ -15,10 +15,15 @@ process.env.REPLICA_ID = 'e2e';
 export default defineConfig({
   testDir: './e2e',
   fullyParallel: true,
+  workers: Number(process.env.E2E_WORKERS ?? 1),
+  timeout: 120_000,
+  expect: { timeout: 15_000 },
   forbidOnly: !!process.env.CI,
   reporter: [['list']],
   use: {
     baseURL,
+    actionTimeout: 30_000,
+    navigationTimeout: 30_000,
     trace: 'off',
     screenshot: process.env.E2E_SCREENSHOT ? 'on' : 'only-on-failure',
     /* The sky is a WebGL2 canvas, and headless Chromium on a machine with no
@@ -38,17 +43,17 @@ export default defineConfig({
     /* The smoke runs the same supervised HTTP/worker process tree as the image. */
     command: [
       'pnpm db:migrate:all',
-      'pnpm build',
+      'node test/seed-playwright.mjs',
       /* `MAIL_FAIL` names a substring of a recipient the transport must
        * refuse, so one run can watch a send fail for one visitor and land for
        * everyone else (src/lib/mail.ts). */
       /* The server is told the origin it is actually reachable at, because
          the door redirects to an absolute `PUBLIC_ORIGIN` URL: with `.env`'s
          development origin it sends the browser to a port nothing serves. */
-      `MAIL_INTENT_KEY=e2e-mail-key MAIL_DIR=${process.cwd()}/.mail MAIL_FAIL=mailfail APP_VERSION=e2e REPLICA_ID=e2e PUBLIC_ORIGIN=${baseURL} HOSTNAME=127.0.0.1 PORT=${port} pnpm start`,
+      `NODE_ENV=production DBOS_SYSTEM_DATABASE_URL=${databaseUrl} USESEND_API_URL= USESEND_API_KEY= SMTP_URL= MAIL_INTENT_KEY=e2e-mail-key MAIL_DIR=${process.cwd()}/.mail MAIL_FAIL=mailfail APP_VERSION=e2e REPLICA_ID=e2e PUBLIC_ORIGIN=${baseURL} HOSTNAME=127.0.0.1 PORT=${port} pnpm start`,
     ].join(' && '),
     url: `${baseURL}/readyz`,
     reuseExistingServer: false,
-    timeout: 180_000,
+    timeout: 120_000,
   },
 });

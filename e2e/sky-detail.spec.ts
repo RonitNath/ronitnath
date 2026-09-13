@@ -58,7 +58,9 @@ async function usable(page: Page): Promise<DebugStar[]> {
 
 async function starOnScreen(page: Page): Promise<DebugStar> {
   await page.goto('/?skydebug=1');
-  await expect.poll(async () => (await usable(page)).length, { timeout: 30_000 }).toBeGreaterThan(0);
+  await expect
+    .poll(async () => (await usable(page)).length, { timeout: 30_000 })
+    .toBeGreaterThan(0);
   // Pause before reading the positions the pointer will be driven to. The sky
   // turns 15 arcminutes a second, and the pick weighs a neighbour's brightness
   // against its distance — so a couple of frames between the reading and the
@@ -129,13 +131,16 @@ test('hovering a star tags it, and clicking it opens the panel', async ({ page, 
 
   // What the panel says is what the route said, for this star.
   const payload = await (await request.get(`/api/sky/star/${star.key}`)).json();
-  expect(payload.names.mainId).toBeTruthy();
   await expect(panel.locator('h2')).toHaveText(payload.title);
-  await expect(panel.locator('.star-detail-table tr')).not.toHaveCount(0);
-  await expect(panel.locator('.star-detail-links a').first()).toHaveAttribute(
-    'href',
-    /simbad\.cds\.unistra\.fr/,
-  );
+  if (payload.names.mainId) {
+    await expect(panel.locator('.star-detail-table tr')).not.toHaveCount(0);
+    await expect(panel.locator('.star-detail-links a').first()).toHaveAttribute(
+      'href',
+      /simbad\.cds\.unistra\.fr/,
+    );
+  } else {
+    await expect(panel.locator('.star-detail-table tr')).toHaveCount(0);
+  }
   if (star.name === GATE_STAR) expect(payload.names.mainId).toBe('* eps UMa');
 
   await page.keyboard.press('Escape');

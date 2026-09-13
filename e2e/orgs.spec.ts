@@ -12,7 +12,6 @@ async function go(page: Page, view = ''): Promise<void> {
   await page.goto(view === '' ? '/app' : `/app/${view}`);
 }
 
-
 /* R5's golden flows: an organization asks somebody in, a document is handed
  * around a level at a time, and a group decides who a guest sees first.
  * Everything here runs against the standalone server and the dev database. */
@@ -116,7 +115,9 @@ test('an organization asks somebody in, and the handle is theirs afterwards', as
   const claim = pathOf((await minted.innerText()).trim());
 
   await page.reload();
-  await expect(page.getByRole('row', { name: /A Colleague/ }).first()).toContainText('Not opened');
+  await expect(page.getByRole('row', { name: /A Colleague/ }).first()).toContainText(
+    'Not opened',
+  );
 
   /* They claim it with an account of their own, and the role comes across. */
   const theirs = await browser.newContext();
@@ -132,7 +133,7 @@ test('an organization asks somebody in, and the handle is theirs afterwards', as
 
   /* A member is not an operator: the page they are in is not their page. */
   await colleague.goto(`/o/${org}`);
-  await expect(colleague.getByText('could not be found')).toBeVisible();
+  await expect(colleague.getByRole('heading', { name: 'Nothing here.' })).toBeVisible();
 
   /* The founder makes them an admin, and now it is. */
   await page.reload();
@@ -157,9 +158,9 @@ test('an organization asks somebody in, and the handle is theirs afterwards', as
   const stranger = await outside.newPage();
   await member(stranger, 'A Stranger');
   await stranger.goto(`/o/${org}`);
-  await expect(stranger.getByText('could not be found')).toBeVisible();
+  await expect(stranger.getByRole('heading', { name: 'Nothing here.' })).toBeVisible();
   await stranger.goto('/o/no-such-organization');
-  await expect(stranger.getByText('could not be found')).toBeVisible();
+  await expect(stranger.getByRole('heading', { name: 'Nothing here.' })).toBeVisible();
   await outside.close();
 });
 
@@ -200,7 +201,7 @@ test('a document is shared a level at a time, and taken back', async ({ page, br
 
   /* Before a share, the document is not theirs to see. */
   await reader.goto(url);
-  await expect(reader.getByText('could not be found')).toBeVisible();
+  await expect(reader.getByRole('heading', { name: 'Nothing here.' })).toBeVisible();
 
   await page.getByLabel('Share with').selectOption({ label: 'The Reader' });
   await page.getByLabel('As').selectOption('viewer');
@@ -227,11 +228,14 @@ test('a document is shared a level at a time, and taken back', async ({ page, br
 
   /* Revoked is gone, and gone is 404. */
   await page.reload();
-  await page.getByRole('row', { name: /The Reader/ }).getByRole('button', { name: 'Revoke' }).click();
+  await page
+    .getByRole('row', { name: /The Reader/ })
+    .getByRole('button', { name: 'Revoke' })
+    .click();
   /* The row goes with the share: what a revoked share leaves is nothing. */
   await expect(page.getByRole('row', { name: /The Reader/ })).toHaveCount(0);
   await reader.goto(url);
-  await expect(reader.getByText('could not be found')).toBeVisible();
+  await expect(reader.getByRole('heading', { name: 'Nothing here.' })).toBeVisible();
   await theirs.close();
 
   /* Published, it is anybody's. */
@@ -251,8 +255,8 @@ test('a document is shared a level at a time, and taken back', async ({ page, br
   await page.getByRole('button', { name: 'Unpublish' }).click();
   await expect(page.getByText('Unpublished.')).toBeVisible();
   await anybody.goto(slug);
-  await expect(anybody.getByText('could not be found')).toBeVisible();
+  await expect(anybody.getByRole('heading', { name: 'Nothing here.' })).toBeVisible();
   await anybody.goto('/d/no-such-document-anywhere');
-  await expect(anybody.getByText('could not be found')).toBeVisible();
+  await expect(anybody.getByRole('heading', { name: 'Nothing here.' })).toBeVisible();
   await outside.close();
 });
