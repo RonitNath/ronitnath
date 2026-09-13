@@ -1,6 +1,6 @@
 'use client';
 
-import { AUDIO_LIMITS, PendingRecordingStore, appendToTus, uploadWithTus, withUploadLock } from '@isoastra/audio-core';
+import { AUDIO_LIMITS, PendingRecordingStore, appendToTus, uploadWithTus, withUploadLock } from '@isoastra/audio-core/browser';
 import { AudioPlayer, AudioRuntimeProvider, RecorderControls, useAudioRecorder } from '@isoastra/audio-react';
 import Link from 'next/link';
 import { useActionState, useCallback, useEffect, useState } from 'react';

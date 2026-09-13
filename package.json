@@ -24,14 +24,17 @@
     "memos:worker": "tsx scripts/memo-worker.mts"
   },
   "dependencies": {
-    "@isoastra/audio-core": "file:../grid-voice-memos/packages/audio-core",
-    "@isoastra/audio-react": "file:../grid-voice-memos/packages/audio-react",
-    "@isoastra/audio-node": "file:../grid-voice-memos/packages/audio-node",
+    "@isoastra/audio-core": "file:../grid-audio-foundation/packages/audio-core",
+    "@isoastra/audio-react": "file:../grid-audio-foundation/packages/audio-react",
+    "@isoastra/audio-node": "file:../grid-audio-foundation/packages/audio-node",
+    "@isoastra/ui": "file:../grid-audio-foundation/packages/ui",
+    "@isoastra/ui-media": "file:../grid-audio-foundation/packages/ui-media",
     "@isoastra/fleet-configured": "0.1.3",
     "@isoastra/fleet-events": "0.2.3",
     "@isoastra/fleet-gates": "0.1.3",
     "@isoastra/fleet-identity": "0.1.1",
     "@isoastra/fleet-ids": "0.1.1",
+    "@isoastra/fleet-runtime": "file:../grid-audio-foundation/packages/fleet-runtime",
     "@isoastra/grid-core": "0.1.0",
     "@isoastra/grid-next": "0.1.0",
     "@isoastra/grid-react": "0.1.0",
@@ -67,6 +70,14 @@
     "vitest": "3.2.7"
   },
   "pnpm": {
+    "overrides": {
+      "@isoastra/audio-core": "file:../grid-audio-foundation/packages/audio-core",
+      "@isoastra/audio-node": "file:../grid-audio-foundation/packages/audio-node",
+      "@isoastra/audio-react": "file:../grid-audio-foundation/packages/audio-react",
+      "@isoastra/fleet-runtime": "file:../grid-audio-foundation/packages/fleet-runtime",
+      "@isoastra/ui": "file:../grid-audio-foundation/packages/ui",
+      "@isoastra/ui-media": "file:../grid-audio-foundation/packages/ui-media"
+    },
     "onlyBuiltDependencies": [
       "esbuild",
       "unrs-resolver",

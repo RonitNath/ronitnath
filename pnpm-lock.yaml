@@ -4,19 +4,27 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+overrides:
+  '@isoastra/audio-core': file:../grid-audio-foundation/packages/audio-core
+  '@isoastra/audio-node': file:../grid-audio-foundation/packages/audio-node
+  '@isoastra/audio-react': file:../grid-audio-foundation/packages/audio-react
+  '@isoastra/fleet-runtime': file:../grid-audio-foundation/packages/fleet-runtime
+  '@isoastra/ui': file:../grid-audio-foundation/packages/ui
+  '@isoastra/ui-media': file:../grid-audio-foundation/packages/ui-media
+
 importers:
 
   .:
     dependencies:
       '@isoastra/audio-core':
-        specifier: file:../grid-voice-memos/packages/audio-core
-        version: link:../grid-voice-memos/packages/audio-core
+        specifier: file:../grid-audio-foundation/packages/audio-core
+        version: file:../grid-audio-foundation/packages/audio-core
       '@isoastra/audio-node':
-        specifier: file:../grid-voice-memos/packages/audio-node
-        version: link:../grid-voice-memos/packages/audio-node
+        specifier: file:../grid-audio-foundation/packages/audio-node
+        version: file:../grid-audio-foundation/packages/audio-node
       '@isoastra/audio-react':
-        specifier: file:../grid-voice-memos/packages/audio-react
-        version: file:../grid-voice-memos/packages/audio-react(react@19.2.8)
+        specifier: file:../grid-audio-foundation/packages/audio-react
+        version: file:../grid-audio-foundation/packages/audio-react(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@isoastra/fleet-configured':
         specifier: 0.1.3
         version: 0.1.3(drizzle-orm@0.45.2(@types/pg@8.23.1)(kysely@0.29.5)(pg@8.23.0))(next@15.5.25(@playwright/test@1.63.0)(@types/node@24.13.3)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(pg@8.23.0)(react@19.2.8)(zod@4.5.4)
@@ -32,6 +40,9 @@ importers:
       '@isoastra/fleet-ids':
         specifier: 0.1.1
         version: 0.1.1
+      '@isoastra/fleet-runtime':
+        specifier: file:../grid-audio-foundation/packages/fleet-runtime
+        version: file:../grid-audio-foundation/packages/fleet-runtime
       '@isoastra/grid-core':
         specifier: 0.1.0
         version: 0.1.0
@@ -41,6 +52,12 @@ importers:
       '@isoastra/grid-react':
         specifier: 0.1.0
         version: 0.1.0(react@19.2.8)
+      '@isoastra/ui':
+        specifier: file:../grid-audio-foundation/packages/ui
+        version: file:../grid-audio-foundation/packages/ui(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@isoastra/ui-media':
+        specifier: file:../grid-audio-foundation/packages/ui-media
+        version: file:../grid-audio-foundation/packages/ui-media(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@node-rs/argon2':
         specifier: ^2.2.0
         version: 2.2.0
@@ -149,8 +166,8 @@ importers:
   ../grid-voice-memos/packages/audio-react:
     dependencies:
       '@isoastra/audio-core':
-        specifier: workspace:^
-        version: link:../audio-core
+        specifier: file:../../../grid-audio-foundation/packages/audio-core
+        version: file:../grid-audio-foundation/packages/audio-core
       hls.js:
         specifier: ^1.7.2
         version: 1.7.2
@@ -922,11 +939,31 @@ packages:
     cpu: [x64]
     os: [win32]
 
+  '@internationalized/date@3.12.4':
+    resolution: {integrity: sha512-M1dEn4c1U1HsSlaVR8upZtSqvXrTkHDfv18H01uCSJyjVLDxnBR38v/fMxecmlwXKR4i9HeZcmgQAPE6A+aGJQ==}
+
+  '@internationalized/number@3.6.8':
+    resolution: {integrity: sha512-8UmMFia46DUt+k97zKd9fKWXcWHR+k8ae3eYzILETuT2KbIvLyOfac7zesw+sJdRAAZ7Q9pM1Mk22aXp2LD0Ig==}
+
+  '@internationalized/string@3.2.10':
+    resolution: {integrity: sha512-PDx6//vHSpRnHfxqMqto11zQvhsaU74O3mKv2F/0eicGZcl9NLjQmGlbHz/LsJh5tLKp4A4L7ZVTzN1/MmMTvA==}
+
   '@ioredis/commands@1.10.0':
     resolution: {integrity: sha512-UmeW7z4LfctwoQ5wkhVzgq8tXkreED2xZGpX+Bg+zA+WJFZCT6c062AfCK/Dfk81xZnnwdhJCUMkitihRaoC2Q==}
 
-  '@isoastra/audio-react@file:../grid-voice-memos/packages/audio-react':
-    resolution: {directory: ../grid-voice-memos/packages/audio-react, type: directory}
+  '@isoastra/audio-core@file:../grid-audio-foundation/packages/audio-core':
+    resolution: {directory: ../grid-audio-foundation/packages/audio-core, type: directory}
+
+  '@isoastra/audio-node@file:../grid-audio-foundation/packages/audio-node':
+    resolution: {directory: ../grid-audio-foundation/packages/audio-node, type: directory}
+    peerDependencies:
+      '@isoastra/fleet-workflows': 0.0.0
+    peerDependenciesMeta:
+      '@isoastra/fleet-workflows':
+        optional: true
+
+  '@isoastra/audio-react@file:../grid-audio-foundation/packages/audio-react':
+    resolution: {directory: ../grid-audio-foundation/packages/audio-react, type: directory}
     peerDependencies:
       react: ^19.0.0
 
@@ -959,6 +996,10 @@ packages:
   '@isoastra/fleet-ids@0.1.1':
     resolution: {integrity: sha512-GxxpYKScNUaV67kqvt//rVQgoxXsvyitKMEulF2RxU0mrg4FX7nrfY/fmsmPRf4KnE6cYH0XEnlEy9Yq3jI44w==, tarball: https://npm.pkg.github.com/download/@isoastra/fleet-ids/0.1.1/1aa2fc71810f33ec7ecab022c1baee6b84aaa181}
 
+  '@isoastra/fleet-runtime@file:../grid-audio-foundation/packages/fleet-runtime':
+    resolution: {directory: ../grid-audio-foundation/packages/fleet-runtime, type: directory}
+    engines: {node: '>=22.12.0'}
+
   '@isoastra/grid-core@0.1.0':
     resolution: {integrity: sha512-j20dlQUQohWQBShvOvwSBpzdMF7/YzRm0zVXSdDlfSL+XUF5XjwXkW9YcsdfuANWg9SlZuaQ06WZKQQGyo+lKQ==, tarball: https://npm.pkg.github.com/download/@isoastra/grid-core/0.1.0/359da17610b24b1127b0ba4d37150c0256c1fc8d}
 
@@ -972,6 +1013,17 @@ packages:
     resolution: {integrity: sha512-yHyryCotwq73EcY2RRum3QyQ9WftgtPObXbqdNEjh/Ucp3djAuvzxa5UiYib4rs/3DPKQPp26m6SWbuuRvRA2A==, tarball: https://npm.pkg.github.com/download/@isoastra/grid-react/0.1.0/d5dc6b417b7751897b5566c8f2964bcf2a78c679}
     peerDependencies:
       react: ^19.0.0
+
+  '@isoastra/ui-media@file:../grid-audio-foundation/packages/ui-media':
+    resolution: {directory: ../grid-audio-foundation/packages/ui-media, type: directory}
+    peerDependencies:
+      react: ^19.0.0
+
+  '@isoastra/ui@file:../grid-audio-foundation/packages/ui':
+    resolution: {directory: ../grid-audio-foundation/packages/ui, type: directory}
+    peerDependencies:
+      react: ^19.0.0
+      react-dom: ^19.0.0
 
   '@jridgewell/gen-mapping@0.3.13':
     resolution: {integrity: sha512-2kkt/7niJ6MgEPxF0bYdQ6etZaA+fQvDcLKckhy1yIQOzaoKjBBjSj63/aLVjYE3qhRt5dvM+uUyfCg6UKCBbA==}
@@ -1170,6 +1222,11 @@ packages:
     resolution: {integrity: sha512-oxMK4vllB9RK5NQ2l1pq1IfOf2AvnEuj/vYGDj0H2nMtmtZpKtCwt/l00GEO6xjGfpBNAvjovvYdCm50dRQkpQ==}
     engines: {node: '>=20'}
     hasBin: true
+
+  '@react-types/shared@3.36.1':
+    resolution: {integrity: sha512-AzsuD9OfxTOZMMvTRhlN3oHBwOmFN7tDh27LzqmHt4+uOgPhJT7ZM7/kVs/8/o0WxayMUIk3hBmCFRHv1FUoag==}
+    peerDependencies:
+      react: ^16.8.0 || ^17.0.0-rc.1 || ^18.0.0 || ^19.0.0-rc.1
 
   '@redis/client@5.12.1':
     resolution: {integrity: sha512-7aPGWeqA3uFm43o19umzdl16CEjK/JQGtSXVPevplTaOU3VJA/rseBC1QvYUz9lLDIMBimc4SW/zrW4S89BaCA==}
@@ -1673,6 +1730,10 @@ packages:
   argparse@2.0.1:
     resolution: {integrity: sha512-8+9WqebbFzpX9OR+Wa6O29asIogeRMzcGtAINdpMHHyAg10f05aSFVBbcEqGf/PXw1EjAZ+q2/bEBg3DvurK3Q==}
 
+  aria-hidden@1.2.6:
+    resolution: {integrity: sha512-ik3ZgC9dY/lYVVM++OISsaYDeg1tb0VtP5uL3ouh1koGOaUMDPpbFIei4JkFimWUFPn90sbMNMXQAIVOlnYKJA==}
+    engines: {node: '>=10'}
+
   aria-query@5.3.2:
     resolution: {integrity: sha512-COROpnaoap1E2F000S62r6A60uHZnmlvomhfyT2DlTcrY1OrBKn2UhH7qn5wTC9zMvD0AY7csdPSNwKP+7WiQw==}
     engines: {node: '>= 0.4'}
@@ -1860,6 +1921,10 @@ packages:
 
   client-only@0.0.1:
     resolution: {integrity: sha512-IV3Ou0jSMzZrd3pZ48nLkT9DA7Ag1pnPzaiQhpW7c3RbcqqzvzzVu+L8gfqMp/8IM2MQtSiqaCxrrcfu8I8rMA==}
+
+  clsx@2.1.1:
+    resolution: {integrity: sha512-eYm0QWBtUrBWZWG0d386OGAw16Z995PiOVo2B7bjWSbHedGl5e0ZWaq65kOGgUSNesEIDkB9ISbTg/JK9dhCZA==}
+    engines: {node: '>=6'}
 
   cluster-key-slot@1.1.1:
     resolution: {integrity: sha512-rwHwUfXL40Chm1r08yrhU3qpUvdVlgkKNeyeGPOxnW8/SyVDvgRaed/Uz54AqWNaTCAThlj6QAs3TZcKI0xDEw==}
@@ -2956,6 +3021,18 @@ packages:
   queue-microtask@1.2.3:
     resolution: {integrity: sha512-NuaNSa6flKT5JaSYQzJok04JzTL1CA6aGhv5rfLW3PgqA+M2ChpZQnAC8h8i4ZFkBS8X5RqkDBHA7r4hej3K9A==}
 
+  react-aria-components@1.21.1:
+    resolution: {integrity: sha512-J88WflYY0z+EhLX0ce+GjFlQ3ag3ubIgfUTjpKSrBQBu92Xtl4Ub9o118HItUddtbk1Ido0jzyPy94/klZy1hg==}
+    peerDependencies:
+      react: ^16.8.0 || ^17.0.0-rc.1 || ^18.0.0 || ^19.0.0-rc.1
+      react-dom: ^16.8.0 || ^17.0.0-rc.1 || ^18.0.0 || ^19.0.0-rc.1
+
+  react-aria@3.52.1:
+    resolution: {integrity: sha512-fdZZruC9/x/joCg0mhKGs5aHpwrXLCSZ4GOJmhhYyiE0ffyEsk9MLFt9LCOCF9tn8ErTD+UDQP4oDUSlZkmpCg==}
+    peerDependencies:
+      react: ^16.8.0 || ^17.0.0-rc.1 || ^18.0.0 || ^19.0.0-rc.1
+      react-dom: ^16.8.0 || ^17.0.0-rc.1 || ^18.0.0 || ^19.0.0-rc.1
+
   react-dom@19.2.8:
     resolution: {integrity: sha512-rVprimfGBG3DR+Tq0IQG2DT5PxKth1WIGDmj5yPmlzr4YBe7uyE+Du4oVqTDXZSHGGGXRtTJEGSSePyQCMBglQ==}
     peerDependencies:
@@ -2963,6 +3040,11 @@ packages:
 
   react-is@16.13.1:
     resolution: {integrity: sha512-24e6ynE2H+OKt4kqsOvNd8kBpV65zoxbA4BVsEOB3ARVWQki/DHzaUoC5KuON/BiccDaCCTZBuOcfZs70kR8bQ==}
+
+  react-stately@3.50.0:
+    resolution: {integrity: sha512-TnckvpDQGU0672wEaLZqdzvhuSeXWjgW6vijMWxiKOxc8CosQUfPGISdcZyfHqjX3XMjEtRxj4w9HumvX4h4mw==}
+    peerDependencies:
+      react: ^16.8.0 || ^17.0.0-rc.1 || ^18.0.0 || ^19.0.0-rc.1
 
   react@19.2.8:
     resolution: {integrity: sha512-PWaYA1L/q9u2u7xYQi+Y3L3Yfnie7XyLeaJICV1MGD6LprsBxcAqGjYyr0eY3p+QdsA+x/Irkt4Qif8D63+Sbw==}
@@ -3284,6 +3366,11 @@ packages:
 
   url-parse@1.5.10:
     resolution: {integrity: sha512-WypcfiRhfeUP9vvF0j6rw0J3hrWrw6iZv3+22h6iRMJ/8z1Tj6XfLP4DsUix5MhMPnXpiHDoKyoZ/bdCkwBCiQ==}
+
+  use-sync-external-store@1.7.0:
+    resolution: {integrity: sha512-6L+EeigHMQhdaIPNIFUKwfWJSwWFQ8gJbJ2DLOs5sDIegTwR9fRxvnM3uciHKjIZhFz+KAv2emhWMRvDmMcY8A==}
+    peerDependencies:
+      react: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
 
   vite-node@3.2.4:
     resolution: {integrity: sha512-EbKSKh+bh1E1IFxeO0pg1n4dvoOTt0UDiXMd/qn++r98+jPO1xtJilvXldeuQ8giIB5IkpjCgMleHMNEsGH6pg==}
@@ -3898,14 +3985,42 @@ snapshots:
   '@img/sharp-win32-x64@0.35.4':
     optional: true
 
+  '@internationalized/date@3.12.4':
+    dependencies:
+      '@swc/helpers': 0.5.15
+
+  '@internationalized/number@3.6.8':
+    dependencies:
+      '@swc/helpers': 0.5.15
+
+  '@internationalized/string@3.2.10':
+    dependencies:
+      '@swc/helpers': 0.5.15
+
   '@ioredis/commands@1.10.0':
     optional: true
 
-  '@isoastra/audio-react@file:../grid-voice-memos/packages/audio-react(react@19.2.8)':
+  '@isoastra/audio-core@file:../grid-audio-foundation/packages/audio-core':
     dependencies:
-      '@isoastra/audio-core': link:../grid-voice-memos/packages/audio-core
+      tus-js-client: 4.3.1
+
+  '@isoastra/audio-node@file:../grid-audio-foundation/packages/audio-node':
+    dependencies:
+      '@tus/file-store': 2.1.1
+      '@tus/server': 2.4.5
+    transitivePeerDependencies:
+      - '@node-rs/xxhash'
+      - '@opentelemetry/api'
+      - supports-color
+
+  '@isoastra/audio-react@file:../grid-audio-foundation/packages/audio-react(react-dom@19.2.8(react@19.2.8))(react@19.2.8)':
+    dependencies:
+      '@isoastra/audio-core': file:../grid-audio-foundation/packages/audio-core
+      '@isoastra/ui-media': file:../grid-audio-foundation/packages/ui-media(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       hls.js: 1.7.2
       react: 19.2.8
+    transitivePeerDependencies:
+      - react-dom
 
   '@isoastra/fleet-configured@0.1.3(drizzle-orm@0.45.2(@types/pg@8.23.1)(kysely@0.29.5)(pg@8.23.0))(next@15.5.25(@playwright/test@1.63.0)(@types/node@24.13.3)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(pg@8.23.0)(react@19.2.8)(zod@4.5.4)':
     dependencies:
@@ -3936,6 +4051,8 @@ snapshots:
 
   '@isoastra/fleet-ids@0.1.1': {}
 
+  '@isoastra/fleet-runtime@file:../grid-audio-foundation/packages/fleet-runtime': {}
+
   '@isoastra/grid-core@0.1.0': {}
 
   '@isoastra/grid-next@0.1.0(next@15.5.25(@playwright/test@1.63.0)(@types/node@24.13.3)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)':
@@ -3948,6 +4065,19 @@ snapshots:
     dependencies:
       '@isoastra/grid-core': 0.1.0
       react: 19.2.8
+
+  '@isoastra/ui-media@file:../grid-audio-foundation/packages/ui-media(react-dom@19.2.8(react@19.2.8))(react@19.2.8)':
+    dependencies:
+      '@isoastra/ui': file:../grid-audio-foundation/packages/ui(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      react: 19.2.8
+    transitivePeerDependencies:
+      - react-dom
+
+  '@isoastra/ui@file:../grid-audio-foundation/packages/ui(react-dom@19.2.8(react@19.2.8))(react@19.2.8)':
+    dependencies:
+      react: 19.2.8
+      react-aria-components: 1.21.1(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      react-dom: 19.2.8(react@19.2.8)
 
   '@jridgewell/gen-mapping@0.3.13':
     dependencies:
@@ -4086,6 +4216,10 @@ snapshots:
   '@playwright/test@1.63.0':
     dependencies:
       playwright: 1.63.0
+
+  '@react-types/shared@3.36.1(react@19.2.8)':
+    dependencies:
+      react: 19.2.8
 
   '@redis/client@5.12.1':
     dependencies:
@@ -4536,6 +4670,10 @@ snapshots:
 
   argparse@2.0.1: {}
 
+  aria-hidden@1.2.6:
+    dependencies:
+      tslib: 2.8.1
+
   aria-query@5.3.2: {}
 
   array-buffer-byte-length@1.0.2:
@@ -4717,6 +4855,8 @@ snapshots:
   check-error@2.1.3: {}
 
   client-only@0.0.1: {}
+
+  clsx@2.1.1: {}
 
   cluster-key-slot@1.1.1:
     optional: true
@@ -5912,12 +6052,48 @@ snapshots:
 
   queue-microtask@1.2.3: {}
 
+  react-aria-components@1.21.1(react-dom@19.2.8(react@19.2.8))(react@19.2.8):
+    dependencies:
+      '@internationalized/date': 3.12.4
+      '@internationalized/string': 3.2.10
+      '@react-types/shared': 3.36.1(react@19.2.8)
+      '@swc/helpers': 0.5.15
+      client-only: 0.0.1
+      react: 19.2.8
+      react-aria: 3.52.1(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      react-dom: 19.2.8(react@19.2.8)
+      react-stately: 3.50.0(react@19.2.8)
+
+  react-aria@3.52.1(react-dom@19.2.8(react@19.2.8))(react@19.2.8):
+    dependencies:
+      '@internationalized/date': 3.12.4
+      '@internationalized/number': 3.6.8
+      '@internationalized/string': 3.2.10
+      '@react-types/shared': 3.36.1(react@19.2.8)
+      '@swc/helpers': 0.5.15
+      aria-hidden: 1.2.6
+      clsx: 2.1.1
+      react: 19.2.8
+      react-dom: 19.2.8(react@19.2.8)
+      react-stately: 3.50.0(react@19.2.8)
+      use-sync-external-store: 1.7.0(react@19.2.8)
+
   react-dom@19.2.8(react@19.2.8):
     dependencies:
       react: 19.2.8
       scheduler: 0.27.0
 
   react-is@16.13.1: {}
+
+  react-stately@3.50.0(react@19.2.8):
+    dependencies:
+      '@internationalized/date': 3.12.4
+      '@internationalized/number': 3.6.8
+      '@internationalized/string': 3.2.10
+      '@react-types/shared': 3.36.1(react@19.2.8)
+      '@swc/helpers': 0.5.15
+      react: 19.2.8
+      use-sync-external-store: 1.7.0(react@19.2.8)
 
   react@19.2.8: {}
 
@@ -6361,6 +6537,10 @@ snapshots:
     dependencies:
       querystringify: 2.2.0
       requires-port: 1.0.0
+
+  use-sync-external-store@1.7.0(react@19.2.8):
+    dependencies:
+      react: 19.2.8
 
   vite-node@3.2.4(@types/node@24.13.3)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.13):
     dependencies:

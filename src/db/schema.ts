@@ -818,6 +818,6 @@ export const voiceMemoWaveformTile = pgTable(
   },
   (t) => [
     primaryKey({ columns: [t.memoId, t.generation, t.level, t.startPeak] }),
-    check('voice_memo_waveform_level', sql`${t.level} IN (1,10,100)`),
+    check('voice_memo_waveform_level', sql`${t.level} > 0 AND (${t.level} IN (10,100) OR (${t.level} & (${t.level} - 1)) = 0)`),
   ],
 );
