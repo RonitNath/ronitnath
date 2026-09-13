@@ -10,7 +10,7 @@ import { issueIngressLease } from '@isoastra/fleet-delivery/ingress';
 const exec = promisify(execFile);
 const postgresImage =
   'postgres:17-alpine@sha256:18cfe3ef5e6815560c98237d6216d1e5119702fb0f3894c8785dd58b8bbe5d73';
-const hostCli = '/opt/fleet-delivery/0.3.12/dist/cli.js';
+const hostCli = '/opt/fleet-delivery/0.3.13/dist/cli.js';
 const knownHosts = '/etc/fleet-ingress/known_hosts';
 const sshKey = '/var/lib/secrets/fleet-ingress/client-ssh';
 
