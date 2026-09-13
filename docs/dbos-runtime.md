@@ -38,24 +38,35 @@ acknowledgements. HTTP then drains for up to 15 seconds, followed by DBOS's
 20-second workflow budget, all inside the supervisor's 45-second deadline.
 Any failed child cleanup or forced termination makes the container exit nonzero.
 
-## Mail recovery
+## Mail recovery and migration
 
-Authentication callbacks persist `mail_intent` before returning. The worker
-polls pending rows and starts a stable DBOS workflow. Six logical delivery
-attempts use 1, 5, 30, 120, and 300-second waits. Each provider result is a DBOS
-checkpoint before a separate database step records and purges it. Provider
-429/5xx, SMTP 4xx and ambiguous network outcomes retry; ordinary HTTP 4xx and
-SMTP 5xx stop. Calls have a ten-second deadline bounded by the one-hour link
-lifetime. Because providers have no accepted idempotency contract, a crash
-before the provider-result checkpoint can repeat a call. Attempt evidence
-records those invocations under one logical attempt.
+New authentication callbacks persist a `fleet_delivery_intent` and its
+`fleet_notification_outbox` row in one transaction before returning. The
+shared notification scheduler starts stable DBOS workflows. Authentication
+mail is direct delivery: it creates no inbox notification and uses no
+aggregation. Six logical delivery attempts use 1, 5, 30, 120, and 300-second
+waits. The address and immutable rendered message are loaded inside worker
+steps and are purged after acceptance, rejection, or expiry. Correlation,
+message kind, a keyed recipient identity, and sanitized attempt evidence remain.
 
-Use `pnpm mail:intents summary` for aggregate state, `list` for non-success rows,
-and `show <uuid>` for sanitized attempt evidence. `resume <uuid>` resumes an
-eligible failed workflow under the same version and identity. `retry <uuid>`
-creates a new generation only while content exists and the link is live.
-Concurrent operator actions serialize per intent. Accepted, exhausted,
-permanently rejected, and expired intents have token-bearing bodies removed.
+useSend receives the stable intent key as `Idempotency-Key`; set
+`USESEND_IDEMPOTENCY_RETENTION_MS` only when the provider contract guarantees
+deduplication for that period. SMTP receives a stable `Message-ID`, which does
+not itself guarantee deduplication. The application explicitly retries
+uncertain authentication delivery with the same key and payload. A crash after
+provider acceptance but before the DBOS checkpoint can therefore duplicate a
+message on a provider without deduplication.
+
+Migration `0016_fleet_notifications` is additive. New callbacks write only the
+shared tables. The registered legacy `deliverMail` workflow and legacy poller
+remain solely for `mail_intent` rows created before the handoff. No row has two
+dispatchers, and old application versions can recover their workflow history.
+
+Use `pnpm mail:intents summary` for both stores, `list` for non-success rows,
+and `show <uuid>` for sanitized attempt evidence. `resume <uuid>` is the legacy
+same-version recovery command. `retry <uuid>` creates a new generation for a
+paused shared intent or an eligible legacy intent while content and link remain
+live. Concurrent operator actions serialize per intent.
 
 DBOS workflow history is the recovery record. Do not reset domain-event cursors
 to retry a workflow. Keep old application versions runnable until their pending
@@ -69,12 +80,15 @@ work is drained or explicitly migrated.
 - identity and gates: request identity/authorization only; no workflow startup.
 - billing, ledger, accounting: authoritative transactional quantities and
   idempotent financial records; notification side effects consume their facts.
+- `fleet-notifications`: durable inbox state, aggregation primitives, revision
+  proposals, delivery evidence, transport contracts, and the DBOS scheduler.
+  ronitnath currently adopts only direct authentication delivery.
 - `fleet-workflows`: DBOS itself plus replay-safe event dispatch and an explicit,
   cancellable subscription loop. Applications own domain interpretation,
   recipient authorization, message text, and retained evidence.
 - `fleet-runtime`: lifecycle state and IPC types. Imports never install signals.
 
-Rebuild the three checked-in local package artifacts with
+Rebuild the four checked-in local package artifacts with
 `scripts/pack-grid.sh`; it also rewrites `vendor/SHA256SUMS`. No dependency may
 point at a sibling source worktree.
 

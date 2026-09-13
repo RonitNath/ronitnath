@@ -2,7 +2,7 @@
 set -eu
 
 root=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
-grid=${GRID_RUNTIME_SOURCE:-/Users/ronitnath/dev/worktrees/grid-dbos-runtime}
+grid=${GRID_RUNTIME_SOURCE:-/Users/ronitnath/dev/worktrees/grid-notifications}
 
 TEST_PG_BIN=${TEST_PG_BIN:-/opt/homebrew/opt/postgresql@16/bin} pnpm --dir "$grid" gate
 TEST_PG_BIN=${TEST_PG_BIN:-/opt/homebrew/opt/postgresql@16/bin} \

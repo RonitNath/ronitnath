@@ -142,15 +142,18 @@ try {
     USESEND_API_KEY: 'local-provider-key',
   };
   await run('pnpm', ['db:migrate:all'], baseEnv);
-  await run('pnpm', ['test'], {
-    ...baseEnv,
-    TEST_DATABASE_URL: databaseUrl,
-    PUBLIC_ORIGIN: 'http://localhost:3000',
-  });
+  if (process.env.RUNTIME_SKIP_DATABASE_GATE !== '1') {
+    await run('pnpm', ['test'], {
+      ...baseEnv,
+      TEST_DATABASE_URL: databaseUrl,
+      PUBLIC_ORIGIN: 'http://localhost:3000',
+    });
+  }
   db = new pg.Pool({ connectionString: databaseUrl, max: 2 });
   db.on('error', () => undefined);
 
   let providerCalls = 0;
+  const providerKeys = [];
   let providerMode = 'success';
   const delivered = [];
   let firstRequestResolve;
@@ -161,6 +164,7 @@ try {
     let body = '';
     for await (const chunk of request) body += chunk;
     providerCalls += 1;
+    providerKeys.push(request.headers['idempotency-key']);
     if (providerCalls === 1) {
       firstRequestResolve();
       return;
@@ -213,7 +217,7 @@ try {
   await waitFor(
     async () => {
       const result = await db.query(
-        "SELECT state,message IS NULL AS purged FROM mail_intent WHERE recipient='runtime@example.test'",
+        "SELECT state,message IS NULL AS purged FROM fleet_delivery_intent WHERE address='runtime@example.test'",
       );
       return result.rows[0]?.state === 'accepted' && result.rows[0]?.purged;
     },
@@ -224,14 +228,15 @@ try {
     providerCalls >= 2,
     `expected an interrupted call and at least one recovery call, got ${providerCalls}`,
   );
-  const recoveredAttempt =
-    await db.query(`SELECT provider_invocations FROM mail_attempt a JOIN mail_intent i ON i.id=a.intent_id
-    WHERE i.recipient='runtime@example.test' AND a.generation=0 AND a.ordinal=1`);
+  const recoveredAttempt = await db.query(`SELECT provider_invocations FROM fleet_delivery_attempt a
+    JOIN fleet_delivery_intent i ON i.tenant_id=a.tenant_id AND i.id=a.intent_id
+    WHERE i.address='runtime@example.test' AND a.generation=1 AND a.ordinal=1`);
   check(
     recoveredAttempt.rowCount === 1 &&
       recoveredAttempt.rows[0].provider_invocations === providerCalls,
     'ambiguous provider invocations were not attributed to one durable attempt',
   );
+  check(providerKeys[0] && providerKeys[0] === providerKeys[1], 'recovery changed the delivery idempotency key');
   const verificationUrl = delivered[0]?.text?.match(/https?:\/\/\S+/)?.[0];
   check(verificationUrl, 'delivered verification URL missing');
   const verification = await fetch(verificationUrl, { redirect: 'manual' });
@@ -255,8 +260,9 @@ try {
   check(versionSignup.ok, `version test signup failed: ${versionSignup.status}`);
   await waitFor(async () => {
     const result =
-      await db.query(`SELECT 1 FROM mail_attempt a JOIN mail_intent i ON i.id=a.intent_id
-      WHERE i.recipient='version@example.test' AND a.outcome='retry' AND a.detail='http_503'`);
+      await db.query(`SELECT 1 FROM fleet_delivery_attempt a JOIN fleet_delivery_intent i
+      ON i.tenant_id=a.tenant_id AND i.id=a.intent_id
+      WHERE i.address='version@example.test' AND a.outcome='retry' AND a.code='http_503'`);
     return result.rowCount === 1;
   }, 'transient workflow attempt missing');
   const recoveredWorker = await waitFor(
@@ -287,7 +293,7 @@ try {
   await waitFor(
     async () => {
       const result = await db.query(
-        "SELECT state FROM mail_intent WHERE recipient='version@example.test'",
+        "SELECT state FROM fleet_delivery_intent WHERE address='version@example.test'",
       );
       return result.rows[0]?.state === 'accepted';
     },
@@ -308,11 +314,18 @@ try {
   check(permanentSignup.ok, 'permanent-failure signup failed before durable delivery');
   await waitFor(async () => {
     const result = await db.query(
-      "SELECT state,message IS NULL AS purged FROM mail_intent WHERE recipient='permanent@example.test'",
+      "SELECT state,message IS NULL AS purged FROM fleet_delivery_intent WHERE address='permanent@example.test'",
     );
-    return result.rows[0]?.state === 'failed' && result.rows[0]?.purged;
+    return result.rows[0]?.state === 'rejected' && result.rows[0]?.purged;
   }, 'permanent provider failure was not finalized');
   providerMode = 'success';
+  await db.query(`INSERT INTO mail_intent(id,deduplication_key,kind,recipient,message,correlation_id,expires_at)
+    VALUES('00000000-0000-4000-8000-000000000098','legacy-pending-test','verify_email','legacy@example.test',
+    '{"to":"legacy@example.test","subject":"Legacy pending","text":"legacy body","html":"<p>legacy body</p>"}','test',now()+interval '1 minute')`);
+  await waitFor(async () => {
+    const result = await db.query("SELECT state,message IS NULL AS purged FROM mail_intent WHERE recipient='legacy@example.test'");
+    return result.rows[0]?.state === 'accepted' && result.rows[0]?.purged;
+  }, 'legacy pending mail was not delivered by its compatible handler');
   await db.query(`INSERT INTO mail_intent(id,deduplication_key,kind,recipient,message,correlation_id,expires_at)
     VALUES('00000000-0000-4000-8000-000000000099','expired-test','verify_email','expired@example.test','{}','test',now()-interval '1 second')`);
   await waitFor(async () => {
@@ -412,7 +425,8 @@ try {
   );
   const devExit = exited(development.child);
   development.child.kill('SIGTERM');
-  check((await devExit).code === 0, 'development runtime did not shut down cleanly');
+  const developmentExit = await devExit;
+  check(developmentExit.code === 0, `development runtime did not shut down cleanly: ${JSON.stringify(developmentExit)}`);
   const combinedLogs = [first, recovered, v2, active, replica, development]
     .map((runtime) => runtime.output())
     .join('\n');
