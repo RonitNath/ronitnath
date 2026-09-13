@@ -19,6 +19,7 @@ import { operatorPath, userPath } from '@/lib/paths';
 import { requireOperator } from '@/lib/tiers';
 import { emit } from '@/lib/fleet/events';
 import { catalogSchema, dateOnly, materializeOffer } from './model';
+import { beginCommand, completeCommand } from './operations';
 
 const DECLINED = 'That billing command is unavailable or has changed.';
 const keyOf = (seller: string) => `billing.catalog.${seller}`;
@@ -59,26 +60,34 @@ const adjustmentEffect = (form: FormData): FinancialAdjustmentEffect => field(fo
 
 export async function saveCatalogDraft(_prev: FormState, form: FormData): Promise<FormState> {
   const { principal } = await requireOperator();
-  const sellerId = field(form, 'seller');
+  const sellerId = field(form, 'seller'), operationKey = field(form, 'operationKey'), version = expected(form);
   let body;
   try { body = catalogSchema.parse(JSON.parse(field(form, 'catalog'))); } catch { return { error: 'The catalog must be valid offer JSON.' }; }
   try {
-    const version = await database().transaction((tx) => saveDraft(tx, 'isoastra', keyOf(sellerId), body, expected(form), customerId(principal.personId)));
+    const savedVersion = await database().transaction(async (tx) => {
+      const operation = await beginCommand(tx, { operationKey, actorPersonId: principal.personId, command: 'save-catalog-draft', request: { sellerId, version, body } });
+      if (operation.retry) return Number((operation.result as { version: number }).version);
+      const next = await saveDraft(tx, 'isoastra', keyOf(sellerId), body, version, customerId(principal.personId));
+      await completeCommand(tx, operationKey, { version: next });
+      return next;
+    });
     revalidatePath(operatorPath('billing'));
-    return { notice: `Draft ${version} saved.` };
+    return { notice: `Draft ${savedVersion} saved.` };
   } catch { return { error: DECLINED }; }
 }
 
 export async function publishCatalog(_prev: FormState, form: FormData): Promise<FormState> {
   const { principal } = await requireOperator();
-  const sellerId = field(form, 'seller');
+  const sellerId = field(form, 'seller'), operationKey = field(form, 'operationKey'), expectedVersion = expected(form);
   try {
     const version = await database().transaction(async (tx) => {
+      const operation = await beginCommand(tx, { operationKey, actorPersonId: principal.personId, command: 'publish-catalog', request: { sellerId, expectedVersion } });
+      if (operation.retry) return Number((operation.result as { version: number }).version);
       const seller = (await tx.select().from(schema.billingSeller).where(eq(schema.billingSeller.id, sellerId)).limit(1))[0];
       if (!seller) throw new Error('seller');
       const draft = await readDraft(tx, 'isoastra', keyOf(sellerId));
       const body = catalogSchema.parse(draft.body);
-      if (draft.version !== expected(form)) throw new Error('stale');
+      if (draft.version !== expectedVersion) throw new Error('stale');
       await publish(tx, 'isoastra', keyOf(sellerId), draft.version, customerId(principal.personId));
       for (const input of body.offers) {
         const offer = validateOfferVersion(materializeOffer(sellerId, draft.version, input));
@@ -87,6 +96,7 @@ export async function publishCatalog(_prev: FormState, form: FormData): Promise<
           .onConflictDoUpdate({ target: [schema.billingOffer.namespace, schema.billingOffer.id], set: { publishedVersion: offer.version, available: offer.available, updatedAt: new Date() } });
         if (offer.kind === 'subscription') await savePriceVersion(ledger(tx), { id: offer.id, namespace: sellerId, version: offer.version, currency: 'USD', interval: offer.interval!, model: { kind: 'flat', amountAtoms: offer.amountAtoms }, recognition: 'advance_deferred' });
       }
+      await completeCommand(tx, operationKey, { version: draft.version });
       return draft.version;
     });
     revalidatePath(operatorPath('billing'));
@@ -96,7 +106,7 @@ export async function publishCatalog(_prev: FormState, form: FormData): Promise<
 
 export async function savePilotOfferDraft(_prev: FormState, form: FormData): Promise<FormState> {
   const { principal } = await requireOperator();
-  const sellerId = field(form, 'seller');
+  const sellerId = field(form, 'seller'), operationKey = field(form, 'operationKey'), version = expected(form);
   const amountAtoms = field(form, 'amountAtoms');
   const paymentDueDays = Number(field(form, 'paymentDueDays'));
   const body = catalogSchema.safeParse({ offers: [{
@@ -106,44 +116,65 @@ export async function savePilotOfferDraft(_prev: FormState, form: FormData): Pro
   }] });
   if (!body.success) return { error: 'Enter valid one-time offer terms and a nonnegative USD-cent price.' };
   try {
-    const version = await database().transaction((tx) => saveDraft(tx, 'isoastra', keyOf(sellerId), body.data, expected(form), customerId(principal.personId)));
+    const savedVersion = await database().transaction(async (tx) => {
+      const operation = await beginCommand(tx, { operationKey, actorPersonId: principal.personId, command: 'save-pilot-offer-draft', request: { sellerId, version, body: body.data } });
+      if (operation.retry) return Number((operation.result as { version: number }).version);
+      const next = await saveDraft(tx, 'isoastra', keyOf(sellerId), body.data, version, customerId(principal.personId));
+      await completeCommand(tx, operationKey, { version: next });
+      return next;
+    });
     revalidatePath(operatorPath('billing'));
-    return { notice: `Pilot offer draft ${version} saved. Review it before publication.` };
+    return { notice: `Pilot offer draft ${savedVersion} saved. Review it before publication.` };
   } catch { return { error: DECLINED }; }
 }
 
 export async function addPilotAccount(_prev: FormState, form: FormData): Promise<FormState> {
-  await requireOperator();
+  const { principal } = await requireOperator();
+  const operationKey = field(form, 'operationKey');
   let personId: number;
   try { personId = decodeId('person', field(form, 'person')); } catch { return { error: 'Enter a valid public person ID.' }; }
-  const exists = await database().select({ id: schema.person.id }).from(schema.person).where(eq(schema.person.id, personId)).limit(1);
-  if (!exists.length) return { error: DECLINED };
-  await database().insert(schema.billingPilotAccount).values({ personId }).onConflictDoUpdate({ target: schema.billingPilotAccount.personId, set: { enabled: true, version: sql`${schema.billingPilotAccount.version}+1`, updatedAt: new Date() } });
+  try { await database().transaction(async (tx) => {
+    const operation = await beginCommand(tx, { operationKey, actorPersonId: principal.personId, command: 'add-pilot-account', request: { personId } });
+    if (operation.retry) return;
+    const exists = await tx.select({ id: schema.person.id }).from(schema.person).where(eq(schema.person.id, personId)).limit(1);
+    if (!exists.length) throw new Error('person');
+    await tx.insert(schema.billingPilotAccount).values({ personId }).onConflictDoUpdate({ target: schema.billingPilotAccount.personId, set: { enabled: true, version: sql`${schema.billingPilotAccount.version}+1`, updatedAt: new Date() } });
+    await completeCommand(tx, operationKey, { personId });
+  }); } catch { return { error: DECLINED }; }
   revalidatePath(operatorPath('billing'));
   return { notice: 'Pilot account enabled.' };
 }
 
 export async function setPilotAccountEnabled(_prev: FormState, form: FormData): Promise<FormState> {
-  await requireOperator();
-  const personId = Number(field(form, 'person')), version = expected(form), enabled = field(form, 'enabled') === 'true';
-  const rows = await database().update(schema.billingPilotAccount).set({ enabled, version: version + 1, updatedAt: new Date() }).where(and(eq(schema.billingPilotAccount.personId, personId), eq(schema.billingPilotAccount.version, version))).returning({ id: schema.billingPilotAccount.personId });
-  if (!rows.length) return { error: DECLINED };
+  const { principal } = await requireOperator();
+  const personId = Number(field(form, 'person')), version = expected(form), enabled = field(form, 'enabled') === 'true', operationKey = field(form, 'operationKey');
+  try { await database().transaction(async (tx) => {
+    const operation = await beginCommand(tx, { operationKey, actorPersonId: principal.personId, command: 'set-pilot-account-enabled', request: { personId, version, enabled } });
+    if (operation.retry) return;
+    const rows = await tx.update(schema.billingPilotAccount).set({ enabled, version: version + 1, updatedAt: new Date() }).where(and(eq(schema.billingPilotAccount.personId, personId), eq(schema.billingPilotAccount.version, version))).returning({ id: schema.billingPilotAccount.personId });
+    if (!rows.length) throw new Error('stale');
+    await completeCommand(tx, operationKey, { personId, version: version + 1, enabled });
+  }); } catch { return { error: DECLINED }; }
   revalidatePath(operatorPath('billing'));
   return { notice: enabled ? 'Pilot account enabled.' : 'New purchases disabled for this account.' };
 }
 
 export async function setSellerEnabled(_prev: FormState, form: FormData): Promise<FormState> {
-  await requireOperator();
+  const { principal } = await requireOperator();
   const sellerId = field(form, 'seller');
-  const enabled = field(form, 'enabled') === 'true', version = expected(form);
+  const enabled = field(form, 'enabled') === 'true', version = expected(form), operationKey = field(form, 'operationKey');
   const changed = await database().transaction(async (tx) => {
+    const operation = await beginCommand(tx, { operationKey, actorPersonId: principal.personId, command: 'set-seller-enabled', request: { sellerId, version, enabled } });
+    if (operation.retry) return [operation.result];
     const seller = (await tx.select().from(schema.billingSeller).where(and(eq(schema.billingSeller.id, sellerId), eq(schema.billingSeller.version, version))).limit(1))[0];
     if (!seller) return [];
     if (enabled) {
       const period = await tx.execute(sql`SELECT 1 FROM fleet_ledger_period WHERE book_id=${seller.bookId} AND state='open' AND starts_on <= current_date AND ends_on > current_date LIMIT 1`);
       if (!period.rowCount) return [];
     }
-    return tx.update(schema.billingSeller).set({ enabled, version: version + 1 }).where(and(eq(schema.billingSeller.id, sellerId), eq(schema.billingSeller.version, version))).returning({ id: schema.billingSeller.id });
+    const rows = await tx.update(schema.billingSeller).set({ enabled, version: version + 1 }).where(and(eq(schema.billingSeller.id, sellerId), eq(schema.billingSeller.version, version))).returning({ id: schema.billingSeller.id });
+    if (rows.length) await completeCommand(tx, operationKey, { sellerId, version: version + 1, enabled });
+    return rows;
   });
   if (!changed.length) return { error: DECLINED };
   revalidatePath(operatorPath('billing'));
@@ -274,14 +305,18 @@ export async function fulfillOrder(_prev: FormState, form: FormData): Promise<Fo
 
 export async function changeMembership(_prev: FormState, form: FormData): Promise<FormState> {
   const me = await member();
-  const membershipId = field(form, 'membership'), offerId = field(form, 'offer'), version = expected(form);
+  const membershipId = field(form, 'membership'), offerId = field(form, 'offer'), version = expected(form), operationKey = field(form, 'operationKey');
   try {
     const changed = await database().transaction(async (tx) => {
+      const operation = await beginCommand(tx, { operationKey, actorPersonId: me.personId, command: 'change-membership', request: { membershipId, offerId, version } });
+      if (operation.retry) return true;
       const row = (await tx.select({ membership: schema.billingMembership, order: schema.billingOrder }).from(schema.billingMembership).innerJoin(schema.billingOrder, eq(schema.billingMembership.orderId, schema.billingOrder.id)).where(and(eq(schema.billingMembership.id, membershipId), eq(schema.billingMembership.version, version), eq(schema.billingOrder.customerPersonId, me.personId))).limit(1))[0];
       if (!row) return false;
       const target = await sellerAndOffer(tx, row.order.sellerId, offerId);
       if (!target || target.offer.kind !== 'subscription') return false;
-      await tx.update(schema.billingMembership).set({ pendingOfferId: target.offer.id, pendingOfferVersion: target.offer.version, version: version + 1 }).where(and(eq(schema.billingMembership.id, membershipId), eq(schema.billingMembership.version, version)));
+      const rows = await tx.update(schema.billingMembership).set({ pendingOfferId: target.offer.id, pendingOfferVersion: target.offer.version, version: version + 1 }).where(and(eq(schema.billingMembership.id, membershipId), eq(schema.billingMembership.version, version))).returning({ id: schema.billingMembership.id });
+      if (!rows.length) throw new Error('stale');
+      await completeCommand(tx, operationKey, { membershipId, version: version + 1 });
       return true;
     });
     if (!changed) return { error: DECLINED };
@@ -292,35 +327,50 @@ export async function changeMembership(_prev: FormState, form: FormData): Promis
 
 export async function cancelRenewal(_prev: FormState, form: FormData): Promise<FormState> {
   const me = await member(), membershipId = field(form, 'membership'), version = expected(form);
-  const rows = await database().update(schema.billingMembership).set({ cancelAt: sql`${schema.billingMembership.serviceEndsAt}`, version: version + 1 }).from(schema.billingOrder)
-    .where(and(eq(schema.billingMembership.id, membershipId), eq(schema.billingMembership.version, version), eq(schema.billingMembership.orderId, schema.billingOrder.id), eq(schema.billingOrder.customerPersonId, me.personId))).returning({ id: schema.billingMembership.id });
-  if (!rows.length) return { error: DECLINED };
+  const operationKey = field(form, 'operationKey');
+  try { await database().transaction(async (tx) => {
+    const operation = await beginCommand(tx, { operationKey, actorPersonId: me.personId, command: 'cancel-renewal', request: { membershipId, version } });
+    if (operation.retry) return;
+    const rows = await tx.update(schema.billingMembership).set({ cancelAt: sql`${schema.billingMembership.serviceEndsAt}`, version: version + 1 }).from(schema.billingOrder)
+      .where(and(eq(schema.billingMembership.id, membershipId), eq(schema.billingMembership.version, version), eq(schema.billingMembership.orderId, schema.billingOrder.id), eq(schema.billingOrder.customerPersonId, me.personId))).returning({ id: schema.billingMembership.id });
+    if (!rows.length) throw new Error('stale');
+    await completeCommand(tx, operationKey, { membershipId, version: version + 1 });
+  }); } catch { return { error: DECLINED }; }
   revalidatePath(userPath(customerId(me.personId), 'billing'));
   return { notice: 'Renewal cancelled. Existing balances remain due.' };
 }
 
 export async function setMembershipSuspended(_prev: FormState, form: FormData): Promise<FormState> {
-  await requireOperator();
-  const membershipId = field(form, 'membership'), version = expected(form), suspend = field(form, 'suspend') === 'true';
-  const rows = await database().update(schema.billingMembership).set({ suspendedAt: suspend ? new Date() : null, state: suspend ? 'suspended' : 'active', version: version + 1 })
-    .where(and(eq(schema.billingMembership.id, membershipId), eq(schema.billingMembership.version, version))).returning({ id: schema.billingMembership.id });
-  if (!rows.length) return { error: DECLINED };
+  const { principal } = await requireOperator();
+  const membershipId = field(form, 'membership'), version = expected(form), suspend = field(form, 'suspend') === 'true', operationKey = field(form, 'operationKey');
+  try { await database().transaction(async (tx) => {
+    const operation = await beginCommand(tx, { operationKey, actorPersonId: principal.personId, command: 'set-membership-suspended', request: { membershipId, version, suspend } });
+    if (operation.retry) return;
+    const rows = await tx.update(schema.billingMembership).set({ suspendedAt: suspend ? new Date() : null, state: suspend ? 'suspended' : 'active', version: version + 1 })
+      .where(and(eq(schema.billingMembership.id, membershipId), eq(schema.billingMembership.version, version))).returning({ id: schema.billingMembership.id });
+    if (!rows.length) throw new Error('stale');
+    await completeCommand(tx, operationKey, { membershipId, version: version + 1, suspended: suspend });
+  }); } catch { return { error: DECLINED }; }
   revalidatePath(operatorPath('billing'));
   return { notice: suspend ? 'Membership suspended.' : 'Membership resumed.' };
 }
 
 export async function renewMembership(_prev: FormState, form: FormData): Promise<FormState> {
-  await requireOperator();
+  const { principal } = await requireOperator();
   const membershipId = field(form, 'membership'), version = expected(form), operationKey = field(form, 'operationKey');
   try {
     await database().transaction(async (tx) => {
+      const operation = await beginCommand(tx, { operationKey, actorPersonId: principal.personId, command: 'renew-membership', request: { membershipId, version } });
+      if (operation.retry) return;
       const row = (await tx.select({ membership: schema.billingMembership, order: schema.billingOrder, seller: schema.billingSeller })
         .from(schema.billingMembership).innerJoin(schema.billingOrder, eq(schema.billingMembership.orderId, schema.billingOrder.id)).innerJoin(schema.billingSeller, eq(schema.billingOrder.sellerId, schema.billingSeller.id))
         .where(and(eq(schema.billingMembership.id, membershipId), eq(schema.billingMembership.version, version))).limit(1))[0];
       const now = new Date();
       if (!row || now < row.membership.serviceEndsAt || row.membership.suspendedAt) throw new Error('membership');
       if (row.membership.cancelAt) {
-        await tx.update(schema.billingMembership).set({ state: 'cancelled', version: version + 1 }).where(and(eq(schema.billingMembership.id, membershipId), eq(schema.billingMembership.version, version)));
+        const rows = await tx.update(schema.billingMembership).set({ state: 'cancelled', version: version + 1 }).where(and(eq(schema.billingMembership.id, membershipId), eq(schema.billingMembership.version, version))).returning({ id: schema.billingMembership.id });
+        if (!rows.length) throw new Error('stale');
+        await completeCommand(tx, operationKey, { membershipId, version: version + 1, cancelled: true });
         return;
       }
       const nextOfferId = row.membership.pendingOfferId ?? row.order.offerId;
@@ -333,7 +383,9 @@ export async function renewMembership(_prev: FormState, form: FormData): Promise
       await issueInvoice(ledger(tx), { bookId: seller.bookId, operationKey: `invoice:${operationKey}`, invoiceId, customerId: customerId(row.order.customerPersonId), unit: 'USD', atoms: offer.amountAtoms, occurredAt: now, effectiveOn: dateOnly(now), chart: { ...chart, revenue: chart.deferredRevenue }, lines: [{ key: `${offer.namespace}:${offer.id}:${offer.version}`, description: `${offer.title} renewal`, atoms: offer.amountAtoms }] });
       await recognize(tx, seller.bookId, chart, row.order.totalAtoms, `recognize:${operationKey}`, `order:${row.order.id}`, now);
       await tx.insert(schema.billingOrder).values({ id: orderId, operationKey, customerPersonId: row.order.customerPersonId, sellerId: seller.id, offerNamespace: offer.namespace, offerId: offer.id, offerVersion: offer.version, invoiceId, kind: 'subscription', state: offer.accessPolicy === 'invoice_first' ? 'invoice_open' : 'invoice_open', totalAtoms: offer.amountAtoms, paidAtoms: 0n, renewsOrderId: row.order.id });
-      await tx.update(schema.billingMembership).set({ orderId, state: offer.accessPolicy === 'invoice_first' ? 'active' : 'pending', serviceStartsAt: startsAt, serviceEndsAt: endsAt, pendingOfferId: null, pendingOfferVersion: null, version: version + 1 }).where(and(eq(schema.billingMembership.id, membershipId), eq(schema.billingMembership.version, version)));
+      const rows = await tx.update(schema.billingMembership).set({ orderId, state: offer.accessPolicy === 'invoice_first' ? 'active' : 'pending', serviceStartsAt: startsAt, serviceEndsAt: endsAt, pendingOfferId: null, pendingOfferVersion: null, version: version + 1 }).where(and(eq(schema.billingMembership.id, membershipId), eq(schema.billingMembership.version, version))).returning({ id: schema.billingMembership.id });
+      if (!rows.length) throw new Error('stale');
+      await completeCommand(tx, operationKey, { membershipId, version: version + 1, orderId });
     });
     revalidatePath(operatorPath('billing'));
     return { notice: 'Membership advanced to its next anchored interval.' };

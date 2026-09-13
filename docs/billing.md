@@ -12,14 +12,17 @@ for this pilot. Ronit and Isoastra sellers map to separate books and initialize 
   seller activation, selected-account allowlists, invoice requests, payment claims,
   operator confirmation, excess-payment credit, credit notes, fulfillment, external
   refunds, service-preserving/service-revoking adjustments, and historical customer
-  views after pilot removal.
-- Verified: shared billing 0.5.0 unit/formal checks, fresh PostgreSQL 16 migration and
-  rollback tests, seller-scoped external receipt identity, database financial bounds,
-  and the standalone-artifact browser journey described below.
-- Remaining before production activation: reconcile this feature branch with current
-  Grid/app main, run the final clean package/app gates and migration rehearsal, publish
-  any resulting private package changes, deploy with empty allowlists and unpublished
-  catalogs, then let Ronit select participants and terms in-app.
+  views after pilot removal. Catalog, allowlist, seller, and membership commands also
+  persist canonical request hashes and original receipts for exact retries.
+- Verified: shared billing 0.5.1 unit/formal checks, generated-trace correspondence to
+  production transitions, fresh PostgreSQL 16 migration and rollback tests,
+  seller-scoped external receipt identity, database financial bounds, canonical retry
+  receipts, and the standalone-artifact browser journey described below.
+- Remaining before production activation: move app billing-table mutations behind
+  database-owned checked functions under a restricted runtime login; replay the same
+  generated traces through all database adapters and the server-action boundary; then
+  deploy with empty allowlists and unpublished catalogs. Ronit selects participants and
+  terms in-app after those gates pass.
 
 ## State and accounting boundaries
 
@@ -31,8 +34,10 @@ for this pilot. Ronit and Isoastra sellers map to separate books and initialize 
   the receipt, allocates it, updates the order, and activates eligible service.
 - Invoice postings credit deferred revenue. Fulfillment or completed service posts
   recognition. Credits and externally completed refunds retain their own evidence.
-- Every financial command has an operation key. Mutable app records use expected
-  versions. Entitlements check server time and service boundaries on every read.
+- Every form command has an operation key. App workflow commands store canonical
+  requests and receipts; financial records also retain their domain operation keys.
+  Mutable app records use expected versions. Entitlements check server time and service
+  boundaries on every read.
 - External receipt identities are unique by seller, source namespace, and external ID.
   Cumulative refunds cannot exceed confirmed receipts minus earlier refunds.
 - Payment-first access requires full payment. Invoice-first access begins at

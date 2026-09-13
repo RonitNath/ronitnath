@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { issueInvoice, recordPayment, type BillingChart } from '@isoastra/fleet-billing/accounting';
 import type { LedgerClient } from '@isoastra/fleet-ledger';
 import { database, schema } from '@/db/client';
+import { beginCommand, completeCommand } from '../operations';
 
 const enabled = Boolean(process.env.BILLING_DATABASE_TEST);
 const suite = enabled ? describe : describe.skip;
@@ -67,5 +68,18 @@ suite('billing application transaction contract', () => {
       offerNamespace: 'ronit', offerId: 'test', offerVersion: 1, invoiceId: `invalid:${id}`,
       kind: 'one_time', state: 'paid', totalAtoms: 100n, paidAtoms: 101n,
     })).rejects.toMatchObject({ cause: { code: '23514' } });
+  });
+
+  it('returns the original operation receipt before evaluating changed state and rejects changed retries', async () => {
+    const party = (await database().insert(schema.party).values({ kind: 'person' }).returning({ id: schema.party.id }))[0]!;
+    await database().insert(schema.person).values({ id: party.id, displayName: 'Operation Registry Test' });
+    const operationKey = randomUUID(), request = { sellerId: 'ronit', version: 7, enabled: true };
+    await database().transaction(async (tx) => {
+      expect(await beginCommand(tx, { operationKey, actorPersonId: party.id, command: 'test-command', request })).toEqual({ retry: false, result: null });
+      await completeCommand(tx, operationKey, { acceptedVersion: 8 });
+    });
+    const retry = await database().transaction((tx) => beginCommand(tx, { operationKey, actorPersonId: party.id, command: 'test-command', request }));
+    expect(retry).toEqual({ retry: true, result: { acceptedVersion: 8 } });
+    await expect(database().transaction((tx) => beginCommand(tx, { operationKey, actorPersonId: party.id, command: 'test-command', request: { ...request, enabled: false } }))).rejects.toThrow('changed retry');
   });
 });

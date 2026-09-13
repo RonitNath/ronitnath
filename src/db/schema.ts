@@ -756,6 +756,10 @@ export const billingSeller = pgTable('billing_seller', {
   id: text('id').primaryKey(), name: text('name').notNull(), bookId: text('book_id').notNull().unique(),
   chart: jsonb('chart').notNull(), enabled: boolean('enabled').notNull().default(false), version: integer('version').notNull().default(1), createdAt: now(),
 });
+export const billingCommand = pgTable('billing_command', {
+  operationKey: text('operation_key').primaryKey(), actorPersonId: integer('actor_person_id').notNull().references(() => person.id),
+  command: text('command').notNull(), requestHash: text('request_hash').notNull(), request: jsonb('request').notNull(), result: jsonb('result'), createdAt: now(),
+});
 export const billingPilotAccount = pgTable('billing_pilot_account', {
   personId: integer('person_id').primaryKey().references(() => person.id, { onDelete: 'cascade' }),
   version: integer('version').notNull().default(1), enabled: boolean('enabled').notNull().default(true), createdAt: now(),
