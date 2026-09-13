@@ -14,10 +14,11 @@ for this pilot. Ronit and Isoastra sellers map to separate books and initialize 
   refunds, service-preserving/service-revoking adjustments, and historical customer
   views after pilot removal. Catalog, allowlist, seller, and membership commands also
   persist canonical request hashes and original receipts for exact retries.
-- Verified: shared billing 0.5.1 unit/formal checks, generated-trace correspondence to
+- Verified: shared billing 0.5.2 unit/formal checks, generated-trace correspondence to
   production transitions, fresh PostgreSQL 16 migration and rollback tests,
   seller-scoped external receipt identity, database financial bounds, canonical retry
-  receipts, and the standalone-artifact browser journey described below.
+  receipts, serialized concurrent retries, net recognition after credits/refunds and
+  cancellation, and the standalone-artifact browser journey described below.
 - Remaining before production activation: move app billing-table mutations behind
   database-owned checked functions under a restricted runtime login; replay the same
   generated traces through all database adapters and the server-action boundary; then
@@ -33,7 +34,8 @@ for this pilot. Ronit and Isoastra sellers map to separate books and initialize 
 - A customer claim never posts money. An operator-confirmed claim atomically records
   the receipt, allocates it, updates the order, and activates eligible service.
 - Invoice postings credit deferred revenue. Fulfillment or completed service posts
-  recognition. Credits and externally completed refunds retain their own evidence.
+  the remaining amount after credits and refunds exactly once. Later credits and
+  externally completed refunds adjust earned revenue and retain their own evidence.
 - Every form command has an operation key. App workflow commands store canonical
   requests and receipts; financial records also retain their domain operation keys.
   Mutable app records use expected versions. Entitlements check server time and service
