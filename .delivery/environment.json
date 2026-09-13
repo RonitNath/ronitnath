@@ -1,16 +1,16 @@
 {
   "instance": {
     "schemaVersion": 3,
-    "instanceId": "dcd87bb9-710d-46ec-beb6-39ae3acb488b",
+    "instanceId": "ae784e49-f4c6-4046-9e93-d6bc422628af",
     "application": "ronitnath",
     "profile": "local",
     "mode": "local",
     "owner": "ronitnath",
     "workspace": "/Users/ronitnath/dev/.worktrees/ronitnath-delivery-env",
     "namespace": "ronitnath-local-2c758ddf97",
-    "state": "ready",
-    "createdAt": "2026-09-13T22:24:18.338Z",
-    "updatedAt": "2026-09-13T22:24:21.682Z",
+    "state": "stopped",
+    "createdAt": "2026-09-13T21:38:53.163Z",
+    "updatedAt": "2026-09-13T21:39:45.268Z",
     "expiresAt": null,
     "resources": [
       {
@@ -28,20 +28,7 @@
     ],
     "exposures": []
   },
-  "processes": [
-    {
-      "service": "database",
-      "pid": 10090,
-      "startedAt": "2026-09-13T22:24:18.341Z",
-      "logPath": ".delivery/logs/database.log"
-    },
-    {
-      "service": "web",
-      "pid": 10168,
-      "startedAt": "2026-09-13T22:24:19.064Z",
-      "logPath": ".delivery/logs/web.log"
-    }
-  ],
+  "processes": [],
   "ingress": null,
-  "seq": 3
+  "seq": 5
 }
