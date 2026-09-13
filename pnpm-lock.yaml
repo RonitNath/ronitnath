@@ -6,6 +6,7 @@ settings:
 
 overrides:
   '@isoastra/fleet-events': file:vendor/isoastra-fleet-events-0.2.3.tgz
+  '@isoastra/fleet-workflows': file:vendor/isoastra-fleet-workflows-0.0.0.tgz
 
 importers:
 
@@ -29,6 +30,9 @@ importers:
       '@isoastra/fleet-ids':
         specifier: 0.1.1
         version: 0.1.1
+      '@isoastra/fleet-notifications':
+        specifier: file:vendor/isoastra-fleet-notifications-0.1.0.tgz
+        version: file:vendor/isoastra-fleet-notifications-0.1.0.tgz(@dbos-inc/dbos-sdk@4.27.6)(drizzle-orm@0.45.2(@types/pg@8.23.1)(kysely@0.29.5)(pg@8.23.0))(next@15.5.25(@playwright/test@1.63.0)(@types/node@24.13.3)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(nodemailer@10.0.0)(pg@8.23.0)(react@19.2.8)(zod@4.5.4)
       '@isoastra/fleet-runtime':
         specifier: file:vendor/isoastra-fleet-runtime-0.0.0.tgz
         version: file:vendor/isoastra-fleet-runtime-0.0.0.tgz
@@ -1083,6 +1087,17 @@ packages:
 
   '@isoastra/fleet-ids@0.1.1':
     resolution: {integrity: sha512-GxxpYKScNUaV67kqvt//rVQgoxXsvyitKMEulF2RxU0mrg4FX7nrfY/fmsmPRf4KnE6cYH0XEnlEy9Yq3jI44w==, tarball: https://npm.pkg.github.com/download/@isoastra/fleet-ids/0.1.1/1aa2fc71810f33ec7ecab022c1baee6b84aaa181}
+
+  '@isoastra/fleet-notifications@file:vendor/isoastra-fleet-notifications-0.1.0.tgz':
+    resolution: {integrity: sha512-vV8EgWNzeHpBqz9bqWLH2QxpOEs/vbQe2a3dqp78YLF7vwoymW8NdXJq3jUeMmPg0D1/ITb/Hhmti5BQmD/mFA==, tarball: file:vendor/isoastra-fleet-notifications-0.1.0.tgz}
+    version: 0.1.0
+    engines: {node: '>=22.12.0'}
+    peerDependencies:
+      nodemailer: '*'
+      pg: ^8.11.0
+    peerDependenciesMeta:
+      nodemailer:
+        optional: true
 
   '@isoastra/fleet-runtime@file:vendor/isoastra-fleet-runtime-0.0.0.tgz':
     resolution: {integrity: sha512-s8ffBWKgn8wbrhvVi3lvP3UrmK0iDXkWlm3Xc6lue45B82IzLSMNAeNT0qipE9Rz2Pqhn2/Nw/qMHAfVZ/uq+Q==, tarball: file:vendor/isoastra-fleet-runtime-0.0.0.tgz}
@@ -4201,6 +4216,20 @@ snapshots:
       better-auth: 1.7.2(drizzle-kit@0.31.10)(drizzle-orm@0.45.2(@types/pg@8.23.1)(kysely@0.29.5)(pg@8.23.0))(next@15.5.25(@playwright/test@1.63.0)(@types/node@24.13.3)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(pg@8.23.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(vitest@3.2.7(@types/node@24.13.3)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.13)(yaml@2.9.0))
 
   '@isoastra/fleet-ids@0.1.1': {}
+
+  '@isoastra/fleet-notifications@file:vendor/isoastra-fleet-notifications-0.1.0.tgz(@dbos-inc/dbos-sdk@4.27.6)(drizzle-orm@0.45.2(@types/pg@8.23.1)(kysely@0.29.5)(pg@8.23.0))(next@15.5.25(@playwright/test@1.63.0)(@types/node@24.13.3)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(nodemailer@10.0.0)(pg@8.23.0)(react@19.2.8)(zod@4.5.4)':
+    dependencies:
+      '@isoastra/fleet-events': file:vendor/isoastra-fleet-events-0.2.3.tgz(drizzle-orm@0.45.2(@types/pg@8.23.1)(kysely@0.29.5)(pg@8.23.0))(next@15.5.25(@playwright/test@1.63.0)(@types/node@24.13.3)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(pg@8.23.0)(react@19.2.8)(zod@4.5.4)
+      '@isoastra/fleet-workflows': file:vendor/isoastra-fleet-workflows-0.0.0.tgz(@dbos-inc/dbos-sdk@4.27.6)(pg@8.23.0)
+      pg: 8.23.0
+    optionalDependencies:
+      nodemailer: 10.0.0
+    transitivePeerDependencies:
+      - '@dbos-inc/dbos-sdk'
+      - drizzle-orm
+      - next
+      - react
+      - zod
 
   '@isoastra/fleet-runtime@file:vendor/isoastra-fleet-runtime-0.0.0.tgz': {}
 

@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "tsx runtime/supervisor.ts",
     "build": "next build && pnpm runtime:build",
-    "runtime:build": "tsup runtime/supervisor.ts runtime/http.ts runtime/worker.ts scripts/mail-intents.ts --format esm --out-dir dist-runtime --clean --external next --external @dbos-inc/dbos-sdk --external pg --external drizzle-orm --external nodemailer --external @isoastra/fleet-events --external @isoastra/fleet-runtime --external @isoastra/fleet-workflows",
+    "runtime:build": "tsup runtime/supervisor.ts runtime/http.ts runtime/worker.ts scripts/mail-intents.ts --format esm --out-dir dist-runtime --clean --external next --external @dbos-inc/dbos-sdk --external pg --external drizzle-orm --external nodemailer --external @isoastra/fleet-events --external @isoastra/fleet-notifications --external @isoastra/fleet-runtime --external @isoastra/fleet-workflows",
     "start": "node dist-runtime/runtime/supervisor.mjs",
     "lint": "eslint .",
     "format": "prettier --write .",
@@ -33,6 +33,7 @@
     "@isoastra/fleet-configured": "0.1.3",
     "@isoastra/fleet-events": "file:vendor/isoastra-fleet-events-0.2.3.tgz",
     "@isoastra/fleet-gates": "0.1.3",
+    "@isoastra/fleet-notifications": "file:vendor/isoastra-fleet-notifications-0.1.0.tgz",
     "@isoastra/fleet-identity": "0.1.1",
     "@isoastra/fleet-ids": "0.1.1",
     "@isoastra/fleet-runtime": "file:vendor/isoastra-fleet-runtime-0.0.0.tgz",
@@ -74,7 +75,8 @@
   },
   "pnpm": {
     "overrides": {
-      "@isoastra/fleet-events": "file:vendor/isoastra-fleet-events-0.2.3.tgz"
+      "@isoastra/fleet-events": "file:vendor/isoastra-fleet-events-0.2.3.tgz",
+      "@isoastra/fleet-workflows": "file:vendor/isoastra-fleet-workflows-0.0.0.tgz"
     },
     "onlyBuiltDependencies": [
       "esbuild",
