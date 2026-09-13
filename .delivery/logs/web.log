@@ -84,3 +84,227 @@ params: isoastra,homepage,published
  ✓ Compiled in 238ms (1859 modules)
  ✓ Compiled in 177ms (389 modules)
 [?25h
+ WARN  Issue while reading "/Users/ronitnath/dev/.worktrees/ronitnath-delivery-env/.npmrc". Failed to replace env in config: ${NODE_AUTH_TOKEN}
+
+> ronitnath@0.0.0 dev /Users/ronitnath/dev/.worktrees/ronitnath-delivery-env
+> next dev
+
+   ▲ Next.js 15.5.25
+   - Local:        http://localhost:40381
+   - Network:      http://192.168.0.70:40381
+
+ ✓ Starting...
+ ✓ Ready in 1821ms
+ ○ Compiling /healthz ...
+ ✓ Compiled /healthz in 535ms (391 modules)
+ GET /healthz 200 in 726ms
+ GET /healthz 200 in 30ms
+ ○ Compiling /auth/sign-in ...
+ ✓ Compiled /auth/sign-in in 3.2s (2878 modules)
+ ✓ Compiled in 597ms (393 modules)
+ GET /auth/sign-in?next=%2Fo%2Fisoastra%2Fdelivery 200 in 3851ms
+ ⚠ Cross origin request detected from 127.0.0.1 to /_next/* resource. In a future major version of Next.js, you will need to explicitly configure "allowedDevOrigins" in next.config to allow this.
+Read more: https://nextjs.org/docs/app/api-reference/config/next-config-js/allowedDevOrigins
+ ○ Compiling /api/realtime ...
+ ✓ Compiled /api/realtime in 1483ms (2856 modules)
+ POST /api/realtime 200 in 1675ms
+ ✓ Compiled /api/realtime/stream in 212ms (2859 modules)
+ ⨯ Error: AUTH_SECRET is not set
+    at required (src/lib/env.ts:8:21)
+    at build (src/features/auth/auth.ts:92:48)
+    at auth (src/features/auth/auth.ts:232:28)
+    at signInEmail (src/features/auth/actions.ts:176:30)
+   6 | export function required(name: string): string {
+   7 |   const value = process.env[name];
+>  8 |   if (!value) throw new Error(`${name} is not set`);
+     |                     ^
+   9 |   return value;
+  10 | }
+  11 | {
+  digest: '1460053031'
+}
+ POST /auth/sign-in?next=%2Fo%2Fisoastra%2Fdelivery 500 in 501ms
+ GET /api/realtime/stream?visitor=0a98c631-b0cb-4ba2-9f70-3fa3af5aaa0d&view=95589772-549a-47c1-8504-a6298589657c 200 in 9493ms
+ POST /api/realtime 204 in 33ms
+ ✓ Compiled in 159ms (393 modules)
+ ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ GET /auth/sign-in?next=%2Fo%2Fisoastra%2Fdelivery 200 in 213ms
+ POST /api/realtime 200 in 42ms
+ GET /api/realtime/stream?visitor=0a98c631-b0cb-4ba2-9f70-3fa3af5aaa0d&view=95589772-549a-47c1-8504-a6298589657c 200 in 5464ms
+[?25h
+ WARN  Issue while reading "/Users/ronitnath/dev/.worktrees/ronitnath-delivery-env/.npmrc". Failed to replace env in config: ${NODE_AUTH_TOKEN}
+
+> ronitnath@0.0.0 dev /Users/ronitnath/dev/.worktrees/ronitnath-delivery-env
+> next dev
+
+   ▲ Next.js 15.5.25
+   - Local:        http://localhost:40381
+   - Network:      http://192.168.0.70:40381
+
+ ✓ Starting...
+ ✓ Ready in 1037ms
+ ✓ Compiled /healthz in 199ms (391 modules)
+ GET /healthz 200 in 21ms
+ ○ Compiling /auth/sign-in ...
+ ✓ Compiled /auth/sign-in in 2.1s (2878 modules)
+ ✓ Compiled in 644ms (393 modules)
+ GET /auth/sign-in?next=%2Fo%2Fisoastra%2Fdelivery 200 in 2759ms
+ ⚠ Cross origin request detected from 127.0.0.1 to /_next/* resource. In a future major version of Next.js, you will need to explicitly configure "allowedDevOrigins" in next.config to allow this.
+Read more: https://nextjs.org/docs/app/api-reference/config/next-config-js/allowedDevOrigins
+ ⨯ Error: key must be exactly 32 hex characters
+    at codec (src/lib/ids.ts:52:23)
+    at encodeId (src/lib/ids.ts:60:10)
+    at homeOf (src/features/auth/actions.ts:84:33)
+    at async signInEmail (src/features/auth/actions.ts:195:27)
+  50 | function codec() {
+  51 |   const keyPrev = process.env.ID_KEY_PREV;
+> 52 |   return aesBlockCodec({
+     |                       ^
+  53 |     key: process.env.ID_KEY ?? '',
+  54 |     namespace: 'rn',
+  55 |     ...(keyPrev ? { keyPrev } : {}),
+ ⨯ Error: key must be exactly 32 hex characters
+    at codec (src/lib/ids.ts:52:23)
+    at encodeId (src/lib/ids.ts:60:10)
+    at homeOf (src/features/auth/actions.ts:84:33)
+    at async signInEmail (src/features/auth/actions.ts:195:27)
+  50 | function codec() {
+  51 |   const keyPrev = process.env.ID_KEY_PREV;
+> 52 |   return aesBlockCodec({
+     |                       ^
+  53 |     key: process.env.ID_KEY ?? '',
+  54 |     namespace: 'rn',
+  55 |     ...(keyPrev ? { keyPrev } : {}), {
+  page: '/auth/sign-in'
+}
+ ○ Compiling /_error ...
+ ✓ Compiled /_error in 1145ms (3198 modules)
+ POST /auth/sign-in?next=%2Fo%2Fisoastra%2Fdelivery 500 in 2594ms
+ ✓ Compiled in 169ms (546 modules)
+[?25h
+ WARN  Issue while reading "/Users/ronitnath/dev/.worktrees/ronitnath-delivery-env/.npmrc". Failed to replace env in config: ${NODE_AUTH_TOKEN}
+
+> ronitnath@0.0.0 dev /Users/ronitnath/dev/.worktrees/ronitnath-delivery-env
+> next dev
+
+   ▲ Next.js 15.5.25
+   - Local:        http://localhost:40381
+   - Network:      http://192.168.0.70:40381
+
+ ✓ Starting...
+ ✓ Ready in 1557ms
+ ✓ Compiled /healthz in 384ms (391 modules)
+ GET /healthz 200 in 554ms
+ ○ Compiling /auth/sign-in ...
+ ✓ Compiled /auth/sign-in in 2.4s (2865 modules)
+ ✓ Compiled in 1027ms (393 modules)
+ GET /auth/sign-in?next=%2Fo%2Fisoastra%2Fdelivery 200 in 3498ms
+ ⚠ Cross origin request detected from 127.0.0.1 to /_next/* resource. In a future major version of Next.js, you will need to explicitly configure "allowedDevOrigins" in next.config to allow this.
+Read more: https://nextjs.org/docs/app/api-reference/config/next-config-js/allowedDevOrigins
+ POST /auth/sign-in?next=%2Fo%2Fisoastra%2Fdelivery 303 in 569ms
+ ○ Compiling /o/isoastra/delivery ...
+ ✓ Compiled /o/isoastra/delivery in 740ms (2921 modules)
+ GET /o/isoastra/delivery 200 in 1328ms
+ ○ Compiling /o/[org]/events ...
+ ✓ Compiled /o/[org]/events in 826ms (2906 modules)
+ POST /api/realtime 200 in 1219ms
+ ✓ Compiled /api/realtime/stream in 370ms (2909 modules)
+ GET /o/isoastra/events 404 in 2897ms
+ GET /o/isoastra/events 404 in 124ms
+ GET /o/isoastra/events 404 in 61ms
+ GET /o/isoastra/events 404 in 23ms
+ POST /api/realtime 200 in 65ms
+ GET /o/isoastra/events 404 in 21ms
+ GET /o/isoastra/events 404 in 39ms
+ GET /o/isoastra/events 404 in 25ms
+ GET /o/isoastra/events 404 in 16ms
+ GET /o/isoastra/events 404 in 38ms
+ POST /api/realtime 200 in 33ms
+ GET /o/isoastra/events 404 in 17ms
+ GET /o/isoastra/events 404 in 37ms
+ GET /o/isoastra/events 404 in 26ms
+ GET /o/isoastra/events 404 in 25ms
+ GET /o/isoastra/events 404 in 20ms
+ POST /api/realtime 200 in 48ms
+ GET /o/isoastra/events 404 in 21ms
+ GET /o/isoastra/events 404 in 57ms
+ GET /o/isoastra/events 404 in 28ms
+ GET /o/isoastra/events 404 in 26ms
+ GET /o/isoastra/events 404 in 17ms
+ POST /api/realtime 200 in 49ms
+ GET /o/isoastra/events 404 in 23ms
+ GET /o/isoastra/events 404 in 22ms
+ GET /o/isoastra/events 404 in 24ms
+ GET /o/isoastra/events 404 in 73ms
+ GET /o/isoastra/events 404 in 19ms
+ POST /api/realtime 200 in 35ms
+ GET /o/isoastra/events 404 in 25ms
+ GET /o/isoastra/events 404 in 22ms
+ GET /o/isoastra/events 404 in 21ms
+ GET /o/isoastra/events 404 in 20ms
+ GET /o/isoastra/events 404 in 38ms
+ POST /api/realtime 200 in 34ms
+ GET /o/isoastra/events 404 in 25ms
+ GET /o/isoastra/events 404 in 24ms
+ GET /o/isoastra/events 404 in 35ms
+ GET /o/isoastra/events 404 in 21ms
+ GET /o/isoastra/events 404 in 18ms
+ POST /api/realtime 200 in 34ms
+ GET /o/isoastra/events 404 in 19ms
+ GET /o/isoastra/events 404 in 53ms
+ GET /o/isoastra/events 404 in 19ms
+ GET /o/isoastra/events 404 in 27ms
+ GET /o/isoastra/events 404 in 25ms
+ POST /api/realtime 200 in 35ms
+ GET /o/isoastra/events 404 in 18ms
+ GET /o/isoastra/events 404 in 29ms
+ GET /o/isoastra/events 404 in 318ms
+ GET /auth/sign-in?next=%2Fo%2Fisoastra%2Fdelivery 200 in 320ms
+ POST /api/realtime 200 in 17ms
+ GET /o/isoastra/delivery 200 in 92ms
+ POST /auth/sign-in?next=%2Fo%2Fisoastra%2Fdelivery 303 in 495ms
+ GET /api/realtime/stream?visitor=7c0bf348-0241-43e4-8797-d98ede73d0a5&view=d9ed5ff9-1362-4f2c-9fbe-29433ff71ddc 200 in 623ms
+ POST /api/realtime 204 in 24ms
+ GET /o/isoastra/events 200 in 41ms
+ POST /api/realtime 200 in 56ms
+ GET /o/isoastra/events 404 in 35ms
+ GET /o/isoastra/events 404 in 29ms
+ POST /api/realtime 200 in 31ms
+ GET /o/isoastra/events 404 in 22ms
+ GET /o/isoastra/events 404 in 37ms
+ GET /o/isoastra/events 404 in 20ms
+ GET /o/isoastra/events 404 in 18ms
+ GET /o/isoastra/events 404 in 34ms
+ POST /api/realtime 200 in 21ms
+ GET /o/isoastra/events 404 in 21ms
+ GET /o/isoastra/events 404 in 57ms
+ ✓ Compiled in 425ms (404 modules)
+ GET /o/isoastra/delivery 200 in 39ms
+ GET /o/isoastra/events 404 in 27ms
+ GET /api/realtime/stream?visitor=9b78efaf-4757-401f-bcbf-775bc425bc1d&view=cde9862a-f874-4ab5-8c38-a49623fa61e5 200 in 159321ms
+[?25h
+ WARN  Issue while reading "/Users/ronitnath/dev/.worktrees/ronitnath-delivery-env/.npmrc". Failed to replace env in config: ${NODE_AUTH_TOKEN}
+
+> ronitnath@0.0.0 dev /Users/ronitnath/dev/.worktrees/ronitnath-delivery-env
+> next dev
+
+   ▲ Next.js 15.5.25
+   - Local:        http://localhost:40381
+   - Network:      http://192.168.0.70:40381
+
+ ✓ Starting...
+ ✓ Ready in 1081ms
+ ✓ Compiled /healthz in 221ms (391 modules)
+ GET /healthz 200 in 341ms
+ ○ Compiling /auth/sign-in ...
+ ✓ Compiled /auth/sign-in in 1561ms (2865 modules)
+ ✓ Compiled in 525ms (393 modules)
+ GET /auth/sign-in?next=%2Fo%2Fisoastra%2Fdelivery 200 in 2114ms
+ POST /auth/sign-in?next=%2Fo%2Fisoastra%2Fdelivery 303 in 344ms
+ ○ Compiling /o/isoastra/delivery ...
+ ✓ Compiled /o/isoastra/delivery in 855ms (2894 modules)
+ GET /o/isoastra/delivery 200 in 1426ms
+ ⚠ Cross origin request detected from 127.0.0.1 to /_next/* resource. In a future major version of Next.js, you will need to explicitly configure "allowedDevOrigins" in next.config to allow this.
+Read more: https://nextjs.org/docs/app/api-reference/config/next-config-js/allowedDevOrigins
+ ○ Compiling /o/[org]/events ...
+ ✓ Compiled /o/[org]/events in 634ms (2906 modules)
