@@ -1,5 +1,6 @@
 import { DBOS, WorkflowQueue } from '@isoastra/fleet-workflows';
 import { Lifecycle } from '@isoastra/fleet-runtime';
+import { DbosNotificationScheduler } from '@isoastra/fleet-notifications/dbos';
 import { closePool } from '@/db/client';
 import {
   deliverMailIntent,
@@ -8,7 +9,8 @@ import {
   pendingMailIntents,
   recordMailAttempt,
 } from '@/lib/mail-intents';
-import { closeMailTransport } from '@/lib/mail';
+import { closeMailTransport, emailTransportRegistration } from '@/lib/mail';
+import { authNotificationAuthorization, notificationStore } from '@/lib/notification-delivery';
 import { assertSchemaCompatibility } from '@/lib/schema-compatibility';
 import { Client } from 'pg';
 import { ownChildLifecycle } from './child';
@@ -61,10 +63,21 @@ async function main(): Promise<void> {
   const lifecycle = new Lifecycle();
   const stopping = new AbortController();
   let dispatchDone: Promise<void> = Promise.resolve();
+  const notifications = new DbosNotificationScheduler({
+    store: notificationStore(),
+    authorization: authNotificationAuthorization,
+    transports: { email: emailTransportRegistration },
+    aggregate: { execute: async () => { throw new Error('ronitnath does not register visible notification aggregation'); } },
+    queueName: 'notifications',
+    workflowName: 'ronitnathNotificationsV1',
+    concurrency: 4,
+    pollMs: 1_000,
+    onPollError: (error) => console.error(JSON.stringify({ level: 'error', event: 'notification.dispatch-failed', message: String(error) })),
+  });
   ownChildLifecycle('worker', lifecycle, {
     quiesce: async () => {
       stopping.abort();
-      await dispatchDone;
+      await Promise.all([dispatchDone, notifications.stop()]);
     },
   });
   try {
@@ -104,10 +117,12 @@ async function main(): Promise<void> {
     });
     await DBOS.launch();
     lifecycle.register('dbos', () => DBOS.shutdown({ workflowCompletionTimeoutMS: 20_000 }));
+    lifecycle.register('notification dispatcher', () => notifications.stop());
     lifecycle.register('mail dispatcher', async () => {
       stopping.abort();
     });
     await assertSchemaCompatibility();
+    await notifications.start();
     lifecycle.ready();
 
     dispatchDone = (async () => {
