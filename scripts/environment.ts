@@ -82,6 +82,10 @@ async function main() {
   await mkdir(root, { recursive: true, mode: 0o700 });
   const unit = `fleet-environment-${namespace}`;
   await ignore('systemctl', ['--user', 'stop', unit]);
+  // A stopped transient unit remains loaded until it is collected. Clear an
+  // older unit before reusing the deterministic environment name, and ask
+  // systemd to collect this replacement after it stops.
+  await ignore('systemctl', ['--user', 'reset-failed', unit]);
   const db = `${namespace}-database`, web = `${namespace}-web`;
   await ownedRemove(web, namespace); await ownedRemove(db, namespace);
   const networkExists = await run('docker', ['network', 'ls', '--filter', `name=^${namespace}$`, '--format', '{{.Name}}'], { quiet: true });
@@ -125,7 +129,7 @@ async function main() {
   const registrationPath = `${root}/registration.json`, environmentPath = `${root}/environment.json`, clientEnvironment = `${root}/ingress.env`;
   await writeFile(registrationPath, JSON.stringify(registration, null, 2), { mode: 0o600 });
   await writeFile(clientEnvironment, `INGRESS_REGISTRY_URL=https://ingress.rdndev.com\nINGRESS_REGISTRY_TOKEN=${secret('ENVIRONMENT_INGRESS_TOKEN')}\nINGRESS_SSH_KEY_PATH=${sshKey}\nINGRESS_KNOWN_HOSTS_PATH=${knownHosts}\nINGRESS_LOCAL_PORT=${port}\n`, { mode: 0o600 });
-  await run('systemd-run', ['--user', `--unit=${unit}`, '--property=Restart=on-failure', `--property=EnvironmentFile=${clientEnvironment}`, '/run/current-system/sw/bin/node', hostCli, 'ingress-maintain', registrationPath]);
+  await run('systemd-run', ['--user', '--collect', `--unit=${unit}`, '--property=Restart=on-failure', `--property=EnvironmentFile=${clientEnvironment}`, '/run/current-system/sw/bin/node', hostCli, 'ingress-maintain', registrationPath]);
   const instance = { ...planned, state: 'ready', updatedAt: new Date().toISOString(), resources: planned.resources.map((resource) => resource.service === 'web' ? { ...resource, port } : resource), exposures: planned.exposures.map((exposure) => ({ ...exposure, leaseId: lease.leaseId })) };
   const state = { schemaVersion: 3, namespace, sha, profile, unit, containers: [db, web], artifacts, instance, registrationPath, artifactFingerprint: createHash('sha256').update(JSON.stringify(artifacts)).digest('hex') };
   await writeFile(environmentPath, JSON.stringify(state, null, 2), { mode: 0o600 });
