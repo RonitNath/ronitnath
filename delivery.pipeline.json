@@ -6,7 +6,7 @@
   "stages": [
     {
       "id": "eligibility", "label": "Candidate on main", "kind": "preflight",
-      "command": { "executable": "pnpm", "args": ["tsx", "scripts/delivery.ts", "eligibility"], "inheritEnv": ["PATH", "LANG", "TZ", "CI", "GITHUB_SHA"] },
+      "command": { "executable": "pnpm", "args": ["tsx", "scripts/delivery.ts", "eligibility"], "inheritEnv": ["PATH", "LANG", "TZ", "CI", "DOCKER_HOST", "XDG_RUNTIME_DIR", "GITHUB_SHA"] },
       "budget": { "cpuCores": 1, "memoryMiB": 256, "timeoutMs": 60000, "outputBytes": 100000 }
     },
     {
