@@ -5,6 +5,7 @@ import { RealtimeReporter } from '@/features/realtime/reporter';
 
 import '@isoastra/ui/styles.css';
 import '@isoastra/grid-ui/styles.css';
+import '@isoastra/ui-layout/styles.css';
 import './globals.css';
 
 export const metadata: Metadata = {

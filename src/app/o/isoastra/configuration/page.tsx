@@ -7,6 +7,7 @@ import {
   HOME_DEFAULT,
 } from '@/features/configuration/model';
 import { requireOperator } from '@/lib/tiers';
+import { PublicationWorkspace } from '@isoastra/ui-layout/workspaces';
 
 export const dynamic = 'force-dynamic';
 export default async function ConfigurationPage() {
@@ -25,7 +26,13 @@ export default async function ConfigurationPage() {
       ? (state.announcementDraft.body as typeof ANNOUNCEMENT_DEFAULT)
       : state.announcement;
   return (
-    <main className="indoors" data-realtime-config="homepage:published">
+    <PublicationWorkspace
+      eyebrow="OPERATOR CONFIGURATION"
+      title="Configuration"
+      description="Typed settings, publication boundaries, affected views and immutable history."
+      state="populated"
+      preview={<section><h2>Publication boundary</h2><p className="note">Homepage changes remain drafts until explicit publication. Announcement copy publishes on save.</p></section>}
+      editor={<div className="indoors" data-realtime-config="homepage:published">
       <h1>Configuration</h1>
       <p className="note">
         Typed settings, their publication policy, and the views currently depending on them.
@@ -95,6 +102,7 @@ export default async function ConfigurationPage() {
           </table>
         </div>
       </section>
-    </main>
+    </div>}
+    />
   );
 }
