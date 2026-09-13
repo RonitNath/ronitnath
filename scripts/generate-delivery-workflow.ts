@@ -4,7 +4,7 @@ import { generateGithubWorkflow } from '@isoastra/fleet-delivery/github';
 async function main() {
   const path = '.github/workflows/deploy.yml';
   const expected = generateGithubWorkflow({
-    packageVersion: '0.2.5',
+    packageVersion: '0.2.6',
     runnerLabels: ['self-hosted', 'ronitnath-delivery', 'delenda'],
     pipelineFile: 'delivery.pipeline.json',
     nodeVersion: '24.13.0',

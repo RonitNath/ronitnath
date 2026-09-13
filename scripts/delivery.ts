@@ -452,7 +452,7 @@ async function publish() {
   };
   const body = {
     schemaVersion: 2 as const,
-    releaseId: randomUUID(),
+    releaseId: process.env.DELIVERY_RELEASE_ID ?? randomUUID(),
     requestedSha: sha(),
     createdAt: new Date().toISOString(),
     artifacts: { runtime, migration },
