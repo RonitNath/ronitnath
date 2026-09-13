@@ -312,6 +312,20 @@ async function exercisePreviousWriter() {
   );
 }
 
+async function seedArtifactOperator() {
+  await run(
+    'pnpm',
+    [
+      'seed:operator',
+      '--email',
+      'artifact-operator@example.com',
+      '--password',
+      'a-long-enough-password',
+    ],
+    { env: testEnv, quiet: true },
+  );
+}
+
 async function artifact() {
   await startDb();
   await mkdir('.delivery/mail', { recursive: true });
@@ -330,23 +344,7 @@ async function artifact() {
       `DATABASE_URL=${containerDb}`,
       previousMigration,
     ]);
-    await run('docker', [
-      'run',
-      '--rm',
-      '--network',
-      network,
-      '-e',
-      `DATABASE_URL=${containerDb}`,
-      '-e',
-      `ID_KEY=${testEnv.ID_KEY}`,
-      previousMigration,
-      'pnpm',
-      'seed:operator',
-      '--email',
-      'artifact-operator@example.com',
-      '--password',
-      'a-long-enough-password',
-    ]);
+    await seedArtifactOperator();
     await run('docker', [
       'run',
       '--rm',
@@ -358,23 +356,7 @@ async function artifact() {
     ]);
     await startWeb(previousRuntime);
     await exercisePreviousWriter();
-    await run('docker', [
-      'run',
-      '--rm',
-      '--network',
-      network,
-      '-e',
-      `DATABASE_URL=${containerDb}`,
-      '-e',
-      `ID_KEY=${testEnv.ID_KEY}`,
-      previousMigration,
-      'pnpm',
-      'seed:operator',
-      '--email',
-      'artifact-operator@example.com',
-      '--password',
-      'a-long-enough-password',
-    ]);
+    await seedArtifactOperator();
     await startWeb(tag('runtime'));
     await run('docker', [
       'run',
