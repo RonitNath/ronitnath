@@ -16,7 +16,8 @@ else
   accounts=(delivery-replica)
 fi
 for account in "${accounts[@]}"; do
-  id "$account" >/dev/null 2>&1 || useradd --system --create-home --shell /usr/sbin/nologin "$account"
+  id "$account" >/dev/null 2>&1 || useradd --system --create-home --shell /bin/bash "$account"
+  usermod --shell /bin/bash "$account"
   home=$(getent passwd "$account" | cut -d: -f6)
   install -d -o "$account" -g "$account" -m 0700 "$home/.ssh"
   install -o "$account" -g "$account" -m 0600 /dev/null "$home/.ssh/authorized_keys"
