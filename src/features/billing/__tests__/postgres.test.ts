@@ -5,6 +5,7 @@ import { issueInvoice, recordPayment, type BillingChart } from '@isoastra/fleet-
 import type { LedgerClient } from '@isoastra/fleet-ledger';
 import { database, schema } from '@/db/client';
 import { beginCommand, completeCommand } from '../operations';
+import { recognizeCompletedOrder, type AppChart } from '../recognition';
 
 const enabled = Boolean(process.env.BILLING_DATABASE_TEST);
 const suite = enabled ? describe : describe.skip;
@@ -81,5 +82,18 @@ suite('billing application transaction contract', () => {
     const retry = await database().transaction((tx) => beginCommand(tx, { operationKey, actorPersonId: party.id, command: 'test-command', request }));
     expect(retry).toEqual({ retry: true, result: { acceptedVersion: 8 } });
     await expect(database().transaction((tx) => beginCommand(tx, { operationKey, actorPersonId: party.id, command: 'test-command', request: { ...request, enabled: false } }))).rejects.toThrow('changed retry');
+  });
+
+  it('recognizes an adjusted completed subscription exactly once', async () => {
+    const party = (await database().insert(schema.party).values({ kind: 'person' }).returning({ id: schema.party.id }))[0]!;
+    await database().insert(schema.person).values({ id: party.id, displayName: 'Recognition Test' });
+    const seller = (await database().select().from(schema.billingSeller).where(eq(schema.billingSeller.id, 'ronit')).limit(1))[0]!;
+    const id = randomUUID(), now = new Date('2028-02-01T00:00:00Z');
+    await database().insert(schema.billingOrder).values({ id, operationKey: `recognition:${id}`, customerPersonId: party.id, sellerId: seller.id, offerNamespace: 'ronit', offerId: 'membership', offerVersion: 1, invoiceId: `recognition:${id}`, kind: 'subscription', state: 'active', totalAtoms: 100n, paidAtoms: 80n, creditedAtoms: 20n });
+    const first = await database().transaction((tx) => recognizeCompletedOrder(tx, { orderId: id, bookId: seller.bookId, chart: seller.chart as AppChart, operationKey: `recognize:${id}`, evidenceId: `order:${id}`, now }));
+    expect(first).toBe(80n);
+    const row = (await database().select().from(schema.billingOrder).where(eq(schema.billingOrder.id, id)).limit(1))[0]!;
+    expect(row.recognizedAtoms).toBe(80n);
+    expect(await database().transaction((tx) => recognizeCompletedOrder(tx, { orderId: id, bookId: seller.bookId, chart: seller.chart as AppChart, operationKey: `recognize-again:${id}`, evidenceId: `order:${id}`, now }))).toBe(0n);
   });
 });

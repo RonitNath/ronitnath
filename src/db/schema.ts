@@ -781,6 +781,7 @@ export const billingOrder = pgTable('billing_order', {
   kind: text('kind').notNull(), state: text('state').notNull(), version: integer('version').notNull().default(1), renewsOrderId: uuid('renews_order_id'),
   totalAtoms: numeric('total_atoms', { precision: 39, scale: 0, mode: 'bigint' }).notNull(), paidAtoms: numeric('paid_atoms', { precision: 39, scale: 0, mode: 'bigint' }).notNull().default(sql`0`),
   creditedAtoms: numeric('credited_atoms', { precision: 39, scale: 0, mode: 'bigint' }).notNull().default(sql`0`), refundedAtoms: numeric('refunded_atoms', { precision: 39, scale: 0, mode: 'bigint' }).notNull().default(sql`0`),
+  recognizedAtoms: numeric('recognized_atoms', { precision: 39, scale: 0, mode: 'bigint' }).notNull().default(sql`0`), recognizedAt: timestamp('recognized_at', { withTimezone: true }),
   fulfilledAt: timestamp('fulfilled_at', { withTimezone: true }), fulfilledOperationKey: text('fulfilled_operation_key').unique(), createdAt: now(),
 }, (t) => [index('billing_order_customer_idx').on(t.customerPersonId), index('billing_order_state_idx').on(t.state)]);
 export const billingMembership = pgTable('billing_membership', {

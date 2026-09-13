@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { and, eq, sql } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
-import { issueCreditNote, issueInvoice, recordPayment, type BillingChart } from '@isoastra/fleet-billing/accounting';
+import { issueCreditNote, issueInvoice, recordPayment } from '@isoastra/fleet-billing/accounting';
 import { anchoredServiceEnd, invoiceOutstanding, membershipAccess, transitionManualBilling, validateOfferVersion, type FinancialAdjustmentEffect } from '@isoastra/fleet-billing/commerce';
 import { savePriceVersion } from '@isoastra/fleet-billing/subscriptions';
 import { postJournal, type LedgerClient } from '@isoastra/fleet-ledger';
@@ -20,6 +20,7 @@ import { requireOperator } from '@/lib/tiers';
 import { emit } from '@/lib/fleet/events';
 import { catalogSchema, dateOnly, materializeOffer } from './model';
 import { beginCommand, completeCommand } from './operations';
+import { adjustmentAccount, recognizeCompletedOrder, type AppChart } from './recognition';
 
 const DECLINED = 'That billing command is unavailable or has changed.';
 const keyOf = (seller: string) => `billing.catalog.${seller}`;
@@ -27,7 +28,6 @@ const field = (form: FormData, name: string) => typeof form.get(name) === 'strin
 const expected = (form: FormData) => Number(field(form, 'version'));
 const positiveAtoms = (raw: string) => /^\d+$/.test(raw) && BigInt(raw) > 0n ? BigInt(raw) : null;
 const customerId = (personId: number) => encodeId('person', personId);
-type AppChart = BillingChart & { deferredRevenue: string };
 const ledger = (client: unknown) => client as LedgerClient;
 
 async function member() {
@@ -200,7 +200,7 @@ export async function requestInvoice(_prev: FormState, form: FormData): Promise<
       const chart = seller.chart as AppChart;
       await issueInvoice(ledger(tx), { bookId: seller.bookId, operationKey: `invoice:${operationKey}`, invoiceId, customerId: customerId(me.personId), unit: 'USD', atoms: offer.amountAtoms, occurredAt: now, effectiveOn: dateOnly(now), chart: { ...chart, revenue: chart.deferredRevenue }, lines: [{ key: `${offer.namespace}:${offer.id}:${offer.version}`, description: offer.title, atoms: offer.amountAtoms }] });
       const fulfilled = offer.kind === 'one_time' && offer.fulfillment === 'immediate';
-      await tx.insert(schema.billingOrder).values({ id: orderId, operationKey, customerPersonId: me.personId, sellerId, offerNamespace: offer.namespace, offerId: offer.id, offerVersion: offer.version, invoiceId, kind: offer.kind, state: fulfilled ? 'fulfilled' : 'invoice_open', totalAtoms: offer.amountAtoms, paidAtoms: 0n, fulfilledAt: fulfilled ? now : null });
+      await tx.insert(schema.billingOrder).values({ id: orderId, operationKey, customerPersonId: me.personId, sellerId, offerNamespace: offer.namespace, offerId: offer.id, offerVersion: offer.version, invoiceId, kind: offer.kind, state: fulfilled ? 'fulfilled' : 'invoice_open', totalAtoms: offer.amountAtoms, paidAtoms: 0n, recognizedAtoms: fulfilled ? offer.amountAtoms : 0n, recognizedAt: fulfilled ? now : null, fulfilledAt: fulfilled ? now : null });
       if (fulfilled) await recognize(tx, seller.bookId, chart, offer.amountAtoms, `fulfill:${operationKey}`, `order:${orderId}`, now);
       await recordAudit(tx, { actorPersonId: me.personId, command: 'request-invoice', targetKind: 'person', targetId: me.personId, payload: { orderId, invoiceId, sellerId, offerId, offerVersion: offer.version } });
       await emit(tx, { orgId: customerId(me.personId), resourceKind: 'billing-order', resourceId: orderId, kind: 'created' });
@@ -294,7 +294,7 @@ export async function fulfillOrder(_prev: FormState, form: FormData): Promise<Fo
       const transition = transitionManualBilling({ version: row.order.version, totalAtoms: row.order.totalAtoms, paidAtoms: row.order.paidAtoms, creditedAtoms: row.order.creditedAtoms, refundedAtoms: row.order.refundedAtoms, fulfilled: false }, { kind: 'fulfill', expectedVersion: version }, 'operator');
       const now = new Date();
       await recognize(tx, row.seller.bookId, row.seller.chart as AppChart, transition.effects.recognizeAtoms, operationKey, `order:${orderId}`, now);
-      const changed = await tx.update(schema.billingOrder).set({ fulfilledAt: now, fulfilledOperationKey: operationKey, state: 'fulfilled', version: transition.state.version }).where(and(eq(schema.billingOrder.id, orderId), eq(schema.billingOrder.version, version))).returning({ id: schema.billingOrder.id });
+      const changed = await tx.update(schema.billingOrder).set({ recognizedAtoms: transition.effects.recognizeAtoms, recognizedAt: now, fulfilledAt: now, fulfilledOperationKey: operationKey, state: 'fulfilled', version: transition.state.version }).where(and(eq(schema.billingOrder.id, orderId), eq(schema.billingOrder.version, version))).returning({ id: schema.billingOrder.id });
       if (!changed.length) throw new Error('stale');
       await recordAudit(tx, { actorPersonId: principal.personId, command: 'fulfill-order', targetKind: 'person', targetId: row.order.customerPersonId, payload: { orderId } });
     });
@@ -367,6 +367,8 @@ export async function renewMembership(_prev: FormState, form: FormData): Promise
         .where(and(eq(schema.billingMembership.id, membershipId), eq(schema.billingMembership.version, version))).limit(1))[0];
       const now = new Date();
       if (!row || now < row.membership.serviceEndsAt || row.membership.suspendedAt) throw new Error('membership');
+      const chart = row.seller.chart as AppChart;
+      await recognizeCompletedOrder(tx, { orderId: row.order.id, bookId: row.seller.bookId, chart, operationKey: `recognize:${operationKey}`, evidenceId: `order:${row.order.id}`, now });
       if (row.membership.cancelAt) {
         const rows = await tx.update(schema.billingMembership).set({ state: 'cancelled', version: version + 1 }).where(and(eq(schema.billingMembership.id, membershipId), eq(schema.billingMembership.version, version))).returning({ id: schema.billingMembership.id });
         if (!rows.length) throw new Error('stale');
@@ -379,9 +381,8 @@ export async function renewMembership(_prev: FormState, form: FormData): Promise
       if (!found || found.offer.kind !== 'subscription') throw new Error('offer');
       const { offer, seller } = found, startsAt = row.membership.serviceEndsAt;
       const endsAt = anchoredServiceEnd({ startsAt, interval: offer.interval!, timeZone: row.membership.timeZone, anchorDay: row.membership.anchorDay, anchorTime: row.membership.anchorTime });
-      const orderId = randomUUID(), invoiceId = `rn:${orderId}`, chart = seller.chart as AppChart;
+      const orderId = randomUUID(), invoiceId = `rn:${orderId}`;
       await issueInvoice(ledger(tx), { bookId: seller.bookId, operationKey: `invoice:${operationKey}`, invoiceId, customerId: customerId(row.order.customerPersonId), unit: 'USD', atoms: offer.amountAtoms, occurredAt: now, effectiveOn: dateOnly(now), chart: { ...chart, revenue: chart.deferredRevenue }, lines: [{ key: `${offer.namespace}:${offer.id}:${offer.version}`, description: `${offer.title} renewal`, atoms: offer.amountAtoms }] });
-      await recognize(tx, seller.bookId, chart, row.order.totalAtoms, `recognize:${operationKey}`, `order:${row.order.id}`, now);
       await tx.insert(schema.billingOrder).values({ id: orderId, operationKey, customerPersonId: row.order.customerPersonId, sellerId: seller.id, offerNamespace: offer.namespace, offerId: offer.id, offerVersion: offer.version, invoiceId, kind: 'subscription', state: offer.accessPolicy === 'invoice_first' ? 'invoice_open' : 'invoice_open', totalAtoms: offer.amountAtoms, paidAtoms: 0n, renewsOrderId: row.order.id });
       const rows = await tx.update(schema.billingMembership).set({ orderId, state: offer.accessPolicy === 'invoice_first' ? 'active' : 'pending', serviceStartsAt: startsAt, serviceEndsAt: endsAt, pendingOfferId: null, pendingOfferVersion: null, version: version + 1 }).where(and(eq(schema.billingMembership.id, membershipId), eq(schema.billingMembership.version, version))).returning({ id: schema.billingMembership.id });
       if (!rows.length) throw new Error('stale');
@@ -412,7 +413,7 @@ export async function creditOrder(_prev: FormState, form: FormData): Promise<For
       const transition = transitionManualBilling({ version: row.order.version, totalAtoms: row.order.totalAtoms, paidAtoms: row.order.paidAtoms, creditedAtoms: row.order.creditedAtoms, refundedAtoms: row.order.refundedAtoms, fulfilled: !!row.order.fulfilledAt }, { kind: 'credit', expectedVersion: version, amountAtoms: atoms, effect }, 'operator');
       const now = new Date();
       const chart = row.seller.chart as AppChart;
-      await issueCreditNote(ledger(tx), { creditNoteId: `credit:${operationKey}`, invoiceId: row.order.invoiceId, bookId: row.seller.bookId, operationKey, unit: 'USD', atoms, occurredAt: now, effectiveOn: dateOnly(now), chart: { ...chart, contraRevenue: row.order.fulfilledAt ? chart.contraRevenue : chart.deferredRevenue } });
+      await issueCreditNote(ledger(tx), { creditNoteId: `credit:${operationKey}`, invoiceId: row.order.invoiceId, bookId: row.seller.bookId, operationKey, unit: 'USD', atoms, occurredAt: now, effectiveOn: dateOnly(now), chart: { ...chart, contraRevenue: adjustmentAccount(row.order, chart) } });
       await tx.insert(schema.billingAdjustment).values({ operationKey, orderId, kind: 'credit', amountAtoms: atoms, evidence, serviceEffect: effect });
       const nextState = effect === 'revoke_unfulfilled_service' ? 'service_revoked' : invoiceOutstanding(transition.state) === 0n ? 'credited' : row.order.state;
       const changed = await tx.update(schema.billingOrder).set({ creditedAtoms: transition.state.creditedAtoms, state: nextState, version: transition.state.version }).where(and(eq(schema.billingOrder.id, orderId), eq(schema.billingOrder.version, version))).returning({ id: schema.billingOrder.id });
@@ -436,7 +437,7 @@ export async function recordExternalRefund(_prev: FormState, form: FormData): Pr
       if (!row) throw new Error('refund');
       const transition = transitionManualBilling({ version: row.order.version, totalAtoms: row.order.totalAtoms, paidAtoms: row.order.paidAtoms, creditedAtoms: row.order.creditedAtoms, refundedAtoms: row.order.refundedAtoms, fulfilled: !!row.order.fulfilledAt }, { kind: 'refund', expectedVersion: version, amountAtoms: atoms, effect }, 'operator');
       const chart = row.seller.chart as AppChart, now = new Date();
-      await postJournal(ledger(tx), { bookId: row.seller.bookId, operationKey, kind: 'billing.external_refund', occurredAt: now, effectiveOn: dateOnly(now), evidence: [{ kind: externalNamespace, id: externalId }], policy: { key: 'billing.external-refund', version: 2 }, postings: [{ accountId: row.order.fulfilledAt ? chart.contraRevenue : chart.deferredRevenue, unit: 'USD', atoms }, { accountId: chart.processorClearing, unit: 'USD', atoms: -atoms }] });
+      await postJournal(ledger(tx), { bookId: row.seller.bookId, operationKey, kind: 'billing.external_refund', occurredAt: now, effectiveOn: dateOnly(now), evidence: [{ kind: externalNamespace, id: externalId }], policy: { key: 'billing.external-refund', version: 3 }, postings: [{ accountId: adjustmentAccount(row.order, chart), unit: 'USD', atoms }, { accountId: chart.processorClearing, unit: 'USD', atoms: -atoms }] });
       await tx.insert(schema.billingAdjustment).values({ operationKey, orderId, kind: 'refund', amountAtoms: atoms, evidence, serviceEffect: effect, externalNamespace, externalId });
       const changed = await tx.update(schema.billingOrder).set({ refundedAtoms: transition.state.refundedAtoms, state: effect === 'revoke_unfulfilled_service' ? 'service_revoked' : row.order.state, version: transition.state.version }).where(and(eq(schema.billingOrder.id, orderId), eq(schema.billingOrder.version, version))).returning({ id: schema.billingOrder.id });
       if (!changed.length) throw new Error('stale');

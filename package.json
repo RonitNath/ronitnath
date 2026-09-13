@@ -31,7 +31,7 @@
   },
   "dependencies": {
     "@isoastra/fleet-accounting": "0.2.0",
-    "@isoastra/fleet-billing": "0.5.1",
+    "@isoastra/fleet-billing": "0.5.2",
     "@isoastra/fleet-configured": "0.1.3",
     "@isoastra/fleet-delivery": "0.1.0",
     "@isoastra/fleet-events": "0.2.3",
