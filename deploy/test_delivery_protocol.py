@@ -77,6 +77,14 @@ class CoordinatorRecoveryTests(unittest.TestCase):
         self.assertEqual(remote.call_count, 1)
         self.assertEqual(remote.call_args.args[0], "replica-status")
 
+    def test_preflight_failure_is_recorded_without_claiming_a_rollback(self):
+        previous = self.release["previousRuntimeDigest"]
+        with patch.object(coordinator, "current_local", return_value={"digest": previous}), patch.object(
+            coordinator, "remote", return_value={"digest": previous}
+        ), patch.object(coordinator, "checkpoint") as checkpoint:
+            coordinator.rollback_changed(self.release, "sha256:" + "c" * 64, {"migration": "pending"}, RuntimeError("failed"))
+        self.assertEqual(checkpoint.call_args.args[2], "failed-before-mutation")
+
     def test_checkpoint_is_durable_when_telemetry_is_offline(self):
         original = coordinator.STATE
         try:

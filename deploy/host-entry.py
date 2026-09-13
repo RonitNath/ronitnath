@@ -249,7 +249,7 @@ def command():
         observed = inspect_container()
         if observed["digest"] != parts[3]:
             fail("replica baseline mismatch")
-        subprocess.run(["docker", "pull", parts[2]], check=True)
+        subprocess.run(["docker", "pull", parts[2]], check=True, text=True, capture_output=True)
         print(json.dumps(observed))
         return
     if action in ("replica-roll", "replica-rollback"):

@@ -281,20 +281,25 @@ def rollback_changed(release, target, state, error):
         checkpoint(release, "degraded", "stopped", error=str(error), migration=state.get("migration"))
         return
     failures = []
+    changed = False
     try:
         if current_local().get("digest") == target:
+            changed = True
             roll_local(reference, artifact["sourceSha"])
     except Exception as rollback_error:
         failures.append("nyc: " + str(rollback_error))
     try:
         peer = remote("replica-status", release["releaseId"])
         if peer.get("digest") == target:
+            changed = True
             operation_id = str(uuid.uuid5(uuid.UUID(release["releaseId"]), "sfo-rollback"))
             remote("replica-rollback", release["releaseId"], operation_id, reference, target, artifact["sourceSha"])
     except Exception as rollback_error:
         failures.append("sfo: " + str(rollback_error))
     if failures:
         checkpoint(release, "degraded", "rollback-failed", error=str(error), rollbackError="; ".join(failures), migration=state.get("migration"))
+    elif not changed:
+        checkpoint(release, "failed", "failed-before-mutation", error=str(error), migration=state.get("migration"))
     else:
         checkpoint(release, "failed", "rolled-back", error=str(error), migration=state.get("migration"))
 
