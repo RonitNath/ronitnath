@@ -46,6 +46,13 @@ class CoordinatorRecoveryTests(unittest.TestCase):
         checkpoint.assert_called_once()
         mutation.assert_not_called()
 
+    def test_manifest_digest_matches_typescript_canonicalization(self):
+        left = {"z": [{"b": 2, "a": 1}], "a": {"y": True, "x": None}}
+        right = {"a": {"x": None, "y": True}, "z": [{"a": 1, "b": 2}]}
+        expected = "sha256:01c3cc3195092620becf9d56c2e69e64c76b2520711026acdfdcadab56110fb6"
+        self.assertEqual(host_entry.manifest_digest(left), expected)
+        self.assertEqual(host_entry.manifest_digest(right), expected)
+
     def test_restart_stops_on_unknown_nontransactional_migration(self):
         self.release["migrations"]["entries"][0]["transactional"] = False
         probe = subprocess.CompletedProcess([], 1, "", "partial")

@@ -109,6 +109,11 @@ def exact_keys(value, keys, name):
         fail(name + " contains missing or unknown fields")
 
 
+def manifest_digest(value):
+    encoded = json.dumps(value, separators=(",", ":"), ensure_ascii=False, sort_keys=True).encode()
+    return "sha256:" + hashlib.sha256(encoded).hexdigest()
+
+
 def validate_artifact(value, name):
     exact_keys(value, {"repository", "tag", "digest", "sourceSha", "platform", "sizeBytes"}, name)
     if value["repository"] != "ghcr.io/ronitnath/ronitnath-app" or not DIGEST.fullmatch(value["digest"]) or not SHA.fullmatch(value["sourceSha"]):
@@ -145,7 +150,7 @@ def validate_manifest(value, release_id, claimed):
         fail("compatibility evidence is incomplete")
     without_digest = dict(value)
     without_digest.pop("manifestDigest")
-    calculated = "sha256:" + hashlib.sha256(json.dumps(without_digest, separators=(",", ":"), ensure_ascii=False).encode()).hexdigest()
+    calculated = manifest_digest(without_digest)
     if value["manifestDigest"] != claimed or calculated != claimed:
         fail("manifest binding failed")
 
