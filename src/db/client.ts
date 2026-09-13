@@ -20,18 +20,23 @@ const schema = { ...kernel, auth: { ...authSchema } };
 const globalForDb = globalThis as unknown as {
   rnPool?: Pool;
   rnDb?: NodePgDatabase<typeof schema>;
+  rnPoolClosing?: Promise<void>;
+  rnPoolClosed?: boolean;
 };
 
 export function pool(): Pool {
+  if (globalForDb.rnPoolClosed) throw new Error('application database pool is closing');
   if (globalForDb.rnPool) return globalForDb.rnPool;
   const connectionString = process.env.DATABASE_URL;
   if (!connectionString) throw new Error('DATABASE_URL is not set');
   const created = new Pool({
     connectionString,
-    max: 10,
+    max: process.env.RUNTIME_ROLE === 'worker' ? 4 : 10,
     idleTimeoutMillis: 30_000,
     connectionTimeoutMillis: 5_000,
     query_timeout: 15_000,
+    statement_timeout: 15_000,
+    lock_timeout: 5_000,
   });
   created.on('error', (error) => {
     console.error(JSON.stringify({ level: 'error', event: 'database.idle-error', message: error.message }));
@@ -41,10 +46,13 @@ export function pool(): Pool {
 }
 
 export async function closePool(): Promise<void> {
+  if (globalForDb.rnPoolClosing) return globalForDb.rnPoolClosing;
   const current = globalForDb.rnPool;
+  globalForDb.rnPoolClosed = true;
   globalForDb.rnPool = undefined;
   globalForDb.rnDb = undefined;
-  if (current) await current.end();
+  globalForDb.rnPoolClosing = current ? current.end() : Promise.resolve();
+  await globalForDb.rnPoolClosing;
 }
 
 export function database(): NodePgDatabase<typeof schema> {

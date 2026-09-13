@@ -4,8 +4,10 @@ import { MailDeliveryError, sendMail, type Message } from '@/lib/mail';
 
 export type MailIntentKind = 'verify_email' | 'reset_password';
 export type MailAttemptResult =
-  | { outcome: 'accepted' | 'permanent' | 'expired' }
-  | { outcome: 'retry'; retryAfterMs?: number };
+  | { outcome: 'accepted'; provider: string; receiptId?: string }
+  | { outcome: 'retry'; code: string; expiresAt: string; retryAfterMs?: number }
+  | { outcome: 'permanent'; code: string }
+  | { outcome: 'expired' | 'superseded' };
 
 function secret(): string {
   const value = process.env.MAIL_INTENT_KEY ?? process.env.ID_KEY;
@@ -47,51 +49,66 @@ export async function pendingMailIntents(limit = 100): Promise<{ id: string; gen
 
 export async function expirePendingMailIntents(): Promise<number> {
   const result = await pool().query(`UPDATE mail_intent SET state='expired',message=NULL,completed_at=now()
-    WHERE state='pending' AND expires_at<=now()`);
+    WHERE state IN ('pending','dispatching') AND expires_at<=now()`);
   return result.rowCount ?? 0;
 }
 
-export async function markMailDispatched(id: string, workflowId: string): Promise<void> {
+export async function markMailDispatched(id: string, generation: number, workflowId: string): Promise<void> {
   await pool().query(`UPDATE mail_intent SET state='dispatching',workflow_id=$2
-    WHERE id=$1 AND state='pending'`, [id, workflowId]);
+    WHERE id=$1 AND dispatch_generation=$3 AND state='pending'`, [id, workflowId, generation]);
 }
 
-export async function attemptMailIntent(id: string, ordinal: number, finalAttempt: boolean): Promise<MailAttemptResult> {
-  const result = await pool().query<{ message: Message | null; expires_at: Date; state: string }>(
-    `SELECT message,expires_at,state FROM mail_intent WHERE id=$1`, [id]);
+export async function deliverMailIntent(id: string, generation: number, ordinal: number): Promise<MailAttemptResult> {
+  const result = await pool().query<{ message: Message | null; expires_at: Date; state: string; dispatch_generation: number }>(
+    `SELECT message,expires_at,state,dispatch_generation FROM mail_intent WHERE id=$1`, [id]);
   const intent = result.rows[0];
-  if (!intent || intent.state === 'accepted' || intent.state === 'failed' || intent.state === 'expired') {
-    return { outcome: 'permanent' };
-  }
-  if (!intent.message || intent.expires_at.getTime() <= Date.now()) {
-    await complete(id, ordinal, 'expired', null);
-    return { outcome: 'expired' };
-  }
+  if (!intent || intent.dispatch_generation !== generation) return { outcome: 'superseded' };
+  if (intent.state === 'accepted' || intent.state === 'failed' || intent.state === 'expired') return { outcome: 'superseded' };
+  if (!intent.message || intent.expires_at.getTime() <= Date.now()) return { outcome: 'expired' };
+  await pool().query(`INSERT INTO mail_attempt(intent_id,generation,ordinal,outcome,provider_invocations)
+    VALUES($1,$2,$3,'started',1) ON CONFLICT(intent_id,generation,ordinal) DO UPDATE
+    SET outcome='started',provider_invocations=mail_attempt.provider_invocations+1,attempted_at=now()`, [id, generation, ordinal]);
   try {
-    await sendMail(intent.message);
-    await complete(id, ordinal, 'accepted', null);
-    return { outcome: 'accepted' };
+    const acceptance = await sendMail(intent.message, Math.min(10_000, intent.expires_at.getTime() - Date.now()));
+    return { outcome: 'accepted', provider: acceptance.provider, ...(acceptance.receiptId ? { receiptId: acceptance.receiptId } : {}) };
   } catch (error) {
-    const failure = error instanceof MailDeliveryError ? error : new MailDeliveryError(safeDetail(error), 'ambiguous');
-    const terminal = failure.kind === 'permanent' || finalAttempt;
-    if (terminal) {
-      await complete(id, ordinal, 'failed', safeDetail(failure));
-      return { outcome: 'permanent' };
-    }
-    await pool().query(`INSERT INTO mail_attempt(intent_id,ordinal,outcome,detail) VALUES($1,$2,$3,$4)
-      ON CONFLICT(intent_id,ordinal) DO NOTHING`, [id, ordinal, failure.kind, safeDetail(failure)]);
-    return { outcome: 'retry', ...(failure.retryAfterMs === undefined ? {} : { retryAfterMs: failure.retryAfterMs }) };
+    const failure = error instanceof MailDeliveryError
+      ? error : new MailDeliveryError(safeDetail(error), 'ambiguous', 'unknown');
+    if (failure.kind === 'permanent') return { outcome: 'permanent', code: failure.code };
+    return { outcome: 'retry', code: failure.code, expiresAt: intent.expires_at.toISOString(),
+      ...(failure.retryAfterMs === undefined ? {} : { retryAfterMs: failure.retryAfterMs }) };
   }
 }
 
-async function complete(id: string, ordinal: number, outcome: 'accepted' | 'expired' | 'failed', detail: string | null): Promise<void> {
+export async function recordMailAttempt(
+  id: string,
+  generation: number,
+  ordinal: number,
+  result: MailAttemptResult,
+  finalAttempt: boolean,
+): Promise<'accepted' | 'retry' | 'failed' | 'expired' | 'superseded'> {
   const client = await pool().connect();
   try {
     await client.query('BEGIN');
-    await client.query(`INSERT INTO mail_attempt(intent_id,ordinal,outcome,detail) VALUES($1,$2,$3,$4)
-      ON CONFLICT(intent_id,ordinal) DO NOTHING`, [id, ordinal, outcome, detail]);
-    await client.query(`UPDATE mail_intent SET state=$2,message=NULL,completed_at=now() WHERE id=$1`, [id, outcome]);
+    const locked = await client.query<{ dispatch_generation: number }>(
+      `SELECT dispatch_generation FROM mail_intent WHERE id=$1 FOR UPDATE`, [id]);
+    if (!locked.rows[0] || locked.rows[0].dispatch_generation !== generation || result.outcome === 'superseded') {
+      await client.query('ROLLBACK');
+      return 'superseded';
+    }
+    const terminalState = result.outcome === 'accepted' ? 'accepted'
+      : result.outcome === 'expired' ? 'expired'
+      : result.outcome === 'permanent' || finalAttempt ? 'failed' : null;
+    const detail = result.outcome === 'accepted'
+      ? JSON.stringify({ provider: result.provider, ...(result.receiptId ? { receiptId: result.receiptId } : {}) })
+      : 'code' in result ? result.code : null;
+    const evidenceOutcome = terminalState ?? result.outcome;
+    await client.query(`INSERT INTO mail_attempt(intent_id,generation,ordinal,outcome,detail) VALUES($1,$2,$3,$4,$5)
+      ON CONFLICT(intent_id,generation,ordinal) DO UPDATE SET outcome=EXCLUDED.outcome,detail=EXCLUDED.detail`,
+      [id, generation, ordinal, evidenceOutcome, detail]);
+    if (terminalState) await client.query(`UPDATE mail_intent SET state=$2,message=NULL,completed_at=now() WHERE id=$1`, [id, terminalState]);
     await client.query('COMMIT');
+    return terminalState ?? 'retry';
   } catch (error) {
     await client.query('ROLLBACK');
     throw error;

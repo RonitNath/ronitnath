@@ -12,7 +12,11 @@ import { runtimeConfig } from './config';
 async function main(): Promise<void> {
   const config = runtimeConfig();
   const lifecycle = new Lifecycle();
-  ownChildLifecycle('http', lifecycle);
+  ownChildLifecycle('http', lifecycle, { quiesce: () => {
+    setRuntimeDraining(true);
+    drainStreams();
+  } });
+  try {
   process.on('message', (message: unknown) => {
     if (isParentMessage(message) && message.type === 'peer' && message.role === 'worker') setWorkerState(message.state);
   });
@@ -76,6 +80,10 @@ async function main(): Promise<void> {
     server.listen(config.port, config.host, () => resolve());
   });
   lifecycle.ready();
+  } catch (error) {
+    await lifecycle.drain('startup failure', Date.now() + 5_000).catch(() => undefined);
+    throw error;
+  }
 }
 
 function canonicalLocation(

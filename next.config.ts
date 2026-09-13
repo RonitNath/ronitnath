@@ -3,6 +3,7 @@ import type { NextConfig } from 'next';
 const IMMUTABLE = 'public, max-age=31536000, immutable';
 
 const config: NextConfig = {
+  distDir: process.env.NEXT_DIST_DIR ?? '.next',
   reactStrictMode: true,
   poweredByHeader: false,
   env: { APP_VERSION: process.env.APP_VERSION ?? 'dev' },

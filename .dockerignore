@@ -2,10 +2,14 @@
 .jj
 node_modules
 .next
+.next-dev
 drizzle/meta/_journal.json.bak
 docs
 deploy
 e2e
+test
+scripts/accept-dbos-local.sh
+scripts/test-container-local.sh
 screenshots
 test-results
 playwright-report

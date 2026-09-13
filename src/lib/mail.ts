@@ -23,10 +23,16 @@ export interface Message {
 
 export type MailFailureKind = 'transient' | 'permanent' | 'ambiguous';
 export class MailDeliveryError extends Error {
-  constructor(message: string, readonly kind: MailFailureKind, readonly retryAfterMs?: number) {
+  constructor(
+    message: string,
+    readonly kind: MailFailureKind,
+    readonly code: string,
+    readonly retryAfterMs?: number,
+  ) {
     super(message);
   }
 }
+export interface MailAcceptance { provider: 'usesend' | 'smtp' | 'file'; receiptId?: string }
 
 /* Where the dev transport writes. `MAIL_DIR` exists because Next's standalone
  * server chdirs into its own directory, so "the repo root" is not something
@@ -61,16 +67,18 @@ function asEml(message: Message): string {
   ].join('\r\n');
 }
 
-async function sendViaUseSend(base: string, key: string, message: Message): Promise<void> {
+async function sendViaUseSend(base: string, key: string, message: Message, timeoutMs: number): Promise<MailAcceptance> {
   let res: Response;
   try {
     res = await fetch(`${base.replace(/\/$/, '')}/api/v1/emails`, {
       method: 'POST',
       headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json' },
       body: JSON.stringify({ from: from(), to: message.to, subject: message.subject, text: message.text, html: message.html }),
+      signal: AbortSignal.timeout(timeoutMs),
     });
   } catch (error) {
-    throw new MailDeliveryError(error instanceof Error ? error.message : String(error), 'ambiguous');
+    const timeout = error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError');
+    throw new MailDeliveryError(timeout ? 'mail provider timed out' : 'mail provider connection failed', 'ambiguous', timeout ? 'network_timeout' : 'network_error');
   }
   if (!res.ok) {
     const raw = res.headers.get('retry-after');
@@ -82,8 +90,14 @@ async function sendViaUseSend(base: string, key: string, message: Message): Prom
       : undefined;
     const kind: MailFailureKind = res.status === 429 || res.status >= 500 ? 'transient' : 'permanent';
     await res.body?.cancel().catch(() => undefined);
-    throw new MailDeliveryError(`usesend: ${res.status}`, kind, retryAfterMs);
+    throw new MailDeliveryError(`usesend: ${res.status}`, kind, `http_${res.status}`, retryAfterMs);
   }
+  let receiptId: string | undefined;
+  try {
+    const body = await res.json() as Record<string, unknown>;
+    if (typeof body.id === 'string') receiptId = body.id.slice(0, 200);
+  } catch { await res.body?.cancel().catch(() => undefined); }
+  return { provider: 'usesend', ...(receiptId ? { receiptId } : {}) };
 }
 
 /* A recipient the transport must refuse. `MAIL_FAIL=1` fails everything;
@@ -95,22 +109,38 @@ function refuses(to: string): boolean {
   return fail === '1' || to.includes(fail);
 }
 
-export async function sendMail(message: Message): Promise<void> {
-  if (refuses(message.to)) throw new MailDeliveryError('mail: refused by MAIL_FAIL', 'permanent');
+export async function sendMail(message: Message, timeoutMs = 10_000): Promise<MailAcceptance> {
+  if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) throw new MailDeliveryError('mail intent expired', 'permanent', 'expired');
+  if (refuses(message.to)) throw new MailDeliveryError('mail: refused by MAIL_FAIL', 'permanent', 'test_refused');
   const apiUrl = process.env.USESEND_API_URL;
   const apiKey = process.env.USESEND_API_KEY;
   if (apiUrl && apiKey) {
-    await sendViaUseSend(apiUrl, apiKey, message);
-    return;
+    return sendViaUseSend(apiUrl, apiKey, message, timeoutMs);
   }
   const url = process.env.SMTP_URL;
   if (url) {
     try {
-      await transport(url).sendMail({ from: from(), to: message.to, subject: message.subject, text: message.text, html: message.html });
+      const active = transport(url);
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const timeout = new Promise<never>((_, reject) => {
+        timer = setTimeout(() => {
+          active.close();
+          globalForMail.rnMailer = undefined;
+          reject(new MailDeliveryError('SMTP provider timed out', 'ambiguous', 'network_timeout'));
+        }, timeoutMs);
+      });
+      const info = await Promise.race([
+        active.sendMail({ from: from(), to: message.to, subject: message.subject, text: message.text, html: message.html }),
+        timeout,
+      ]).finally(() => { if (timer) clearTimeout(timer); });
+      return { provider: 'smtp', ...(typeof info.messageId === 'string' ? { receiptId: info.messageId.slice(0, 200) } : {}) };
     } catch (error) {
-      throw new MailDeliveryError(error instanceof Error ? error.message : String(error), 'ambiguous');
+      if (error instanceof MailDeliveryError) throw error;
+      const responseCode = typeof error === 'object' && error && 'responseCode' in error
+        ? Number((error as { responseCode?: unknown }).responseCode) : 0;
+      const kind: MailFailureKind = responseCode >= 500 ? 'permanent' : responseCode >= 400 ? 'transient' : 'ambiguous';
+      throw new MailDeliveryError('SMTP provider rejected or lost the request', kind, responseCode ? `smtp_${responseCode}` : 'smtp_unknown');
     }
-    return;
   }
 
   const stamp = new Date().toISOString().replace(/[:.]/g, '-');
@@ -121,6 +151,7 @@ export async function sendMail(message: Message): Promise<void> {
   console.log(
     JSON.stringify({ level: 'info', event: 'mail.console', to: message.to, subject: message.subject, path }),
   );
+  return { provider: 'file' };
 }
 
 export async function closeMailTransport(): Promise<void> {

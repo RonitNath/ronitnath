@@ -752,10 +752,12 @@ export const mailAttempt = pgTable(
   {
     id: bigserial('id', { mode: 'number' }).primaryKey(),
     intentId: uuid('intent_id').notNull().references(() => mailIntent.id, { onDelete: 'cascade' }),
+    generation: integer('generation').notNull().default(0),
     ordinal: smallint('ordinal').notNull(),
+    providerInvocations: integer('provider_invocations').notNull().default(0),
     outcome: text('outcome').notNull(),
     detail: text('detail'),
     attemptedAt: timestamp('attempted_at', { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [uniqueIndex('mail_attempt_intent_ordinal').on(t.intentId, t.ordinal)],
+  (t) => [uniqueIndex('mail_attempt_intent_generation_ordinal').on(t.intentId, t.generation, t.ordinal)],
 );

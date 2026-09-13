@@ -17,6 +17,7 @@
 import { sql } from 'drizzle-orm';
 import { database } from '@/db/client';
 import { runtimeStatus } from '@/lib/runtime';
+import { schemaCompatibility } from '@/lib/schema-compatibility';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -41,14 +42,9 @@ export async function GET() {
     if (missing.length > 0) {
       return Response.json({ ok: false, missing, version }, { status: 503, headers });
     }
-    const schemas = await database().execute<{ workflow: boolean; mail: boolean; generation: boolean }>(sql`
-      select
-        to_regclass('dbos.workflow_status') is not null as workflow,
-        to_regclass('public.mail_intent') is not null as mail,
-        exists(select 1 from information_schema.columns
-          where table_schema='public' and table_name='mail_intent' and column_name='dispatch_generation') as generation`);
-    if (!schemas.rows[0]?.workflow || !schemas.rows[0]?.mail || !schemas.rows[0]?.generation) {
-      return Response.json({ ok: false, schemas: 'incompatible', version }, { status: 503, headers });
+    const compatibility = await schemaCompatibility();
+    if (!compatibility.ok) {
+      return Response.json({ ok: false, schemas: 'incompatible', detail: compatibility.detail, version }, { status: 503, headers });
     }
     return Response.json({ ok: true, spine: 'ok', workflow: 'ready', version }, { status: 200, headers });
   } catch (error) {

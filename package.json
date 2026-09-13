@@ -4,9 +4,9 @@
   "private": true,
   "packageManager": "pnpm@10.28.1",
   "scripts": {
-    "dev": "tsx watch --include 'runtime/**/*.ts' --include 'src/lib/mail*.ts' runtime/supervisor.ts",
+    "dev": "tsx runtime/supervisor.ts",
     "build": "next build && pnpm runtime:build",
-    "runtime:build": "tsup runtime/supervisor.ts runtime/http.ts runtime/worker.ts scripts/mail-intents.ts --format esm --out-dir dist-runtime --clean --sourcemap --external next --external @dbos-inc/dbos-sdk --external pg --external drizzle-orm --external nodemailer --external @isoastra/fleet-events --external @isoastra/fleet-runtime --external @isoastra/fleet-workflows",
+    "runtime:build": "tsup runtime/supervisor.ts runtime/http.ts runtime/worker.ts scripts/mail-intents.ts --format esm --out-dir dist-runtime --clean --external next --external @dbos-inc/dbos-sdk --external pg --external drizzle-orm --external nodemailer --external @isoastra/fleet-events --external @isoastra/fleet-runtime --external @isoastra/fleet-workflows",
     "start": "node dist-runtime/runtime/supervisor.mjs",
     "lint": "eslint .",
     "format": "prettier --write .",
@@ -21,11 +21,13 @@
     "db:workflow:migrate": "tsx scripts/migrate-workflows.ts",
     "db:migrate:all": "pnpm db:migrate && pnpm db:workflow:migrate",
     "db:load-sky": "node scripts/load-sky.mjs",
-    "e2e": "node test/playwright-isolated.mjs",
+    "e2e": "pnpm build && pnpm e2e:prepared",
+    "e2e:prepared": "node test/playwright-isolated.mjs",
     "seed:operator": "tsx scripts/seed-operator.ts",
     "migrate:identity": "tsx scripts/migrate-identity.ts",
     "import:export": "tsx scripts/import-export.ts",
-    "mail:intents": "node dist-runtime/scripts/mail-intents.mjs"
+    "mail:intents": "node dist-runtime/scripts/mail-intents.mjs",
+    "acceptance:local": "sh scripts/accept-dbos-local.sh"
   },
   "dependencies": {
     "@isoastra/fleet-configured": "0.1.3",

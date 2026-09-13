@@ -34,6 +34,8 @@ import { hashPassword, isCurrent, normaliseEmail, verifyPassword } from '@/lib/f
 import { passwordResetMail, verificationMail } from '@/lib/mail';
 import { queueMailIntent } from '@/lib/mail-queue';
 
+const AUTH_LINK_TTL_SECONDS = 60 * 60;
+
 /** Who ZITADEL is allowed to vouch for. Employee SSO is for employees; the
  *  ruling is one address, and an empty list means the door is shut rather than
  *  open (fleet-conventions §2). */
@@ -121,6 +123,7 @@ function build() {
       enabled: true,
       requireEmailVerification: true,
       revokeSessionsOnPasswordReset: true,
+      resetPasswordTokenExpiresIn: AUTH_LINK_TTL_SECONDS,
       password: {
         hash: (password) => hashPassword(password),
         /* The PHC string carries its own parameters, so this verifies a hash
@@ -130,13 +133,14 @@ function build() {
         verify: ({ hash, password }) => verifyPassword(hash, password),
       },
       sendResetPassword: async ({ user, url }) => {
-        await queueMailIntent('reset_password', passwordResetMail(user.email, url), new Date(Date.now() + 3_600_000));
+        await queueMailIntent('reset_password', passwordResetMail(user.email, url), new Date(Date.now() + AUTH_LINK_TTL_SECONDS * 1_000));
       },
     },
     emailVerification: {
       autoSignInAfterVerification: true,
+      expiresIn: AUTH_LINK_TTL_SECONDS,
       sendVerificationEmail: async ({ user, url }) => {
-        await queueMailIntent('verify_email', verificationMail(user.email, url), new Date(Date.now() + 3_600_000));
+        await queueMailIntent('verify_email', verificationMail(user.email, url), new Date(Date.now() + AUTH_LINK_TTL_SECONDS * 1_000));
       },
     },
     account: {

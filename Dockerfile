@@ -38,7 +38,6 @@ ENV NODE_ENV=production \
     APP_VERSION=${APP_VERSION} \
     PORT=3140 \
     HOSTNAME=0.0.0.0
-RUN apk add --no-cache curl
 COPY --from=prod-deps --chown=node:node /app/node_modules ./node_modules
 COPY --from=build --chown=node:node /app/package.json ./package.json
 COPY --from=build --chown=node:node /app/.next ./.next
@@ -49,5 +48,5 @@ COPY --from=build --chown=node:node /app/drizzle ./drizzle
 USER node
 EXPOSE 3140
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
-  CMD curl -fsS "http://127.0.0.1:${PORT}/healthz" || exit 1
+  CMD ["node", "-e", "fetch('http://127.0.0.1:'+process.env.PORT+'/healthz').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
 CMD ["node", "dist-runtime/runtime/supervisor.mjs"]
