@@ -1062,7 +1062,7 @@ packages:
       zod: ^3.23.0 || ^4.0.0
 
   '@isoastra/fleet-events@file:vendor/isoastra-fleet-events-0.2.3.tgz':
-    resolution: {integrity: sha512-nOqASre4BF0pwco16nKnjFpwLMxiWlS9gMQN0p1VRzNDqEsStFdln4JUjVIy7DeM1/lyGF85LoB4hvFUjuMZFA==, tarball: file:vendor/isoastra-fleet-events-0.2.3.tgz}
+    resolution: {integrity: sha512-ZivEMVp6+dQVVHC42/NzWLxugc0MgbmXX3yT4NOz7DObb2L5GaEwT54iMGSlMqn6kdd33DtWcF1/L+P3XH0sPA==, tarball: file:vendor/isoastra-fleet-events-0.2.3.tgz}
     version: 0.2.3
     peerDependencies:
       drizzle-orm: '>=0.44.0 <0.46.0'
@@ -1085,12 +1085,12 @@ packages:
     resolution: {integrity: sha512-GxxpYKScNUaV67kqvt//rVQgoxXsvyitKMEulF2RxU0mrg4FX7nrfY/fmsmPRf4KnE6cYH0XEnlEy9Yq3jI44w==, tarball: https://npm.pkg.github.com/download/@isoastra/fleet-ids/0.1.1/1aa2fc71810f33ec7ecab022c1baee6b84aaa181}
 
   '@isoastra/fleet-runtime@file:vendor/isoastra-fleet-runtime-0.0.0.tgz':
-    resolution: {integrity: sha512-1X43tf1J1xDmN6MAaIY51vmBc3Ved48Wu22uxoX+k4H2IdD0HI9fA+94UpxEthy+MdCnYZoBLiWf74jgvYP4Sw==, tarball: file:vendor/isoastra-fleet-runtime-0.0.0.tgz}
+    resolution: {integrity: sha512-s8ffBWKgn8wbrhvVi3lvP3UrmK0iDXkWlm3Xc6lue45B82IzLSMNAeNT0qipE9Rz2Pqhn2/Nw/qMHAfVZ/uq+Q==, tarball: file:vendor/isoastra-fleet-runtime-0.0.0.tgz}
     version: 0.0.0
     engines: {node: '>=22.12.0'}
 
   '@isoastra/fleet-workflows@file:vendor/isoastra-fleet-workflows-0.0.0.tgz':
-    resolution: {integrity: sha512-tHJXCN/XcGOnCe8E1I20QYC53h8nZ0xGn+qxxo0p3jN3hl9yapqtgD4xZbu1Z/dfnAyss2Na1YuVyYl1JAHVYw==, tarball: file:vendor/isoastra-fleet-workflows-0.0.0.tgz}
+    resolution: {integrity: sha512-mRBdsu2cSkQ+A6LHw2XsqHWdNLPFOqb0Y73dKM7I4akRt62t6xLg7z3GYuNpl0ww7xtHK5fwJTwSlxbbk6Qq9Q==, tarball: file:vendor/isoastra-fleet-workflows-0.0.0.tgz}
     version: 0.0.0
     engines: {node: '>=22.12.0'}
     peerDependencies:
