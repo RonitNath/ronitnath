@@ -31,6 +31,6 @@ describe('delivery environment adoption', () => {
     expect(workflow).toContain("branches: ['deploy', 'staging', 'preview/**']");
     expect(workflow).toContain("github.ref_name == 'deploy' && 'production' || 'staging'");
     expect(workflow).toContain('docker/login-action@dbcb813823bdd20940b903addbd779551569679f');
-    expect(workflow).toContain("startsWith(github.ref_name, 'preview/') && 'preview' || 'staging'");
+    expect(workflow).toContain("startsWith(github.ref, 'refs/heads/preview/') && 'preview' || 'staging'");
   });
 });
