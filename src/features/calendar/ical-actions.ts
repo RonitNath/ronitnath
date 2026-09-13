@@ -118,17 +118,19 @@ function exportRecord(item: StoredItem): IcalRecord {
     rawJCal: [],
     timeZoneDefinitions: {},
   };
-  return original ? {
+  if (!original) return current;
+  const merged: IcalRecord = {
     ...original,
     title: current.title,
     status: current.status,
     sequence: current.sequence,
-    ...(current.timing ? { timing: current.timing } : {}),
-    ...(current.due ? { due: current.due } : {}),
-    ...(current.rrule ? { rrule: current.rrule } : {}),
     rdates: current.rdates,
     exdates: current.exdates,
-  } : current;
+  };
+  if (current.timing) merged.timing = current.timing; else delete merged.timing;
+  if (current.due) merged.due = current.due; else delete merged.due;
+  if (current.rrule) merged.rrule = current.rrule; else delete merged.rrule;
+  return merged;
 }
 
 function exportRecords(item: StoredItem): IcalRecord[] {

@@ -927,11 +927,11 @@ packages:
     os: [win32]
 
   '@isoastra/calendar-core@file:vendor/grid-calendar/isoastra-calendar-core-0.1.0.tgz':
-    resolution: {integrity: sha512-xVEV1YJfCEu6hd/3tfrFKkiVKPXAVXRBGQ2zEHpyKuT5reIpAO060q8uqd8+4Y5XSFndlaV+rJHmF/LiBWMsTg==, tarball: file:vendor/grid-calendar/isoastra-calendar-core-0.1.0.tgz}
+    resolution: {integrity: sha512-Ukbu+U1X7xreTIhZSdyeBYvgP2lRKMwknR1llY+TtLYON/9p5GVAzmlimC4cEZiRjZm+hHub9j76SUCUmOiDNQ==, tarball: file:vendor/grid-calendar/isoastra-calendar-core-0.1.0.tgz}
     version: 0.1.0
 
   '@isoastra/calendar-ical@file:vendor/grid-calendar/isoastra-calendar-ical-0.1.0.tgz':
-    resolution: {integrity: sha512-2aI8cIlOyQ8gf/dgco/WRuikOE9ecjvKcOHcgLaRGgrYyqJjmNwjfbg2lBuXpdYUY6naCoR2shgaPkyer5LLEA==, tarball: file:vendor/grid-calendar/isoastra-calendar-ical-0.1.0.tgz}
+    resolution: {integrity: sha512-TQgCLDTDNeGkTNAxrxEEgszx6HCZ661tg8eJ7/xC3ocmsBL7ayeIaoVeYXMaTOo+hMHNNIrCorukJnFEt3/NoQ==, tarball: file:vendor/grid-calendar/isoastra-calendar-ical-0.1.0.tgz}
     version: 0.1.0
 
   '@isoastra/calendar-react@file:vendor/grid-calendar/isoastra-calendar-react-0.1.0.tgz':

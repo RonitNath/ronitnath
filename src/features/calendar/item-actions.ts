@@ -98,7 +98,7 @@ export async function editCalendarOccurrence(user: string, raw: z.input<typeof e
         const series: RecurringSeries = { id: item.id, timing: item.timing, ...item.recurrence };
         const zone = item.timing.kind === 'instant' ? 'UTC' : item.timing.kind === 'follow-me' ? item.timing.resolvedTimeZone : item.timing.timeZone;
         const cutoff = resolveLocal(input.recurrenceId, zone, 'earlier');
-        const expansion = expandOccurrences(series, { from: '1900-01-01T00:00Z', to: cutoff, maxCandidates: 100_000, maxOccurrences: 100_000 });
+        const expansion = expandOccurrences({ ...series, rdates: [], exdates: [], exceptions: {} }, { from: '1900-01-01T00:00Z', to: cutoff, maxCandidates: 100_000, maxOccurrences: 100_000 });
         const budget = expansion.diagnostics.find(({ code }) => code === 'budget-exceeded');
         if (budget) throw new CalendarConflictError(budget.message);
         const count = expansion.occurrences.length;
@@ -122,6 +122,10 @@ function recurrenceOf(series: RecurringSeries): NonNullable<StoredItem['recurren
     ...(series.exdates ? { exdates: series.exdates } : {}),
     ...(series.exceptions ? { exceptions: series.exceptions } : {}),
     ...(series.calendar ? { calendar: series.calendar } : {}),
+    ...(series.lineageId ? { lineageId: series.lineageId } : {}),
+    ...(series.segmentStart ? { segmentStart: series.segmentStart } : {}),
+    ...(series.identityTiming ? { identityTiming: series.identityTiming } : {}),
+    ...(series.identityRRule ? { identityRRule: series.identityRRule } : {}),
   };
 }
 
