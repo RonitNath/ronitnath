@@ -1,0 +1,86 @@
+ WARN  Issue while reading "/Users/ronitnath/dev/.worktrees/ronitnath-delivery-env/.npmrc". Failed to replace env in config: ${NODE_AUTH_TOKEN}
+
+> ronitnath@0.0.0 dev /Users/ronitnath/dev/.worktrees/ronitnath-delivery-env
+> next dev
+
+   ▲ Next.js 15.5.25
+   - Local:        http://localhost:40381
+   - Network:      http://192.168.0.70:40381
+
+ ✓ Starting...
+ ✓ Ready in 1114ms
+ ○ Compiling /healthz ...
+ ✓ Compiled /healthz in 859ms (391 modules)
+ GET /healthz 200 in 997ms
+ ○ Compiling / ...
+ ✓ Compiled / in 2.4s (1924 modules)
+ ⨯ Error: Failed query: SELECT * FROM configured WHERE org_id=$1 AND key=$2 AND state=$3
+params: isoastra,homepage,published
+    at async publicConfiguration (src/features/configuration/model.ts:34:32)
+    at async Home (src/app/page.tsx:18:25)
+  32 | export async function publicConfiguration() {
+  33 |   const db = database();
+> 34 |   const [home, announcement] = await Promise.all([
+     |                                ^
+  35 |     readPublished(db, 'isoastra', HOME_KEY, homeSchema),
+  36 |     readPublished(db, 'isoastra', ANNOUNCEMENT_KEY, announcementSchema),
+  37 |   ]); {
+  query: 'SELECT * FROM configured WHERE org_id=$1 AND key=$2 AND state=$3',
+  params: [Array],
+  digest: '1747916432',
+  [cause]: error: relation "configured" does not exist
+      at async publicConfiguration (src/features/configuration/model.ts:34:32)
+      at async Home (src/app/page.tsx:18:25)
+    32 | export async function publicConfiguration() {
+    33 |   const db = database();
+  > 34 |   const [home, announcement] = await Promise.all([
+       |                                ^
+    35 |     readPublished(db, 'isoastra', HOME_KEY, homeSchema),
+    36 |     readPublished(db, 'isoastra', ANNOUNCEMENT_KEY, announcementSchema),
+    37 |   ]); {
+    length: 109,
+    severity: 'ERROR',
+    code: '42P01',
+    detail: undefined,
+    hint: undefined,
+    position: '15',
+    internalPosition: undefined,
+    internalQuery: undefined,
+    where: undefined,
+    schema: undefined,
+    table: undefined,
+    column: undefined,
+    dataType: undefined,
+    constraint: undefined,
+    file: 'parse_relation.c',
+    line: '1449',
+    routine: 'parserOpenTable'
+  }
+}
+ GET / 500 in 2846ms
+ ✓ Compiled in 492ms (389 modules)
+ ✓ Compiled in 80ms (389 modules)
+ ✓ Compiled in 143ms (389 modules)
+[?25h
+ WARN  Issue while reading "/Users/ronitnath/dev/.worktrees/ronitnath-delivery-env/.npmrc". Failed to replace env in config: ${NODE_AUTH_TOKEN}
+
+> ronitnath@0.0.0 dev /Users/ronitnath/dev/.worktrees/ronitnath-delivery-env
+> next dev
+
+   ▲ Next.js 15.5.25
+   - Local:        http://localhost:40381
+   - Network:      http://192.168.0.70:40381
+
+ ✓ Starting...
+ ✓ Ready in 1104ms
+ ✓ Compiled /healthz in 204ms (391 modules)
+ GET /healthz 200 in 353ms
+ ○ Compiling / ...
+ ✓ Compiled / in 1976ms (1859 modules)
+ GET / 200 in 2464ms
+ ✓ Compiled in 461ms (389 modules)
+ ✓ Compiled in 280ms (1859 modules)
+ GET / 200 in 348ms
+ ✓ Compiled in 238ms (1859 modules)
+ ✓ Compiled in 177ms (389 modules)
+[?25h

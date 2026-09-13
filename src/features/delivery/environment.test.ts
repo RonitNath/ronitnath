@@ -10,6 +10,9 @@ describe('delivery environment adoption', () => {
     );
     expect(definition.sensitivity).toBe('sensitive');
     expect(Object.values(definition.profiles).some(({ mode }) => mode === 'staging')).toBe(true);
+    expect(definition.fixtures.find(({ name }) => name === 'synthetic')?.command?.args).toEqual([
+      'db:migrate',
+    ]);
     const first = planEnvironment(definition, {
       profile: 'local',
       owner: 'agent',
@@ -29,6 +32,7 @@ describe('delivery environment adoption', () => {
   it('keeps production and staging credentials behind branch-scoped environments', async () => {
     const workflow = await readFile('.github/workflows/deploy.yml', 'utf8');
     expect(workflow).toContain("branches: ['deploy', 'staging', 'preview/**']");
+    expect(workflow).toContain('@isoastra/fleet-delivery@0.3.12');
     expect(workflow).toContain("github.ref_name == 'deploy' && 'production' || 'staging'");
     expect(workflow).toContain('docker/login-action@dbcb813823bdd20940b903addbd779551569679f');
     expect(workflow).toContain("startsWith(github.ref, 'refs/heads/preview/') && 'preview' || 'staging'");

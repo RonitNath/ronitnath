@@ -44,5 +44,21 @@
     { "id": "migration-compatibility", "profile": "release", "command": { "executable": "pnpm", "args": ["delivery:artifact"] }, "inputs": ["drizzle/", "delivery.migrations.json"], "risk": "migration", "always": true }
   ],
   "migrations": ["drizzle/", "delivery.migrations.json"],
-  "fixtures": [{ "name": "synthetic", "command": null, "allowedModes": ["local", "semilocal", "preview", "staging"] }]
+  "fixtures": [
+    {
+      "name": "synthetic",
+      "command": {
+        "executable": "pnpm",
+        "args": ["db:migrate"],
+        "env": {
+          "DATABASE_URL": {
+            "source": "literal",
+            "value": "postgres://ronitnath:ronitnath@127.0.0.1:${service.database.port}/ronitnath"
+          }
+        },
+        "inheritEnv": ["PATH", "HOME", "LANG", "TZ"]
+      },
+      "allowedModes": ["local", "semilocal", "preview", "staging"]
+    }
+  ]
 }

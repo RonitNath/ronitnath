@@ -72,7 +72,10 @@ async function main() {
   const owner = `github:${secret('GITHUB_REPOSITORY')}:${ref}`;
   const planned = planEnvironment(definition, { profile, owner, workspace: `${definition.name}:${ref}` });
   const namespace = planned.namespace;
-  const root = `/var/lib/ronitnath-runner/environments/${namespace}`;
+  // The runner's Nix StateDirectory is explicitly writable inside its hardened
+  // mount namespace. Keep durable environment state there so recovery and the
+  // host reaper observe the same files.
+  const root = `/var/lib/github-runner/ronitnath/environments/${namespace}`;
   const artifacts = JSON.parse(await readFile('.delivery/artifacts.json', 'utf8')) as Artifacts;
   if (artifacts.requestedSha !== sha || !artifacts.runtime.includes('@sha256:') || !artifacts.migrate.includes('@sha256:'))
     throw new Error('environment artifacts are not bound to this candidate');
