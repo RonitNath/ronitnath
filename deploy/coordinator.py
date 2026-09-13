@@ -312,7 +312,8 @@ def main(release_id):
         if state.get("state") in ("deployed", "failed", "degraded"):
             return
         try:
-            verify_candidate(release["requestedSha"])
+            if not state:
+                verify_candidate(release["requestedSha"])
             local = current_local()
             peer = remote("replica-status", release_id)
             allowed = {previous, target}

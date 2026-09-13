@@ -135,6 +135,32 @@ class CoordinatorRecoveryTests(unittest.TestCase):
         finally:
             cleanup.STATE = original
 
+    def test_recovery_finishes_owned_release_without_rechecking_moving_branch(self):
+        original = coordinator.STATE
+        original_lock = coordinator.LOCK
+        release_id = self.release["releaseId"]
+        target = "sha256:" + "c" * 64
+        self.release.update({
+            "requestedSha": "d" * 40,
+            "artifacts": {
+                "runtime": {"repository": "ghcr.io/ronitnath/ronitnath-app", "digest": target},
+                "migration": {"repository": "ghcr.io/ronitnath/ronitnath-app", "digest": "sha256:" + "e" * 64},
+            },
+        })
+        try:
+            with tempfile.TemporaryDirectory() as directory:
+                coordinator.STATE = Path(directory)
+                coordinator.LOCK = str(Path(directory) / "coordinator.lock")
+                (coordinator.STATE / (release_id + ".manifest.json")).write_text(json.dumps(self.release))
+                (coordinator.STATE / (release_id + ".state.json")).write_text(json.dumps({"state": "deploying", "step": "nyc-accepted", "migration": "complete"}))
+                healthy = {"digest": target, "healthy": True}
+                with patch.object(coordinator, "verify_candidate") as verify, patch.object(coordinator, "current_local", return_value=healthy), patch.object(coordinator, "remote", return_value=healthy), patch.object(coordinator, "run"), patch.object(coordinator, "ready"), patch.object(coordinator, "anonymous_denied"), patch.object(coordinator, "realtime_acceptance", return_value={"operator": True, "received": True, "applied": True}), patch.object(coordinator, "checkpoint", side_effect=lambda _release, state, step, **extra: {"state": state, "step": step, "migration": extra.get("migration", "complete"), "operations": {"sfo": "10000000-0000-4000-8000-000000000009"}}):
+                    coordinator.main(release_id)
+                verify.assert_not_called()
+        finally:
+            coordinator.STATE = original
+            coordinator.LOCK = original_lock
+
 
 class ReplicaRecoveryTests(unittest.TestCase):
     def test_repeated_operation_observes_completed_target_without_mutating(self):
