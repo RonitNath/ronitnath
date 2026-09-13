@@ -17,6 +17,7 @@
     "delivery:static": "tsx scripts/delivery.ts static",
     "delivery:artifact": "tsx scripts/delivery.ts artifact",
     "delivery:cleanup": "tsx scripts/delivery.ts cleanup",
+    "delivery:environment": "tsx scripts/environment.ts",
     "delivery:protocol:test": "python3 -m unittest deploy/test_delivery_protocol.py",
     "env:plan": "fleet-delivery env plan delivery.application.json local --json",
     "env:up": "fleet-delivery env up delivery.application.json local --json",
@@ -36,7 +37,7 @@
   },
   "dependencies": {
     "@isoastra/fleet-configured": "0.1.3",
-    "@isoastra/fleet-delivery": "0.3.5",
+    "@isoastra/fleet-delivery": "0.3.7",
     "@isoastra/fleet-events": "0.2.3",
     "@isoastra/fleet-gates": "0.1.3",
     "@isoastra/fleet-identity": "0.1.1",

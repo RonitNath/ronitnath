@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 2,
+  "name": "ronitnath-preview",
+  "maxConcurrency": 2,
+  "capacity": { "cpuCores": 4, "memoryMiB": 8192 },
+  "stages": [
+    { "id": "static", "label": "Disposable static and database checks", "kind": "check", "command": { "executable": "flock", "args": ["/run/fleet-admission/heavy.lock", "pnpm", "delivery:static"], "inheritEnv": ["PATH", "LANG", "TZ", "CI", "HOME", "PNPM_HOME", "DOCKER_HOST", "DOCKER_CONFIG", "XDG_RUNTIME_DIR", "GITHUB_SHA"] }, "cleanup": [{ "executable": "pnpm", "args": ["delivery:cleanup"] }], "budget": { "cpuCores": 4, "memoryMiB": 8192, "timeoutMs": 900000, "outputBytes": 2000000 } },
+    { "id": "build", "label": "One candidate build graph", "kind": "build", "needs": ["static"], "command": { "executable": "flock", "args": ["/run/fleet-admission/heavy.lock", "pnpm", "tsx", "scripts/delivery.ts", "build"], "env": { "FLEET_PACKAGES_TOKEN": { "source": "secret", "name": "FLEET_PACKAGES_TOKEN" } }, "inheritEnv": ["PATH", "LANG", "TZ", "HOME", "PNPM_HOME", "DOCKER_HOST", "DOCKER_CONFIG", "XDG_RUNTIME_DIR", "GITHUB_SHA"] }, "cleanup": [{ "executable": "pnpm", "args": ["delivery:cleanup"] }], "budget": { "cpuCores": 4, "memoryMiB": 8192, "timeoutMs": 900000, "outputBytes": 2000000 } },
+    { "id": "candidate", "label": "Candidate artifact browser acceptance", "kind": "check", "needs": ["build"], "command": { "executable": "flock", "args": ["/run/fleet-admission/heavy.lock", "pnpm", "tsx", "scripts/delivery.ts", "candidate"], "inheritEnv": ["PATH", "LANG", "TZ", "CI", "HOME", "PNPM_HOME", "DOCKER_HOST", "DOCKER_CONFIG", "XDG_RUNTIME_DIR", "GITHUB_SHA"] }, "cleanup": [{ "executable": "pnpm", "args": ["delivery:cleanup"] }], "budget": { "cpuCores": 4, "memoryMiB": 8192, "timeoutMs": 1200000, "outputBytes": 2000000 } },
+    { "id": "publish", "label": "Publish accepted environment artifacts", "kind": "publish", "needs": ["candidate"], "command": { "executable": "pnpm", "args": ["tsx", "scripts/delivery.ts", "publish-environment"], "inheritEnv": ["PATH", "LANG", "TZ", "HOME", "PNPM_HOME", "DOCKER_HOST", "DOCKER_CONFIG", "XDG_RUNTIME_DIR", "GITHUB_SHA"] }, "mutation": "uncertain", "budget": { "cpuCores": 2, "memoryMiB": 2048, "timeoutMs": 600000, "outputBytes": 1000000 } }
+  ]
+}

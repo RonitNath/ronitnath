@@ -395,6 +395,31 @@ async function artifact() {
   }
 }
 
+async function candidate() {
+  await startDb();
+  await mkdir('.delivery/mail', { recursive: true });
+  try {
+    await run('docker', [
+      'run', '--rm', '--network', network, '-e', `DATABASE_URL=${containerDb}`, tag('migrate'),
+    ]);
+    await seedArtifactOperator();
+    await startWeb(tag('runtime'));
+    await run('docker', [
+      'run', '--rm', '--network', `container:${webName}`,
+      '-v', `${process.cwd()}:/work`, '-w', '/work',
+      '-e', `DATABASE_URL=${containerDb}`, '-e', 'E2E_BASE_URL=http://localhost:3140',
+      '-e', 'MAIL_DIR=/work/.delivery/mail', playwrightImage,
+      'bash', '-lc', './node_modules/.bin/playwright test --config playwright.delivery.config.ts',
+    ]);
+    await run('docker', [
+      'run', '--rm', '--network', network, '-e', `DATABASE_URL=${containerDb}`, tag('migrate'),
+    ]);
+  } finally {
+    await ignore('docker', ['rm', '-f', webName]);
+    await ignore('docker', ['rm', '-f', dbName]);
+  }
+}
+
 function digestFromInspect(output: string): string {
   const found = output.match(/Digest:\s+(sha256:[a-f0-9]{64})/);
   if (!found) throw new Error('registry did not return an OCI digest');
@@ -497,6 +522,33 @@ async function publish() {
   await writeFile('.delivery/release.json', JSON.stringify(release, null, 2));
 }
 
+async function publishEnvironment() {
+  await run('docker', ['push', tag('runtime')]);
+  await run('docker', ['push', tag('migrate')]);
+  const runtimeDigest = digestFromInspect(
+    await run('docker', ['buildx', 'imagetools', 'inspect', tag('runtime')], { quiet: true }),
+  );
+  const migrateDigest = digestFromInspect(
+    await run('docker', ['buildx', 'imagetools', 'inspect', tag('migrate')], { quiet: true }),
+  );
+  const journal = JSON.parse(await readFile('drizzle/meta/_journal.json', 'utf8')) as {
+    entries: { tag: string }[];
+  };
+  const migrationChecksums = Object.fromEntries(
+    await Promise.all(journal.entries.map(async ({ tag: migrationTag }) => [
+      migrationTag,
+      createHash('sha256').update(await readFile(`drizzle/${migrationTag}.sql`)).digest('hex'),
+    ])),
+  );
+  await writeFile('.delivery/artifacts.json', JSON.stringify({
+    schemaVersion: 3,
+    requestedSha: sha(),
+    runtime: `${repository}@${runtimeDigest}`,
+    migrate: `${repository}@${migrateDigest}`,
+    migrationChecksums,
+  }, null, 2));
+}
+
 async function cleanup() {
   await ignore('docker', ['rm', '-f', webName]);
   await ignore('docker', ['rm', '-f', dbName]);
@@ -510,7 +562,9 @@ async function main() {
     static: staticChecks,
     build,
     artifact,
+    candidate,
     publish,
+    'publish-environment': publishEnvironment,
     cleanup,
   };
   if (!command || !commands[command])

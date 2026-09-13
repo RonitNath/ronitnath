@@ -25,4 +25,12 @@ describe('delivery environment adoption', () => {
       second.resources.map(({ port }) => port),
     );
   });
+
+  it('keeps production and staging credentials behind branch-scoped environments', async () => {
+    const workflow = await readFile('.github/workflows/deploy.yml', 'utf8');
+    expect(workflow).toContain("branches: ['deploy', 'staging', 'preview/**']");
+    expect(workflow).toContain("github.ref_name == 'deploy' && 'production' || 'staging'");
+    expect(workflow).toContain('docker/login-action@dbcb813823bdd20940b903addbd779551569679f');
+    expect(workflow).toContain("startsWith(github.ref_name, 'preview/') && 'preview' || 'staging'");
+  });
 });
