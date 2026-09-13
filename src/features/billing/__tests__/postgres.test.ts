@@ -36,4 +36,36 @@ suite('billing application transaction contract', () => {
     const rows = await database().execute<{ n: string }>(`select count(*)::text n from billing_v2_invoice where id='${invoiceId}'`);
     expect(rows.rows[0]?.n).toBe('0');
   });
+
+  it('deduplicates confirmed receipt identities across every invoice for one seller', async () => {
+    const party = (await database().insert(schema.party).values({ kind: 'person' }).returning({ id: schema.party.id }))[0]!;
+    await database().insert(schema.person).values({ id: party.id, displayName: 'Receipt Identity Test' });
+    const first = randomUUID(), duplicate = randomUUID(), otherSeller = randomUUID();
+    await database().insert(schema.billingReceiptClaim).values({
+      operationKey: first, customerPersonId: party.id, sellerId: 'ronit', invoiceId: `invoice:${first}`,
+      amountAtoms: 100n, evidence: 'first', state: 'confirmed', confirmedOperationKey: `confirm:${first}`,
+      confirmedExternalNamespace: 'manual', confirmedExternalId: 'same-economic-receipt',
+    });
+    await expect(database().insert(schema.billingReceiptClaim).values({
+      operationKey: duplicate, customerPersonId: party.id, sellerId: 'ronit', invoiceId: `invoice:${duplicate}`,
+      amountAtoms: 100n, evidence: 'duplicate', state: 'confirmed', confirmedOperationKey: `confirm:${duplicate}`,
+      confirmedExternalNamespace: 'manual', confirmedExternalId: 'same-economic-receipt',
+    })).rejects.toMatchObject({ cause: { code: '23505' } });
+    await expect(database().insert(schema.billingReceiptClaim).values({
+      operationKey: otherSeller, customerPersonId: party.id, sellerId: 'isoastra', invoiceId: `invoice:${otherSeller}`,
+      amountAtoms: 100n, evidence: 'other seller', state: 'confirmed', confirmedOperationKey: `confirm:${otherSeller}`,
+      confirmedExternalNamespace: 'manual', confirmedExternalId: 'same-economic-receipt',
+    })).resolves.toBeDefined();
+  });
+
+  it('rejects persisted order totals that violate cumulative financial bounds', async () => {
+    const party = (await database().insert(schema.party).values({ kind: 'person' }).returning({ id: schema.party.id }))[0]!;
+    await database().insert(schema.person).values({ id: party.id, displayName: 'Order Bound Test' });
+    const id = randomUUID();
+    await expect(database().insert(schema.billingOrder).values({
+      id, operationKey: `invalid:${id}`, customerPersonId: party.id, sellerId: 'ronit',
+      offerNamespace: 'ronit', offerId: 'test', offerVersion: 1, invoiceId: `invalid:${id}`,
+      kind: 'one_time', state: 'paid', totalAtoms: 100n, paidAtoms: 101n,
+    })).rejects.toMatchObject({ cause: { code: '23514' } });
+  });
 });

@@ -16,6 +16,8 @@ try {
   await run(`${pgBin}/pg_ctl`, ['-D', data, '-o', `-h 127.0.0.1 -p ${port} -c fsync=on -c synchronous_commit=on -c full_page_writes=on`, '-w', 'start']);
   const env = { ...process.env, DATABASE_URL: `postgresql://${process.env.USER}@127.0.0.1:${port}/postgres`, BILLING_DATABASE_TEST: '1', ID_KEY: '0123456789abcdef0123456789abcdef' };
   await run('pnpm', ['db:migrate'], env);
+  await run('pnpm', ['tsx', 'scripts/migrate-billing.mts', 'open-period', 'ronit', '2020-01-01', '2100-01-01'], env);
+  await run('pnpm', ['tsx', 'scripts/migrate-billing.mts', 'open-period', 'isoastra', '2020-01-01', '2100-01-01'], env);
   await run('pnpm', ['vitest', 'run', 'src/features/billing/__tests__/postgres.test.ts'], env);
 } finally {
   await run(`${pgBin}/pg_ctl`, ['-D', data, '-m', 'fast', 'stop']).catch(() => {});

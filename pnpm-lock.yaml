@@ -12,8 +12,8 @@ importers:
         specifier: 0.2.0
         version: 0.2.0(drizzle-orm@0.45.2(@types/pg@8.23.1)(kysely@0.29.5)(pg@8.23.0))
       '@isoastra/fleet-billing':
-        specifier: 0.4.0
-        version: 0.4.0(drizzle-orm@0.45.2(@types/pg@8.23.1)(kysely@0.29.5)(pg@8.23.0))(next@15.5.25(@playwright/test@1.63.0)(@types/node@24.13.3)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(pg@8.23.0)(react@19.2.8)(zod@4.5.4)
+        specifier: 0.5.0
+        version: 0.5.0(drizzle-orm@0.45.2(@types/pg@8.23.1)(kysely@0.29.5)(pg@8.23.0))(next@15.5.25(@playwright/test@1.63.0)(@types/node@24.13.3)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(pg@8.23.0)(react@19.2.8)(zod@4.5.4)
       '@isoastra/fleet-configured':
         specifier: 0.1.3
         version: 0.1.3(drizzle-orm@0.45.2(@types/pg@8.23.1)(kysely@0.29.5)(pg@8.23.0))(next@15.5.25(@playwright/test@1.63.0)(@types/node@24.13.3)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(pg@8.23.0)(react@19.2.8)(zod@4.5.4)
@@ -895,8 +895,8 @@ packages:
     peerDependencies:
       drizzle-orm: '>=0.44.0 <0.46.0'
 
-  '@isoastra/fleet-billing@0.4.0':
-    resolution: {integrity: sha512-V/G3B6Gsa0SlKqXp8M/6SkGVAQdwYUI4z7QnP87j47XMCXTn9IQGq6w7pT7M6ohrw2mhGb+jIJptkxPapdm1lg==, tarball: https://npm.pkg.github.com/download/@isoastra/fleet-billing/0.4.0/eb0538d2ca269ee05d42f6bf171b0e2279bc5e0b}
+  '@isoastra/fleet-billing@0.5.0':
+    resolution: {integrity: sha512-vrgvkHgJy7TFDMayEIHZZNxn9ZjEW4ot5Ew0/KtSvsLPxyEvNo/Cm6jUDmu11QEgvLCs/NmDZTYK1Sl2PhwRJA==, tarball: https://npm.pkg.github.com/download/@isoastra/fleet-billing/0.5.0/81466046d868406bf39b7206da9aea2d550349f9}
     peerDependencies:
       drizzle-orm: '>=0.44.0 <0.46.0'
       pg: ^8.11.0
@@ -3771,7 +3771,7 @@ snapshots:
       decimal.js: 10.6.0
       drizzle-orm: 0.45.2(@types/pg@8.23.1)(kysely@0.29.5)(pg@8.23.0)
 
-  '@isoastra/fleet-billing@0.4.0(drizzle-orm@0.45.2(@types/pg@8.23.1)(kysely@0.29.5)(pg@8.23.0))(next@15.5.25(@playwright/test@1.63.0)(@types/node@24.13.3)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(pg@8.23.0)(react@19.2.8)(zod@4.5.4)':
+  '@isoastra/fleet-billing@0.5.0(drizzle-orm@0.45.2(@types/pg@8.23.1)(kysely@0.29.5)(pg@8.23.0))(next@15.5.25(@playwright/test@1.63.0)(@types/node@24.13.3)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(pg@8.23.0)(react@19.2.8)(zod@4.5.4)':
     dependencies:
       '@isoastra/fleet-events': 0.2.3(drizzle-orm@0.45.2(@types/pg@8.23.1)(kysely@0.29.5)(pg@8.23.0))(next@15.5.25(@playwright/test@1.63.0)(@types/node@24.13.3)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(pg@8.23.0)(react@19.2.8)(zod@4.5.4)
       '@isoastra/fleet-ledger': 0.2.0(drizzle-orm@0.45.2(@types/pg@8.23.1)(kysely@0.29.5)(pg@8.23.0))

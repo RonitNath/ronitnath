@@ -6,7 +6,12 @@ export async function sellers() {
   return database().select().from(schema.billingSeller).orderBy(asc(schema.billingSeller.name));
 }
 
-export async function publishedOffers() {
+export async function pilotEligibility(personId: number) {
+  return (await database().select().from(schema.billingPilotAccount).where(and(eq(schema.billingPilotAccount.personId, personId), eq(schema.billingPilotAccount.enabled, true))).limit(1))[0] ?? null;
+}
+
+export async function publishedOffers(personId: number) {
+  if (!await pilotEligibility(personId)) return [];
   const rows = await database().select().from(schema.billingOffer)
     .innerJoin(schema.billingOfferVersion, and(
       eq(schema.billingOffer.namespace, schema.billingOfferVersion.namespace),
@@ -15,7 +20,11 @@ export async function publishedOffers() {
     )).innerJoin(schema.billingSeller, eq(schema.billingOfferVersion.sellerId, schema.billingSeller.id))
     .where(and(eq(schema.billingOffer.available, true), eq(schema.billingSeller.enabled, true)))
     .orderBy(asc(schema.billingSeller.name), asc(schema.billingOfferVersion.id));
-  return rows.map(({ billing_offer_version: row, billing_seller: seller }) => ({ seller, offer: materializeOffer(row.sellerId, row.version, catalogSchema.shape.offers.element.parse(row.terms)) }));
+  return rows.map(({ billing_offer_version: row, billing_seller: seller }) => ({ seller, offer: materializeOffer(row.sellerId, row.version, catalogSchema.shape.offers.element.parse(row.terms)) })).filter(({ offer }) => offer.kind === 'one_time');
+}
+
+export async function pilotAccounts() {
+  return database().select({ pilot: schema.billingPilotAccount, person: schema.person }).from(schema.billingPilotAccount).innerJoin(schema.person, eq(schema.billingPilotAccount.personId, schema.person.id)).orderBy(asc(schema.person.displayName));
 }
 
 export async function billingForCustomer(personId: number) {
