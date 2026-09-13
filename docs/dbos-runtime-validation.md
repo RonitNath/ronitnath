@@ -9,10 +9,10 @@ because machine load was not controlled.
 
 | Measure                       |      baseline |  DBOS runtime | notifications | vs. DBOS |
 | ----------------------------- | ------------: | ------------: | ------------: | -------: |
-| Image size                    | 137,490,695 B | 328,107,761 B | 328,385,366 B |    +0.1% |
-| Ready startup                 |      2,574 ms |      2,456 ms |      2,495 ms |    +1.6% |
-| Idle container memory         |     122.7 MiB |     512.1 MiB |     512.6 MiB |    +0.1% |
-| `/healthz`, 20 requests, mean |      6.949 ms |      4.440 ms |      7.718 ms |  +73.8%* |
+| Image size                    | 137,490,695 B | 328,107,761 B | 328,378,345 B |    +0.1% |
+| Ready startup                 |      2,574 ms |      2,456 ms |      3,824 ms |  +55.7%* |
+| Idle container memory         |     122.7 MiB |     512.1 MiB |     514.9 MiB |   +0.5%* |
+| `/healthz`, 20 requests, mean |      6.949 ms |      4.440 ms |      6.266 ms |  +41.1%* |
 
 The image-size increase is the cost of shipping production dependencies for a
 custom Next server instead of the incompatible standalone trace. Removing curl
