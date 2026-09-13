@@ -56,6 +56,10 @@ export const reachable = await (async () => {
   }
 })();
 
+if (process.env.CI === 'true' && !reachable) {
+  throw new Error(`mandatory PostgreSQL test database is unavailable at ${TEST_DSN}`);
+}
+
 export async function closeDatabase(): Promise<void> {
   if (globalForDb.rnPool) {
     await pool().end();

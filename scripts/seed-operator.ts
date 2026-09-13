@@ -25,7 +25,8 @@ config({ path: ['.env.local', '.env'], quiet: true });
 async function main(): Promise<void> {
   const { createLocalAccountIssuer } = await import('better-auth');
   const { authSchema, database, schema } = await import('../src/db/client');
-  const { hashPassword, identityId, normaliseEmail } = await import('../src/lib/fleet/identity');
+  const { hashPassword, identityId, normaliseEmail } =
+    await import('../src/lib/fleet/identity');
   const { oidcAllowlist } = await import('../src/features/auth/email-address');
   const { grantOperator } = await import('../src/features/platform/operators');
   const { createPerson } = await import('../src/features/people/provision');
@@ -34,12 +35,15 @@ async function main(): Promise<void> {
   const email = normaliseEmail(
     flag >= 0 ? (process.argv[flag + 1] ?? '') : (oidcAllowlist()[0] ?? ''),
   );
-  if (!email) throw new Error('usage: pnpm seed:operator --email <address> [--password <secret>]');
+  if (!email)
+    throw new Error('usage: pnpm seed:operator --email <address> [--password <secret>]');
 
   const passwordFlag = process.argv.indexOf('--password');
   const password = passwordFlag >= 0 ? (process.argv[passwordFlag + 1] ?? '') : '';
   if (!password && !oidcAllowlist().includes(email)) {
-    throw new Error(`${email} is not on OIDC_ALLOWLIST and has no password; it could never sign in`);
+    throw new Error(
+      `${email} is not on OIDC_ALLOWLIST and has no password; it could never sign in`,
+    );
   }
 
   const db = database();
@@ -74,7 +78,11 @@ async function main(): Promise<void> {
       })
       .onConflictDoUpdate({
         target: authSchema.account.id,
-        set: { password: phc, issuer: createLocalAccountIssuer('credential'), updatedAt: new Date() },
+        set: {
+          password: phc,
+          issuer: createLocalAccountIssuer('credential'),
+          updatedAt: new Date(),
+        },
       });
   }
 

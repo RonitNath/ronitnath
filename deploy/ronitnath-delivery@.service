@@ -1,0 +1,16 @@
+[Unit]
+Description=ronitnath release coordinator %i
+After=docker.service network-online.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/libexec/ronitnath-coordinator %i
+User=root
+Group=root
+TimeoutStartSec=45min
+Restart=on-failure
+RestartSec=30
+
+[Install]
+WantedBy=multi-user.target

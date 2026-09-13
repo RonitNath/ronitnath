@@ -47,7 +47,7 @@ interface Summary {
  *  already somebody else's. `person.user_id` is unique — one account is one
  *  person — so this is a guard rather than an upsert. */
 async function attach(
-  db: Awaited<ReturnType<typeof import('../src/db/client')['database']>>,
+  db: Awaited<ReturnType<(typeof import('../src/db/client'))['database']>>,
   personId: number,
   userId: string,
 ): Promise<number> {

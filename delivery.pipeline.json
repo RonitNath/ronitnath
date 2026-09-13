@@ -1,149 +1,36 @@
 {
-  "schemaVersion": 1,
-  "name": "ronitnath-production",
-  "maxConcurrency": 1,
+  "schemaVersion": 2,
+  "name": "ronitnath-candidate-validation",
+  "maxConcurrency": 2,
+  "capacity": { "cpuCores": 4, "memoryMiB": 8192 },
   "stages": [
     {
-      "id": "eligibility",
-      "label": "Candidate on main",
-      "kind": "preflight",
-      "command": {
-        "executable": "pnpm",
-        "args": ["tsx", "scripts/delivery.ts", "eligibility"]
-      },
+      "id": "eligibility", "label": "Candidate on main", "kind": "preflight",
+      "command": { "executable": "pnpm", "args": ["tsx", "scripts/delivery.ts", "eligibility"], "inheritEnv": ["PATH", "LANG", "TZ", "CI", "GITHUB_SHA"] },
       "budget": { "cpuCores": 1, "memoryMiB": 256, "timeoutMs": 60000, "outputBytes": 100000 }
     },
     {
-      "id": "static",
-      "label": "Static, unit, and PostgreSQL checks",
-      "kind": "check",
-      "needs": ["eligibility"],
-      "command": { "executable": "pnpm", "args": ["delivery:static"] },
-      "budget": {
-        "cpuCores": 4,
-        "memoryMiB": 8192,
-        "timeoutMs": 900000,
-        "outputBytes": 2000000
-      }
+      "id": "static", "label": "Static, unit, and PostgreSQL checks", "kind": "check", "needs": ["eligibility"],
+      "command": { "executable": "flock", "args": ["/run/fleet-admission/heavy.lock", "pnpm", "delivery:static"], "inheritEnv": ["PATH", "LANG", "TZ", "CI", "HOME", "PNPM_HOME", "DOCKER_HOST", "DOCKER_CONFIG", "XDG_RUNTIME_DIR", "GITHUB_SHA"] },
+      "cleanup": [{ "executable": "pnpm", "args": ["delivery:cleanup"] }],
+      "budget": { "cpuCores": 4, "memoryMiB": 8192, "timeoutMs": 900000, "outputBytes": 2000000 }
     },
     {
-      "id": "build",
-      "label": "One candidate build graph",
-      "kind": "build",
-      "needs": ["static"],
-      "command": {
-        "executable": "pnpm",
-        "args": ["tsx", "scripts/delivery.ts", "build"],
-        "env": {
-          "FLEET_PACKAGES_TOKEN": { "source": "secret", "name": "FLEET_PACKAGES_TOKEN" }
-        }
-      },
-      "budget": {
-        "cpuCores": 4,
-        "memoryMiB": 8192,
-        "timeoutMs": 900000,
-        "outputBytes": 2000000
-      }
+      "id": "build", "label": "One candidate build graph", "kind": "build", "needs": ["static"],
+      "command": { "executable": "flock", "args": ["/run/fleet-admission/heavy.lock", "pnpm", "tsx", "scripts/delivery.ts", "build"], "env": { "FLEET_PACKAGES_TOKEN": { "source": "secret", "name": "FLEET_PACKAGES_TOKEN" } }, "inheritEnv": ["PATH", "LANG", "TZ", "HOME", "PNPM_HOME", "DOCKER_HOST", "DOCKER_CONFIG", "XDG_RUNTIME_DIR", "GITHUB_SHA"] },
+      "cleanup": [{ "executable": "pnpm", "args": ["delivery:cleanup"] }],
+      "budget": { "cpuCores": 4, "memoryMiB": 8192, "timeoutMs": 900000, "outputBytes": 2000000 }
     },
     {
-      "id": "artifact",
-      "label": "Artifact and compatibility tests",
-      "kind": "check",
-      "needs": ["build"],
-      "command": { "executable": "pnpm", "args": ["delivery:artifact"] },
-      "env": { "FLEET_PACKAGES_TOKEN": { "source": "secret", "name": "FLEET_PACKAGES_TOKEN" } },
-      "budget": {
-        "cpuCores": 4,
-        "memoryMiB": 8192,
-        "timeoutMs": 1200000,
-        "outputBytes": 2000000
-      }
+      "id": "artifact", "label": "Actual previous artifact compatibility", "kind": "check", "needs": ["build"],
+      "command": { "executable": "flock", "args": ["/run/fleet-admission/heavy.lock", "pnpm", "delivery:artifact"], "env": { "FLEET_PACKAGES_TOKEN": { "source": "secret", "name": "FLEET_PACKAGES_TOKEN" } }, "inheritEnv": ["PATH", "LANG", "TZ", "CI", "HOME", "PNPM_HOME", "DOCKER_HOST", "DOCKER_CONFIG", "XDG_RUNTIME_DIR", "GITHUB_SHA"] },
+      "cleanup": [{ "executable": "pnpm", "args": ["delivery:cleanup"] }],
+      "budget": { "cpuCores": 4, "memoryMiB": 8192, "timeoutMs": 1200000, "outputBytes": 2000000 }
     },
     {
-      "id": "publish",
-      "label": "Publish exact OCI artifacts",
-      "kind": "publish",
-      "needs": ["artifact"],
-      "command": { "executable": "pnpm", "args": ["tsx", "scripts/delivery.ts", "publish"] },
-      "mutation": "non-retryable",
-      "budget": {
-        "cpuCores": 2,
-        "memoryMiB": 2048,
-        "timeoutMs": 600000,
-        "outputBytes": 1000000
-      }
-    },
-    {
-      "id": "production-preflight",
-      "label": "Pull and checkpoint both replicas",
-      "kind": "preflight",
-      "needs": ["publish"],
-      "command": {
-        "executable": "pnpm",
-        "args": ["tsx", "scripts/delivery.ts", "production-preflight"],
-        "env": { "DEPLOY_SSH_KEY": { "source": "secret", "name": "DEPLOY_SSH_KEY" } }
-      },
-      "budget": { "cpuCores": 1, "memoryMiB": 512, "timeoutMs": 600000, "outputBytes": 1000000 }
-    },
-    {
-      "id": "migrate",
-      "label": "Locked forward migration",
-      "kind": "migrate",
-      "needs": ["production-preflight"],
-      "command": {
-        "executable": "pnpm",
-        "args": ["tsx", "scripts/delivery.ts", "migrate"],
-        "env": { "DEPLOY_SSH_KEY": { "source": "secret", "name": "DEPLOY_SSH_KEY" } }
-      },
-      "mutation": "non-retryable",
-      "budget": {
-        "cpuCores": 1,
-        "memoryMiB": 1024,
-        "timeoutMs": 600000,
-        "outputBytes": 1000000
-      }
-    },
-    {
-      "id": "nyc",
-      "label": "NYC rollout",
-      "kind": "rollout",
-      "needs": ["migrate"],
-      "command": {
-        "executable": "pnpm",
-        "args": ["tsx", "scripts/delivery.ts", "roll", "nyc"],
-        "env": { "DEPLOY_SSH_KEY": { "source": "secret", "name": "DEPLOY_SSH_KEY" } }
-      },
-      "mutation": "non-retryable",
-      "budget": { "cpuCores": 1, "memoryMiB": 512, "timeoutMs": 300000, "outputBytes": 1000000 }
-    },
-    {
-      "id": "sfo",
-      "label": "SFO rollout",
-      "kind": "rollout",
-      "needs": ["nyc"],
-      "command": {
-        "executable": "pnpm",
-        "args": ["tsx", "scripts/delivery.ts", "roll", "sfo"],
-        "env": { "DEPLOY_SSH_KEY": { "source": "secret", "name": "DEPLOY_SSH_KEY" } }
-      },
-      "mutation": "non-retryable",
-      "budget": { "cpuCores": 1, "memoryMiB": 512, "timeoutMs": 300000, "outputBytes": 1000000 }
-    },
-    {
-      "id": "acceptance",
-      "label": "Public production acceptance",
-      "kind": "acceptance",
-      "needs": ["sfo"],
-      "command": {
-        "executable": "pnpm",
-        "args": ["tsx", "scripts/delivery.ts", "acceptance"],
-        "env": {
-          "DELIVERY_INGEST_TOKEN": { "source": "secret", "name": "DELIVERY_INGEST_TOKEN" }
-        }
-      },
-      "attempts": 3,
-      "retryDelayMs": 3000,
-      "budget": { "cpuCores": 1, "memoryMiB": 512, "timeoutMs": 120000, "outputBytes": 1000000 }
+      "id": "publish", "label": "Publish and bind exact OCI artifacts", "kind": "publish", "needs": ["artifact"],
+      "command": { "executable": "pnpm", "args": ["tsx", "scripts/delivery.ts", "publish"], "inheritEnv": ["PATH", "LANG", "TZ", "HOME", "PNPM_HOME", "DOCKER_HOST", "DOCKER_CONFIG", "XDG_RUNTIME_DIR", "GITHUB_SHA"] },
+      "mutation": "uncertain", "budget": { "cpuCores": 2, "memoryMiB": 2048, "timeoutMs": 600000, "outputBytes": 1000000 }
     }
   ]
 }

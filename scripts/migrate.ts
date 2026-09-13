@@ -8,16 +8,42 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
 import { drizzle } from 'drizzle-orm/node-postgres';
+import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import { sql } from 'drizzle-orm';
 import { Pool } from 'pg';
 import { withMigrationLock } from '@isoastra/fleet-delivery/postgres';
+import { z } from 'zod';
 
 const folder = join(process.cwd(), 'drizzle');
 
 interface Journal {
   entries: { idx: number; tag: string }[];
 }
+
+const executionPolicySchema = z
+  .object({
+    schemaVersion: z.literal(2),
+    entries: z.array(
+      z
+        .object({
+          name: z.string().min(1),
+          mode: z.enum(['expand', 'transition', 'contract']),
+          transactional: z.boolean(),
+          lockTimeoutMs: z.number().int().positive(),
+          statementTimeoutMs: z.number().int().positive(),
+          backfill: z
+            .object({
+              required: z.boolean(),
+              complete: z.boolean(),
+              probe: z.string().min(1).nullable(),
+            })
+            .strict(),
+        })
+        .strict(),
+    ),
+  })
+  .strict();
 
 async function main(): Promise<void> {
   const connectionString = process.env.DATABASE_URL;
@@ -31,44 +57,60 @@ async function main(): Promise<void> {
 
   /* One dedicated advisory-lock connection plus the migrator connection. */
   const pool = new Pool({ connectionString, max: 2 });
-  const db = drizzle(pool);
   try {
-    await verifyHistory(db, journal);
-    const before = await applied(db);
     const lock = await pool.connect();
     try {
-      await withMigrationLock(
-        lock,
-        7403140,
-        {
-          mode: 'expand',
-          compatibleFrom: ['d2373d4823d43beb4a7d2b24741636ee7b449098'],
-          lockTimeoutMs: 30_000,
-          statementTimeoutMs: 120_000,
-          transactional: true,
-          backfillRequired: false,
-        },
-        () => migrate(db, { migrationsFolder: folder }),
+      const policy = executionPolicySchema.parse(
+        JSON.parse(readFileSync(join(process.cwd(), 'delivery.migrations.json'), 'utf8')),
       );
+      for (const entry of policy.entries) {
+        if (!journal.entries.some(({ tag }) => tag === entry.name)) {
+          throw new Error(`migration policy names unknown migration ${entry.name}`);
+        }
+        if (entry.mode === 'contract' && entry.backfill.required && !entry.backfill.complete) {
+          throw new Error(`contract migration ${entry.name} requires a completed backfill`);
+        }
+      }
+      const limits = {
+        lockTimeoutMs: Math.min(...policy.entries.map((entry) => entry.lockTimeoutMs)),
+        statementTimeoutMs: Math.min(
+          ...policy.entries.map((entry) => entry.statementTimeoutMs),
+        ),
+      };
+      await withMigrationLock(lock, 7403140, limits, async (lockedClient) => {
+        const lockedDb = drizzle(lockedClient);
+        await verifyHistory(lockedDb, journal);
+        const before = await applied(lockedDb);
+        if (process.env.MIGRATION_PROBE_ONLY === '1') {
+          if (before !== journal.entries.length)
+            throw new Error(
+              `migration probe found ${before} of ${journal.entries.length} entries`,
+            );
+          console.log(
+            `migrate: probe complete, ${before} of ${journal.entries.length} total, at ${last.tag}`,
+          );
+          return;
+        }
+        await migrate(lockedDb, { migrationsFolder: folder });
+        const after = await applied(lockedDb);
+        console.log(
+          `migrate: ${after - before} applied, ${after} of ${journal.entries.length} total, at ${last.tag}`,
+        );
+        if (after !== journal.entries.length)
+          throw new Error(
+            `expected ${journal.entries.length} migrations to be recorded, found ${after}`,
+          );
+        await verifyHistory(lockedDb, journal);
+      });
     } finally {
       lock.release();
     }
-    const after = await applied(db);
-    console.log(
-      `migrate: ${after - before} applied, ${after} of ${journal.entries.length} total, at ${last.tag}`,
-    );
-    if (after !== journal.entries.length) {
-      throw new Error(
-        `expected ${journal.entries.length} migrations to be recorded, found ${after}`,
-      );
-    }
-    await verifyHistory(db, journal);
   } finally {
     await pool.end();
   }
 }
 
-async function verifyHistory(db: ReturnType<typeof drizzle>, journal: Journal): Promise<void> {
+async function verifyHistory(db: NodePgDatabase, journal: Journal): Promise<void> {
   const exists = await db.execute<{ n: string }>(sql`
     select count(*)::text as n from information_schema.tables
     where table_schema = 'drizzle' and table_name = '__drizzle_migrations'`);
@@ -87,7 +129,7 @@ async function verifyHistory(db: ReturnType<typeof drizzle>, journal: Journal): 
   }
 }
 
-async function applied(db: ReturnType<typeof drizzle>): Promise<number> {
+async function applied(db: NodePgDatabase): Promise<number> {
   const rows = await db.execute<{ n: string }>(sql`
     select count(*)::text as n from information_schema.tables
     where table_schema = 'drizzle' and table_name = '__drizzle_migrations'`);

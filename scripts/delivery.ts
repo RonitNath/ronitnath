@@ -1,9 +1,9 @@
 import { execFile } from 'node:child_process';
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
-import { createHash } from 'node:crypto';
-import { flushTelemetry } from '@isoastra/fleet-delivery/node';
+import { createHash, randomUUID } from 'node:crypto';
+import { manifestDigest } from '@isoastra/fleet-delivery/node';
 
 const exec = promisify(execFile);
 const dbName = 'ronitnath-delivery-db';
@@ -14,7 +14,37 @@ const postgresImage =
 const playwrightImage =
   'mcr.microsoft.com/playwright:v1.63.0-noble@sha256:eff16c30e6f3f4af0a03fa4b706120d5e9b0891c344a27d64559aff5900a4a27';
 const repository = 'ghcr.io/ronitnath/ronitnath-app';
-const compatibilitySha = 'd2373d4823d43beb4a7d2b24741636ee7b449098';
+interface Baseline {
+  agreed: boolean;
+  runtime: {
+    repository: string;
+    tag: string;
+    digest: `sha256:${string}`;
+    sourceSha: string;
+    platform: string;
+    sizeBytes: number | null;
+  };
+  migration: {
+    repository: string;
+    tag: string;
+    digest: `sha256:${string}`;
+    sourceSha: string;
+    platform: string;
+    sizeBytes: number | null;
+  };
+  schemaChecksums: Record<string, string>;
+}
+interface MigrationPolicySource {
+  schemaVersion: 2;
+  entries: Array<{
+    name: string;
+    mode: 'expand' | 'transition' | 'contract';
+    transactional: boolean;
+    lockTimeoutMs: number;
+    statementTimeoutMs: number;
+    backfill: { required: boolean; complete: boolean; probe: string | null };
+  }>;
+}
 
 function sha(): string {
   const value = process.env.GITHUB_SHA ?? process.env.DELIVERY_SHA;
@@ -25,8 +55,11 @@ function sha(): string {
 function tag(kind: 'runtime' | 'migrate'): string {
   return `${repository}:${sha()}${kind === 'migrate' ? '-migrate' : ''}`;
 }
-function compatibilityTag(kind: 'runtime' | 'migrate'): string {
-  return `ronitnath-compatibility:${compatibilitySha}-${kind}`;
+async function baseline(): Promise<Baseline> {
+  const value = JSON.parse(await readFile('.delivery/baseline.json', 'utf8')) as Baseline;
+  if (!value.agreed || !value.runtime?.digest || !value.migration?.digest)
+    throw new Error('production replicas do not have an agreed, testable baseline');
+  return value;
 }
 
 async function run(
@@ -109,12 +142,15 @@ const testEnv: NodeJS.ProcessEnv = {
   FLEET_TEST_DATABASE_URL: hostDb,
   ID_KEY: '0123456789abcdef0123456789abcdef',
   AUTH_SECRET: 'delivery-auth-secret-delivery-auth-secret',
+  DELIVERY_ACCEPTANCE_EMAIL: 'delivery-seed@example.com',
+  DELIVERY_ACCEPTANCE_TOKEN: 'delivery-acceptance-test-token',
   MAIL_DIR: join(process.cwd(), '.delivery/mail'),
   CI: 'true',
 };
 
 async function eligibility() {
   const candidate = sha();
+  if (process.env.CI === 'true') await run('fleet-delivery-verify', []);
   await run('git', ['fetch', '--no-tags', 'origin', 'main']);
   try {
     await run('git', ['merge-base', '--is-ancestor', candidate, 'origin/main'], {
@@ -133,7 +169,6 @@ async function staticChecks() {
     await run('pnpm', ['delivery:workflow:check'], { env: testEnv });
     await run('pnpm', ['typecheck'], { env: testEnv });
     await run('pnpm', ['lint'], { env: testEnv });
-    await run('pnpm', ['vitest', 'run', '--maxWorkers=2'], { env: testEnv });
     const email = 'delivery-seed@example.com';
     await run(
       'pnpm',
@@ -155,6 +190,8 @@ async function staticChecks() {
       ],
       { quiet: true },
     );
+    await run('pnpm', ['vitest', 'run', '--maxWorkers=2'], { env: testEnv });
+    await run('pnpm', ['delivery:protocol:test'], { env: testEnv });
     await run(
       'pnpm',
       ['seed:operator', '--email', email, '--password', 'a-long-enough-password'],
@@ -197,33 +234,6 @@ async function build() {
   ];
   await run('docker', [...common, '--target', 'runtime', '-t', tag('runtime'), '.']);
   await run('docker', [...common, '--target', 'migrate', '-t', tag('migrate'), '.']);
-}
-
-async function buildCompatibilityArtifacts(): Promise<string> {
-  const directory = await mkdtemp('/tmp/ronitnath-compatibility-');
-  const archive = join(directory, 'source.tar');
-  await run('git', ['archive', '--format=tar', `--output=${archive}`, compatibilitySha]);
-  await run('tar', ['-xf', archive, '-C', directory]);
-  const common = [
-    'buildx',
-    'build',
-    '--load',
-    '--build-arg',
-    `APP_VERSION=${compatibilitySha}`,
-    '--secret',
-    'id=npm_token,env=FLEET_PACKAGES_TOKEN',
-  ];
-  await run(
-    'docker',
-    [...common, '--target', 'runtime', '-t', compatibilityTag('runtime'), '.'],
-    { cwd: directory },
-  );
-  await run(
-    'docker',
-    [...common, '--target', 'migrate', '-t', compatibilityTag('migrate'), '.'],
-    { cwd: directory },
-  );
-  return directory;
 }
 
 async function startWeb(image: string) {
@@ -305,9 +315,12 @@ async function exercisePreviousWriter() {
 async function artifact() {
   await startDb();
   await mkdir('.delivery/mail', { recursive: true });
-  let compatibilityDirectory: string | undefined;
+  const previous = await baseline();
+  const previousRuntime = `${previous.runtime.repository}@${previous.runtime.digest}`;
+  const previousMigration = `${previous.migration.repository}@${previous.migration.digest}`;
   try {
-    compatibilityDirectory = await buildCompatibilityArtifacts();
+    await run('docker', ['pull', previousRuntime]);
+    await run('docker', ['pull', previousMigration]);
     await run('docker', [
       'run',
       '--rm',
@@ -315,7 +328,7 @@ async function artifact() {
       network,
       '-e',
       `DATABASE_URL=${containerDb}`,
-      compatibilityTag('migrate'),
+      previousMigration,
     ]);
     await run('docker', [
       'run',
@@ -326,7 +339,7 @@ async function artifact() {
       `DATABASE_URL=${containerDb}`,
       '-e',
       `ID_KEY=${testEnv.ID_KEY}`,
-      compatibilityTag('migrate'),
+      previousMigration,
       'pnpm',
       'seed:operator',
       '--email',
@@ -343,7 +356,7 @@ async function artifact() {
       `DATABASE_URL=${containerDb}`,
       tag('migrate'),
     ]);
-    await startWeb(compatibilityTag('runtime'));
+    await startWeb(previousRuntime);
     await exercisePreviousWriter();
     await run('docker', [
       'run',
@@ -354,7 +367,7 @@ async function artifact() {
       `DATABASE_URL=${containerDb}`,
       '-e',
       `ID_KEY=${testEnv.ID_KEY}`,
-      compatibilityTag('migrate'),
+      previousMigration,
       'pnpm',
       'seed:operator',
       '--email',
@@ -383,13 +396,20 @@ async function artifact() {
       '-lc',
       './node_modules/.bin/playwright test --config playwright.delivery.config.ts',
     ]);
-    await startWeb(compatibilityTag('runtime'));
+    await startWeb(previousRuntime);
     await exercisePreviousWriter();
+    await run('docker', [
+      'run',
+      '--rm',
+      '--network',
+      network,
+      '-e',
+      `DATABASE_URL=${containerDb}`,
+      tag('migrate'),
+    ]);
   } finally {
     await ignore('docker', ['rm', '-f', webName]);
     await ignore('docker', ['rm', '-f', dbName]);
-    if (compatibilityDirectory)
-      await rm(compatibilityDirectory, { recursive: true, force: true });
   }
 }
 
@@ -420,11 +440,69 @@ async function publish() {
       ]),
     ),
   );
+  const previous = await baseline();
+  const policy = JSON.parse(
+    await readFile('delivery.migrations.json', 'utf8'),
+  ) as MigrationPolicySource;
+  const runtime = {
+    repository,
+    tag: tag('runtime'),
+    digest: runtimeDigest,
+    sourceSha: sha(),
+    platform: 'linux/amd64',
+    sizeBytes: Number(
+      await run('docker', ['image', 'inspect', tag('runtime'), '--format', '{{.Size}}'], {
+        quiet: true,
+      }),
+    ),
+  };
+  const migration = {
+    repository,
+    tag: tag('migrate'),
+    digest: migrateDigest,
+    sourceSha: sha(),
+    platform: 'linux/amd64',
+    sizeBytes: Number(
+      await run('docker', ['image', 'inspect', tag('migrate'), '--format', '{{.Size}}'], {
+        quiet: true,
+      }),
+    ),
+  };
+  const body = {
+    schemaVersion: 2 as const,
+    releaseId: randomUUID(),
+    requestedSha: sha(),
+    createdAt: new Date().toISOString(),
+    artifacts: { runtime, migration },
+    migrations: {
+      schemaVersion: 2 as const,
+      entries: policy.entries.map((entry) => ({
+        ...entry,
+        checksum: migrationChecksums[entry.name]!,
+        compatibleRuntimeDigests: [previous.runtime.digest],
+      })),
+    },
+    compatibility: {
+      previousRuntime: previous.runtime,
+      previousMigration: previous.migration,
+      previousSchemaChecksums: previous.schemaChecksums,
+      candidateSchemaChecksums: migrationChecksums,
+      previousRead: true,
+      previousWrite: true,
+      candidateRead: true,
+      candidateWrite: true,
+      rollbackRead: true,
+      repeatedMigration: true,
+      testedAt: new Date().toISOString(),
+    },
+    previousRuntimeDigest: previous.runtime.digest,
+  };
+  const release = { ...body, manifestDigest: manifestDigest(body) };
   await writeFile(
     '.delivery/artifacts.json',
     JSON.stringify(
       {
-        schemaVersion: 1,
+        schemaVersion: 2,
         requestedSha: sha(),
         runtime: `${repository}@${runtimeDigest}`,
         migrate: `${repository}@${migrateDigest}`,
@@ -434,95 +512,24 @@ async function publish() {
       2,
     ),
   );
+  await writeFile('.delivery/release.json', JSON.stringify(release, null, 2));
 }
 
-function deploymentKeyPath(): string {
-  return join(
-    process.env.RUNNER_TEMP ?? '/tmp',
-    `ronitnath-deploy-${process.env.GITHUB_RUN_ID ?? 'local'}`,
-  );
-}
-async function deployKey(): Promise<string> {
-  const path = deploymentKeyPath();
-  const value = process.env.DEPLOY_SSH_KEY?.trimEnd();
-  if (!value) throw new Error('DEPLOY_SSH_KEY is required');
-  await writeFile(path, `${value}\n`, { mode: 0o600 });
-  return path;
-}
-async function remote(host: string, args: string[]) {
-  const key = await deployKey();
-  return run('ssh', [
-    '-i',
-    key,
-    '-o',
-    'IdentitiesOnly=yes',
-    '-o',
-    'StrictHostKeyChecking=accept-new',
-    '-o',
-    'UserKnownHostsFile=.delivery/known-hosts',
-    `root@${host}`,
-    ...args,
-  ]);
-}
-async function artifacts(): Promise<{ runtime: string; migrate: string }> {
-  return JSON.parse(await readFile('.delivery/artifacts.json', 'utf8')) as {
-    runtime: string;
-    migrate: string;
-  };
-}
-async function productionPreflight() {
-  const value = await artifacts();
-  for (const host of ['nyc', 'sfo'])
-    await remote(host, ['preflight', sha(), value.runtime, value.migrate]);
-}
-async function migrate() {
-  const value = await artifacts();
-  await remote('nyc', ['migrate', sha(), value.migrate]);
-}
-async function roll(host: string) {
-  const value = await artifacts();
-  await remote(host, ['roll', sha(), value.runtime]);
-}
-async function acceptance() {
-  const response = await fetch('https://ronitnath.com/healthz', { cache: 'no-store' });
-  if (!response.ok) throw new Error(`public health returned ${response.status}`);
-  const health = (await response.json()) as { ok?: boolean; version?: string };
-  if (!health.ok || health.version !== sha())
-    throw new Error(`public version mismatch: ${JSON.stringify(health)}`);
-  const denied = await fetch('https://ronitnath.com/o/isoastra/delivery', {
-    redirect: 'manual',
-  });
-  if (denied.status !== 404)
-    throw new Error(`anonymous delivery inspector returned ${denied.status}`);
-  const endpoint = 'https://ronitnath.com/api/delivery/events';
-  const token = process.env.DELIVERY_INGEST_TOKEN;
-  if (token)
-    await flushTelemetry({
-      endpoint,
-      token,
-      bufferPath: '.delivery/telemetry-buffer.jsonl',
-    }).catch((error) => console.warn(`telemetry reconciliation remains buffered: ${error}`));
-}
 async function cleanup() {
   await ignore('docker', ['rm', '-f', webName]);
   await ignore('docker', ['rm', '-f', dbName]);
   await ignore('docker', ['network', 'rm', network]);
-  await rm(deploymentKeyPath(), { force: true });
 }
 
 async function main() {
-  const [command, argument] = process.argv.slice(2);
+  const [command] = process.argv.slice(2);
   const commands: Record<string, () => Promise<void>> = {
     eligibility,
     static: staticChecks,
     build,
     artifact,
     publish,
-    'production-preflight': productionPreflight,
-    migrate,
-    acceptance,
     cleanup,
-    roll: () => roll(argument ?? ''),
   };
   if (!command || !commands[command])
     throw new Error(`unknown delivery command: ${command ?? ''}`);

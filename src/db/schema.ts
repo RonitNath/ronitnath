@@ -25,7 +25,7 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core';
 import type { RealtimeSubscription } from '@isoastra/fleet-events/presence';
-import type { RunEvent, ReleaseManifest } from '@isoastra/fleet-delivery';
+import type { ReleaseManifest, StoredRunEvent } from '@isoastra/fleet-delivery';
 
 const now = () => timestamp('created_at', { withTimezone: true }).notNull().defaultNow();
 
@@ -744,9 +744,17 @@ export const deliveryRunEvent = pgTable(
   'delivery_run_event',
   {
     runId: uuid('run_id').notNull().references(() => deliveryRun.id, { onDelete: 'cascade' }),
+    producerId: text('producer_id').notNull().default('legacy'),
     seq: bigint('seq', { mode: 'number' }).notNull(),
-    event: jsonb('event').$type<RunEvent>().notNull(),
+    event: jsonb('event').$type<StoredRunEvent>().notNull(),
     at: timestamp('at', { withTimezone: true }).notNull(),
   },
-  (t) => [primaryKey({ columns: [t.runId, t.seq] }), index('delivery_event_at_idx').on(t.at)],
+  (t) => [primaryKey({ columns: [t.runId, t.producerId, t.seq] }), index('delivery_event_at_idx').on(t.at)],
 );
+
+export const deliveryAcceptanceFixture = pgTable('delivery_acceptance_fixture', {
+  id: uuid('id').primaryKey(),
+  releaseId: uuid('release_id').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+});

@@ -1,0 +1,8 @@
+[Unit]
+Description=Compact expired ronitnath delivery records
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/libexec/ronitnath-delivery-cleanup
+User=root
+Group=root

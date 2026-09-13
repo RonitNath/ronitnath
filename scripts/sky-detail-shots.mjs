@@ -61,7 +61,11 @@ async function hoverBrightStar(page) {
     await page.mouse.move(star.x, star.y);
     // The tag is written by the next animation frame, not by the event.
     await wait(120);
-    const text = (await page.locator('.star-tag').textContent().catch(() => '')) ?? '';
+    const text =
+      (await page
+        .locator('.star-tag')
+        .textContent()
+        .catch(() => '')) ?? '';
     if (text.toUpperCase().startsWith(star.name.toUpperCase())) return star;
   }
   throw new Error('no named star could be hovered');
@@ -74,7 +78,11 @@ async function faintStar(page, view) {
   for (let y = 120; y < view.height - 160; y += step) {
     for (let x = 40; x < view.width - 40; x += step) {
       await page.mouse.move(x, y);
-      const text = (await page.locator('.star-tag').textContent().catch(() => '')) ?? '';
+      const text =
+        (await page
+          .locator('.star-tag')
+          .textContent()
+          .catch(() => '')) ?? '';
       const magnitude = Number(/mag ([\d.]+)/.exec(text)?.[1] ?? NaN);
       if (magnitude > 7) return { x, y };
     }
@@ -93,7 +101,8 @@ async function shoot(browser, view, theme) {
     await context.addInitScript(() => localStorage.setItem('rn_theme', 'light'));
   }
   const page = await context.newPage();
-  const shot = (name) => page.screenshot({ path: join(outDir, `${name}-${view.name}-${theme}.png`) });
+  const shot = (name) =>
+    page.screenshot({ path: join(outDir, `${name}-${view.name}-${theme}.png`) });
   await page.goto(`${baseUrl}/?skydebug=1`, { waitUntil: 'load' });
   // Everything has landed before the first shot: the catalogue, g9 and enough
   // tiles that the sky behind the panel is the sky a visitor sees.

@@ -12,8 +12,8 @@ importers:
         specifier: 0.1.3
         version: 0.1.3(drizzle-orm@0.45.2(@types/pg@8.23.1)(kysely@0.29.5)(pg@8.23.0))(next@15.5.25(@playwright/test@1.63.0)(@types/node@24.13.3)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(pg@8.23.0)(react@19.2.8)(zod@4.5.4)
       '@isoastra/fleet-delivery':
-        specifier: 0.1.1
-        version: 0.1.1(pg@8.23.0)(zod@4.5.4)
+        specifier: 0.2.3
+        version: 0.2.3(pg@8.23.0)(zod@4.5.4)
       '@isoastra/fleet-events':
         specifier: 0.2.3
         version: 0.2.3(drizzle-orm@0.45.2(@types/pg@8.23.1)(kysely@0.29.5)(pg@8.23.0))(next@15.5.25(@playwright/test@1.63.0)(@types/node@24.13.3)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(pg@8.23.0)(react@19.2.8)(zod@4.5.4)
@@ -891,8 +891,8 @@ packages:
       pg: ^8.11.0
       zod: ^3.23.0 || ^4.0.0
 
-  '@isoastra/fleet-delivery@0.1.1':
-    resolution: {integrity: sha512-pzOMtQoSO4/gj9s91XZT9RxfY5myoJUzEB3Fxp4xq8ztNw36yp7VK+AUCpt+nBlgjlJngydHYZ5iu/VYmkDxeA==, tarball: https://npm.pkg.github.com/download/@isoastra/fleet-delivery/0.1.1/766766d5910c7ca2851b3969a72c060567940f5a}
+  '@isoastra/fleet-delivery@0.2.3':
+    resolution: {integrity: sha512-xuKwYe3mUzZ4yisLMVa1oUtPDRKbMhRktChgFoDM4hjuEgCFVvshCjqRw2SZpzhvmKHh9y9V4XOkkyqE7CC+3Q==, tarball: https://npm.pkg.github.com/download/@isoastra/fleet-delivery/0.2.3/bcbbf43ae5dacb2ccca1d21bc3124c3f600f471b}
     hasBin: true
     peerDependencies:
       pg: ^8.11.0
@@ -3743,7 +3743,7 @@ snapshots:
       - next
       - react
 
-  '@isoastra/fleet-delivery@0.1.1(pg@8.23.0)(zod@4.5.4)':
+  '@isoastra/fleet-delivery@0.2.3(pg@8.23.0)(zod@4.5.4)':
     dependencies:
       pg: 8.23.0
       zod: 4.5.4

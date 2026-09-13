@@ -84,8 +84,10 @@ while (Date.now() < deadline && seen.size < TARGETS.length) {
       },
       [name, BOX],
     );
-    console.log(`${name} mag ${at.magnitude.toFixed(2)} at ${Math.round(at.x)},${Math.round(at.y)}` +
-      (around.length ? ` — named neighbours in frame: ${around.join(', ')}` : ''));
+    console.log(
+      `${name} mag ${at.magnitude.toFixed(2)} at ${Math.round(at.x)},${Math.round(at.y)}` +
+        (around.length ? ` — named neighbours in frame: ${around.join(', ')}` : ''),
+    );
     seen.add(name);
     await page.locator('button.sky-control', { hasText: 'Resume sky' }).click();
     await wait(400);

@@ -62,7 +62,8 @@ async function neighbourOf(page, callout) {
       if (x < 20 || y < 80 || x > VIEW.width - 20 || y > VIEW.height - 20) continue;
       await page.mouse.move(x, y);
       await wait(60);
-      if (await page.locator('.star-tag').isVisible()) return { x, y, text: await tagText(page) };
+      if (await page.locator('.star-tag').isVisible())
+        return { x, y, text: await tagText(page) };
     }
   }
   return null;

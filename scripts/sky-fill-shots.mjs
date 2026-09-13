@@ -85,14 +85,11 @@ async function capture(page, view, target, seen) {
     path: join(outDir, `${target.figure}-${view.name}.png`),
     timeout: 60_000,
   });
-  const magnitudes = await page.evaluate(
-    (name) => {
-      const stars = globalThis.__sky?.().named ?? [];
-      const star = stars.find((candidate) => candidate.name === name);
-      return { star, neighbours: stars.slice(0, 12).map((s) => `${s.name} ${s.magnitude}`) };
-    },
-    target.star,
-  );
+  const magnitudes = await page.evaluate((name) => {
+    const stars = globalThis.__sky?.().named ?? [];
+    const star = stars.find((candidate) => candidate.name === name);
+    return { star, neighbours: stars.slice(0, 12).map((s) => `${s.name} ${s.magnitude}`) };
+  }, target.star);
   console.log(
     `${view.name}: ${target.figure} on ${target.star} ` +
       `mag ${magnitudes.star?.magnitude?.toFixed(2)} at ` +
@@ -112,7 +109,9 @@ const browser = await chromium.launch({
     ? ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader']
     : [],
 });
-const sessions = await Promise.all(VIEWS.map(async (view) => ({ view, ...(await open(browser, view)) })));
+const sessions = await Promise.all(
+  VIEWS.map(async (view) => ({ view, ...(await open(browser, view)) })),
+);
 const seen = sessions.map(() => new Set());
 
 const deadline = Date.now() + Number(minutes) * 60_000;
@@ -130,7 +129,11 @@ while (Date.now() < deadline && seen.some((set) => set.size < TARGETS.length)) {
 }
 
 for (const [index, { view }] of sessions.entries()) {
-  const missing = TARGETS.filter((target) => !seen[index].has(target.figure)).map((t) => t.figure);
-  console.log(`${view.name}: ${seen[index].size}/${TARGETS.length} captured${missing.length ? `, missed ${missing.join(', ')}` : ''}`);
+  const missing = TARGETS.filter((target) => !seen[index].has(target.figure)).map(
+    (t) => t.figure,
+  );
+  console.log(
+    `${view.name}: ${seen[index].size}/${TARGETS.length} captured${missing.length ? `, missed ${missing.join(', ')}` : ''}`,
+  );
 }
 await browser.close();
