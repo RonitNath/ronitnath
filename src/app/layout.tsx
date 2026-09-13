@@ -3,6 +3,8 @@ import type { Metadata, Viewport } from 'next';
 import { ImpersonationBar } from '@/features/platform/components/bar';
 import { RealtimeReporter } from '@/features/realtime/reporter';
 
+import '@isoastra/ui/styles.css';
+import '@isoastra/grid-ui/styles.css';
 import './globals.css';
 
 export const metadata: Metadata = {

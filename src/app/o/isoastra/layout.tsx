@@ -29,7 +29,7 @@ export default async function PlatformLayout({ children }: { children: React.Rea
         <Link href={operatorPath('realtime')}>Realtime</Link>
         <Link href={operatorPath('configuration')}>Configuration</Link>
       </nav>
-      {children}
+      <div className="iso-pilot" data-iso-theme="light" data-iso-density="compact">{children}</div>
     </>
   );
 }

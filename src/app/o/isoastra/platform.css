@@ -158,3 +158,4 @@ input.reason {
     width: 100%;
   }
 }
+.iso-pilot{--iso-bg:var(--bg);--iso-canvas:var(--bg);--iso-surface:var(--bg-muted);--iso-surface-raised:var(--bg-muted);--iso-surface-muted:var(--bg-subtle);--iso-ink:var(--fg);--iso-ink-muted:var(--fg-muted);--iso-ink-faint:var(--fg-subtle);--iso-border:var(--border);--iso-border-strong:var(--border);--iso-primary:var(--accent);--iso-primary-hover:var(--accent-hover);--iso-focus:var(--accent);background:var(--bg);color:var(--fg)}

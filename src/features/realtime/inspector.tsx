@@ -3,8 +3,10 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
-import { Grid, FindBox, Pager, useGrid, type Column } from '@isoastra/grid-react';
+import { useGrid, type Column } from '@isoastra/grid-react';
 import { useQueryState } from '@isoastra/grid-next';
+import { DataTable } from '@isoastra/grid-ui';
+import { Status } from '@isoastra/ui';
 
 export interface InspectorRow {
   id: string;
@@ -36,7 +38,7 @@ const columns: readonly Column<InspectorRow>[] = [
     header: 'State',
     filterBy: (row) => row.status,
     sortBy: (row) => row.status,
-    cell: (row) => row.status,
+    cell: (row) => <Status tone={row.status.includes('visible') ? 'success' : 'neutral'}>{row.status}</Status>,
   },
   {
     id: 'visible',
@@ -76,23 +78,6 @@ export function RealtimeInspector({ rows }: { rows: InspectorRow[] }) {
     return () => clearInterval(timer);
   }, [router]);
   return (
-    <>
-      <div className="filters">
-        <FindBox grid={grid} placeholder="Find visitor, path, or viewport" />
-      </div>
-      <div className="scroller">
-        <Grid
-          grid={grid}
-          columns={columns}
-          rowKey={(row) => row.id}
-          classes={{ table: 'rows dense' }}
-          rowProps={(row) =>
-            ({ 'data-realtime-row': row.id }) as React.HTMLAttributes<HTMLTableRowElement>
-          }
-          empty="No browser views have reported yet."
-        />
-      </div>
-      <Pager grid={grid} className="pager" sizes={[25, 50, 100]} />
-    </>
+    <DataTable grid={grid} columns={columns} rowKey={(row) => row.id} title="Browser views" empty="No browser views have reported yet." selectable filters={['status']} sizes={[25, 50, 100]} />
   );
 }
