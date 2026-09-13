@@ -383,7 +383,13 @@
 .calendar-dialog { border: 1px solid var(--border); inset: 10% auto auto 50%; margin: 0; max-height: 80vh; overflow: auto; padding: 1.25rem; position: fixed; transform: translateX(-50%); width: min(28rem, calc(100vw - 2rem)); z-index: 20; }
 .calendar-dialog::backdrop { background: color-mix(in srgb, var(--background) 75%, transparent); }
 .calendar-dialog label,
-.file-field { display: grid; gap: .3rem; margin-block: .5rem; }
+.file-field,
+.calendar-resource-form label,
+.iso-calendar-booking-editor label { display: grid; gap: .3rem; margin-block: .5rem; }
+.iso-calendar-booking-editor fieldset { border: 1px solid var(--border); margin-block: .75rem; }
+.iso-calendar-booking-editor fieldset label { grid-template-columns: 1fr 4rem; }
+.calendar-bookings { display: grid; gap: .5rem; margin-top: .75rem; }
+.calendar-bookings article { border-top: 1px solid var(--border); display: grid; gap: .25rem; padding-top: .5rem; }
 .personal-calendar[data-pending='true'] { opacity: .72; }
 @media (max-width: 800px) {
   .calendar-layout { grid-template-columns: 1fr; }

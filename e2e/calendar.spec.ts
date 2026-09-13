@@ -65,6 +65,7 @@ test('personal calendar works through HTTP and keeps account boundaries', async 
   await expect(ownerPage.getByText('Asia/Tokyo', { exact: true })).toBeVisible({ timeout: 20_000 });
 
   const tomorrow = new Date(Date.now() + 86_400_000).toISOString().slice(0, 10);
+  const dayAfter = new Date(Date.now() + 2 * 86_400_000).toISOString().slice(0, 10);
   await ownerPage.getByRole('button', { name: 'New event' }).click();
   const eventDialog = ownerPage.getByRole('dialog', { name: 'New event' });
   await eventDialog.getByLabel('Title').fill('Private appointment');
@@ -90,17 +91,23 @@ test('personal calendar works through HTTP and keeps account boundaries', async 
   await expect(ownerPage.getByText('Work block scheduled.')).toBeVisible();
   await ownerPage.getByLabel('Tasks').getByRole('checkbox').click();
   await expect(ownerPage.getByText('Task completed.')).toBeVisible();
+  await expect(ownerPage.getByLabel('Tasks').getByRole('checkbox')).toBeChecked();
+  await ownerPage.getByLabel('Tasks').getByRole('checkbox').click();
+  await expect(ownerPage.getByText('Task reopened.')).toBeVisible();
+  await expect(ownerPage.getByLabel('Tasks').getByRole('checkbox')).not.toBeChecked();
+  await ownerPage.getByLabel('Tasks').getByRole('checkbox').click();
+  await expect(ownerPage.getByText('Task completed.')).toBeVisible();
 
+  await ownerPage.getByText('Private appointment').click();
+  let editDialog = ownerPage.getByRole('dialog', { name: 'Edit occurrence' });
+  await editDialog.getByLabel('Starts').fill(`${tomorrow}T10:00`);
+  await editDialog.getByLabel('Ends').fill(`${tomorrow}T10:45`);
   const stalePool = new Pool({ connectionString: process.env.DATABASE_URL });
   try {
     await stalePool.query("UPDATE calendar_item SET version=version+100 WHERE title='Private appointment' AND scope_id=$1", [owner.userPath.split('/').at(-1)]);
   } finally {
     await stalePool.end();
   }
-  await ownerPage.getByText('Private appointment').click();
-  let editDialog = ownerPage.getByRole('dialog', { name: 'Edit occurrence' });
-  await editDialog.getByLabel('Starts').fill(`${tomorrow}T10:00`);
-  await editDialog.getByLabel('Ends').fill(`${tomorrow}T10:45`);
   await editDialog.getByRole('button', { name: 'Save' }).click();
   await expect(ownerPage.getByText(/Expected version \d+, found \d+/)).toBeVisible();
   await expect(editDialog).toBeVisible();
@@ -119,12 +126,27 @@ test('personal calendar works through HTTP and keeps account boundaries', async 
   expect(exported).toContain('Private appointment');
   expect(exported).toContain('Write itinerary');
 
-  const imported = `BEGIN:VCALENDAR\r\nVERSION:2.0\r\nBEGIN:VEVENT\r\nUID:imported@example.test\r\nDTSTART:${tomorrow.replaceAll('-', '')}T150000Z\r\nDTEND:${tomorrow.replaceAll('-', '')}T153000Z\r\nSUMMARY:Imported appointment\r\nEND:VEVENT\r\nEND:VCALENDAR`;
+  const imported = `BEGIN:VCALENDAR\r\nVERSION:2.0\r\nBEGIN:VEVENT\r\nUID:imported@example.test\r\nDTSTART:${tomorrow.replaceAll('-', '')}T150000Z\r\nDTEND:${tomorrow.replaceAll('-', '')}T153000Z\r\nRRULE:FREQ=DAILY;COUNT=2\r\nSUMMARY:Imported appointment\r\nEND:VEVENT\r\nBEGIN:VEVENT\r\nUID:imported@example.test\r\nRECURRENCE-ID:${dayAfter.replaceAll('-', '')}T150000Z\r\nDTSTART:${dayAfter.replaceAll('-', '')}T150000Z\r\nDTEND:${dayAfter.replaceAll('-', '')}T153000Z\r\nSTATUS:CANCELLED\r\nSUMMARY:Imported appointment\r\nEND:VEVENT\r\nEND:VCALENDAR`;
   await ownerPage.getByText('Import .ics', { exact: true }).click();
   await ownerPage.getByLabel('Calendar file').setInputFiles({ name: 'import.ics', mimeType: 'text/calendar', buffer: Buffer.from(imported) });
-  await expect(ownerPage.getByText('Imported appointment')).toBeVisible();
+  await expect(ownerPage.getByText('Imported appointment').first()).toBeVisible();
   await ownerPage.getByRole('button', { name: 'Apply import' }).click();
   await expect(ownerPage.getByText('1 calendar items imported.')).toBeVisible();
+  await expect(ownerPage.getByRole('button', { name: /Imported appointment/ })).toHaveCount(1);
+
+  const booking = ownerPage.getByText('Resource booking', { exact: true }).locator('..');
+  await booking.getByLabel('Name').fill('Consulting room');
+  await booking.getByLabel('Capacity').fill('2');
+  await booking.getByRole('button', { name: 'Add resource' }).click();
+  await expect(ownerPage.getByText('Resource created.')).toBeVisible();
+  await booking.getByLabel('Starts').fill(`${tomorrow}T16:00`);
+  await booking.getByLabel('Ends').fill(`${tomorrow}T17:00`);
+  await booking.getByLabel('Consulting room quantity').fill('1');
+  await booking.getByRole('button', { name: 'Place hold' }).click();
+  await expect(ownerPage.getByText('Five-minute hold placed.')).toBeVisible();
+  await booking.getByRole('button', { name: 'Confirm' }).click();
+  await expect(ownerPage.getByText('Booking confirmed.')).toBeVisible();
+  await expect(booking.getByText('confirmed', { exact: true })).toBeVisible();
 
   const losAngeles = await browser.newContext({ timezoneId: 'America/Los_Angeles' });
   const secondDevice = await losAngeles.newPage();

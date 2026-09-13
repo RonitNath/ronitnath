@@ -3,7 +3,9 @@
 `/u/[user]/calendar` consumes checked-in `pnpm pack` artifacts from
 `vendor/grid-calendar`. It provides day, week, month, and agenda views; tasks and
 manual work blocks; occurrence edits; foreground device timezone reporting; and
-ICS preview, apply, and download. The existing owner-or-platform-operator subject
+ICS preview, apply, and download. Calendar occurrences load through authorized
+visible-window queries. Resources support integer capacity, arbitrary-interval
+five-minute holds, confirmation, and cancellation. The existing owner-or-platform-operator subject
 gate protects every query, command, and export. Operator views cannot report a
 timezone for the subject.
 
@@ -23,6 +25,6 @@ DATABASE_URL=postgresql://ronitnath:ronitnath@127.0.0.1:55440/ronitnath \
 
 The test creates synthetic owner, outsider, and operator accounts. It covers event
 and task writes, work blocks, occurrence edits, ICS round trips, two-device timezone
-ordering, denied cross-account page/export access, operator access, and desktop and
-mobile screenshots. No production data, provider account, or outbound delivery is
-used; mail is captured under `.mail`.
+ordering, a resource hold and confirmation, denied cross-account page/export access,
+operator access, and desktop and mobile screenshots. No production data, provider
+account, or outbound delivery is used; mail is captured under `.mail`.

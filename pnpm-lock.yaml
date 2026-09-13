@@ -927,22 +927,22 @@ packages:
     os: [win32]
 
   '@isoastra/calendar-core@file:vendor/grid-calendar/isoastra-calendar-core-0.1.0.tgz':
-    resolution: {integrity: sha512-cHxlacaZHNgK8GBehsoYuAuazxynbONzXkBHU1k7Cnej4/9xxnhRx7eq+uTECcxf0Xg4o8h6MKvo/+pryAaHNA==, tarball: file:vendor/grid-calendar/isoastra-calendar-core-0.1.0.tgz}
+    resolution: {integrity: sha512-xVEV1YJfCEu6hd/3tfrFKkiVKPXAVXRBGQ2zEHpyKuT5reIpAO060q8uqd8+4Y5XSFndlaV+rJHmF/LiBWMsTg==, tarball: file:vendor/grid-calendar/isoastra-calendar-core-0.1.0.tgz}
     version: 0.1.0
 
   '@isoastra/calendar-ical@file:vendor/grid-calendar/isoastra-calendar-ical-0.1.0.tgz':
-    resolution: {integrity: sha512-8rnYLJoxqkb+brITVKFUdXEqPgD/oW3X0ZMPuHPj3G2pXzroeR6XxK7Wzx271+O+zWOmC/zrBpkLglsBFRaCCQ==, tarball: file:vendor/grid-calendar/isoastra-calendar-ical-0.1.0.tgz}
+    resolution: {integrity: sha512-2aI8cIlOyQ8gf/dgco/WRuikOE9ecjvKcOHcgLaRGgrYyqJjmNwjfbg2lBuXpdYUY6naCoR2shgaPkyer5LLEA==, tarball: file:vendor/grid-calendar/isoastra-calendar-ical-0.1.0.tgz}
     version: 0.1.0
 
   '@isoastra/calendar-react@file:vendor/grid-calendar/isoastra-calendar-react-0.1.0.tgz':
-    resolution: {integrity: sha512-Yk6SeQlnldr7coPXO9Q4yVRwfMRFv4MsDcIhkYl+cRG5cAgznXhzq7Wm0aJpRtEG2BN4ab2Ko6XPc1Ir572J5g==, tarball: file:vendor/grid-calendar/isoastra-calendar-react-0.1.0.tgz}
+    resolution: {integrity: sha512-0CIp7n4/B8W9bymi4YbHzBcWdQtxzp8U6N+kTL4ZFu9RCJh40BL2eaqkzhsO5lqywTEUOJxLJZiDJEmck2PVDg==, tarball: file:vendor/grid-calendar/isoastra-calendar-react-0.1.0.tgz}
     version: 0.1.0
     peerDependencies:
       react: ^19.0.0
       react-dom: ^19.0.0
 
   '@isoastra/fleet-calendar@file:vendor/grid-calendar/isoastra-fleet-calendar-0.1.0.tgz':
-    resolution: {integrity: sha512-kBYAAuL4QQai7SuJnPFY9p2M/blOVf+RSupJ1yUthkVcByVDcuw1WpPd/bCmLoeOnQcpEBMBVHMatscS0/MrzQ==, tarball: file:vendor/grid-calendar/isoastra-fleet-calendar-0.1.0.tgz}
+    resolution: {integrity: sha512-ya0oZW3806yVDQA6ep2w0X3rTAF3Pe+3sQUbLCYE6OJFuG3VtvEugDooYpLaFpadCbhgvoCr+74zwH0LWY0MZw==, tarball: file:vendor/grid-calendar/isoastra-fleet-calendar-0.1.0.tgz}
     version: 0.1.0
     peerDependencies:
       drizzle-orm: '>=0.44.0 <0.46.0'

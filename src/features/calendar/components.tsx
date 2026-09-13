@@ -1,18 +1,20 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useMemo, useState, useTransition } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react';
 
-import { CalendarView, IcsImportPreview, ItemEditor, TaskList, TimeZoneReporter, type CalendarOccurrence, type CalendarTaskView, type ItemEditorValue } from '@isoastra/calendar-react';
+import { BookingEditor, CalendarView, IcsImportPreview, ItemEditor, TaskList, TimeZoneReporter, type CalendarOccurrence, type CalendarTaskView, type ItemEditorValue, type TimeZoneReport } from '@isoastra/calendar-react';
 import type { ImportPreview } from '@isoastra/calendar-ical';
-import type { StoredItem } from '@isoastra/fleet-calendar';
+import type { Booking, CalendarResource, StoredItem } from '@isoastra/fleet-calendar';
 import { resolveLocal } from '@isoastra/calendar-core';
 
 import { useRefreshOn } from '@/features/realtime/use-events';
 import { userPath, userStreamPath } from '@/lib/paths';
 import { applyCalendarImport, previewCalendarImport } from './ical-actions';
-import { completeCalendarTask, createCalendarItem, editCalendarOccurrence } from './item-actions';
-import { reportCalendarTimeZone } from './zone-actions';
+import { changeCalendarBooking, createCalendarHold, createCalendarResource } from './booking-actions';
+import { completeCalendarTask, createCalendarItem, editCalendarOccurrence, undoCalendarTask } from './item-actions';
+import { activateCalendarTimeZoneSession, reportCalendarTimeZone } from './zone-actions';
+import { loadCalendarWindow } from './window-actions';
 
 interface CalendarClientProps {
   user: string;
@@ -21,6 +23,8 @@ interface CalendarClientProps {
   occurrences: CalendarOccurrence[];
   tasks: CalendarTaskView[];
   items: StoredItem[];
+  resources: CalendarResource[];
+  bookings: Booking[];
   viewingOther: boolean;
 }
 
@@ -47,6 +51,33 @@ export function PersonalCalendar(props: CalendarClientProps) {
   const [source, setSource] = useState('');
   const [preview, setPreview] = useState<ImportPreview | null>(null);
   const [choices, setChoices] = useState<Record<string, 'replace' | 'skip'>>({});
+  const [resourceName, setResourceName] = useState('');
+  const [resourceCapacity, setResourceCapacity] = useState(1);
+  const [occurrences, setOccurrences] = useState(props.occurrences);
+  const windowRequest = useRef(0);
+  const [displayTimeZone, setDisplayTimeZone] = useState(props.activeTimeZone);
+  useEffect(() => setOccurrences(props.occurrences), [props.occurrences]);
+  useEffect(() => setDisplayTimeZone(props.activeTimeZone), [props.activeTimeZone]);
+  const changeDisplayTimeZone = useCallback((timeZone: string) => setDisplayTimeZone(timeZone), []);
+  const activateZone = useCallback(async (sessionId: string) => {
+    const result = await activateCalendarTimeZoneSession(props.user, { sessionId, expectedVersion: props.timeZoneVersion, idempotencyKey: mutationId() });
+    if (!result.ok) throw new Error(result.error);
+    return result;
+  }, [props.timeZoneVersion, props.user]);
+  const reportZone = useCallback(async (report: TimeZoneReport) => {
+    const result = await reportCalendarTimeZone(props.user, { ...report, idempotencyKey: mutationId() });
+    if (!result.ok) throw new Error(result.error);
+    if (result.accepted && result.version !== report.expectedVersion) router.refresh();
+    return result;
+  }, [props.user, router]);
+  const changeWindow = useCallback((window: { start: string; end: string; timeZone: string }) => {
+    const request = ++windowRequest.current;
+    void loadCalendarWindow(props.user, { from: window.start, to: window.end, timeZone: window.timeZone }).then((result) => {
+      if (request !== windowRequest.current) return;
+      if (result.ok) setOccurrences(result.occurrences);
+      else setNotice(result.error);
+    });
+  }, [props.user]);
   const versions = useMemo(() => new Map(props.items.map((item) => [item.id, item.version])), [props.items]);
   useRefreshOn(userStreamPath(props.user), ['calendar-item', 'calendar-task', 'calendar-scope', 'calendar-booking']);
 
@@ -64,8 +95,9 @@ export function PersonalCalendar(props: CalendarClientProps) {
         title: taskToSchedule ? taskToSchedule.title : value.title,
         localStart: 'localStart' in value.timing ? value.timing.localStart : undefined,
         durationMinutes: 'durationMinutes' in value.timing ? value.timing.durationMinutes : undefined,
-        timeZone: props.activeTimeZone,
+        timeZone: displayTimeZone,
         followMe: value.followMe,
+        rrule: value.rrule,
         linkedTaskId: taskToSchedule?.id,
       });
       done(result, kind === 'work-block' ? 'Work block scheduled.' : 'Event saved.');
@@ -95,10 +127,9 @@ export function PersonalCalendar(props: CalendarClientProps) {
       <div><TimeZoneReporter
         enabled={!props.viewingOther}
         activeTimeZone={props.activeTimeZone}
-        onReport={async (report) => {
-          const result = await reportCalendarTimeZone(props.user, { ...report, expectedVersion: props.timeZoneVersion, idempotencyKey: mutationId() });
-          if (result.ok && result.accepted) router.refresh();
-        }}
+        onDisplayTimeZoneChange={changeDisplayTimeZone}
+        onActivate={activateZone}
+        onReport={reportZone}
       /><small>{props.viewingOther ? 'Viewing this account as an operator. Device zone updates are disabled.' : 'Foreground devices may update this scheduling zone.'}</small></div>
       <div><button type="button" onClick={() => setComposer('event')}>New event</button><button type="button" onClick={() => setComposer('task')}>New task</button><a className="button" href={userPath(props.user, 'calendar/export')}>Download .ics</a></div>
     </header>
@@ -106,16 +137,17 @@ export function PersonalCalendar(props: CalendarClientProps) {
     <div className="calendar-layout">
       <section className="calendar-board" aria-label="Calendar">
         <CalendarView
-          occurrences={props.occurrences}
-          timeZone={props.activeTimeZone}
+          occurrences={occurrences}
+          timeZone={displayTimeZone}
+          onWindowChange={changeWindow}
           allowOverlap
           height={720}
           onSelect={(occurrence) => {
             setSelected(occurrence);
-            setEditStart(localValue(occurrence.start, props.activeTimeZone));
-            setEditEnd(localValue(occurrence.end, props.activeTimeZone));
+            setEditStart(localValue(occurrence.start, displayTimeZone));
+            setEditEnd(localValue(occurrence.end, displayTimeZone));
           }}
-          onMove={({ id, start, end }) => move(props.occurrences.find((occurrence) => occurrence.id === id)!, start, end, 'single')}
+          onMove={({ id, start, end }) => move(occurrences.find((occurrence) => occurrence.id === id)!, start, end, 'single')}
           renderEvent={({ occurrence, timeText }) => <span className="calendar-event"><strong>{occurrence.title}</strong><small>{timeText}{occurrence.kind === 'work-block' ? ' · task' : ''}</small></span>}
         />
       </section>
@@ -123,9 +155,37 @@ export function PersonalCalendar(props: CalendarClientProps) {
         <h2>Tasks</h2>
         <TaskList
           tasks={props.tasks}
-          onComplete={(task) => startTransition(async () => done(await completeCalendarTask(props.user, { id: task.id, occurrenceId: task.occurrenceId, version: versions.get(task.id) ?? 0, idempotencyKey: mutationId() }), 'Task completed.'))}
+          onComplete={(task) => startTransition(async () => {
+            const command = task.completed ? undoCalendarTask : completeCalendarTask;
+            done(await command(props.user, { id: task.id, occurrenceId: task.occurrenceId, version: versions.get(task.id) ?? 0, idempotencyKey: mutationId() }), task.completed ? 'Task reopened.' : 'Task completed.');
+          })}
           onSchedule={(task) => setTaskToSchedule(task)}
         />
+        <details open>
+          <summary>Resource booking</summary>
+          <form className="calendar-resource-form" onSubmit={(event) => {
+            event.preventDefault();
+            startTransition(async () => {
+              const result = await createCalendarResource(props.user, { name: resourceName, capacity: resourceCapacity, idempotencyKey: mutationId() });
+              done(result, 'Resource created.');
+              if (result.ok) setResourceName('');
+            });
+          }}>
+            <label>Name<input value={resourceName} onChange={(event) => setResourceName(event.target.value)} required /></label>
+            <label>Capacity<input type="number" min={1} value={resourceCapacity} onChange={(event) => setResourceCapacity(Number(event.target.value))} required /></label>
+            <button type="submit">Add resource</button>
+          </form>
+          {props.resources.length ? <BookingEditor resources={props.resources} timeZone={displayTimeZone} onSubmit={(booking) => startTransition(async () => {
+            done(await createCalendarHold(props.user, { ...booking, idempotencyKey: mutationId() }), 'Five-minute hold placed.');
+          })} /> : <p>Add a resource before booking time.</p>}
+          <section aria-label="Bookings" className="calendar-bookings">{props.bookings.map((booking) => <article key={booking.id}>
+            <strong>{booking.state}</strong>
+            <small>{new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short', timeZone: displayTimeZone }).format(new Date(booking.start))}</small>
+            <small>{booking.resources.map(({ resourceId, quantity }) => `${props.resources.find(({ id }) => id === resourceId)?.name ?? resourceId} × ${quantity}`).join(', ')}</small>
+            {booking.state === 'hold' ? <button type="button" onClick={() => startTransition(async () => done(await changeCalendarBooking(props.user, { id: booking.id, action: 'confirm', version: booking.version, idempotencyKey: mutationId() }), 'Booking confirmed.'))}>Confirm</button> : null}
+            {booking.state !== 'cancelled' ? <button type="button" onClick={() => startTransition(async () => done(await changeCalendarBooking(props.user, { id: booking.id, action: 'cancel', version: booking.version, idempotencyKey: mutationId() }), 'Booking cancelled.'))}>Cancel booking</button> : null}
+          </article>)}</section>
+        </details>
         <details>
           <summary>Import .ics</summary>
           <label className="file-field">Calendar file<input type="file" accept=".ics,text/calendar" onChange={async (event) => {
@@ -148,13 +208,13 @@ export function PersonalCalendar(props: CalendarClientProps) {
         </details>
       </aside>
     </div>
-    {composer === 'event' || composer === 'work-block' || taskToSchedule ? <dialog open aria-labelledby="calendar-item-heading" className="calendar-dialog"><h2 id="calendar-item-heading">{taskToSchedule ? 'Schedule task' : 'New event'}</h2><ItemEditor {...(taskToSchedule ? { value: { title: taskToSchedule.title } } : {})} timeZone={props.activeTimeZone} onSave={saveItem} onCancel={() => { setComposer(null); setTaskToSchedule(null); }} /></dialog> : null}
-    {composer === 'task' ? <dialog open aria-labelledby="calendar-task-heading" className="calendar-dialog"><h2 id="calendar-task-heading">New task</h2><TaskComposer timeZone={props.activeTimeZone} onCancel={() => setComposer(null)} onSave={(input) => startTransition(async () => {
-      const result = await createCalendarItem(props.user, { ...input, kind: 'task', idempotencyKey: mutationId(), timeZone: props.activeTimeZone });
+    {composer === 'event' || composer === 'work-block' || taskToSchedule ? <dialog open aria-labelledby="calendar-item-heading" className="calendar-dialog"><h2 id="calendar-item-heading">{taskToSchedule ? 'Schedule task' : 'New event'}</h2><ItemEditor {...(taskToSchedule ? { value: { title: taskToSchedule.title } } : {})} timeZone={displayTimeZone} onSave={saveItem} onCancel={() => { setComposer(null); setTaskToSchedule(null); }} /></dialog> : null}
+    {composer === 'task' ? <dialog open aria-labelledby="calendar-task-heading" className="calendar-dialog"><h2 id="calendar-task-heading">New task</h2><TaskComposer timeZone={displayTimeZone} onCancel={() => setComposer(null)} onSave={(input) => startTransition(async () => {
+      const result = await createCalendarItem(props.user, { ...input, kind: 'task', idempotencyKey: mutationId(), timeZone: displayTimeZone });
       done(result, 'Task saved.');
       if (result.ok) setComposer(null);
     })} /></dialog> : null}
-    {selected ? <dialog open aria-labelledby="calendar-edit-heading" className="calendar-dialog"><h2 id="calendar-edit-heading">Edit occurrence</h2><label>Change<select value={editMode} onChange={(event) => setEditMode(event.target.value as typeof editMode)}><option value="single">This occurrence</option><option value="future">This and future</option><option value="all">Entire series</option></select></label><label>Starts<input type="datetime-local" value={editStart} onChange={(event) => setEditStart(event.target.value)} /></label><label>Ends<input type="datetime-local" value={editEnd} onChange={(event) => setEditEnd(event.target.value)} /></label><div><button type="button" onClick={() => void move(selected, resolveLocal(editStart, props.activeTimeZone, 'earlier'), resolveLocal(editEnd, props.activeTimeZone, 'earlier'))}>Save</button><button type="button" onClick={() => setSelected(null)}>Cancel</button></div></dialog> : null}
+    {selected ? <dialog open aria-labelledby="calendar-edit-heading" className="calendar-dialog"><h2 id="calendar-edit-heading">Edit occurrence</h2><label>Change<select value={editMode} onChange={(event) => setEditMode(event.target.value as typeof editMode)}><option value="single">This occurrence</option><option value="future">This and future</option><option value="all">Entire series</option></select></label><label>Starts<input type="datetime-local" value={editStart} onChange={(event) => setEditStart(event.target.value)} /></label><label>Ends<input type="datetime-local" value={editEnd} onChange={(event) => setEditEnd(event.target.value)} /></label><div><button type="button" onClick={() => void move(selected, resolveLocal(editStart, displayTimeZone, 'earlier'), resolveLocal(editEnd, displayTimeZone, 'earlier'))}>Save</button><button type="button" onClick={() => setSelected(null)}>Cancel</button></div></dialog> : null}
   </div>;
 }
 

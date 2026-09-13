@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 
-import { createFollowMeIntent, editRecurringSeries, expandOccurrences, type RecurringSeries, type TemporalIntent } from '@isoastra/calendar-core';
+import { createFollowMeIntent, editRecurringSeries, expandOccurrences, resolveLocal, type RecurringSeries, type TemporalIntent } from '@isoastra/calendar-core';
 import { CalendarConflictError, type StoredItem } from '@isoastra/fleet-calendar';
 
 import { recordAudit } from '@/features/auth/audit';
@@ -96,10 +96,15 @@ export async function editCalendarOccurrence(user: string, raw: z.input<typeof e
       } else {
         if (!item.timing || item.timing.kind === 'date') throw new CalendarConflictError('This series cannot be split at a time.');
         const series: RecurringSeries = { id: item.id, timing: item.timing, ...item.recurrence };
-        const count = expandOccurrences(series, { from: '1900-01-01T00:00Z', to: input.recurrenceId, maxCandidates: 100_000, maxOccurrences: 100_000 }).occurrences.length;
+        const zone = item.timing.kind === 'instant' ? 'UTC' : item.timing.kind === 'follow-me' ? item.timing.resolvedTimeZone : item.timing.timeZone;
+        const cutoff = resolveLocal(input.recurrenceId, zone, 'earlier');
+        const expansion = expandOccurrences(series, { from: '1900-01-01T00:00Z', to: cutoff, maxCandidates: 100_000, maxOccurrences: 100_000 });
+        const budget = expansion.diagnostics.find(({ code }) => code === 'budget-exceeded');
+        if (budget) throw new CalendarConflictError(budget.message);
+        const count = expansion.occurrences.length;
         const [previous, next] = editRecurringSeries(series, { mode: 'future', recurrenceId: input.recurrenceId, nextSeriesId: randomUUID(), nextTiming: moved as Exclude<TemporalIntent, { kind: 'date' }>, consumedOccurrences: count });
         await request.store.editItem(tx, { scopeId: user, actor: request.actor, idempotencyKey: `${input.idempotencyKey}-old`, expectedVersion: input.version }, item.id, { recurrence: recurrenceOf(previous!) });
-        await request.store.createItem(tx, { scopeId: user, actor: request.actor, idempotencyKey: `${input.idempotencyKey}-new`, expectedVersion: 0 }, cloneForSplit(item, next!));
+        if (next) await request.store.createItem(tx, { scopeId: user, actor: request.actor, idempotencyKey: `${input.idempotencyKey}-new`, expectedVersion: 0 }, cloneForSplit(item, next));
       }
       await recordAudit(tx, { actorPersonId: request.subject.personId, command: 'edit-calendar-occurrence', targetKind: 'person', targetId: request.subject.subjectPersonId, payload: { calendarItemId: item.id, occurrenceId: input.recurrenceId, mode: input.mode } });
     });
@@ -133,6 +138,20 @@ export async function completeCalendarTask(user: string, input: { id: string; oc
     });
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message : 'The task was not completed.' };
+  }
+  revalidatePath(userPath(user, 'calendar'));
+  return { ok: true };
+}
+
+export async function undoCalendarTask(user: string, input: { id: string; occurrenceId: string; version: number; idempotencyKey: string }): Promise<{ ok: boolean; error?: string }> {
+  const request = await calendarRequest(user);
+  try {
+    await calendarDatabase().transaction(async (tx) => {
+      await request.store.undoTaskOccurrence(tx, { scopeId: user, actor: request.actor, idempotencyKey: input.idempotencyKey, expectedVersion: input.version }, input.id, input.occurrenceId);
+      await recordAudit(tx, { actorPersonId: request.subject.personId, command: 'undo-calendar-task', targetKind: 'person', targetId: request.subject.subjectPersonId, payload: { calendarItemId: input.id, occurrenceId: input.occurrenceId } });
+    });
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : 'The task was not reopened.' };
   }
   revalidatePath(userPath(user, 'calendar'));
   return { ok: true };

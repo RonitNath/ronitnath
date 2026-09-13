@@ -13,14 +13,19 @@ import { calendarDatabase, calendarRequest, ensureCalendarScope } from './server
 const MAX_ICS_BYTES = 1_000_000;
 
 function imported(item: StoredItem): IcalRecord | undefined {
+  return importedRecords(item).find((record) => !record.recurrenceId);
+}
+
+function importedRecords(item: StoredItem): IcalRecord[] {
+  const records = item.metadata?.icalRecords;
+  if (Array.isArray(records)) return records.filter((record) => record && typeof record === 'object') as IcalRecord[];
   const value = item.metadata?.ical;
-  return value && typeof value === 'object' ? value as IcalRecord : undefined;
+  return value && typeof value === 'object' ? [value as IcalRecord] : [];
 }
 
 function existing(items: StoredItem[]): ExistingIcalRecord[] {
   return items.flatMap((item) => {
-    const record = imported(item);
-    return record ? [{ key: record.key, localId: item.id, fingerprint: record.fingerprint, sequence: record.sequence }] : [];
+    return importedRecords(item).map((record) => ({ key: record.key, localId: item.id, fingerprint: record.fingerprint, sequence: record.sequence }));
   });
 }
 
@@ -43,15 +48,19 @@ function localId(record: IcalRecord): string {
   return `ics-${createHash('sha256').update(record.key).digest('hex').slice(0, 32)}`;
 }
 
-function mapped(record: IcalRecord, id: string): Omit<StoredItem, 'scopeId' | 'version'> {
+function mapped(record: IcalRecord, records: IcalRecord[], id: string): Omit<StoredItem, 'scopeId' | 'version'> {
+  const exceptions = Object.fromEntries(records.flatMap((candidate) => candidate.recurrenceId ? [[candidate.occurrenceKey ?? candidate.recurrenceId.replace(/Z$/, ''), {
+    ...(candidate.status === 'cancelled' ? { cancelled: true } : {}),
+    ...(candidate.timing ? { timing: candidate.timing } : {}),
+  }]] : []));
   return {
     id,
     kind: record.kind,
     title: record.title,
     ...(record.timing ? { timing: record.timing } : {}),
-    ...(record.rrule || record.rdates.length || record.exdates.length ? { recurrence: { ...(record.rrule ? { rrule: record.rrule } : {}), rdates: record.rdates, exdates: record.exdates } } : {}),
+    ...(record.rrule || record.rdates.length || record.exdates.length || Object.keys(exceptions).length ? { recurrence: { ...(record.rrule ? { rrule: record.rrule } : {}), rdates: record.rdates, exdates: record.exdates, ...(Object.keys(exceptions).length ? { exceptions } : {}) } } : {}),
     ...(record.kind === 'task' ? { task: { ...(record.due ? { due: record.due } : {}), completedOccurrenceIds: [] } } : {}),
-    metadata: { ical: record },
+    metadata: { ical: record, icalRecords: records },
     committed: false,
     status: record.status === 'cancelled' ? 'cancelled' : 'active',
   };
@@ -62,25 +71,30 @@ export async function applyCalendarImport(user: string, source: string, choices:
     const request = await calendarRequest(user);
     const { preview, items } = await authorizedPreview(user, source);
     const application = applyImport(preview, choices);
-    const byIcalKey = new Map(items.flatMap((item) => {
-      const record = imported(item);
-      return record ? [[record.key, item] as const] : [];
-    }));
+    const byIcalKey = new Map(items.flatMap((item) => importedRecords(item).map((record) => [record.key, item] as const)));
+    const groups = new Map<string, IcalRecord[]>();
+    for (const record of application.upserts) groups.set(record.uid, [...(groups.get(record.uid) ?? []), record]);
     await calendarDatabase().transaction(async (tx) => {
       await ensureCalendarScope(tx, request);
-      for (const record of application.upserts) {
-        const prior = byIcalKey.get(record.key);
+      for (const [uid, changed] of groups) {
+        const prior = byIcalKey.get(`${uid}::master`) ?? changed.map(({ key }) => byIcalKey.get(key)).find(Boolean);
+        const records = new Map((prior ? importedRecords(prior) : []).map((record) => [record.key, record]));
+        for (const record of changed) records.set(record.key, record);
+        const master = records.get(`${uid}::master`);
+        if (!master) throw new Error(`Calendar series ${uid} has no master component.`);
+        const combined = [...records.values()];
+        const fingerprint = createHash('sha256').update(combined.map(({ fingerprint: value }) => value).sort().join(':')).digest('hex').slice(0, 32);
         if (prior) {
-          await request.store.editItem(tx, { scopeId: user, actor: request.actor, idempotencyKey: `${idempotencyKey}-${record.fingerprint}`, expectedVersion: prior.version }, prior.id, mapped(record, prior.id));
+          await request.store.editItem(tx, { scopeId: user, actor: request.actor, idempotencyKey: `${idempotencyKey}-${fingerprint}`, expectedVersion: prior.version }, prior.id, mapped(master, combined, prior.id));
         } else {
-          const id = localId(record);
-          await request.store.createItem(tx, { scopeId: user, actor: request.actor, idempotencyKey: `${idempotencyKey}-${record.fingerprint}`, expectedVersion: 0 }, mapped(record, id));
+          const id = localId(master);
+          await request.store.createItem(tx, { scopeId: user, actor: request.actor, idempotencyKey: `${idempotencyKey}-${fingerprint}`, expectedVersion: 0 }, mapped(master, combined, id));
         }
       }
       await recordAudit(tx, { actorPersonId: request.subject.personId, command: 'import-calendar-file', targetKind: 'person', targetId: request.subject.subjectPersonId, payload: { applied: application.upserts.length, skipped: application.skipped.length } });
     });
     revalidatePath(userPath(user, 'calendar'));
-    return { ok: true, applied: application.upserts.length };
+    return { ok: true, applied: groups.size };
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message : 'The calendar was not imported.' };
   }
@@ -88,8 +102,7 @@ export async function applyCalendarImport(user: string, source: string, choices:
 
 function exportRecord(item: StoredItem): IcalRecord {
   const original = imported(item);
-  if (original) return original;
-  return {
+  const current: IcalRecord = {
     key: `${item.id}::master`,
     uid: `${item.id}@ronitnath.com`,
     kind: item.kind === 'task' ? 'task' : 'event',
@@ -105,10 +118,39 @@ function exportRecord(item: StoredItem): IcalRecord {
     rawJCal: [],
     timeZoneDefinitions: {},
   };
+  return original ? {
+    ...original,
+    title: current.title,
+    status: current.status,
+    sequence: current.sequence,
+    ...(current.timing ? { timing: current.timing } : {}),
+    ...(current.due ? { due: current.due } : {}),
+    ...(current.rrule ? { rrule: current.rrule } : {}),
+    rdates: current.rdates,
+    exdates: current.exdates,
+  } : current;
+}
+
+function exportRecords(item: StoredItem): IcalRecord[] {
+  const master = exportRecord(item);
+  const originalExceptions = new Map(importedRecords(item).filter(({ recurrenceId }) => recurrenceId).map((record) => [record.occurrenceKey ?? record.recurrenceId!.replace(/Z$/, ''), record]));
+  const exceptions = Object.entries(item.recurrence?.exceptions ?? {}).map(([recurrenceId, exception]) => {
+    const original = originalExceptions.get(recurrenceId);
+    return {
+      ...(original ?? { ...master, rawJCal: [], rdates: [], exdates: [], rrule: undefined }),
+      key: `${master.uid}::${recurrenceId}`,
+      recurrenceId,
+      occurrenceKey: recurrenceId,
+      sequence: item.version,
+      status: exception.cancelled ? 'cancelled' as const : 'active' as const,
+      ...(exception.timing ? { timing: exception.timing } : {}),
+    } as IcalRecord;
+  });
+  return [master, ...exceptions];
 }
 
 export async function exportPersonalCalendar(user: string): Promise<string> {
   const request = await calendarRequest(user, 'calendar/export');
   const items = await request.store.listItems(calendarDatabase(), request);
-  return exportCalendar({ name: `${request.subject.subjectName}'s calendar`, records: items.map(exportRecord) });
+  return exportCalendar({ name: `${request.subject.subjectName}'s calendar`, records: items.flatMap(exportRecords) });
 }

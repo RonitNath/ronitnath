@@ -1,7 +1,7 @@
 import { sql } from 'drizzle-orm';
 
 import { expandOccurrences, resolveIntent, type Occurrence } from '@isoastra/calendar-core';
-import type { StoredItem } from '@isoastra/fleet-calendar';
+import type { Booking, CalendarResource, StoredItem } from '@isoastra/fleet-calendar';
 import type { CalendarOccurrence, CalendarTaskView } from '@isoastra/calendar-react/model';
 
 import { database } from '@/db/client';
@@ -13,6 +13,8 @@ export interface PersonalCalendarData {
   occurrences: CalendarOccurrence[];
   tasks: CalendarTaskView[];
   items: StoredItem[];
+  resources: CalendarResource[];
+  bookings: Booking[];
   viewingOther: boolean;
 }
 
@@ -33,6 +35,8 @@ export async function loadPersonalCalendar(user: string): Promise<PersonalCalend
   const activeTimeZone = scopeRows.rows[0]?.time_zone ?? 'UTC';
   const timeZoneVersion = Number(scopeRows.rows[0]?.time_zone_version ?? 0);
   const items = await request.store.listItems(db, request);
+  const resources = await request.store.listResources(db, request);
+  const bookings = await request.store.listBookings(db, request);
   const completions = await request.store.taskCompletions(db, request);
   const completed = new Set(completions.map(({ itemId, occurrenceId }) => `${itemId}/${occurrenceId}`));
   const now = new Date();
@@ -40,7 +44,7 @@ export async function loadPersonalCalendar(user: string): Promise<PersonalCalend
   const to = new Date(Date.UTC(now.getUTCFullYear() + 3, 0, 1)).toISOString();
   const occurrences = items
     .filter((item) => item.kind !== 'task' && item.status !== 'cancelled')
-    .flatMap((item) => eventOccurrences(item, activeTimeZone, from, to).map((occurrence) => ({
+    .flatMap((item) => eventOccurrences(item, activeTimeZone, from, to).filter(({ cancelled }) => !cancelled).map((occurrence) => ({
       ...occurrence,
       title: item.title,
       kind: item.kind === 'work-block' ? 'work-block' as const : 'event' as const,
@@ -48,7 +52,7 @@ export async function loadPersonalCalendar(user: string): Promise<PersonalCalend
     })));
   const tasks = items.filter((item) => item.kind === 'task' && item.status !== 'cancelled').flatMap((item) => {
     if (item.timing && item.timing.kind !== 'date' && item.recurrence?.rrule) {
-      return eventOccurrences(item, activeTimeZone, from, to).map((occurrence) => ({
+      return eventOccurrences(item, activeTimeZone, from, to).filter(({ cancelled }) => !cancelled).map((occurrence) => ({
         id: item.id,
         occurrenceId: occurrence.recurrenceId,
         title: item.title,
@@ -67,5 +71,5 @@ export async function loadPersonalCalendar(user: string): Promise<PersonalCalend
       completed: completed.has(`${item.id}/${occurrenceId}`),
     }];
   });
-  return { activeTimeZone, timeZoneVersion, occurrences, tasks, items, viewingOther: request.subject.viewingOther };
+  return { activeTimeZone, timeZoneVersion, occurrences, tasks, items, resources, bookings, viewingOther: request.subject.viewingOther };
 }
