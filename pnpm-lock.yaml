@@ -1089,7 +1089,7 @@ packages:
     resolution: {integrity: sha512-GxxpYKScNUaV67kqvt//rVQgoxXsvyitKMEulF2RxU0mrg4FX7nrfY/fmsmPRf4KnE6cYH0XEnlEy9Yq3jI44w==, tarball: https://npm.pkg.github.com/download/@isoastra/fleet-ids/0.1.1/1aa2fc71810f33ec7ecab022c1baee6b84aaa181}
 
   '@isoastra/fleet-notifications@file:vendor/isoastra-fleet-notifications-0.1.0.tgz':
-    resolution: {integrity: sha512-vV8EgWNzeHpBqz9bqWLH2QxpOEs/vbQe2a3dqp78YLF7vwoymW8NdXJq3jUeMmPg0D1/ITb/Hhmti5BQmD/mFA==, tarball: file:vendor/isoastra-fleet-notifications-0.1.0.tgz}
+    resolution: {integrity: sha512-uBP6kBsSget4Vxfel5wxlVAHiwE6oaf9T2qCdyWSXoTHPBNW1OfklHKbhfi2yi3F3ZttSKHwIdwJTNgVfHsBVQ==, tarball: file:vendor/isoastra-fleet-notifications-0.1.0.tgz}
     version: 0.1.0
     engines: {node: '>=22.12.0'}
     peerDependencies:
