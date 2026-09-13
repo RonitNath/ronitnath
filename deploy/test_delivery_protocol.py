@@ -5,6 +5,7 @@ import subprocess
 import tempfile
 import time
 import unittest
+import urllib.error
 from pathlib import Path
 from unittest.mock import Mock, patch
 
@@ -52,6 +53,12 @@ class CoordinatorRecoveryTests(unittest.TestCase):
         expected = "sha256:01c3cc3195092620becf9d56c2e69e64c76b2520711026acdfdcadab56110fb6"
         self.assertEqual(host_entry.manifest_digest(left), expected)
         self.assertEqual(host_entry.manifest_digest(right), expected)
+
+    def test_anonymous_acceptance_recognizes_standard_denials(self):
+        for status in (401, 403, 404):
+            denial = urllib.error.HTTPError("https://example.invalid", status, "denied", {}, None)
+            with patch.object(coordinator.urllib.request, "urlopen", side_effect=denial):
+                coordinator.anonymous_denied("https://example.invalid")
 
     def test_restart_stops_on_unknown_nontransactional_migration(self):
         self.release["migrations"]["entries"][0]["transactional"] = False

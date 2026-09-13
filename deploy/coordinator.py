@@ -197,7 +197,7 @@ def anonymous_denied(url):
     try:
         urllib.request.urlopen(url, timeout=15)
     except urllib.error.HTTPError as error:
-        if error.code == 404:
+        if error.code in (401, 403, 404):
             return
         raise
     raise RuntimeError("anonymous inspector unexpectedly accessible")
