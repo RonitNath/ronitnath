@@ -4,7 +4,7 @@ ronitnath.com is the first production pilot for Grid personal-content privacy.
 The application uses the **managed (Level 2)** profile for event copy. This is
 a server-recoverable profile: PostgreSQL, WAL, replicas, dumps and storage
 backups receive authenticated ciphertext, while the authorized application can
-ask AWS KMS to unwrap a user''s root key.
+ask AWS KMS to unwrap a user's root key.
 
 ## Current claim
 
@@ -43,7 +43,7 @@ separate fleet-CA certificates for one-hour IAM Roles Anywhere credentials.
 The role can use only this key and only the `ronitnath-events` encryption
 context. The web process uses the non-owner PostgreSQL role
 `ronitnath_runtime`; the schema owner is reserved for migrations. Platform
-operator status does not authorize opening another person''s protected event.
+operator status does not authorize opening another person's protected event.
 
 KMS and the running server remain inside the Level 2 trust boundary. An
 administrator who can change the deployed server, assume the KMS role, or
@@ -79,6 +79,33 @@ and decrypted content are forbidden telemetry fields.
 Run `pnpm qualify:event-privacy` against a migrated database to create an
 isolated canary transaction, verify that SQL contains no canary plaintext,
 round-trip the event, deny the operator bypass, and roll the fixture back.
+
+## Production qualification
+
+The Level 2 claim became active on 2026-09-14 after release
+`f35a1594-f6a7-47a1-b1d2-f5cc93c95da1` deployed source
+`bcf54a7278ed8df40ea32c0a90c0e138c30a0e43` and runtime image
+`sha256:15a11e34b583e9e677d7c22807993f83a9e0363c98c65ab523ddca592e561cf1`
+to SFO and NYC. The migration image was
+`sha256:db2d47677bdff16487f944da9ca4bffe3cc1984d485e2ca906b43f195491d22f`.
+
+Production qualification established that:
+
+- the one legacy event was migrated and the completion probe reported zero
+  revision-zero rows;
+- all classified legacy columns on protected event rows were null;
+- the deployed migration image completed a real KMS encrypt/decrypt canary,
+  found no canary plaintext in its visible SQL rows, rejected an operator
+  bypass, and rolled the transaction back;
+- the migrated public event decrypted successfully through each replica;
+- both web containers run as the non-owner `ronitnath_runtime` role and both
+  IAM Roles Anywhere credential sidecars use separate host certificates;
+- the public landing page loads Umami while event pages load neither Umami nor
+  HyperDX, and the canary string was absent from the external event response.
+
+This qualification supports only the covered event fields and current release.
+It does not erase earlier plaintext copies or upgrade the uncovered fields
+listed above.
 
 
 
