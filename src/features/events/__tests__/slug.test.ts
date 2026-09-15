@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { slugCandidate, slugify } from '../slug';
+import { opaqueEventSlug, slugCandidate, slugify } from '../slug';
 
 describe('slugify', () => {
   it('makes a URL word out of a title', () => {
@@ -24,6 +24,14 @@ describe('slugify', () => {
     const slug = slugify('a'.repeat(20) + ' ' + 'b'.repeat(60));
     expect(slug.length).toBeLessThanOrEqual(48);
     expect(slug.endsWith('-')).toBe(false);
+  });
+});
+
+describe('opaqueEventSlug', () => {
+  it('does not encode protected event copy', () => {
+    const slug = opaqueEventSlug();
+    expect(slug).toMatch(/^p-[0-9a-f-]{36}$/);
+    expect(slug).not.toContain('board-games');
   });
 });
 

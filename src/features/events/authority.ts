@@ -19,6 +19,13 @@ import type { Transaction } from '@/features/auth/db';
 /* One actor shape for the whole deployment (src/lib/authority.ts). */
 export type { Actor } from '@/lib/authority';
 import type { Actor } from '@/lib/authority';
+import type { RequestKeyCache } from '@isoastra/privacy/server';
+import {
+  eventContentFromLegacy,
+  materializeEvent,
+  readEventContent,
+  type EventRouting,
+} from '@/features/privacy/event-content';
 
 export const HOST = 'host';
 export const INVITED = 'invited';
@@ -40,6 +47,7 @@ export interface EventRow {
   colour: string | null;
   posterUrl: string | null;
   revealGuests: boolean;
+  privacyRevision: number;
   sequence: number;
   publishedAt: Date | null;
   updatedAt: Date;
@@ -62,6 +70,7 @@ const columns = {
   colour: schema.event.colour,
   posterUrl: schema.event.posterUrl,
   revealGuests: schema.event.revealGuests,
+  privacyRevision: schema.event.privacyRevision,
   sequence: schema.event.sequence,
   publishedAt: schema.event.publishedAt,
   updatedAt: schema.event.updatedAt,
@@ -70,17 +79,45 @@ const columns = {
 
 export const EVENT_COLUMNS = columns;
 
+type StoredEventRow = Awaited<ReturnType<typeof selectStoredEvent>>[number];
+
+async function selectStoredEvent(tx: Transaction, eventId: number) {
+  return tx.select(columns).from(schema.event).where(eq(schema.event.id, eventId)).limit(1);
+}
+
+async function openStoredEvent(
+  tx: Transaction,
+  row: StoredEventRow,
+  cache?: RequestKeyCache,
+): Promise<EventRow> {
+  const routing: EventRouting = {
+    id: row.id,
+    hostPersonId: row.hostPersonId,
+    slug: row.slug,
+    sequence: row.sequence,
+    privacyRevision: row.privacyRevision,
+    publishedAt: row.publishedAt,
+    updatedAt: row.updatedAt,
+    createdAt: row.createdAt,
+  };
+  const content =
+    (await readEventContent(tx, routing, cache)) ??
+    eventContentFromLegacy(row);
+  return materializeEvent(routing, content);
+}
+
 /** The event an actor may act on as its host, or null — one answer for
  *  "not yours" and "not there". */
 export async function hostedEvent(
   tx: Transaction,
   actor: Actor,
   eventId: number,
+  cache?: RequestKeyCache,
 ): Promise<EventRow | null> {
-  const rows = await tx.select(columns).from(schema.event).where(eq(schema.event.id, eventId)).limit(1);
+  const rows = await selectStoredEvent(tx, eventId);
   const row = rows[0];
   if (!row) return null;
-  if (row.hostPersonId === actor.personId || actor.isOperator) return row;
+  if (row.hostPersonId === actor.personId) return openStoredEvent(tx, row, cache);
   return null;
 }
 
@@ -94,7 +131,7 @@ export async function publishedEvent(tx: Transaction, slug: string): Promise<Eve
     .limit(1);
   const row = rows[0];
   if (!row || row.publishedAt === null) return null;
-  return row;
+  return openStoredEvent(tx, row);
 }
 
 /** The relations an event writes: the host owns it, an invited person is

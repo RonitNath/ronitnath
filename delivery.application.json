@@ -24,7 +24,10 @@
         "env": {
           "DATABASE_URL": { "source": "literal", "value": "postgres://ronitnath:ronitnath@127.0.0.1:${service.database.port}/ronitnath" },
           "AUTH_SECRET": { "source": "literal", "value": "local-auth-${environment.id}" },
-          "ID_KEY": { "source": "literal", "value": "11111111111111111111111111111111" }
+          "ID_KEY": { "source": "literal", "value": "11111111111111111111111111111111" },
+          "PRIVACY_LOCAL_KEK": { "source": "literal", "value": "ERERERERERERERERERERERERERERERERERERERERERE" },
+          "PRIVACY_ALLOW_LOCAL_KEK": { "source": "literal", "value": "1" },
+          "EVENT_PRIVACY_WRITE": { "source": "literal", "value": "managed" }
         },
         "inheritEnv": ["PATH", "HOME", "LANG", "TZ"]
       },

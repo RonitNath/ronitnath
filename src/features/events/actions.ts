@@ -24,9 +24,13 @@ import { encodeId, tryDecodeId } from '@/lib/ids';
 import { userPath } from '@/lib/paths';
 import { HOST, INVITED, dropRelation, hostedEvent, writeRelation } from './authority';
 import { guestUrl, mintOpenLink, mintPersonalLink } from './links';
-import { slugCandidate } from './slug';
+import { opaqueEventSlug, slugCandidate } from './slug';
 import { fromWallClock, isZone } from './time';
 import { emit } from '@/lib/fleet/events';
+import {
+  eventPrivacyWritesEnabled,
+  writeEventContent,
+} from '@/features/privacy/event-content';
 
 const NO_SUCH = 'That is not something you can do here.';
 
@@ -129,25 +133,58 @@ export async function createEvent(_prev: FormState, form: FormData): Promise<For
     /* Uniqueness is the index's answer, not a lookup's: two hosts naming the
      * same evening in the same second cannot both win. */
     for (let attempt = 0; attempt < 12; attempt += 1) {
-      const slug = slugCandidate(input.title, attempt);
+      const protect = eventPrivacyWritesEnabled();
+      const slug = protect ? opaqueEventSlug() : slugCandidate(input.title, attempt);
       const rows = await tx
         .insert(schema.event)
         .values({
           hostPersonId: me.personId,
           slug,
-          title: input.title,
-          startsAt,
-          endsAt,
-          timezone: input.timezone,
-          location: input.location || null,
-          address: input.address || null,
-          body: input.body,
-          capacity,
+          title: protect ? null : input.title,
+          startsAt: protect ? null : startsAt,
+          endsAt: protect ? null : endsAt,
+          timezone: protect ? null : input.timezone,
+          location: protect ? null : input.location || null,
+          address: protect ? null : input.address || null,
+          body: protect ? null : input.body,
+          capacity: protect ? null : capacity,
+          revealGuests: protect ? null : false,
+          privacyRevision: protect ? 1 : 0,
         })
         .onConflictDoNothing({ target: schema.event.slug })
-        .returning({ id: schema.event.id });
+        .returning({
+          id: schema.event.id,
+          hostPersonId: schema.event.hostPersonId,
+          slug: schema.event.slug,
+          sequence: schema.event.sequence,
+          privacyRevision: schema.event.privacyRevision,
+          publishedAt: schema.event.publishedAt,
+          updatedAt: schema.event.updatedAt,
+          createdAt: schema.event.createdAt,
+        });
       const row = rows[0];
       if (!row) continue;
+      if (protect) {
+        await writeEventContent(
+          tx,
+          row,
+          {
+            title: input.title,
+            summary: null,
+            startsAt: startsAt.toISOString(),
+            endsAt: endsAt?.toISOString() ?? null,
+            timezone: input.timezone,
+            location: input.location || null,
+            address: input.address || null,
+            body: input.body,
+            capacity,
+            colour: null,
+            posterUrl: null,
+            revealGuests: false,
+          },
+          0,
+        );
+      }
       await writeRelation(tx, { personId: me.personId, verb: HOST, eventId: row.id });
       await tx
         .insert(schema.resource)
@@ -203,20 +240,45 @@ export async function updateEvent(_prev: FormState, form: FormData): Promise<For
   const ok = await database().transaction(async (tx) => {
     const event = await hostedEvent(tx, me, target);
     if (!event) return false;
+    const protect = eventPrivacyWritesEnabled() || event.privacyRevision > 0;
+    const nextPrivacyRevision = protect ? event.privacyRevision + 1 : 0;
+    if (protect) {
+      await writeEventContent(
+        tx,
+        { ...event, privacyRevision: nextPrivacyRevision },
+        {
+          title: input.title,
+          summary: event.summary,
+          startsAt: startsAt.toISOString(),
+          endsAt: endsAt?.toISOString() ?? null,
+          timezone: input.timezone,
+          location: input.location || null,
+          address: input.address || null,
+          body: input.body,
+          capacity,
+          colour: input.colour || null,
+          posterUrl: input.posterUrl || null,
+          revealGuests: input.revealGuests,
+        },
+        event.privacyRevision,
+      );
+    }
     await tx
       .update(schema.event)
       .set({
-        title: input.title,
-        startsAt,
-        endsAt,
-        timezone: input.timezone,
-        location: input.location || null,
-        address: input.address || null,
-        body: input.body,
-        capacity,
-        colour: input.colour || null,
-        posterUrl: input.posterUrl || null,
-        revealGuests: input.revealGuests,
+        title: protect ? null : input.title,
+        summary: protect ? null : event.summary,
+        startsAt: protect ? null : startsAt,
+        endsAt: protect ? null : endsAt,
+        timezone: protect ? null : input.timezone,
+        location: protect ? null : input.location || null,
+        address: protect ? null : input.address || null,
+        body: protect ? null : input.body,
+        capacity: protect ? null : capacity,
+        colour: protect ? null : input.colour || null,
+        posterUrl: protect ? null : input.posterUrl || null,
+        revealGuests: protect ? null : input.revealGuests,
+        privacyRevision: nextPrivacyRevision,
         updatedAt: sql`now()`,
         /* Only a published event's calendar entry is out there to correct. */
         sequence: event.publishedAt ? event.sequence + 1 : event.sequence,

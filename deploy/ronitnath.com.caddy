@@ -6,9 +6,9 @@
 # the application itself (next.config.ts headers), so the edge needs no rule of
 # its own for /stars, /sky, /cities or /textures.
 #
-# Umami is NOT in-page in this application, so the edge injects it the way it
-# does for every other first-party host, which is why the upstream is asked for
-# an identity encoding and the response is not compressed before the rewrite.
+# Umami is limited to the public landing/about pages. Event, account, user and
+# organization surfaces can contain decrypted personal content and must never
+# load a recorder or a generic auto-tracker.
 ronitnath.com {
   import cloudflare_tls
   import umami_csp
@@ -38,7 +38,8 @@ ronitnath.com {
     }
   }
 
-  handle {
+  @public_marketing path / /about /about/*
+  handle @public_marketing {
     encode zstd gzip
     import umami_inject ba50852f-45e9-43e9-983c-ceaa773bc7dd
     reverse_proxy http://100.88.42.226:3140 http://100.88.223.144:3140 {
@@ -50,6 +51,19 @@ ronitnath.com {
       health_timeout 5s
       health_status 200
       header_up Accept-Encoding identity
+    }
+  }
+
+  handle {
+    encode zstd gzip
+    reverse_proxy http://100.88.42.226:3140 http://100.88.223.144:3140 {
+      lb_policy first
+      lb_try_duration 5s
+      lb_try_interval 250ms
+      health_uri /healthz
+      health_interval 10s
+      health_timeout 5s
+      health_status 200
     }
   }
 }

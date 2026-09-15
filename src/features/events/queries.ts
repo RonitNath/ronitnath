@@ -15,6 +15,8 @@ import { sharedGroupMembers } from '@/features/groups/queries';
 import { headcount, type Headcount } from './capacity';
 import { linkState, type LinkState } from '@/features/people/invitations';
 import { orderGuests, type Ordered } from './ordering';
+import { RequestKeyCache } from '@isoastra/privacy/server';
+import { hostedEvent } from './authority';
 
 export interface EventSummary {
   id: number;
@@ -34,21 +36,24 @@ export interface EventSummary {
  *  only number a host wants from a list row. */
 export async function listEvents(personId: number): Promise<EventSummary[]> {
   const db = database();
-  const events = await db
-    .select({
-      id: schema.event.id,
-      slug: schema.event.slug,
-      title: schema.event.title,
-      startsAt: schema.event.startsAt,
-      endsAt: schema.event.endsAt,
-      timezone: schema.event.timezone,
-      location: schema.event.location,
-      capacity: schema.event.capacity,
-      publishedAt: schema.event.publishedAt,
-    })
-    .from(schema.event)
-    .where(eq(schema.event.hostPersonId, personId))
-    .orderBy(desc(schema.event.startsAt));
+  const events = await db.transaction(async (tx) => {
+    const ids = await tx
+      .select({ id: schema.event.id })
+      .from(schema.event)
+      .where(eq(schema.event.hostPersonId, personId))
+      .orderBy(desc(schema.event.createdAt));
+    const cache = new RequestKeyCache();
+    try {
+      const opened = [];
+      for (const { id } of ids) {
+        const row = await hostedEvent(tx, { personId, isOperator: false }, id, cache);
+        if (row) opened.push(row);
+      }
+      return opened.sort((left, right) => right.startsAt.getTime() - left.startsAt.getTime());
+    } finally {
+      cache.clear();
+    }
+  });
   if (events.length === 0) return [];
 
   const ids = events.map((row) => row.id);

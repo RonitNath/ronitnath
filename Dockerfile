@@ -21,15 +21,26 @@ RUN pnpm build
 # transfer and the preflight pull on each production host.
 FROM deps AS migrate-build
 COPY scripts/migrate.ts ./scripts/migrate.ts
+COPY scripts/migrate-event-privacy.ts scripts/qualify-event-privacy.ts ./scripts/
+COPY tsconfig.json ./
+COPY src ./src
 COPY delivery.migrations.json ./delivery.migrations.json
 COPY drizzle ./drizzle
 RUN pnpm exec esbuild scripts/migrate.ts \
     --bundle --platform=node --format=cjs --target=node24 \
-    --outfile=/migration/migrate.cjs
+    --outfile=/migration/migrate.cjs && \
+    pnpm exec esbuild scripts/migrate-event-privacy.ts \
+    --bundle --platform=node --format=cjs --target=node24 \
+    --tsconfig=tsconfig.json --outfile=/migration/migrate-event-privacy.cjs && \
+    pnpm exec esbuild scripts/qualify-event-privacy.ts \
+    --bundle --platform=node --format=cjs --target=node24 \
+    --tsconfig=tsconfig.json --outfile=/migration/qualify-event-privacy.cjs
 
 FROM node:24-alpine@sha256:50c8e8ca1d27439048670df5883f32d57cf81cff6233222c893fd0d9884cbd81 AS migrate
 WORKDIR /app
 COPY --from=migrate-build /migration/migrate.cjs ./migrate.cjs
+COPY --from=migrate-build /migration/migrate-event-privacy.cjs ./migrate-event-privacy.cjs
+COPY --from=migrate-build /migration/qualify-event-privacy.cjs ./qualify-event-privacy.cjs
 COPY delivery.migrations.json ./delivery.migrations.json
 COPY drizzle ./drizzle
 CMD ["node", "migrate.cjs"]

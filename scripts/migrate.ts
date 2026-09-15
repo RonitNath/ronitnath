@@ -46,8 +46,8 @@ const executionPolicySchema = z
   .strict();
 
 async function main(): Promise<void> {
-  const connectionString = process.env.DATABASE_URL;
-  if (!connectionString) throw new Error('DATABASE_URL is not set');
+  const connectionString = process.env.MIGRATION_DATABASE_URL ?? process.env.DATABASE_URL;
+  if (!connectionString) throw new Error('MIGRATION_DATABASE_URL or DATABASE_URL is not set');
 
   const journal: Journal = JSON.parse(
     readFileSync(join(folder, 'meta', '_journal.json'), 'utf8'),
