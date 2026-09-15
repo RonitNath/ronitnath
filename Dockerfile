@@ -31,10 +31,10 @@ RUN pnpm exec esbuild scripts/migrate.ts \
     --outfile=/migration/migrate.cjs && \
     pnpm exec esbuild scripts/migrate-event-privacy.ts \
     --bundle --platform=node --format=cjs --target=node24 \
-    --tsconfig=tsconfig.json --outfile=/migration/migrate-event-privacy.cjs && \
+    --conditions=react-server --tsconfig=tsconfig.json --outfile=/migration/migrate-event-privacy.cjs && \
     pnpm exec esbuild scripts/qualify-event-privacy.ts \
     --bundle --platform=node --format=cjs --target=node24 \
-    --tsconfig=tsconfig.json --outfile=/migration/qualify-event-privacy.cjs
+    --conditions=react-server --tsconfig=tsconfig.json --outfile=/migration/qualify-event-privacy.cjs
 
 FROM node:24-alpine@sha256:50c8e8ca1d27439048670df5883f32d57cf81cff6233222c893fd0d9884cbd81 AS migrate
 WORKDIR /app

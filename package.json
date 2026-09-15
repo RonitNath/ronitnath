@@ -33,8 +33,8 @@
     "e2e": "playwright test",
     "seed:operator": "tsx scripts/seed-operator.ts",
     "migrate:identity": "tsx scripts/migrate-identity.ts",
-    "migrate:event-privacy": "tsx scripts/migrate-event-privacy.ts",
-    "qualify:event-privacy": "tsx scripts/qualify-event-privacy.ts",
+    "migrate:event-privacy": "node --conditions=react-server --import tsx scripts/migrate-event-privacy.ts",
+    "qualify:event-privacy": "node --conditions=react-server --import tsx scripts/qualify-event-privacy.ts",
     "import:export": "tsx scripts/import-export.ts"
   },
   "dependencies": {
