@@ -8,6 +8,11 @@
 
 const MAX = 48;
 
+/** A protected event's public route must not repeat its title. */
+export function opaqueEventSlug(): string {
+  return `p-${crypto.randomUUID()}`;
+}
+
 /** The bare stem: lower case, words joined by hyphens, nothing that has to be
  *  percent-encoded, never empty and never longer than a line of a URL. */
 export function slugify(title: string): string {

@@ -343,9 +343,9 @@ export const event = pgTable(
       .notNull()
       .references(() => person.id, { onDelete: 'cascade' }),
     slug: text('slug').notNull(),
-    title: text('title').notNull(),
+    title: text('title'),
     summary: text('summary'),
-    startsAt: timestamp('starts_at', { withTimezone: true }).notNull(),
+    startsAt: timestamp('starts_at', { withTimezone: true }),
     endsAt: timestamp('ends_at', { withTimezone: true }),
     /* The two halves of a place. `location` is the name a guest may read
      * before answering ("Ronit's apartment"); the address is the thing that
@@ -355,11 +355,11 @@ export const event = pgTable(
     /* An instant is an instant, but "Sunday afternoon" is a wall clock in a
      * particular city: the host's zone is what the guest page falls back to
      * and what the calendar entry is written in. */
-    timezone: text('timezone').notNull().default('America/Los_Angeles'),
+    timezone: text('timezone'),
     /* Markdown-lite, as the host typed it. The HTML a guest reads is rendered
      * from this on the way out and never stored, so there is exactly one
      * place where markup can be born (src/features/events/markup.ts). */
-    body: text('body').notNull().default(''),
+    body: text('body'),
     /* Null is no limit. A yes past the limit is still a yes — it is `full`,
      * a word on the page, not an error (src/features/events/capacity.ts). */
     capacity: integer('capacity'),
@@ -368,7 +368,10 @@ export const event = pgTable(
     colour: text('colour'),
     posterUrl: text('poster_url'),
     /* Whether a guest who has answered yes sees full names or first names. */
-    revealGuests: boolean('reveal_guests').notNull().default(false),
+    revealGuests: boolean('reveal_guests'),
+    /* Zero identifies a legacy plaintext row. Protected revisions start at
+     * one and bind the ciphertext to this exact row revision. */
+    privacyRevision: integer('privacy_revision').notNull().default(0),
     /* RFC 5545 SEQUENCE. Bumped by every host edit that a calendar would
      * want to hear about, so an entry already in somebody's calendar is
      * replaced rather than duplicated. */

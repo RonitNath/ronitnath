@@ -9,6 +9,8 @@ are retained for recovery.
 - Service: `web`, host network, listening on `PORT=3140`. The edge proxies
   `ronitnath.com` to `127.0.0.1:3140`.
 - Config: `/data/crypt/ronitnath/web.env` on the target (root-owned, `0600`).
+- Privacy identity: `/data/crypt/ronitnath/aws/{certificate.pem,private-key.pem,ca.pem}`
+  (root-owned, `0400`), consumed only by the pinned IAM Roles Anywhere helper.
 - Database: the per-node HAProxy in front of Patroni `internal-ha`, so the DSN
   in `web.env` dials `127.0.0.1:5000`.
 
@@ -25,7 +27,8 @@ GRANT ALL ON SCHEMA public TO ronitnath;
 Then `/data/crypt/ronitnath/web.env`, from `.env.example`:
 
 ```
-DATABASE_URL=postgres://ronitnath:<generated>@127.0.0.1:5000/ronitnath
+DATABASE_URL=postgres://ronitnath_runtime:<generated>@127.0.0.1:5000/ronitnath
+MIGRATION_DATABASE_URL=postgres://ronitnath:<owner-password>@127.0.0.1:5000/ronitnath
 ID_KEY=<openssl rand -hex 16>       # never rotate: it is every public id
 PUBLIC_ORIGIN=https://ronitnath.com
 SESSION_COOKIE=rn_session
@@ -42,6 +45,12 @@ MAIL_FROM=Ronit Nath <no-reply@ronitnath.com>
 APP_VERSION=<tag>
 RN_IMPERSONATION=on                         # `off` removes SignInAs entirely
 ```
+
+The runtime role is non-owner and `NOBYPASSRLS`; only the migration image
+reads `MIGRATION_DATABASE_URL`. Event privacy also requires
+`PRIVACY_KMS_KEY_ID=alias/isoastra/ronitnath/privacy/prod`,
+`AWS_REGION=us-west-1`, and the local Roles Anywhere metadata endpoint. The
+compose file supplies those non-secret settings.
 
 Mail is not optional in production: with neither `USESEND_API_*` nor `SMTP_URL` set the app falls back to
 the dev transport, which writes verification and reset mail to a directory

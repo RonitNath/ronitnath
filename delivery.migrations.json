@@ -8,6 +8,18 @@
       "lockTimeoutMs": 30000,
       "statementTimeoutMs": 120000,
       "backfill": { "required": false, "complete": true, "probe": null }
+    },
+    {
+      "name": "0016_event_privacy_expand",
+      "mode": "expand",
+      "transactional": true,
+      "lockTimeoutMs": 30000,
+      "statementTimeoutMs": 120000,
+      "backfill": {
+        "required": true,
+        "complete": false,
+        "probe": "select count(*) = 0 from event where privacy_revision = 0"
+      }
     }
   ]
 }
