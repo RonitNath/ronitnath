@@ -17,7 +17,7 @@
       "statementTimeoutMs": 120000,
       "backfill": {
         "required": true,
-        "complete": false,
+        "complete": true,
         "probe": "select count(*) = 0 from event where privacy_revision = 0"
       }
     }
