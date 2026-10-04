@@ -1,0 +1,13 @@
+'use strict';
+const assert=require('node:assert/strict'),guard=require('./guard.cjs');
+process.env.OIDC_ISSUER='https://auth.isoastra.com';
+const ronit={sub:'388597630173413379',email:'ronit@isoastra.com',email_verified:true};
+assert(guard.profile(ronit));assert(guard.profile({sub:'388644017279107075',email:'support@isoastra.com',email_verified:true}));
+for(const p of [{...ronit,sub:'employee'},{...ronit,sub:''},{...ronit,sub:undefined},{...ronit,email_verified:false},{...ronit,email_verified:'true'},{...ronit,email:'other@isoastra.com'},{...ronit,sub:'toString'}])assert.equal(guard.profile(p),false);
+assert(guard.principal([{subject:ronit.sub}],{email:ronit.email}));
+assert.equal(guard.principal([{subject:'employee'}],{email:ronit.email}),false);
+assert(guard.principal([{subject:ronit.sub}],{email:'388597630173413379@zitadel.invalid'}));
+assert(guard.principal([],{email:'customer@example.com'}));
+process.env.OIDC_ISSUER='https://customer-idp.example.com';assert.equal(guard.profile(ronit),false);assert.equal(guard.principal([{subject:ronit.sub}],{email:ronit.email}),false);
+const denial=guard.denied();assert.equal(denial.name,'APIError');assert.equal(denial.statusCode,403);assert.equal(denial.body.code,'WORKFORCE_IDENTITY_DENIED');
+console.log('PASS exact issuer/sub/verified-email callbacks + stale federated principals');
